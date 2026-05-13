@@ -2,14 +2,15 @@
 import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 
-const genres    = ['FPS', 'RPG', 'Strategy', 'Roguelite', 'Indie']
+const genres    = ['RPG', 'Roguelite', 'Strategy', 'Indie', 'Simulation', 'FPS',]
 const platforms = ['PC', 'Steam']
 const recentGames = [
-  { name: 'Elden Ring',          status: 'Platinumed' },
-  { name: 'Hollow Knight',       status: 'All bosses' },
-  { name: 'Counter-Strike 2',    status: 'Currently playing' },
-  { name: 'Hades II',            status: 'Currently playing' },
-  { name: 'Baldur\'s Gate 3',    status: 'Completed' },
+  { name: 'The Binding of Isaac',   status: 'Real Platinum God' },
+  { name: 'Hollow Knight: Silksong',status: 'Currently playing' },
+  { name: 'Project Zomboid',        status: 'Currently playing' },
+  { name: 'Slay the Spire 2',       status: 'Ascension 10' },
+  { name: 'Factorio',               status: '150+ hours' },
+  { name: 'Faster Than Light',      status: '200+ hours' },
 ]
 </script>
 

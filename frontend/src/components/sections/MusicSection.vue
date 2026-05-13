@@ -2,8 +2,8 @@
 import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 
-const genres = ['Hardcore', 'Techno', 'Acidcore', 'Hard Techno', 'Industrial', 'Rave']
-const tools  = ['FL Studio', 'Ableton', 'Synthesizers', 'VST Plugins', 'Drum machines']
+const genres = ['Hardcore', 'Techno', 'Acidcore', 'Hard Techno',]
+const tools  = ['FL Studio', 'Ableton', 'Akai MPK mini', 'Serum 2', 'Vital', 'DR910', 'Valhalla DSP']
 </script>
 
 <template>
@@ -64,18 +64,18 @@ const tools  = ['FL Studio', 'Ableton', 'Synthesizers', 'VST Plugins', 'Drum mac
         </Card>
 
         <!-- Terminal music player mock -->
-        <Card class="bg-card border-border overflow-hidden">
+        <div class="rounded border border-border bg-card overflow-hidden">
           <div class="flex items-center gap-2 px-4 py-2 bg-muted border-b border-border">
             <span class="w-3 h-3 rounded-full bg-red-500/80"></span>
             <span class="w-3 h-3 rounded-full bg-yellow-500/80"></span>
             <span class="w-3 h-3 rounded-full bg-green-500/80"></span>
             <span class="ml-3 text-xs text-muted-foreground">ncmpcpp — music player</span>
           </div>
-          <CardContent class="p-4 font-mono text-xs space-y-2">
+          <div class="p-4 font-mono text-xs space-y-2">
             <p class="text-muted-foreground">──────────────────────────────</p>
             <p class="text-accent">♪ Now playing:</p>
-            <p class="text-foreground pl-2">Couvbat — Unnamed Hardcore Track</p>
-            <p class="text-muted-foreground pl-2">~175 BPM · Acidcore</p>
+            <p class="text-foreground pl-2">Couvbat — Constellation</p>
+            <p class="text-muted-foreground pl-2">~180 BPM · Acidcore</p>
             <p class="text-muted-foreground">──────────────────────────────</p>
             <p class="text-primary">
               [▶▶▶▶▶▶▶▶▶▶▶░░░░░░░░░░] 58%
@@ -91,8 +91,8 @@ const tools  = ['FL Studio', 'Ableton', 'Synthesizers', 'VST Plugins', 'Drum mac
                 class="text-accent hover:text-accent/80 transition-colors"
               >soundcloud.com/couvbat</a>
             </p>
-          </CardContent>
-        </Card>
+          </div>
+        </div>
       </div>
     </div>
   </section>
