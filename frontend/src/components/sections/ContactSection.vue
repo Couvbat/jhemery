@@ -19,8 +19,9 @@ async function submit() {
   if (!form.value.name || !form.value.email || !form.value.message) return
   status.value = 'sending'
   errorMsg.value = ''
+  const apiUrl = import.meta.env.VITE_API_URL ?? 'http://localhost:3000'
   try {
-    const res = await fetch('http://localhost:3000/contact', {
+    const res = await fetch(`${apiUrl}/contact`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(form.value),
