@@ -11,7 +11,7 @@ const errorMsg = ref('')
 
 const socials = [
   { label: 'GitHub',   handle: '@Couvbat',          href: 'https://github.com/Couvbat' },
-  { label: 'LinkedIn', handle: 'Jules Hémery',       href: 'https://www.linkedin.com/in/jules-hemery' },
+  { label: 'LinkedIn', handle: 'Jules Hémery',       href: 'https://www.linkedin.com/in/jules-h%C3%A9mery-338134195/' },
   { label: 'Email',    handle: 'contact@jhemery.fr', href: 'mailto:contact@jhemery.fr' },
 ]
 
