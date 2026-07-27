@@ -151,7 +151,7 @@ const osColor: Record<string, string> = {
         <Card
           v-for="m in pcs"
           :key="m.name"
-          class="bg-card border-border overflow-hidden border-glow"
+          class="bg-card border-border overflow-hidden border-glow gap-0 py-0"
         >
           <div class="flex items-center gap-2 px-4 py-2 bg-muted border-b border-border">
             <span class="w-3 h-3 rounded-full bg-red-500/80"></span>
@@ -181,7 +181,7 @@ const osColor: Record<string, string> = {
         <Card
           v-for="m in nas"
           :key="m.name"
-          class="bg-card border-border overflow-hidden"
+          class="bg-card border-border overflow-hidden gap-0 py-0"
           style="box-shadow: 0 0 8px rgba(191,0,255,0.15);"
         >
           <div class="flex items-center gap-2 px-4 py-2 bg-muted border-b border-border">
@@ -209,7 +209,7 @@ const osColor: Record<string, string> = {
 
       <!-- Peripherals -->
       <div v-if="activeTab === 'peripherals'">
-        <Card class="bg-card border-border overflow-hidden border-glow-cyan">
+        <Card class="bg-card border-border overflow-hidden border-glow-cyan gap-0 py-0">
           <div class="flex items-center gap-2 px-4 py-2 bg-muted border-b border-border">
             <span class="w-3 h-3 rounded-full bg-red-500/80"></span>
             <span class="w-3 h-3 rounded-full bg-yellow-500/80"></span>
