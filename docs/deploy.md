@@ -7,7 +7,7 @@ This repo auto-deploys to o2switch on every push to `master`:
 
 Workflow files: [.github/workflows/frontend-build.yml](../.github/workflows/frontend-build.yml), [frontend-deploy.yml](../.github/workflows/frontend-deploy.yml), [frontend-pr-check.yml](../.github/workflows/frontend-pr-check.yml), [backend-build.yml](../.github/workflows/backend-build.yml), [backend-deploy.yml](../.github/workflows/backend-deploy.yml), [backend-pr-check.yml](../.github/workflows/backend-pr-check.yml).
 
-o2switch requires the connecting IP to be whitelisted before SSH will accept a connection, so each deploy run whitelists the GitHub Actions runner's IP via the cPanel API, rsyncs over SSH, then leaves the whitelist in place until the next run resets it.
+o2switch requires the connecting IP to be whitelisted before SSH will accept a connection, so each deploy run adds the GitHub Actions runner's IP to the whitelist via the cPanel API (`SshWhitelist/add`), rsyncs over SSH, then removes only that one entry afterwards (`SshWhitelist/remove`, `if: always()` so it runs even on failure). It only ever touches the entry it just added — it never calls `remove_all`, so any IPs you've whitelisted manually (e.g. your own machine) are left alone. Note: o2switch caps the whitelist at 5 entries total, per their [SSH whitelist FAQ](https://faq.o2switch.fr/cpanel/outils/exception-parefeu/).
 
 ## Part A — cPanel setup
 
