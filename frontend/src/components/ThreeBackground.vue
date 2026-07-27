@@ -47,6 +47,12 @@ function createShapes(targetScene: THREE.Scene) {
 
     targetScene.add(mesh)
     shapes.push(mesh)
+
+    mesh.userData.rotationSpeed = {
+      x: (Math.random() - 0.5) * 0.006,
+      y: (Math.random() - 0.5) * 0.006,
+      z: (Math.random() - 0.5) * 0.004,
+    }
   }
 }
 
@@ -55,6 +61,21 @@ function handleResize() {
   camera.aspect = window.innerWidth / window.innerHeight
   camera.updateProjectionMatrix()
   renderer.setSize(window.innerWidth, window.innerHeight)
+}
+
+function animate() {
+  animationFrameId = requestAnimationFrame(animate)
+
+  shapes.forEach((mesh) => {
+    const speed = mesh.userData.rotationSpeed as { x: number; y: number; z: number }
+    mesh.rotation.x += speed.x
+    mesh.rotation.y += speed.y
+    mesh.rotation.z += speed.z
+  })
+
+  if (renderer && scene && camera) {
+    renderer.render(scene, camera)
+  }
 }
 
 onMounted(() => {
@@ -69,12 +90,16 @@ onMounted(() => {
   renderer.setSize(window.innerWidth, window.innerHeight)
 
   createShapes(scene)
-  renderer.render(scene, camera)
+  animate()
 
   window.addEventListener('resize', handleResize)
 })
 
 onUnmounted(() => {
+  if (animationFrameId !== null) {
+    cancelAnimationFrame(animationFrameId)
+    animationFrameId = null
+  }
   window.removeEventListener('resize', handleResize)
 
   shapes.forEach((mesh) => {
