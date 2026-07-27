@@ -32,15 +32,10 @@ jobs:
         id: ip
         run: echo "ipv4=$(curl -sf https://api.ipify.org || curl -sf https://ipv4.icanhazip.com)" >> "$GITHUB_OUTPUT"
 
-      - name: Removing all whitelisted IP
-        run: |
-          curl -sm 45 -H"Authorization: cpanel ${{ secrets.CPANEL_USERNAME }}:${{ secrets.CPANEL_API_TOKEN }}" \
-          "https://${{ secrets.CPANEL_SERVER }}:2083/execute/SshWhitelist/remove_all"
-
       - name: Whitelisting the runner IP
         run: |
           curl -sm 45 -H"Authorization: cpanel ${{ secrets.CPANEL_USERNAME }}:${{ secrets.CPANEL_API_TOKEN }}" \
-          "https://${{ secrets.CPANEL_SERVER }}:2083/execute/SshWhitelist/add?address=${{ steps.ip.outputs.ipv4 }}&port=22"
+          "https://${{ secrets.CPANEL_SERVER }}:2083/execute/SshWhitelist/add?address=${{ steps.ip.outputs.ipv4 }}&port=22&direction=in"
 
       - name: Making sure the IP is whitelisted
         run: |
@@ -59,6 +54,12 @@ jobs:
           rsync --timeout=60 -e "ssh -o StrictHostKeyChecking=no -i ~/.ssh/id_rsa" \
           -av --delete build/ \
           "${{ secrets.CPANEL_USERNAME }}@${{ secrets.CPANEL_SERVER }}:${{ secrets.FRONTEND_REMOTE_PATH }}"
+
+      - name: Un-whitelisting the runner IP
+        if: always()
+        run: |
+          curl -sm 45 -H"Authorization: cpanel ${{ secrets.CPANEL_USERNAME }}:${{ secrets.CPANEL_API_TOKEN }}" \
+          "https://${{ secrets.CPANEL_SERVER }}:2083/execute/SshWhitelist/remove?address=${{ steps.ip.outputs.ipv4 }}&port=22&direction=in"
 
       - name: Cleaning SSH keys
         if: always()
