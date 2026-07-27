@@ -70,7 +70,7 @@ const recentGames = [
         </Card>
 
         <!-- Game log terminal -->
-        <Card class="bg-card border-border overflow-hidden">
+        <Card class="bg-card border-border overflow-hidden gap-0 py-0">
           <div class="flex items-center gap-2 px-4 py-2 bg-muted border-b border-border">
             <span class="w-3 h-3 rounded-full bg-red-500/80"></span>
             <span class="w-3 h-3 rounded-full bg-yellow-500/80"></span>
