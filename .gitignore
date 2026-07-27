@@ -3,4 +3,8 @@ dist
 
 # secrets
 backend/.env
-frontend/.env.local
+frontend/.env
+
+#builds
+backend/dist
+frontend/dist

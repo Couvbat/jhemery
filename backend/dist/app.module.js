@@ -10,6 +10,7 @@ exports.AppModule = void 0;
 const common_1 = require("@nestjs/common");
 const config_1 = require("@nestjs/config");
 const contact_module_1 = require("./contact/contact.module");
+const steam_module_1 = require("./steam/steam.module");
 let AppModule = class AppModule {
 };
 exports.AppModule = AppModule;
@@ -18,6 +19,7 @@ exports.AppModule = AppModule = __decorate([
         imports: [
             config_1.ConfigModule.forRoot({ isGlobal: true }),
             contact_module_1.ContactModule,
+            steam_module_1.SteamModule,
         ],
     })
 ], AppModule);
