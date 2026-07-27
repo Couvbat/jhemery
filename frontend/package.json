@@ -20,12 +20,14 @@
     "reka-ui": "^2.9.7",
     "tailwind-merge": "^3.6.0",
     "tailwindcss": "^4.3.0",
+    "three": "^0.185.1",
     "vue": "^3.5.32",
     "vue-router": "^5.0.4"
   },
   "devDependencies": {
     "@tsconfig/node24": "^24.0.4",
     "@types/node": "^24.12.2",
+    "@types/three": "^0.185.1",
     "@vitejs/plugin-vue": "^6.0.6",
     "@vue/tsconfig": "^0.9.1",
     "npm-run-all2": "^8.0.4",
