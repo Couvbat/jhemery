@@ -4,6 +4,12 @@ import { Badge } from '@/components/ui/badge'
 
 const genres = ['Hardcore', 'Techno', 'Acidcore', 'Hard Techno',]
 const tools  = ['FL Studio', 'Ableton', 'Akai MPK mini', 'Serum 2', 'Vital', 'DR910', 'Valhalla DSP']
+
+const PLAYLIST_URL = 'https://soundcloud.com/couvbat/sets/mon-bruit'
+const SOUNDCLOUD_EMBED_SRC =
+  `https://w.soundcloud.com/player/?url=${encodeURIComponent(PLAYLIST_URL)}` +
+  '&color=%2300ff41&auto_play=false&hide_related=true&show_comments=false' +
+  '&show_reposts=false&show_teaser=false&visual=false'
 </script>
 
 <template>
@@ -71,18 +77,16 @@ const tools  = ['FL Studio', 'Ableton', 'Akai MPK mini', 'Serum 2', 'Vital', 'DR
             <span class="w-3 h-3 rounded-full bg-green-500/80"></span>
             <span class="ml-3 text-xs text-muted-foreground">ncmpcpp — music player</span>
           </div>
-          <div class="p-4 font-mono text-xs space-y-2">
-            <p class="text-muted-foreground">──────────────────────────────</p>
-            <p class="text-accent">♪ Now playing:</p>
-            <p class="text-foreground pl-2">Couvbat — Constellation</p>
-            <p class="text-muted-foreground pl-2">~180 BPM · Acidcore</p>
-            <p class="text-muted-foreground">──────────────────────────────</p>
-            <p class="text-primary">
-              [▶▶▶▶▶▶▶▶▶▶▶░░░░░░░░░░] 58%
-            </p>
-            <p class="text-muted-foreground">──────────────────────────────</p>
-            <p class="text-muted-foreground">Volume: 80%  Repeat: off  Shuffle: on</p>
-            <p class="text-muted-foreground mt-4 pt-2 border-t border-border">
+          <div class="p-4 space-y-2">
+            <iframe
+              :src="SOUNDCLOUD_EMBED_SRC"
+              width="100%"
+              height="166"
+              frameborder="0"
+              allow="autoplay"
+              class="rounded"
+            ></iframe>
+            <p class="text-muted-foreground font-mono text-xs pt-2 border-t border-border">
               Listen on SoundCloud:
               <a
                 href="https://soundcloud.com/couvbat"
