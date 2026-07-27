@@ -12,6 +12,15 @@ let animationFrameId: number | null = null
 const shapeCount = 10
 const shapes: THREE.Mesh[] = []
 
+let mouseX = 0
+let mouseY = 0
+let cameraBaseZ = 10
+
+function handleMouseMove(event: MouseEvent) {
+  mouseX = (event.clientX / window.innerWidth) * 2 - 1
+  mouseY = (event.clientY / window.innerHeight) * 2 - 1
+}
+
 function readNeonColor(varName: string, fallback: string): THREE.Color {
   const value = getComputedStyle(document.documentElement).getPropertyValue(varName).trim()
   return new THREE.Color(value || fallback)
@@ -73,6 +82,15 @@ function animate() {
     mesh.rotation.z += speed.z
   })
 
+  if (camera) {
+    const targetX = mouseX * 0.6
+    const targetY = -mouseY * 0.4
+    camera.position.x += (targetX - camera.position.x) * 0.03
+    camera.position.y += (targetY - camera.position.y) * 0.03
+    camera.position.z = cameraBaseZ
+    camera.lookAt(0, 0, 0)
+  }
+
   if (renderer && scene && camera) {
     renderer.render(scene, camera)
   }
@@ -83,16 +101,23 @@ onMounted(() => {
 
   scene = new THREE.Scene()
   camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 100)
-  camera.position.z = 10
+  camera.position.z = cameraBaseZ
 
   renderer = new THREE.WebGLRenderer({ canvas: canvasRef.value, alpha: true, antialias: true })
   renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2))
   renderer.setSize(window.innerWidth, window.innerHeight)
 
   createShapes(scene)
-  animate()
+
+  const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches
+  if (prefersReducedMotion) {
+    renderer.render(scene, camera)
+  } else {
+    animate()
+  }
 
   window.addEventListener('resize', handleResize)
+  window.addEventListener('mousemove', handleMouseMove)
 })
 
 onUnmounted(() => {
@@ -101,6 +126,7 @@ onUnmounted(() => {
     animationFrameId = null
   }
   window.removeEventListener('resize', handleResize)
+  window.removeEventListener('mousemove', handleMouseMove)
 
   shapes.forEach((mesh) => {
     mesh.geometry.dispose()
