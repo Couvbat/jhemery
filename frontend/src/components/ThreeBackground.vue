@@ -9,8 +9,13 @@ let scene: THREE.Scene | null = null
 let camera: THREE.PerspectiveCamera | null = null
 let animationFrameId: number | null = null
 
+interface AnimatedShape {
+  mesh: THREE.Mesh
+  speed: { x: number; y: number; z: number }
+}
+
 const shapeCount = 10
-const shapes: THREE.Mesh[] = []
+const shapes: AnimatedShape[] = []
 
 let mouseX = 0
 let mouseY = 0
@@ -26,7 +31,7 @@ function readNeonColor(varName: string, fallback: string): THREE.Color {
   return new THREE.Color(value || fallback)
 }
 
-function createShapes(targetScene: THREE.Scene) {
+function createShapes(targetScene: THREE.Scene, aspect: number) {
   const greenColor = readNeonColor('--neon-green', '#00ff41')
   const cyanColor = readNeonColor('--neon-cyan', '#00ffff')
   const geometries = [
@@ -36,9 +41,19 @@ function createShapes(targetScene: THREE.Scene) {
     () => new THREE.OctahedronGeometry(1, 0),
   ]
 
+  // Horizontal spread derived from the camera frustum (fov 60, distance cameraBaseZ) so
+  // narrow/portrait viewports get a proportionally narrower spread instead of a fixed ±10.
+  const verticalFovRad = (60 * Math.PI) / 180
+  const horizontalSpread = 2 * Math.tan(verticalFovRad / 2) * cameraBaseZ * aspect
+
+  const cyanIndices = new Set<number>()
+  while (cyanIndices.size < 2) {
+    cyanIndices.add(Math.floor(Math.random() * shapeCount))
+  }
+
   for (let i = 0; i < shapeCount; i++) {
-    const geometry = geometries[i % geometries.length]!()
-    const isCyan = i % 4 === 3
+    const geometry = geometries[Math.floor(Math.random() * geometries.length)]!()
+    const isCyan = cyanIndices.has(i)
     const material = new THREE.MeshBasicMaterial({
       color: isCyan ? cyanColor : greenColor,
       wireframe: true,
@@ -48,20 +63,21 @@ function createShapes(targetScene: THREE.Scene) {
     const mesh = new THREE.Mesh(geometry, material)
 
     mesh.position.set(
-      (Math.random() - 0.5) * 20,
+      (Math.random() - 0.5) * horizontalSpread,
       (Math.random() - 0.5) * 14,
       (Math.random() - 0.5) * 12 - 4,
     )
     mesh.rotation.set(Math.random() * Math.PI, Math.random() * Math.PI, Math.random() * Math.PI)
 
     targetScene.add(mesh)
-    shapes.push(mesh)
-
-    mesh.userData.rotationSpeed = {
-      x: (Math.random() - 0.5) * 0.006,
-      y: (Math.random() - 0.5) * 0.006,
-      z: (Math.random() - 0.5) * 0.004,
-    }
+    shapes.push({
+      mesh,
+      speed: {
+        x: (Math.random() - 0.5) * 0.006,
+        y: (Math.random() - 0.5) * 0.006,
+        z: (Math.random() - 0.5) * 0.004,
+      },
+    })
   }
 }
 
@@ -79,8 +95,7 @@ function handleResize() {
 function animate() {
   animationFrameId = requestAnimationFrame(animate)
 
-  shapes.forEach((mesh) => {
-    const speed = mesh.userData.rotationSpeed as { x: number; y: number; z: number }
+  shapes.forEach(({ mesh, speed }) => {
     mesh.rotation.x += speed.x
     mesh.rotation.y += speed.y
     mesh.rotation.z += speed.z
@@ -103,15 +118,22 @@ function animate() {
 onMounted(() => {
   if (!canvasRef.value) return
 
-  scene = new THREE.Scene()
-  camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 100)
-  camera.position.z = cameraBaseZ
+  try {
+    scene = new THREE.Scene()
+    camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 100)
+    camera.position.z = cameraBaseZ
 
-  renderer = new THREE.WebGLRenderer({ canvas: canvasRef.value, alpha: true, antialias: true })
-  renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2))
-  renderer.setSize(window.innerWidth, window.innerHeight)
+    renderer = new THREE.WebGLRenderer({ canvas: canvasRef.value, alpha: true, antialias: true })
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2))
+    renderer.setSize(window.innerWidth, window.innerHeight)
 
-  createShapes(scene)
+    createShapes(scene, camera.aspect)
+  } catch (error) {
+    console.warn('ThreeBackground: WebGL unavailable, skipping animated background.', error)
+    return
+  }
+
+  if (!renderer || !scene || !camera) return
 
   const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches
   if (prefersReducedMotion) {
@@ -131,15 +153,14 @@ onUnmounted(() => {
   }
   window.removeEventListener('resize', handleResize)
   window.removeEventListener('mousemove', handleMouseMove)
-  mouseX = 0
-  mouseY = 0
 
-  shapes.forEach((mesh) => {
+  shapes.forEach(({ mesh }) => {
     mesh.geometry.dispose()
     ;(mesh.material as THREE.Material).dispose()
   })
   shapes.length = 0
 
+  renderer?.forceContextLoss()
   renderer?.dispose()
   renderer = null
   scene = null
@@ -151,5 +172,6 @@ onUnmounted(() => {
   <canvas
     ref="canvasRef"
     class="fixed inset-0 -z-10 pointer-events-none"
+    aria-hidden="true"
   ></canvas>
 </template>

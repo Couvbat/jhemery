@@ -1,7 +1,9 @@
 <script setup lang="ts">
+import { defineAsyncComponent } from 'vue'
 import { RouterView } from 'vue-router'
 import NavBar from '@/components/NavBar.vue'
-import ThreeBackground from '@/components/ThreeBackground.vue'
+
+const ThreeBackground = defineAsyncComponent(() => import('@/components/ThreeBackground.vue'))
 </script>
 
 <template>
