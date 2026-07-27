@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { ref, onMounted } from 'vue'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -39,6 +40,45 @@ const statusColor: Record<Project['status'], string> = {
   wip:        'text-yellow-400 border-yellow-400/50',
   archived:   'text-muted-foreground border-border',
 }
+
+interface GithubCommit {
+  repo: string
+  sha: string
+  message: string
+  url: string
+  date: string
+}
+
+const githubCommits = ref<GithubCommit[] | null>(null)
+
+function shortRepo(repo: string): string {
+  return repo.split('/')[1] ?? repo
+}
+
+function relativeTime(iso: string): string {
+  const diffMs = Date.now() - new Date(iso).getTime()
+  const minutes = Math.floor(diffMs / 60000)
+  if (minutes < 1) return 'just now'
+  if (minutes < 60) return `${minutes}m ago`
+  const hours = Math.floor(minutes / 60)
+  if (hours < 24) return `${hours}h ago`
+  const days = Math.floor(hours / 24)
+  return `${days}d ago`
+}
+
+onMounted(async () => {
+  const apiUrl = import.meta.env.VITE_API_URL ?? 'http://localhost:3000'
+  try {
+    const res = await fetch(`${apiUrl}/github/activity`)
+    if (!res.ok) throw new Error('GitHub activity unavailable')
+    const data = await res.json()
+    if (data.configured && data.commits?.length) {
+      githubCommits.value = data.commits
+    }
+  } catch {
+    // silently hide the card
+  }
+})
 </script>
 
 <template>
@@ -113,6 +153,34 @@ const statusColor: Record<Project['status'], string> = {
             </Button>
           </CardFooter>
         </Card>
+      </div>
+
+      <!-- Recent GitHub activity -->
+      <div
+        v-if="githubCommits && githubCommits.length"
+        class="mt-4 rounded border border-border bg-card overflow-hidden"
+      >
+        <div class="flex items-center gap-2 px-4 py-2 bg-muted border-b border-border">
+          <span class="w-3 h-3 rounded-full bg-red-500/80"></span>
+          <span class="w-3 h-3 rounded-full bg-yellow-500/80"></span>
+          <span class="w-3 h-3 rounded-full bg-green-500/80"></span>
+          <span class="ml-3 text-xs text-muted-foreground">git log --oneline</span>
+        </div>
+        <div class="p-4 font-mono text-xs space-y-1.5">
+          <a
+            v-for="c in githubCommits"
+            :key="c.sha"
+            :href="c.url"
+            target="_blank"
+            rel="noopener noreferrer"
+            class="flex items-center gap-2 hover:text-primary transition-colors"
+          >
+            <span class="text-primary shrink-0">{{ c.sha }}</span>
+            <span class="text-foreground flex-1 truncate">{{ c.message }}</span>
+            <span class="text-secondary shrink-0">{{ shortRepo(c.repo) }}</span>
+            <span class="text-muted-foreground shrink-0 hidden sm:inline">{{ relativeTime(c.date) }}</span>
+          </a>
+        </div>
       </div>
     </div>
   </section>
