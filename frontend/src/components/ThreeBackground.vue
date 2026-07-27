@@ -14,7 +14,7 @@ const shapes: THREE.Mesh[] = []
 
 let mouseX = 0
 let mouseY = 0
-let cameraBaseZ = 10
+const cameraBaseZ = 10
 
 function handleMouseMove(event: MouseEvent) {
   mouseX = (event.clientX / window.innerWidth) * 2 - 1
@@ -70,6 +70,10 @@ function handleResize() {
   camera.aspect = window.innerWidth / window.innerHeight
   camera.updateProjectionMatrix()
   renderer.setSize(window.innerWidth, window.innerHeight)
+
+  if (animationFrameId === null && scene) {
+    renderer.render(scene, camera)
+  }
 }
 
 function animate() {
@@ -114,10 +118,10 @@ onMounted(() => {
     renderer.render(scene, camera)
   } else {
     animate()
+    window.addEventListener('mousemove', handleMouseMove)
   }
 
   window.addEventListener('resize', handleResize)
-  window.addEventListener('mousemove', handleMouseMove)
 })
 
 onUnmounted(() => {
@@ -127,6 +131,8 @@ onUnmounted(() => {
   }
   window.removeEventListener('resize', handleResize)
   window.removeEventListener('mousemove', handleMouseMove)
+  mouseX = 0
+  mouseY = 0
 
   shapes.forEach((mesh) => {
     mesh.geometry.dispose()
