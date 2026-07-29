@@ -44,7 +44,7 @@ Then:
 
 ### 4. Set up the frontend domain
 
-cPanel → **Domaines** → confirm the domain's document root. That path is the `FRONTEND_REMOTE_PATH` secret (e.g. `/home/<user>/jhemery.fr` for an addon domain, or `/home/<user>/public_html` if it's the account's main domain).
+cPanel → **Domaines** → confirm the domain's document root. That path is the `FRONTEND_REMOTE_PATH` secret (e.g. `/home/<user>/jhemery.xyz` for an addon domain, or `/home/<user>/public_html` if it's the account's main domain).
 
 ### 5. Set up the backend as a Node.js App
 
@@ -52,14 +52,14 @@ cPanel → **Logiciel** → **Setup Node.js App** → **Create Application**:
 
 - Node version: 24 (or closest available)
 - Application mode: Production
-- Application root: e.g. `api.jhemery.fr` → `BACKEND_REMOTE_PATH` = `/home/<user>/api.jhemery.fr`
-- Application URL: `api.jhemery.fr`
+- Application root: e.g. `api.jhemery.xyz` → `BACKEND_REMOTE_PATH` = `/home/<user>/api.jhemery.xyz`
+- Application URL: `api.jhemery.xyz`
 - Application startup file: `main.js`
 
 After creation, cPanel shows a command like:
 
 ```
-source /home/<user>/nodevenv/api.jhemery.fr/24/bin/activate && cd /home/<user>/api.jhemery.fr
+source /home/<user>/nodevenv/api.jhemery.xyz/24/bin/activate && cd /home/<user>/api.jhemery.xyz
 ```
 
 Copy the `source .../bin/activate` part — that exact path is the `BACKEND_APP_ENTRY` secret. The deploy workflow uses it to run `npm ci` with the right Node version and to restart the app (via `tmp/restart.txt`, the standard Passenger reload convention).
@@ -69,7 +69,7 @@ Copy the `source .../bin/activate` part — that exact path is the `BACKEND_APP_
 `backend/.env` is gitignored and excluded from every rsync deploy on purpose, so it must exist on the server independently:
 
 - cPanel **File Manager** (or SSH, once your key is authorized) → go to `BACKEND_REMOTE_PATH` → create `.env`
-- Fill it in based on [backend/.env.example](../backend/.env.example): real `SMTP_HOST`, `SMTP_USER`, `SMTP_PASS`, `FRONTEND_URL=https://jhemery.fr`, etc.
+- Fill it in based on [backend/.env.example](../backend/.env.example): real `SMTP_HOST`, `SMTP_USER`, `SMTP_PASS`, `FRONTEND_URL=https://jhemery.xyz`, etc.
 
 Because it's excluded from rsync, deploys never overwrite this file — edit it directly on the server when secrets change.
 

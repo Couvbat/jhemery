@@ -1,106 +1,53 @@
 <script setup lang="ts">
-import { ref, onMounted, computed } from 'vue'
+import { computed } from 'vue'
 import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
+import SectionHeader from '@/components/SectionHeader.vue'
+import { gaming } from '@/content'
+import { useLocale } from '@/i18n'
+import { useSteam, formatPlaytime } from '@/composables/useSteam'
 
-const genres    = ['RPG', 'Roguelite', 'Strategy', 'Indie', 'Simulation', 'FPS',]
-const platforms = ['PC', 'Steam']
-
-const fallbackGames = [
-  { name: 'The Binding of Isaac',   status: 'Real Platinum God' },
-  { name: 'Hollow Knight: Silksong',status: 'Currently playing' },
-  { name: 'Project Zomboid',        status: 'Currently playing' },
-  { name: 'Slay the Spire 2',       status: 'Ascension 10' },
-  { name: 'Factorio',               status: '150+ hours' },
-  { name: 'Faster Than Light',      status: '200+ hours' },
-]
-
-interface SteamRecentGame {
-  appId: number
-  name: string
-  iconUrl: string
-  playtime2Weeks: number
-  playtimeForever: number
-}
-
-interface SteamProfile {
-  name: string
-  avatar: string
-  profileUrl: string
-  status: string
-  inGame?: string
-}
-
-const steamGames = ref<SteamRecentGame[] | null>(null)
-const steamProfile = ref<SteamProfile | null>(null)
-const steamLoaded = ref(false)
+const { t, m } = useLocale()
+const { profile: steamProfile, games: steamGames } = useSteam()
 
 const displayGames = computed(() => {
-  if (steamGames.value && steamGames.value.length) {
+  if (steamGames.value?.length) {
     return steamGames.value.map((g) => ({
       name: g.name,
-      status: g.name === steamProfile.value?.inGame
-        ? 'Currently playing'
-        : formatPlaytime(g.playtime2Weeks || g.playtimeForever),
+      status:
+        g.name === steamProfile.value?.inGame
+          ? t(m.gaming.inGame)
+          : formatPlaytime(g.playtime2Weeks || g.playtimeForever),
+      live: g.name === steamProfile.value?.inGame,
     }))
   }
-  return fallbackGames
-})
-
-function formatPlaytime(minutes: number): string {
-  if (minutes < 60) return `${minutes}m`
-  const hours = minutes / 60
-  return `${Number.isInteger(hours) ? hours : hours.toFixed(1)}h`
-}
-
-onMounted(async () => {
-  const apiUrl = import.meta.env.VITE_API_URL ?? 'http://localhost:3000'
-  try {
-    const res = await fetch(`${apiUrl}/steam/activity`)
-    if (!res.ok) throw new Error('Steam activity unavailable')
-    const data = await res.json()
-    if (data.configured) {
-      steamGames.value = data.recentGames ?? []
-      steamProfile.value = data.profile ?? null
-    }
-  } catch {
-    // silently fall back to static log
-  } finally {
-    steamLoaded.value = true
-  }
+  return gaming.fallbackGames.map((g) => ({
+    name: g.name,
+    status: t(g.status),
+    live: g.status.en === 'Currently playing',
+  }))
 })
 </script>
 
 <template>
   <section id="gaming" class="py-20 pt-24">
     <div class="max-w-5xl mx-auto px-4">
-      <div class="mb-10">
-        <p class="text-muted-foreground text-sm mb-1">
-          <span class="text-primary">couvbat</span><span class="text-muted-foreground">:~$</span>
-          <span class="ml-2 text-foreground">steam --launch gaming.sh</span>
-        </p>
-        <h2 class="text-2xl md:text-3xl font-bold glow-purple text-secondary">
-          <span class="text-secondary">#</span> Gaming
-        </h2>
-      </div>
+      <SectionHeader section="gaming" tone="purple" />
 
       <div class="grid gap-4 md:grid-cols-2">
         <!-- About gaming -->
-        <Card class="bg-card border-border" style="box-shadow: 0 0 8px rgba(191,0,255,0.2);">
+        <Card class="bg-card border-border" style="box-shadow: 0 0 8px rgba(191, 0, 255, 0.2)">
           <CardContent class="p-6 space-y-4">
             <div class="text-4xl">🎮</div>
             <p class="text-sm text-muted-foreground leading-relaxed">
-              Gaming is where I unwind, compete, and explore. I love games that challenge
-              both my <span class="text-secondary">reflexes</span> and my
-              <span class="text-secondary">mind</span> — whether it's optimising a build,
-              speedrunning a level, or discovering hidden lore.
+              {{ t(gaming.blurb) }}
             </p>
 
             <div>
-              <p class="text-xs text-muted-foreground mb-2">Favourite genres</p>
+              <p class="text-xs text-muted-foreground mb-2">{{ t(m.gaming.favouriteGenres) }}</p>
               <div class="flex flex-wrap gap-1">
                 <Badge
-                  v-for="g in genres"
+                  v-for="g in gaming.genres"
                   :key="g"
                   variant="outline"
                   class="text-xs border-secondary/50 text-secondary"
@@ -111,10 +58,10 @@ onMounted(async () => {
             </div>
 
             <div>
-              <p class="text-xs text-muted-foreground mb-2">Platforms</p>
+              <p class="text-xs text-muted-foreground mb-2">{{ t(m.gaming.platforms) }}</p>
               <div class="flex flex-wrap gap-1">
                 <Badge
-                  v-for="p in platforms"
+                  v-for="p in gaming.platforms"
                   :key="p"
                   variant="outline"
                   class="text-xs border-muted text-muted-foreground"
@@ -136,29 +83,36 @@ onMounted(async () => {
           </div>
           <CardContent class="p-4 font-mono text-xs space-y-1">
             <p class="text-muted-foreground mb-2">
-              {{ steamProfile ? 'Live from Steam:' : 'Recent activity log:' }}
+              {{ steamProfile ? t(m.gaming.liveFromSteam) : t(m.gaming.recentLog) }}
             </p>
             <p v-if="steamProfile" class="mb-2 flex items-center gap-1.5">
-              <span :class="[
-                'w-1.5 h-1.5 rounded-full shrink-0',
-                steamProfile.status === 'in-game' || steamProfile.status === 'online'
-                  ? 'bg-primary'
-                  : 'bg-muted-foreground'
-              ]"></span>
+              <span
+                :class="[
+                  'w-1.5 h-1.5 rounded-full shrink-0',
+                  steamProfile.status === 'in-game' || steamProfile.status === 'online'
+                    ? 'bg-primary'
+                    : 'bg-muted-foreground',
+                ]"
+              ></span>
               <span class="text-foreground">{{ steamProfile.name }}</span>
               <span class="text-muted-foreground">
-                — {{ steamProfile.inGame ? `in-game: ${steamProfile.inGame}` : steamProfile.status }}
+                —
+                {{
+                  steamProfile.inGame
+                    ? `${t(m.gaming.inGame)}: ${steamProfile.inGame}`
+                    : steamProfile.status
+                }}
               </span>
             </p>
             <div v-for="game in displayGames" :key="game.name" class="flex items-center gap-2">
               <span class="text-secondary shrink-0">▸</span>
               <span class="text-foreground flex-1">{{ game.name }}</span>
-              <span :class="[
-                'text-xs px-1.5 py-0.5 rounded',
-                game.status === 'Currently playing'
-                  ? 'bg-primary/20 text-primary'
-                  : 'text-muted-foreground'
-              ]">
+              <span
+                :class="[
+                  'text-xs px-1.5 py-0.5 rounded',
+                  game.live ? 'bg-primary/20 text-primary' : 'text-muted-foreground',
+                ]"
+              >
                 {{ game.status }}
               </span>
             </div>
@@ -169,7 +123,7 @@ onMounted(async () => {
               rel="noopener noreferrer"
               class="inline-block mt-2 text-secondary hover:underline"
             >
-              view full steam profile ↗
+              {{ t(m.gaming.viewProfile) }}
             </a>
           </CardContent>
         </Card>

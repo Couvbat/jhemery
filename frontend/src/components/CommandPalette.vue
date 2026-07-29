@@ -1,0 +1,180 @@
+<script setup lang="ts">
+import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
+import { sections } from '@/content'
+import { useLocale } from '@/i18n'
+import { paletteCommands } from '@/terminal/registry'
+import { openTerminal } from '@/composables/useTerminal'
+import { scrollToSection } from '@/composables/useActiveSection'
+
+const { t, m } = useLocale()
+
+const open = ref(false)
+const query = ref('')
+const cursor = ref(0)
+const inputEl = ref<HTMLInputElement | null>(null)
+let previouslyFocused: HTMLElement | null = null
+
+interface Entry {
+  id: string
+  label: string
+  hint: string
+  run: () => void
+}
+
+/**
+ * Sections come first — jumping around the page is what most visitors actually want
+ * from Ctrl+K. Registry commands follow, so the palette never needs its own list.
+ */
+const entries = computed<Entry[]>(() => [
+  ...sections.map((s) => ({
+    id: `go:${s.id}`,
+    label: `cd ${t(s.label)}`,
+    hint: t(s.heading),
+    run: () => scrollToSection(s.id),
+  })),
+  ...paletteCommands().map((c) => ({
+    id: `cmd:${c.name}`,
+    label: c.name,
+    hint: t(c.description),
+    run: () => openTerminal(c.name),
+  })),
+])
+
+const filtered = computed(() => {
+  const needle = query.value.trim().toLowerCase()
+  if (!needle) return entries.value
+  return entries.value.filter(
+    (e) => e.label.toLowerCase().includes(needle) || e.hint.toLowerCase().includes(needle),
+  )
+})
+
+watch(filtered, () => {
+  cursor.value = 0
+})
+
+const activeDescendant = computed(() => {
+  const entry = filtered.value[cursor.value]
+  return entry ? `palette-${entry.id}` : undefined
+})
+
+async function show() {
+  previouslyFocused = document.activeElement as HTMLElement | null
+  open.value = true
+  query.value = ''
+  cursor.value = 0
+  await nextTick()
+  inputEl.value?.focus()
+}
+
+function hide() {
+  open.value = false
+  previouslyFocused?.focus()
+  previouslyFocused = null
+}
+
+function choose(entry: Entry | undefined) {
+  if (!entry) return
+  hide()
+  entry.run()
+}
+
+function onGlobalKeydown(event: KeyboardEvent) {
+  if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'k') {
+    event.preventDefault()
+    if (open.value) hide()
+    else void show()
+  }
+}
+
+function onKeydown(event: KeyboardEvent) {
+  if (event.key === 'Escape') {
+    event.preventDefault()
+    hide()
+  } else if (event.key === 'ArrowDown') {
+    event.preventDefault()
+    cursor.value = (cursor.value + 1) % Math.max(filtered.value.length, 1)
+  } else if (event.key === 'ArrowUp') {
+    event.preventDefault()
+    cursor.value =
+      (cursor.value - 1 + Math.max(filtered.value.length, 1)) % Math.max(filtered.value.length, 1)
+  } else if (event.key === 'Enter') {
+    event.preventDefault()
+    choose(filtered.value[cursor.value])
+  }
+}
+
+onMounted(() => window.addEventListener('keydown', onGlobalKeydown))
+onUnmounted(() => window.removeEventListener('keydown', onGlobalKeydown))
+</script>
+
+<template>
+  <Transition
+    enter-active-class="transition duration-150 ease-out"
+    enter-from-class="opacity-0"
+    leave-active-class="transition duration-100 ease-in"
+    leave-to-class="opacity-0"
+  >
+    <div
+      v-if="open"
+      class="fixed inset-0 z-[70] flex items-start justify-center px-4 pt-[15vh] bg-background/70 backdrop-blur-sm"
+      @click.self="hide"
+    >
+      <div
+        role="dialog"
+        aria-modal="true"
+        :aria-label="t(m.palette.open)"
+        class="w-full max-w-lg rounded border border-primary/40 bg-card overflow-hidden border-glow"
+      >
+        <div class="flex items-center gap-2 px-4 py-3 border-b border-border font-mono text-sm">
+          <span class="text-primary">&gt;</span>
+          <label for="palette-input" class="sr-only">{{ t(m.palette.open) }}</label>
+          <input
+            id="palette-input"
+            ref="inputEl"
+            v-model="query"
+            role="combobox"
+            aria-expanded="true"
+            aria-controls="palette-list"
+            :aria-activedescendant="activeDescendant"
+            autocomplete="off"
+            spellcheck="false"
+            :placeholder="t(m.palette.placeholder)"
+            class="flex-1 bg-transparent outline-none text-foreground placeholder:text-muted-foreground caret-primary"
+            @keydown="onKeydown"
+          />
+        </div>
+
+        <ul
+          id="palette-list"
+          role="listbox"
+          :aria-label="t(m.palette.open)"
+          class="max-h-72 overflow-y-auto py-1 font-mono text-sm"
+        >
+          <li
+            v-for="(entry, i) in filtered"
+            :id="`palette-${entry.id}`"
+            :key="entry.id"
+            role="option"
+            :aria-selected="i === cursor"
+            :class="[
+              'flex items-center gap-3 px-4 py-2 cursor-pointer transition-colors',
+              i === cursor ? 'bg-primary/15 text-primary' : 'text-foreground hover:bg-muted',
+            ]"
+            @click="choose(entry)"
+            @mousemove="cursor = i"
+          >
+            <span class="truncate">{{ entry.label }}</span>
+            <span class="ml-auto text-xs text-muted-foreground truncate">{{ entry.hint }}</span>
+          </li>
+          <li v-if="!filtered.length" class="px-4 py-3 text-muted-foreground">
+            {{ t(m.palette.empty) }}
+          </li>
+        </ul>
+
+        <div class="px-4 py-2 border-t border-border text-[10px] font-mono text-muted-foreground">
+          {{ t(m.palette.hint) }}
+        </div>
+      </div>
+    </div>
+  </Transition>
+</template>

@@ -24,6 +24,92 @@
   }
 }
 
+/*
+ * CRT overdrive — toggled on <html> by the Konami code or the `crt` command.
+ * Everything here is decorative and disabled under prefers-reduced-motion.
+ */
+.crt-overdrive body {
+  animation: crt-flicker 0.15s infinite;
+}
+
+/* Denser scanlines + a rolling bar, drawn over the whole page. */
+.crt-overdrive body::after {
+  content: '';
+  position: fixed;
+  inset: 0;
+  z-index: 9998;
+  pointer-events: none;
+  background:
+    repeating-linear-gradient(
+      0deg,
+      rgba(0, 0, 0, 0.35) 0px,
+      rgba(0, 0, 0, 0.35) 1px,
+      transparent 1px,
+      transparent 3px
+    );
+}
+
+.crt-overdrive body::before {
+  content: '';
+  position: fixed;
+  left: 0;
+  right: 0;
+  height: 18vh;
+  z-index: 9999;
+  pointer-events: none;
+  background: linear-gradient(
+    to bottom,
+    transparent,
+    rgba(0, 255, 65, 0.06),
+    transparent
+  );
+  animation: crt-roll 6s linear infinite;
+}
+
+/* Cheap chromatic aberration — no filters, just offset shadows. */
+.crt-overdrive h1,
+.crt-overdrive h2,
+.crt-overdrive .glow-green,
+.crt-overdrive .glow-cyan,
+.crt-overdrive .glow-purple {
+  text-shadow:
+    -1.5px 0 rgba(255, 0, 128, 0.7),
+    1.5px 0 rgba(0, 255, 255, 0.7),
+    0 0 10px currentColor;
+}
+
+.crt-glitch body {
+  animation: crt-shake 0.12s infinite;
+  filter: saturate(0.2) contrast(1.6);
+}
+
+@keyframes crt-flicker {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.97; }
+}
+
+@keyframes crt-roll {
+  0% { top: -20vh; }
+  100% { top: 100vh; }
+}
+
+@keyframes crt-shake {
+  0% { transform: translate(0, 0); }
+  25% { transform: translate(-3px, 1px); }
+  50% { transform: translate(2px, -2px); }
+  75% { transform: translate(-1px, 2px); }
+  100% { transform: translate(0, 0); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .crt-overdrive body,
+  .crt-overdrive body::before,
+  .crt-glitch body {
+    animation: none;
+  }
+  .crt-glitch body { filter: none; }
+}
+
 #app {
   min-height: 100vh;
 }

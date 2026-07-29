@@ -1,6 +1,11 @@
 <script setup lang="ts">
 import { onMounted, onUnmounted, ref } from 'vue'
 import * as THREE from 'three'
+import { useCrt } from '@/composables/useCrt'
+
+// CRT overdrive spins the wireframes up; reading the ref inside the loop keeps the
+// animation frame allocation-free.
+const { speedMultiplier } = useCrt()
 
 const canvasRef = ref<HTMLCanvasElement | null>(null)
 
@@ -95,10 +100,11 @@ function handleResize() {
 function animate() {
   animationFrameId = requestAnimationFrame(animate)
 
+  const boost = speedMultiplier.value
   shapes.forEach(({ mesh, speed }) => {
-    mesh.rotation.x += speed.x
-    mesh.rotation.y += speed.y
-    mesh.rotation.z += speed.z
+    mesh.rotation.x += speed.x * boost
+    mesh.rotation.y += speed.y * boost
+    mesh.rotation.z += speed.z * boost
   })
 
   if (camera) {
