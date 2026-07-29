@@ -5,6 +5,7 @@ import { COW, TRAIN } from '../ascii'
 import { art, blank, line } from '../format'
 import type { Command, CommandContext, OutputLine } from '../types'
 import { forgetGuestbookFile, resolveGuestbookFile } from './guestbook-fs'
+import { resolveFileLines } from './files'
 
 const FORTUNES = [
   'Weeks of coding can save you hours of planning.',
@@ -24,6 +25,18 @@ const RM_STAGES = [
   'removing /home/couvbat/music/*.als…',
   'removing /home/couvbat/.ssh/…',
   'removing /…',
+]
+
+const VIM_SPLASH: string[] = [
+  '',
+  '',
+  '',
+  '',
+  'VIM - Vi IMproved',
+  '',
+  'type :q to exit',
+  '',
+  "(Esc still won't save you)",
 ]
 
 function sleep(ms: number, signal?: AbortSignal): Promise<void> {
@@ -152,35 +165,49 @@ export const eggCommands: Command[] = [
     description: { en: 'Open the editor', fr: "Ouvrir l'éditeur" },
     group: 'fun',
     hidden: true,
-    run({ effects, raw }) {
-      if (raw.startsWith('emacs')) {
+    run(ctx) {
+      if (ctx.raw.startsWith('emacs')) {
         return [line('emacs: a great operating system, lacking only a decent editor.', 'muted')]
       }
-      effects.vim(true)
-      return [
-        line('~', 'muted'),
-        line('~   VIM - Vi IMproved', 'primary'),
-        line('~', 'muted'),
-        line('~   type  :q!  to exit', 'muted'),
-        line('~', 'muted'),
-        line('(Esc will not save you now)', 'accent'),
-      ]
+
+      const [file] = ctx.args
+      if (!file) {
+        ctx.effects.vim(true, { name: '[No Name]', lines: VIM_SPLASH })
+        return
+      }
+
+      const lines = resolveFileLines(file, ctx.t)
+      if (!lines) {
+        return [line(`vim: ${file}: No such file or directory`, 'error')]
+      }
+      ctx.effects.vim(true, { name: file, lines: lines.map((l) => l.text) })
     },
   },
   {
     name: ':q',
-    aliases: [':q!', ':wq', ':x', ':quit'],
+    aliases: [':q!', ':quit', ':quit!', ':wq', ':wq!', ':x'],
     description: { en: 'Escape', fr: 'Sortir' },
     group: 'fun',
     hidden: true,
     run({ effects, raw }) {
-      if (raw.trim() === ':q!') {
+      const cmd = raw.trim()
+
+      if (cmd === ':q' || cmd === ':quit') {
+        if (effects.vimIsDirty()) {
+          return [line("E37: No write since last change (add ! to override)", 'error')]
+        }
         effects.vim(false)
         return [line('you are free. that was the hard part.', 'success')]
       }
+
+      if (cmd === ':q!' || cmd === ':quit!') {
+        effects.vim(false)
+        return [line('you are free. that was the hard part.', 'success')]
+      }
+
       return [
-        line('E37: No write since last change (add ! to override)', 'error'),
-        line('hint: the whole command is `:q!`', 'muted'),
+        line("E45: 'readonly' option is set (add ! to override)", 'error'),
+        line('hint: try `:q` to quit without writing.', 'muted'),
       ]
     },
   },

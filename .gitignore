@@ -8,3 +8,6 @@ frontend/.env
 #builds
 backend/dist
 frontend/dist
+
+# superpowers scratch state (subagent-driven-development progress ledger, etc.)
+.superpowers/
