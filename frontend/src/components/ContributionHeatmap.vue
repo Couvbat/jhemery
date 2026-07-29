@@ -34,6 +34,12 @@ const rows = computed(() => {
   return byWeekday
 })
 
+// Real CSS grid (not monospace whitespace) so the graph stretches to fill the card on
+// wide screens, while a min column width keeps it scrollable instead of squishing on mobile.
+const gridStyle = computed(() => ({
+  gridTemplateColumns: `repeat(${props.weeks.length}, minmax(10px, 1fr))`,
+}))
+
 function charFor(day: ContributionDay | null): string {
   if (!day) return ' '
   return LEVEL_CHARS[Math.min(day.level, 4)]!
@@ -62,14 +68,15 @@ function titleFor(day: ContributionDay | null): string {
 
     <!-- 53 weeks never fits a phone; scroll the grid rather than the page. -->
     <div class="p-4 overflow-x-auto">
-      <div class="font-mono text-[10px] leading-[1.15] w-max" role="img"
+      <div class="font-mono text-[10px] leading-[1.15] min-w-full w-max" role="img"
         :aria-label="`${total} contributions`">
-        <div v-for="(row, rowIndex) in rows" :key="rowIndex" class="whitespace-pre">
+        <div v-for="(row, rowIndex) in rows" :key="rowIndex" class="grid" :style="gridStyle">
           <span
             v-for="(day, colIndex) in row"
             :key="colIndex"
             :class="classFor(day)"
             :title="titleFor(day)"
+            class="text-center"
             >{{ charFor(day) }}</span
           >
         </div>

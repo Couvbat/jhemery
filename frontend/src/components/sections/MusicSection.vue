@@ -71,7 +71,7 @@ const { autoplayNonce } = useMusicPlayer()
               :key="autoplayNonce"
               :src="autoplayNonce > 0 ? `${soundcloudEmbedSrc}&auto_play=true` : soundcloudEmbedSrc"
               width="100%"
-              height="166"
+              height="400"
               frameborder="0"
               allow="autoplay"
               class="rounded"
