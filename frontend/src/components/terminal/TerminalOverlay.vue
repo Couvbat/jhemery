@@ -63,7 +63,14 @@ async function onSubmit() {
 const INSERT_KEYS = new Set(['i', 'I', 'a', 'A', 'o', 'O', 's', 'S', 'c', 'C', 'r', 'R'])
 
 function onKeydown(event: KeyboardEvent) {
-  if (vimBuffer.value && input.value === '' && INSERT_KEYS.has(event.key)) {
+  if (
+    vimBuffer.value &&
+    input.value === '' &&
+    !event.ctrlKey &&
+    !event.altKey &&
+    !event.metaKey &&
+    INSERT_KEYS.has(event.key)
+  ) {
     event.preventDefault()
     triggerVimReadonlyError()
     return
