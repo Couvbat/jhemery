@@ -20,13 +20,4 @@ export const projects: Project[] = [
     stack: ['React', 'Node.js', 'Express', 'MongoDB', 'MySQL', 'PHP', 'Docker'],
     status: 'production',
   },
-  {
-    name: 'side-project (WIP)',
-    description: {
-      en: 'Personal side project exploring AI-assisted tooling and automation. Details coming soon.',
-      fr: "Projet personnel explorant l'outillage assisté par IA et l'automatisation. Détails à venir.",
-    },
-    stack: ['TypeScript', 'Python', 'Node.js', 'AI'],
-    status: 'wip',
-  },
 ]
