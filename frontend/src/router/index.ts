@@ -15,6 +15,12 @@ const router = createRouter({
       name: 'home',
       component: HomeView,
     },
+    {
+      // Needs the .htaccess rewrite in public/ to survive a hard refresh on Apache.
+      path: '/:pathMatch(.*)*',
+      name: 'not-found',
+      component: () => import('../views/NotFoundView.vue'),
+    },
   ],
 })
 

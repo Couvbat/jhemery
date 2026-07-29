@@ -1,29 +1,19 @@
 <script setup lang="ts">
 import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
+import SectionHeader from '@/components/SectionHeader.vue'
+import { music, soundcloudEmbedSrc } from '@/content'
+import { useLocale } from '@/i18n'
+import { useMusicPlayer } from '@/composables/useMusicPlayer'
 
-const genres = ['Hardcore', 'Techno', 'Acidcore', 'Hard Techno',]
-const tools  = ['FL Studio', 'Ableton', 'Akai MPK mini', 'Serum 2', 'Vital', 'DR910', 'Valhalla DSP']
-
-const PLAYLIST_URL = 'https://soundcloud.com/couvbat/sets/mon-bruit'
-const SOUNDCLOUD_EMBED_SRC =
-  `https://w.soundcloud.com/player/?url=${encodeURIComponent(PLAYLIST_URL)}` +
-  '&color=%2300ff41&auto_play=false&hide_related=true&show_comments=false' +
-  '&show_reposts=false&show_teaser=false&visual=false'
+const { t, m } = useLocale()
+const { autoplayNonce } = useMusicPlayer()
 </script>
 
 <template>
   <section id="music" class="py-20 pt-24">
     <div class="max-w-5xl mx-auto px-4">
-      <div class="mb-10">
-        <p class="text-muted-foreground text-sm mb-1">
-          <span class="text-primary">couvbat</span><span class="text-muted-foreground">:~$</span>
-          <span class="ml-2 text-foreground">play music.flp</span>
-        </p>
-        <h2 class="text-2xl md:text-3xl font-bold glow-cyan text-accent">
-          <span class="text-accent">#</span> Music
-        </h2>
-      </div>
+      <SectionHeader section="music" tone="cyan" />
 
       <div class="grid gap-4 md:grid-cols-2">
         <!-- About music -->
@@ -31,19 +21,14 @@ const SOUNDCLOUD_EMBED_SRC =
           <CardContent class="p-6 space-y-4">
             <div class="text-4xl">♪</div>
             <p class="text-sm text-muted-foreground leading-relaxed">
-              Music is my second language. I produce
-              <span class="text-accent">hardcore</span>,
-              <span class="text-accent">techno</span>,
-              <span class="text-accent">acidcore</span> and other hard electronic genres.
-              Raw kicks, distorted basslines, relentless BPMs — the same drive I put
-              into code goes straight into every track.
+              {{ t(music.blurb) }}
             </p>
 
             <div>
-              <p class="text-xs text-muted-foreground mb-2">Genres</p>
+              <p class="text-xs text-muted-foreground mb-2">{{ t(m.music.genres) }}</p>
               <div class="flex flex-wrap gap-1">
                 <Badge
-                  v-for="g in genres"
+                  v-for="g in music.genres"
                   :key="g"
                   variant="outline"
                   class="text-xs border-accent/50 text-accent"
@@ -54,15 +39,15 @@ const SOUNDCLOUD_EMBED_SRC =
             </div>
 
             <div>
-              <p class="text-xs text-muted-foreground mb-2">Tools</p>
+              <p class="text-xs text-muted-foreground mb-2">{{ t(m.music.tools) }}</p>
               <div class="flex flex-wrap gap-1">
                 <Badge
-                  v-for="t in tools"
-                  :key="t"
+                  v-for="tool in music.tools"
+                  :key="tool"
                   variant="outline"
                   class="text-xs border-muted text-muted-foreground"
                 >
-                  {{ t }}
+                  {{ tool }}
                 </Badge>
               </div>
             </div>
@@ -78,22 +63,29 @@ const SOUNDCLOUD_EMBED_SRC =
             <span class="ml-3 text-xs text-muted-foreground">ncmpcpp — music player</span>
           </div>
           <div class="p-4 space-y-2">
+            <!--
+              The `key` remounts the iframe when the terminal `play` command fires, which is
+              the only way to hand SoundCloud an autoplay flag it will honour.
+            -->
             <iframe
-              :src="SOUNDCLOUD_EMBED_SRC"
+              :key="autoplayNonce"
+              :src="autoplayNonce > 0 ? `${soundcloudEmbedSrc}&auto_play=true` : soundcloudEmbedSrc"
               width="100%"
               height="166"
               frameborder="0"
               allow="autoplay"
               class="rounded"
+              :title="t(m.music.listen)"
             ></iframe>
             <p class="text-muted-foreground font-mono text-xs pt-2 border-t border-border">
-              Listen on SoundCloud:
+              {{ t(m.music.listen) }}:
               <a
-                href="https://soundcloud.com/couvbat"
+                :href="music.profileUrl"
                 target="_blank"
                 rel="noopener noreferrer"
                 class="text-accent hover:text-accent/80 transition-colors"
-              >soundcloud.com/couvbat</a>
+                >soundcloud.com/couvbat</a
+              >
             </p>
           </div>
         </div>

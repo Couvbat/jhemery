@@ -1,0 +1,91 @@
+<script setup lang="ts">
+import { onMounted, onUnmounted, ref } from 'vue'
+import { profile } from '@/content'
+import { useLocale } from '@/i18n'
+import { prefersReducedMotion } from '@/composables/useCrt'
+
+const STORAGE_KEY = 'couvbat:booted'
+const STEP_MS = 130
+
+const { t, m } = useLocale()
+
+const visible = ref(false)
+const shown = ref<string[]>([])
+let timer: ReturnType<typeof setTimeout> | undefined
+
+const STEPS = [
+  '[    0.000000] couvsh 1.0 booting…',
+  '[    0.041233] CPU: caffeine detected, 4 cores online',
+  `[    0.118904] mounting /home/${profile.handle}`,
+  '[    0.204551] loading module: vue@3',
+  '[    0.288017] loading module: three.js (wireframes)',
+  '[    0.377420] starting service: nestjs-api',
+  '[    0.501338] starting service: terminal',
+  `[    0.664902] resolving ${profile.domain} … ok`,
+  '[    0.812004] all systems nominal',
+  '',
+  'welcome.',
+]
+
+function finish() {
+  clearTimeout(timer)
+  visible.value = false
+  try {
+    window.localStorage.setItem(STORAGE_KEY, '1')
+  } catch {
+    // Private browsing — the sequence will just play again next time.
+  }
+}
+
+function step(index: number) {
+  if (index >= STEPS.length) {
+    timer = setTimeout(finish, 450)
+    return
+  }
+  shown.value = [...shown.value, STEPS[index]!]
+  timer = setTimeout(() => step(index + 1), STEP_MS)
+}
+
+onMounted(() => {
+  let alreadyBooted = false
+  try {
+    alreadyBooted = window.localStorage.getItem(STORAGE_KEY) === '1'
+  } catch {
+    alreadyBooted = true
+  }
+
+  // First visit only, and never when the visitor asked for less motion.
+  if (alreadyBooted || prefersReducedMotion()) return
+
+  visible.value = true
+  window.addEventListener('keydown', finish)
+  window.addEventListener('click', finish)
+  step(0)
+})
+
+onUnmounted(() => {
+  clearTimeout(timer)
+  window.removeEventListener('keydown', finish)
+  window.removeEventListener('click', finish)
+})
+</script>
+
+<template>
+  <Transition
+    leave-active-class="transition duration-300 ease-in"
+    leave-to-class="opacity-0"
+  >
+    <div
+      v-if="visible"
+      class="fixed inset-0 z-[110] bg-background flex items-center justify-center px-6 cursor-pointer"
+      aria-hidden="true"
+    >
+      <div class="w-full max-w-2xl font-mono text-xs sm:text-sm space-y-0.5">
+        <p v-for="(entry, i) in shown" :key="i" class="text-primary whitespace-pre-wrap">
+          {{ entry || ' ' }}
+        </p>
+        <p class="text-muted-foreground pt-6">{{ t(m.boot.skip) }}</p>
+      </div>
+    </div>
+  </Transition>
+</template>

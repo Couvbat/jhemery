@@ -1,0 +1,36 @@
+# Apache config for the built SPA on o2switch.
+# Only mod_rewrite is required — no mod_proxy — so this works on shared hosting.
+
+<IfModule mod_rewrite.c>
+  RewriteEngine On
+  RewriteBase /
+
+  # `curl jhemery.xyz` gets the ANSI résumé instead of an HTML document. Also
+  # covers agentic/LLM crawlers that fetch raw HTML without running JavaScript —
+  # without this they'd see an empty `<div id="app">` instead of real content.
+  # resume.txt is generated at build time from src/content by vite-plugins/resume.ts.
+  RewriteCond %{HTTP_USER_AGENT} (curl|wget|httpie|lynx|links|GPTBot|ChatGPT-User|OAI-SearchBot|ClaudeBot|Claude-Web|anthropic-ai|PerplexityBot|Google-Extended|CCBot|Bytespider|Meta-ExternalAgent|Applebot-Extended) [NC]
+  RewriteCond %{REQUEST_URI} ^/?$
+  RewriteRule ^ /resume.txt [L]
+
+  # SPA fallback: hand every non-file request to index.html so Vue Router owns
+  # routing. Without this, a hard refresh on any path other than / 404s.
+  RewriteCond %{REQUEST_FILENAME} !-f
+  RewriteCond %{REQUEST_FILENAME} !-d
+  RewriteRule ^ /index.html [L]
+</IfModule>
+
+<IfModule mod_mime.c>
+  AddDefaultCharset UTF-8
+  AddCharset UTF-8 .txt
+</IfModule>
+
+# Hashed build assets are immutable; index.html and resume.txt must not be cached.
+<IfModule mod_headers.c>
+  <FilesMatch "\.(js|css|woff2?|svg|png|jpg|jpeg|webp|ico)$">
+    Header set Cache-Control "public, max-age=31536000, immutable"
+  </FilesMatch>
+  <FilesMatch "^(index\.html|resume\.txt)$">
+    Header set Cache-Control "no-cache"
+  </FilesMatch>
+</IfModule>
