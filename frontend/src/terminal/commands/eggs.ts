@@ -109,8 +109,9 @@ export const eggCommands: Command[] = [
       }
 
       const rmMatch = /^rm\s+(?:-\w+\s+)?(\S+)$/.exec(rest)
-      if (rmMatch) {
-        return removeGuestbookEntry(ctx, rmMatch[1])
+      const rmTarget = rmMatch?.[1]
+      if (rmTarget) {
+        return removeGuestbookEntry(ctx, rmTarget)
       }
 
       return [

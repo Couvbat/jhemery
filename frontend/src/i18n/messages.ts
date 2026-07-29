@@ -10,8 +10,8 @@ export const messages = {
     language: { en: 'Switch language', fr: 'Changer de langue' },
   },
   hero: {
-    aboutFile: { en: 'cat about.txt', fr: 'cat a-propos.txt' },
-    skills: { en: 'ls skills/', fr: 'ls competences/' },
+    aboutFile: { en: 'cat about.txt', fr: 'cat about.txt' },
+    skills: { en: 'ls skills/', fr: 'ls skills/' },
   },
   projects: {
     recentActivity: { en: 'git log --oneline', fr: 'git log --oneline' },
@@ -39,9 +39,11 @@ export const messages = {
     peripherals: { en: 'Peripherals', fr: 'Périphériques' },
   },
   contact: {
-    name: { en: 'name', fr: 'nom' },
+    // Rendered as `--<flag>` in the terminal-styled form — kept in English in both
+    // locales, like every other fake command/file name in the UI.
+    name: { en: 'name', fr: 'name' },
     email: { en: 'email', fr: 'email' },
-    subject: { en: 'subject', fr: 'sujet' },
+    subject: { en: 'subject', fr: 'subject' },
     message: { en: 'message', fr: 'message' },
     namePlaceholder: { en: 'Jules', fr: 'Jules' },
     emailPlaceholder: { en: 'you@example.com', fr: 'vous@exemple.com' },

@@ -7,19 +7,19 @@ import type { SectionMeta } from './types'
 export const sections: SectionMeta[] = [
   {
     id: 'about',
-    label: { en: 'about', fr: 'a-propos' },
+    label: { en: 'about', fr: 'about' },
     prompt: 'whoami',
     heading: { en: 'About', fr: 'À propos' },
   },
   {
     id: 'projects',
-    label: { en: 'projects', fr: 'projets' },
+    label: { en: 'projects', fr: 'projects' },
     prompt: 'ls -la projects/',
     heading: { en: 'Projects', fr: 'Projets' },
   },
   {
     id: 'music',
-    label: { en: 'music', fr: 'musique' },
+    label: { en: 'music', fr: 'music' },
     prompt: 'play music.als',
     heading: { en: 'Music', fr: 'Musique' },
   },
@@ -31,7 +31,7 @@ export const sections: SectionMeta[] = [
   },
   {
     id: 'hardware',
-    label: { en: 'hardware', fr: 'materiel' },
+    label: { en: 'hardware', fr: 'hardware' },
     prompt: 'neofetch --all',
     heading: { en: 'Hardware', fr: 'Matériel' },
   },
