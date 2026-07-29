@@ -1,0 +1,29 @@
+# Jules Hémery (Couvbat)
+
+> Full-Stack Developer at In-Leed (France). Builds web apps, produces hard electronic
+> music, and tinkers with AI on the side. This file is a machine-readable summary of
+> https://jhemery.xyz for LLMs and agentic browsers — the live site is a client-rendered
+> single-page app, so most of its content (and a hidden terminal easter egg) isn't
+> visible to a fetcher that doesn't execute JavaScript.
+
+## Profile
+
+- [About](https://jhemery.xyz/#about): Bio, languages spoken, background
+- [Plain-text résumé](https://jhemery.xyz/resume.txt): Full CV as plain text — also what `curl jhemery.xyz` returns
+- [Contact](https://jhemery.xyz/#contact): Contact form and direct email/social links
+
+## Projects
+
+- [Projects section](https://jhemery.xyz/#projects): This portfolio, professional work at In-Leed, and current side projects, plus pinned GitHub repos
+- [GitHub](https://github.com/Couvbat): Source code, including this site's repository
+
+## Other
+
+- [LinkedIn](https://www.linkedin.com/in/jules-h%C3%A9mery-338134195/)
+- [SoundCloud](https://soundcloud.com/couvbat): Music production — hardcore, techno, acidcore
+
+## Optional
+
+- [Hardware](https://jhemery.xyz/#hardware): PCs, NAS and peripherals
+- [Gaming](https://jhemery.xyz/#gaming): Currently playing and favourite genres
+- [Sitemap](https://jhemery.xyz/sitemap.xml)

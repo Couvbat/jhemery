@@ -5,9 +5,11 @@
   RewriteEngine On
   RewriteBase /
 
-  # `curl jhemery.fr` gets the ANSI résumé instead of an HTML document.
+  # `curl jhemery.xyz` gets the ANSI résumé instead of an HTML document. Also
+  # covers agentic/LLM crawlers that fetch raw HTML without running JavaScript —
+  # without this they'd see an empty `<div id="app">` instead of real content.
   # resume.txt is generated at build time from src/content by vite-plugins/resume.ts.
-  RewriteCond %{HTTP_USER_AGENT} (curl|wget|httpie|lynx|links) [NC]
+  RewriteCond %{HTTP_USER_AGENT} (curl|wget|httpie|lynx|links|GPTBot|ChatGPT-User|OAI-SearchBot|ClaudeBot|Claude-Web|anthropic-ai|PerplexityBot|Google-Extended|CCBot|Bytespider|Meta-ExternalAgent|Applebot-Extended) [NC]
   RewriteCond %{REQUEST_URI} ^/?$
   RewriteRule ^ /resume.txt [L]
 

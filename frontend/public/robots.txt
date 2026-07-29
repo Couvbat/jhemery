@@ -2,3 +2,6 @@ User-agent: *
 Allow: /
 
 Sitemap: https://jhemery.xyz/sitemap.xml
+
+# Machine-readable summary for LLMs and agentic browsers, see https://llmstxt.org/
+# llms.txt: https://jhemery.xyz/llms.txt

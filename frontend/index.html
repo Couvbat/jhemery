@@ -49,6 +49,25 @@
   </head>
   <body>
     <div id="app"></div>
+    <!--
+      Seen by anything that fetches this page without executing JavaScript — search
+      crawlers that skip JS rendering, and agentic/LLM browsing tools that just do a
+      plain GET. Without this, they see an empty <div id="app"> and nothing else.
+    -->
+    <noscript>
+      <div style="font-family: monospace; max-width: 640px; margin: 40px auto; padding: 0 16px; color: #e6f5e9; background: #0d0f0d;">
+        <h1>Jules Hémery (Couvbat)</h1>
+        <p>Full-Stack Developer at In-Leed, based in France. I build web apps, produce hard electronic music, and tinker with AI on the side.</p>
+        <p>This site is an interactive, JavaScript-rendered experience — enable JavaScript for the full version, including a hidden terminal.</p>
+        <ul>
+          <li><a href="https://github.com/Couvbat">GitHub</a></li>
+          <li><a href="https://www.linkedin.com/in/jules-h%C3%A9mery-338134195/">LinkedIn</a></li>
+          <li><a href="https://soundcloud.com/couvbat">SoundCloud</a></li>
+          <li><a href="mailto:contact@jhemery.xyz">contact@jhemery.xyz</a></li>
+        </ul>
+        <p>Machine-readable summaries: <a href="/llms.txt">/llms.txt</a> · <a href="/resume.txt">/resume.txt</a></p>
+      </div>
+    </noscript>
     <script type="module" src="/src/main.ts"></script>
   </body>
 </html>

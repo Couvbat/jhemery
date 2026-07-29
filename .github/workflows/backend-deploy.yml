@@ -57,7 +57,7 @@ jobs:
 
       # Requires the app to be set up via cPanel "Setup Node.js App" (Passenger).
       # BACKEND_APP_ENTRY must point to the venv's activate script shown on that
-      # cPanel screen, e.g. /home/<user>/nodevenv/api.jhemery.fr/24/bin/activate
+      # cPanel screen, e.g. /home/<user>/nodevenv/api.jhemery.xyz/24/bin/activate
       - name: Install production dependencies & restart app
         run: |
           ssh -o StrictHostKeyChecking=no -i ~/.ssh/id_rsa \
