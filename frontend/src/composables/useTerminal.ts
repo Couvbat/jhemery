@@ -3,7 +3,8 @@ import { currentLocale, useLocale } from '@/i18n'
 import { messages } from '@/i18n/messages'
 import { history, pushHistory } from '@/terminal/history'
 import { commonPrefix, complete, resolve, suggest } from '@/terminal/registry'
-import type { CommandContext, OutputLine, TerminalEffects, VimFile } from '@/terminal/types'
+import type { CommandContext, OutputLine, TerminalEffects, VimBufferState, VimFile } from '@/terminal/types'
+import { handleVimKey } from '@/terminal/vimEditor'
 import { scrollToSection } from './useActiveSection'
 import { setCrt, glitch } from './useCrt'
 import { showMatrix } from './useMatrix'
@@ -17,10 +18,7 @@ const busy = ref(false)
 /** While a vim trap is active, Esc no longer closes the overlay. That is the joke. */
 const trapped = ref(false)
 /** Non-null while the vim pane is showing in place of the normal scrolling output. */
-const vimBuffer = ref<VimFile | null>(null)
-/** Transient readonly-error message shown in the vim pane's status line. */
-const vimError = ref<string | null>(null)
-let vimErrorTimeoutId: number | null = null
+const vimBuffer = ref<VimBufferState | null>(null)
 
 const buffer = ref<OutputLine[]>([])
 const historyIndex = ref(-1)
@@ -56,8 +54,18 @@ const effects: TerminalEffects = {
   crt: setCrt,
   vim: (enabled: boolean, file?: VimFile) => {
     trapped.value = enabled
-    vimBuffer.value = enabled ? (file ?? null) : null
+    vimBuffer.value =
+      enabled && file
+        ? {
+            name: file.name,
+            lines: [...file.lines],
+            cursor: { row: 0, col: 0 },
+            mode: 'normal',
+            dirty: false,
+          }
+        : null
   },
+  vimIsDirty: () => vimBuffer.value?.dirty ?? false,
   glitch,
   playMusic: () => {
     requestPlayback()
@@ -65,16 +73,12 @@ const effects: TerminalEffects = {
   },
 }
 
-/** Flashes the vim pane's readonly error, auto-clearing after 2s. Called directly
- *  from TerminalOverlay's keydown handler, not through a Command — it's a UI
- *  reaction to a blocked keystroke, not something the visitor typed and submitted. */
-export function triggerVimReadonlyError() {
-  vimError.value = "E45: 'readonly' option is set (add ! to override)"
-  if (vimErrorTimeoutId !== null) window.clearTimeout(vimErrorTimeoutId)
-  vimErrorTimeoutId = window.setTimeout(() => {
-    vimError.value = null
-    vimErrorTimeoutId = null
-  }, 2000)
+/** Delegates one keydown to the vim editor's pure state machine. Returns `false`
+ *  if there's no open vim buffer, or the key wasn't handled (currently only `:`),
+ *  telling the caller to let the keystroke fall through normally. */
+export function handleVimKeydown(event: KeyboardEvent): boolean {
+  if (!vimBuffer.value) return false
+  return handleVimKey(vimBuffer.value, event)
 }
 
 function buildContext(args: string[], raw: string, signal: AbortSignal): CommandContext {
@@ -253,7 +257,7 @@ export function useTerminal() {
     busy: computed(() => busy.value),
     trapped: computed(() => trapped.value),
     vimBuffer: computed(() => vimBuffer.value),
-    vimError: computed(() => vimError.value),
+    handleVimKeydown,
     buffer: computed(() => buffer.value),
     revision: computed(() => revision.value),
     pendingPrompt: computed(() => pendingPrompt.value),
@@ -266,6 +270,5 @@ export function useTerminal() {
     completeInput,
     clearBuffer,
     run,
-    triggerVimReadonlyError,
   }
 }

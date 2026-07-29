@@ -11,13 +11,11 @@ const {
   open,
   maximised,
   busy,
-  trapped,
   buffer,
   revision,
   pendingPrompt,
   vimBuffer,
-  vimError,
-  triggerVimReadonlyError,
+  handleVimKeydown,
   closeTerminal,
   submit,
   cancel,
@@ -60,8 +58,6 @@ async function onSubmit() {
   inputEl.value?.focus()
 }
 
-const INSERT_KEYS = new Set(['i', 'I', 'a', 'A', 'o', 'O', 's', 'S', 'c', 'C', 'r', 'R'])
-
 function onKeydown(event: KeyboardEvent) {
   if (
     vimBuffer.value &&
@@ -69,10 +65,15 @@ function onKeydown(event: KeyboardEvent) {
     !event.ctrlKey &&
     !event.altKey &&
     !event.metaKey &&
-    INSERT_KEYS.has(event.key)
+    event.key !== ':'
   ) {
-    event.preventDefault()
-    triggerVimReadonlyError()
+    if (handleVimKeydown(event)) {
+      // Escape leaving insert mode must not also reach onPanelKeydown's Escape
+      // handling below (which would additionally submit `:q`) — a key the vim
+      // editor consumed is fully consumed, not just its default action.
+      event.preventDefault()
+      event.stopPropagation()
+    }
     return
   }
 
@@ -158,7 +159,7 @@ function onPanelKeydown(event: KeyboardEvent) {
           <span class="ml-3 text-xs text-muted-foreground flex-1"
             >{{ profile.handle }}@{{ profile.host }} ~ {{ t(m.terminal.title) }}</span
           >
-          <span v-if="trapped" class="text-xs text-yellow-400">-- INSERT --</span>
+          <span v-if="vimBuffer?.mode === 'insert'" class="text-xs text-yellow-400">-- INSERT --</span>
           <button
             class="text-xs text-muted-foreground hover:text-primary px-1 transition-colors"
             :aria-label="maximised ? t(m.terminal.restore) : t(m.terminal.maximise)"
@@ -188,7 +189,7 @@ function onPanelKeydown(event: KeyboardEvent) {
         >
           <TerminalOutput v-for="(entry, i) in buffer" :key="i" :line="entry" />
         </div>
-        <VimPane v-else :file="vimBuffer" :error="vimError" />
+        <VimPane v-else :buffer="vimBuffer" />
 
         <!-- Input -->
         <form

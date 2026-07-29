@@ -74,6 +74,7 @@ export interface TerminalEffects {
   matrix: () => void
   crt: (enabled?: boolean) => boolean
   vim: (enabled: boolean, file?: VimFile) => void
+  vimIsDirty: () => boolean
   glitch: (durationMs: number) => Promise<void>
   playMusic: () => void
 }
