@@ -4,6 +4,7 @@ import { profile } from '@/content'
 import { useLocale } from '@/i18n'
 import { useTerminal } from '@/composables/useTerminal'
 import TerminalOutput from './TerminalOutput.vue'
+import VimPane from './VimPane.vue'
 
 const { t, m } = useLocale()
 const {
@@ -14,6 +15,9 @@ const {
   buffer,
   revision,
   pendingPrompt,
+  vimBuffer,
+  vimError,
+  triggerVimReadonlyError,
   closeTerminal,
   submit,
   cancel,
@@ -56,7 +60,15 @@ async function onSubmit() {
   inputEl.value?.focus()
 }
 
+const INSERT_KEYS = new Set(['i', 'I', 'a', 'A', 'o', 'O', 's', 'S', 'c', 'C', 'r', 'R'])
+
 function onKeydown(event: KeyboardEvent) {
+  if (vimBuffer.value && input.value === '' && INSERT_KEYS.has(event.key)) {
+    event.preventDefault()
+    triggerVimReadonlyError()
+    return
+  }
+
   if (event.key === 'ArrowUp') {
     event.preventDefault()
     input.value = recallHistory(-1, input.value)
@@ -160,6 +172,7 @@ function onPanelKeydown(event: KeyboardEvent) {
 
         <!-- Output -->
         <div
+          v-if="!vimBuffer"
           ref="scrollEl"
           class="flex-1 overflow-y-auto p-4 font-mono text-xs sm:text-sm space-y-0.5"
           aria-live="polite"
@@ -168,6 +181,7 @@ function onPanelKeydown(event: KeyboardEvent) {
         >
           <TerminalOutput v-for="(entry, i) in buffer" :key="i" :line="entry" />
         </div>
+        <VimPane v-else :file="vimBuffer" :error="vimError" />
 
         <!-- Input -->
         <form
