@@ -1,0 +1,12 @@
+# DO NOT REMOVE. CLOUDLINUX PASSENGER CONFIGURATION BEGIN
+PassengerAppRoot "/home/tfgf0954/api.jhemery.xyz"
+PassengerBaseURI "/"
+PassengerNodejs "/home/tfgf0954/nodevenv/api.jhemery.xyz/24/bin/node"
+PassengerAppType node
+PassengerStartupFile dist/main.js
+# DO NOT REMOVE. CLOUDLINUX PASSENGER CONFIGURATION END
+# DO NOT REMOVE OR MODIFY. CLOUDLINUX ENV VARS CONFIGURATION BEGIN
+<IfModule Litespeed>
+
+</IfModule>
+# DO NOT REMOVE OR MODIFY. CLOUDLINUX ENV VARS CONFIGURATION END

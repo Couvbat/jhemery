@@ -21,7 +21,7 @@ const RM_STAGES = [
   'removing /usr/bin/…',
   'removing /etc/…',
   'removing /home/couvbat/portfolio…',
-  'removing /home/couvbat/music/*.flp…',
+  'removing /home/couvbat/music/*.als…',
   'removing /home/couvbat/.ssh/…',
   'removing /…',
 ]

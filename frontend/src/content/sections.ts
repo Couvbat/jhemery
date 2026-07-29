@@ -20,7 +20,7 @@ export const sections: SectionMeta[] = [
   {
     id: 'music',
     label: { en: 'music', fr: 'musique' },
-    prompt: 'play music.flp',
+    prompt: 'play music.als',
     heading: { en: 'Music', fr: 'Musique' },
   },
   {
