@@ -263,6 +263,13 @@ GitHub's REST API does not expose the contribution graph; the GraphQL
 `{ configured: false }` when `GITHUB_TOKEN` is absent, and the frontend hides the card. Cached for
 one hour — the graph updates at most daily.
 
+### `GET /github/pinned-repos`
+
+Also GraphQL-only (`user.pinnedItems`), so it shares the same `GITHUB_TOKEN` requirement and
+one-hour cache as contributions. `ProjectsSection` renders these as extra cards alongside the
+hand-curated `content/projects.ts` list, deduplicated by repo URL so a pinned repo that's already
+written up manually doesn't show twice.
+
 Rendered in `ProjectsSection` as an ASCII heatmap using `·░▒▓█`, 53 weeks × 7 days, horizontally
 scrollable on narrow viewports.
 

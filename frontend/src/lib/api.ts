@@ -49,6 +49,21 @@ export interface GithubContributions {
   weeks?: ContributionDay[][]
 }
 
+export interface GithubPinnedRepo {
+  name: string
+  description: string | null
+  url: string
+  language: string | null
+  languageColor: string | null
+  stars: number
+  forks: number
+}
+
+export interface GithubPinnedRepos {
+  configured: boolean
+  repos?: GithubPinnedRepo[]
+}
+
 export interface GuestbookEntry {
   id: string
   name: string
@@ -93,6 +108,7 @@ export const api = {
   steamActivity: () => request<SteamActivity>('/steam/activity'),
   githubActivity: () => request<GithubActivity>('/github/activity'),
   githubContributions: () => request<GithubContributions>('/github/contributions'),
+  githubPinnedRepos: () => request<GithubPinnedRepos>('/github/pinned-repos'),
   guestbook: () => request<GuestbookList>('/guestbook'),
   sign: (name: string, message: string) =>
     request<GuestbookEntry>('/guestbook', {

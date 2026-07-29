@@ -19,6 +19,7 @@ export const messages = {
     less: { en: 'less', fr: 'moins' },
     more: { en: 'more', fr: 'plus' },
     justNow: { en: 'just now', fr: "à l'instant" },
+    noDescription: { en: 'No description provided.', fr: 'Aucune description fournie.' },
   },
   music: {
     genres: { en: 'Genres', fr: 'Genres' },

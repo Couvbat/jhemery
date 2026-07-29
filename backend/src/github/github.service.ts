@@ -5,12 +5,16 @@ import {
   GithubActivity,
   GithubCommit,
   GithubContributions,
+  GithubPinnedRepos,
 } from './github.types';
 
 const CACHE_TTL_MS = 5 * 60 * 1000;
 // The contribution graph changes at most daily, so cache it far longer.
 const CONTRIBUTIONS_TTL_MS = 60 * 60 * 1000;
+// Pinned repos change even less often than contributions.
+const PINNED_REPOS_TTL_MS = 60 * 60 * 1000;
 const MAX_COMMITS = 6;
+const MAX_PINNED_REPOS = 6;
 
 const CONTRIBUTIONS_QUERY = `
   query($login: String!) {
@@ -22,6 +26,28 @@ const CONTRIBUTIONS_QUERY = `
             contributionDays {
               date
               contributionCount
+            }
+          }
+        }
+      }
+    }
+  }
+`;
+
+const PINNED_REPOS_QUERY = `
+  query($login: String!, $first: Int!) {
+    user(login: $login) {
+      pinnedItems(first: $first, types: REPOSITORY) {
+        nodes {
+          ... on Repository {
+            name
+            description
+            url
+            stargazerCount
+            forkCount
+            primaryLanguage {
+              name
+              color
             }
           }
         }
@@ -62,12 +88,34 @@ interface CommitSearchResponse {
   }>;
 }
 
+interface PinnedReposResponse {
+  data?: {
+    user?: {
+      pinnedItems: {
+        nodes: Array<{
+          name: string;
+          description: string | null;
+          url: string;
+          stargazerCount: number;
+          forkCount: number;
+          primaryLanguage: { name: string; color: string } | null;
+        }>;
+      };
+    } | null;
+  };
+  errors?: Array<{ message: string }>;
+}
+
 @Injectable()
 export class GithubService {
   private readonly logger = new Logger(GithubService.name);
   private cache: { data: GithubActivity; expiresAt: number } | null = null;
   private contributionsCache: {
     data: GithubContributions;
+    expiresAt: number;
+  } | null = null;
+  private pinnedReposCache: {
+    data: GithubPinnedRepos;
     expiresAt: number;
   } | null = null;
 
@@ -130,6 +178,37 @@ export class GithubService {
     }
   }
 
+  /**
+   * Pinned repos are also GraphQL-only, so this shares the contributions
+   * card's requirement of a token — the frontend hides the extra project
+   * cards when unconfigured, same as everywhere else.
+   */
+  async getPinnedRepos(): Promise<GithubPinnedRepos> {
+    const username = this.config.get<string>('GITHUB_USERNAME');
+    const token = this.config.get<string>('GITHUB_TOKEN');
+    if (!username || !token) {
+      return { configured: false };
+    }
+
+    if (this.pinnedReposCache && this.pinnedReposCache.expiresAt > Date.now()) {
+      return this.pinnedReposCache.data;
+    }
+
+    try {
+      const data = await this.fetchPinnedRepos(username, token);
+      this.pinnedReposCache = {
+        data,
+        expiresAt: Date.now() + PINNED_REPOS_TTL_MS,
+      };
+      return data;
+    } catch (err) {
+      this.logger.warn(
+        `Failed to fetch GitHub pinned repos: ${err instanceof Error ? err.message : String(err)}`,
+      );
+      return { configured: false };
+    }
+  }
+
   private async fetchContributions(
     username: string,
     token: string,
@@ -169,6 +248,44 @@ export class GithubService {
       configured: true,
       total: calendar.totalContributions,
       weeks,
+    };
+  }
+
+  private async fetchPinnedRepos(
+    username: string,
+    token: string,
+  ): Promise<GithubPinnedRepos> {
+    const res = await fetch('https://api.github.com/graphql', {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${token}`,
+        'Content-Type': 'application/json',
+        'User-Agent': 'jhemery-portfolio',
+      },
+      body: JSON.stringify({
+        query: PINNED_REPOS_QUERY,
+        variables: { login: username, first: MAX_PINNED_REPOS },
+      }),
+    });
+    if (!res.ok) throw new Error(`GitHub GraphQL failed: ${res.status}`);
+
+    const json = (await res.json()) as PinnedReposResponse;
+    if (json.errors?.length) {
+      throw new Error(json.errors.map((e) => e.message).join('; '));
+    }
+
+    const nodes = json.data?.user?.pinnedItems.nodes ?? [];
+    return {
+      configured: true,
+      repos: nodes.map((n) => ({
+        name: n.name,
+        description: n.description,
+        url: n.url,
+        language: n.primaryLanguage?.name ?? null,
+        languageColor: n.primaryLanguage?.color ?? null,
+        stars: n.stargazerCount,
+        forks: n.forkCount,
+      })),
     };
   }
 

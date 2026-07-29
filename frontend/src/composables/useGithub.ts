@@ -1,10 +1,12 @@
 import { computed, ref } from 'vue'
-import { api, type GithubCommit, type GithubContributions } from '@/lib/api'
+import { api, type GithubCommit, type GithubContributions, type GithubPinnedRepo } from '@/lib/api'
 
 const commits = ref<GithubCommit[] | null>(null)
 const contributions = ref<GithubContributions | null>(null)
+const pinnedRepos = ref<GithubPinnedRepo[] | null>(null)
 let commitsInFlight: Promise<void> | null = null
 let contributionsInFlight: Promise<void> | null = null
+let pinnedReposInFlight: Promise<void> | null = null
 
 export function fetchCommits(): Promise<void> {
   if (commits.value) return Promise.resolve()
@@ -44,6 +46,25 @@ export function fetchContributions(): Promise<void> {
   return contributionsInFlight
 }
 
+export function fetchPinnedRepos(): Promise<void> {
+  if (pinnedRepos.value) return Promise.resolve()
+  if (pinnedReposInFlight) return pinnedReposInFlight
+
+  pinnedReposInFlight = api
+    .githubPinnedRepos()
+    .then((data) => {
+      if (data.configured && data.repos?.length) pinnedRepos.value = data.repos
+    })
+    .catch(() => {
+      // Unconfigured or rate-limited — the extra cards stay hidden.
+    })
+    .finally(() => {
+      pinnedReposInFlight = null
+    })
+
+  return pinnedReposInFlight
+}
+
 export function relativeTime(iso: string, justNow = 'just now'): string {
   const minutes = Math.floor((Date.now() - new Date(iso).getTime()) / 60000)
   if (minutes < 1) return justNow
@@ -61,11 +82,14 @@ export function useGithub(autoFetch = true) {
   if (autoFetch) {
     void fetchCommits()
     void fetchContributions()
+    void fetchPinnedRepos()
   }
   return {
     commits: computed(() => commits.value),
     contributions: computed(() => contributions.value),
+    pinnedRepos: computed(() => pinnedRepos.value),
     fetchCommits,
     fetchContributions,
+    fetchPinnedRepos,
   }
 }

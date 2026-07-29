@@ -24,3 +24,18 @@ export interface GithubContributions {
   /** Weeks of 7 days, oldest first. */
   weeks?: ContributionDay[][];
 }
+
+export interface GithubPinnedRepo {
+  name: string;
+  description: string | null;
+  url: string;
+  language: string | null;
+  languageColor: string | null;
+  stars: number;
+  forks: number;
+}
+
+export interface GithubPinnedRepos {
+  configured: boolean;
+  repos?: GithubPinnedRepo[];
+}

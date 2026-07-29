@@ -1,6 +1,10 @@
 import { Controller, Get } from '@nestjs/common';
 import { GithubService } from './github.service';
-import { GithubActivity, GithubContributions } from './github.types';
+import {
+  GithubActivity,
+  GithubContributions,
+  GithubPinnedRepos,
+} from './github.types';
 
 @Controller('github')
 export class GithubController {
@@ -14,5 +18,10 @@ export class GithubController {
   @Get('contributions')
   async getContributions(): Promise<GithubContributions> {
     return this.githubService.getContributions();
+  }
+
+  @Get('pinned-repos')
+  async getPinnedRepos(): Promise<GithubPinnedRepos> {
+    return this.githubService.getPinnedRepos();
   }
 }
