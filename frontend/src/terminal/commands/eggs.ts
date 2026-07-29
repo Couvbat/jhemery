@@ -191,14 +191,23 @@ export const eggCommands: Command[] = [
     hidden: true,
     run({ effects, raw }) {
       const cmd = raw.trim()
-      if (cmd === ':q' || cmd === ':q!' || cmd === ':quit' || cmd === ':quit!') {
+
+      if (cmd === ':q' || cmd === ':quit') {
+        if (effects.vimIsDirty()) {
+          return [line("E37: No write since last change (add ! to override)", 'error')]
+        }
+        effects.vim(false)
+        return [line('you are free. that was the hard part.', 'success')]
+      }
+
+      if (cmd === ':q!' || cmd === ':quit!') {
         effects.vim(false)
         return [line('you are free. that was the hard part.', 'success')]
       }
 
       return [
         line("E45: 'readonly' option is set (add ! to override)", 'error'),
-        line('hint: try `:q` — there is nothing to save anyway.', 'muted'),
+        line('hint: try `:q` to quit without writing.', 'muted'),
       ]
     },
   },
