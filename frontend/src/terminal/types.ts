@@ -50,6 +50,21 @@ export interface CommandContext {
   signal: AbortSignal
 }
 
+export interface VimCursor {
+  row: number
+  col: number
+}
+
+export type VimMode = 'normal' | 'insert'
+
+export interface VimBufferState {
+  name: string
+  lines: string[]
+  cursor: VimCursor
+  mode: VimMode
+  dirty: boolean
+}
+
 export interface VimFile {
   name: string
   lines: string[]
