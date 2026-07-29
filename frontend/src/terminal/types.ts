@@ -50,10 +50,15 @@ export interface CommandContext {
   signal: AbortSignal
 }
 
+export interface VimFile {
+  name: string
+  lines: string[]
+}
+
 export interface TerminalEffects {
   matrix: () => void
   crt: (enabled?: boolean) => boolean
-  vim: (enabled: boolean) => void
+  vim: (enabled: boolean, file?: VimFile) => void
   glitch: (durationMs: number) => Promise<void>
   playMusic: () => void
 }

@@ -3,7 +3,7 @@ import { currentLocale, useLocale } from '@/i18n'
 import { messages } from '@/i18n/messages'
 import { history, pushHistory } from '@/terminal/history'
 import { commonPrefix, complete, resolve, suggest } from '@/terminal/registry'
-import type { CommandContext, OutputLine, TerminalEffects } from '@/terminal/types'
+import type { CommandContext, OutputLine, TerminalEffects, VimFile } from '@/terminal/types'
 import { scrollToSection } from './useActiveSection'
 import { setCrt, glitch } from './useCrt'
 import { showMatrix } from './useMatrix'
@@ -16,6 +16,11 @@ const maximised = ref(false)
 const busy = ref(false)
 /** While a vim trap is active, Esc no longer closes the overlay. That is the joke. */
 const trapped = ref(false)
+/** Non-null while the vim pane is showing in place of the normal scrolling output. */
+const vimBuffer = ref<VimFile | null>(null)
+/** Transient readonly-error message shown in the vim pane's status line. */
+const vimError = ref<string | null>(null)
+let vimErrorTimeoutId: number | null = null
 
 const buffer = ref<OutputLine[]>([])
 const historyIndex = ref(-1)
@@ -49,14 +54,27 @@ function clearBuffer() {
 const effects: TerminalEffects = {
   matrix: showMatrix,
   crt: setCrt,
-  vim: (enabled: boolean) => {
+  vim: (enabled: boolean, file?: VimFile) => {
     trapped.value = enabled
+    vimBuffer.value = enabled ? (file ?? null) : null
   },
   glitch,
   playMusic: () => {
     requestPlayback()
     scrollToSection('music')
   },
+}
+
+/** Flashes the vim pane's readonly error, auto-clearing after 2s. Called directly
+ *  from TerminalOverlay's keydown handler, not through a Command — it's a UI
+ *  reaction to a blocked keystroke, not something the visitor typed and submitted. */
+export function triggerVimReadonlyError() {
+  vimError.value = "E45: 'readonly' option is set (add ! to override)"
+  if (vimErrorTimeoutId !== null) window.clearTimeout(vimErrorTimeoutId)
+  vimErrorTimeoutId = window.setTimeout(() => {
+    vimError.value = null
+    vimErrorTimeoutId = null
+  }, 2000)
 }
 
 function buildContext(args: string[], raw: string, signal: AbortSignal): CommandContext {
@@ -234,6 +252,8 @@ export function useTerminal() {
     maximised,
     busy: computed(() => busy.value),
     trapped: computed(() => trapped.value),
+    vimBuffer: computed(() => vimBuffer.value),
+    vimError: computed(() => vimError.value),
     buffer: computed(() => buffer.value),
     revision: computed(() => revision.value),
     pendingPrompt: computed(() => pendingPrompt.value),
@@ -246,5 +266,6 @@ export function useTerminal() {
     completeInput,
     clearBuffer,
     run,
+    triggerVimReadonlyError,
   }
 }
