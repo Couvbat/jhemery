@@ -1,8 +1,14 @@
 import { randomUUID } from 'node:crypto';
 import { mkdir, readFile, rename, writeFile } from 'node:fs/promises';
 import { dirname, isAbsolute, join } from 'node:path';
-import { BadRequestException, Injectable, Logger } from '@nestjs/common';
+import {
+  BadRequestException,
+  Injectable,
+  Logger,
+  OnModuleDestroy,
+} from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import mongoose, { Connection, Model, Schema } from 'mongoose';
 import { SignGuestbookDto } from './guestbook.dto';
 import { GuestbookEntry } from './guestbook.types';
 
@@ -15,14 +21,33 @@ const PAGE_SIZE = 25;
 const URL_PATTERN =
   /(https?:\/\/|www\.|\b[a-z0-9-]+\.(com|net|org|ru|xyz|top|shop)\b)/i;
 
+type GuestbookEntryDoc = GuestbookEntry;
+
+const guestbookSchema = new Schema<GuestbookEntryDoc>(
+  {
+    id: { type: String, required: true, unique: true },
+    name: { type: String, required: true },
+    message: { type: String, required: true },
+    date: { type: String, required: true },
+  },
+  { versionKey: false, collection: 'guestbook_entries' },
+);
+
 @Injectable()
-export class GuestbookService {
+export class GuestbookService implements OnModuleDestroy {
   private readonly logger = new Logger(GuestbookService.name);
   /** Serialises writes so two concurrent signings cannot clobber each other. */
   private writeQueue: Promise<unknown> = Promise.resolve();
   private cache: GuestbookEntry[] | null = null;
+  private mongoConnection: Connection | null = null;
+  private mongoModelPromise: Promise<Model<GuestbookEntryDoc> | null> | null =
+    null;
 
   constructor(private readonly config: ConfigService) {}
+
+  async onModuleDestroy(): Promise<void> {
+    await this.mongoConnection?.close();
+  }
 
   get enabled(): boolean {
     return this.config.get<string>('GUESTBOOK_ENABLED') === 'true';
@@ -30,7 +55,7 @@ export class GuestbookService {
 
   /**
    * Stored under DATA_DIR (default `uploads`), which the deploy rsync excludes —
-   * so entries survive deploys. There is no database on this host.
+   * so entries survive deploys. Falls back to this when MONGODB_URI is unset.
    */
   private get filePath(): string {
     const dir = this.config.get<string>('DATA_DIR') ?? 'uploads';
@@ -41,6 +66,16 @@ export class GuestbookService {
   }
 
   async list(): Promise<GuestbookEntry[]> {
+    const model = await this.getModel();
+    if (model) {
+      const docs = await model
+        .find({}, '-_id')
+        .sort({ _id: -1 })
+        .limit(PAGE_SIZE)
+        .lean();
+      return docs;
+    }
+
     const entries = await this.load();
     return [...entries].reverse().slice(0, PAGE_SIZE);
   }
@@ -63,16 +98,28 @@ export class GuestbookService {
       date: new Date().toISOString(),
     };
 
-    await this.enqueue(async () => {
-      const entries = await this.load();
-      const next = [...entries, entry].slice(-MAX_ENTRIES);
-      await this.persist(next);
-    });
+    const model = await this.getModel();
+    if (model) {
+      await model.create(entry);
+      await this.enforceMongoCap(model);
+    } else {
+      await this.enqueue(async () => {
+        const entries = await this.load();
+        const next = [...entries, entry].slice(-MAX_ENTRIES);
+        await this.persist(next);
+      });
+    }
 
     return entry;
   }
 
   async remove(id: string): Promise<boolean> {
+    const model = await this.getModel();
+    if (model) {
+      const res = await model.deleteOne({ id });
+      return res.deletedCount === 1;
+    }
+
     let removed = false;
     await this.enqueue(async () => {
       const entries = await this.load();
@@ -81,6 +128,53 @@ export class GuestbookService {
       if (removed) await this.persist(next);
     });
     return removed;
+  }
+
+  /**
+   * Lazily connects to MongoDB on first use and memoises the model. Returns
+   * null (falling back to the JSON file) when MONGODB_URI isn't set, or when
+   * the connection attempt fails — a transient outage on a self-hosted
+   * instance shouldn't take the whole guestbook down.
+   */
+  private getModel(): Promise<Model<GuestbookEntryDoc> | null> {
+    if (!this.mongoModelPromise) {
+      this.mongoModelPromise = this.connectMongo();
+    }
+    return this.mongoModelPromise;
+  }
+
+  private async connectMongo(): Promise<Model<GuestbookEntryDoc> | null> {
+    const uri = this.config.get<string>('MONGODB_URI');
+    if (!uri) return null;
+
+    try {
+      this.mongoConnection = await mongoose.createConnection(uri).asPromise();
+      return this.mongoConnection.model<GuestbookEntryDoc>(
+        'GuestbookEntry',
+        guestbookSchema,
+      );
+    } catch (err) {
+      this.logger.warn(
+        `Could not connect to MongoDB, falling back to file storage: ${err instanceof Error ? err.message : String(err)}`,
+      );
+      // Reset so the next call retries instead of being stuck on a rejection.
+      this.mongoModelPromise = null;
+      return null;
+    }
+  }
+
+  private async enforceMongoCap(
+    model: Model<GuestbookEntryDoc>,
+  ): Promise<void> {
+    const count = await model.countDocuments();
+    if (count <= MAX_ENTRIES) return;
+
+    const oldest = await model
+      .find({}, '_id')
+      .sort({ _id: 1 })
+      .limit(count - MAX_ENTRIES)
+      .lean();
+    await model.deleteMany({ _id: { $in: oldest.map((o) => o._id) } });
   }
 
   private enqueue<T>(task: () => Promise<T>): Promise<T> {
