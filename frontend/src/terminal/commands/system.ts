@@ -148,7 +148,7 @@ export const systemCommands: Command[] = [
                 tone: 'success',
                 pre: true,
               }
-            : { text: `  ✗ ${'???'.padEnd(24)}  locked`, tone: 'muted', pre: true },
+            : { text: `  ✗ ${'???'.padEnd(24)}  ${t(achievement.hint)}`, tone: 'muted', pre: true },
         )
       }
 
