@@ -5,7 +5,7 @@ import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
 import { Label } from '@/components/ui/label'
 import SectionHeader from '@/components/SectionHeader.vue'
-import { availability, socials } from '@/content'
+import { socials } from '@/content'
 import { useLocale } from '@/i18n'
 import { api } from '@/lib/api'
 
@@ -145,15 +145,6 @@ async function submit() {
                 >→</span
               >
             </a>
-          </div>
-
-          <div class="pt-4 border-t border-border">
-            <p class="text-xs text-muted-foreground font-mono">
-              <span class="text-primary">$</span> echo "{{ t(availability) }}"
-            </p>
-            <p class="text-xs text-foreground font-mono pl-4 mt-1">
-              {{ t(availability) }}
-            </p>
           </div>
         </div>
       </div>

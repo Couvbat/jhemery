@@ -3,7 +3,8 @@ import { currentLocale, useLocale } from '@/i18n'
 import { messages } from '@/i18n/messages'
 import { history, pushHistory } from '@/terminal/history'
 import { commonPrefix, complete, resolve, suggest } from '@/terminal/registry'
-import type { CommandContext, OutputLine, TerminalEffects } from '@/terminal/types'
+import type { CommandContext, OutputLine, TerminalEffects, VimBufferState, VimFile } from '@/terminal/types'
+import { handleVimKey } from '@/terminal/vimEditor'
 import { scrollToSection } from './useActiveSection'
 import { setCrt, glitch } from './useCrt'
 import { showMatrix } from './useMatrix'
@@ -16,6 +17,8 @@ const maximised = ref(false)
 const busy = ref(false)
 /** While a vim trap is active, Esc no longer closes the overlay. That is the joke. */
 const trapped = ref(false)
+/** Non-null while the vim pane is showing in place of the normal scrolling output. */
+const vimBuffer = ref<VimBufferState | null>(null)
 
 const buffer = ref<OutputLine[]>([])
 const historyIndex = ref(-1)
@@ -49,14 +52,33 @@ function clearBuffer() {
 const effects: TerminalEffects = {
   matrix: showMatrix,
   crt: setCrt,
-  vim: (enabled: boolean) => {
+  vim: (enabled: boolean, file?: VimFile) => {
     trapped.value = enabled
+    vimBuffer.value =
+      enabled && file
+        ? {
+            name: file.name,
+            lines: [...file.lines],
+            cursor: { row: 0, col: 0 },
+            mode: 'normal',
+            dirty: false,
+          }
+        : null
   },
+  vimIsDirty: () => vimBuffer.value?.dirty ?? false,
   glitch,
   playMusic: () => {
     requestPlayback()
     scrollToSection('music')
   },
+}
+
+/** Delegates one keydown to the vim editor's pure state machine. Returns `false`
+ *  if there's no open vim buffer, or the key wasn't handled (currently only `:`),
+ *  telling the caller to let the keystroke fall through normally. */
+export function handleVimKeydown(event: KeyboardEvent): boolean {
+  if (!vimBuffer.value) return false
+  return handleVimKey(vimBuffer.value, event)
 }
 
 function buildContext(args: string[], raw: string, signal: AbortSignal): CommandContext {
@@ -234,6 +256,8 @@ export function useTerminal() {
     maximised,
     busy: computed(() => busy.value),
     trapped: computed(() => trapped.value),
+    vimBuffer: computed(() => vimBuffer.value),
+    handleVimKeydown,
     buffer: computed(() => buffer.value),
     revision: computed(() => revision.value),
     pendingPrompt: computed(() => pendingPrompt.value),

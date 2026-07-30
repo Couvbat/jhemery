@@ -1,10 +1,10 @@
-import { findSection, profile, sectionIds, sections, socials, skills, availability } from '@/content'
+import { findSection, profile, sectionIds, sections, socials } from '@/content'
 import { currentSection } from '@/composables/useActiveSection'
 import { announce, toast, visitSection } from '../achievements'
 import type { Command } from '../types'
-import { blank, line, wrap } from '../format'
-import { SECRET_FILE, secretContents } from './secret'
-import { resolveGuestbookFile } from './guestbook-fs'
+import { line } from '../format'
+import { SECRET_FILE } from './secret'
+import { resolveFileLines } from './files'
 
 const FILES = ['about.txt', 'skills.txt', 'contact.txt'] as const
 
@@ -67,46 +67,10 @@ export const navigateCommands: Command[] = [
       const [file] = args
       if (!file) return [line('cat: missing operand', 'error')]
 
-      switch (file) {
-        case 'about.txt':
-        case 'a-propos.txt':
-          return [
-            ...t(profile.bio).flatMap((paragraph) => [
-              ...wrap(paragraph).map((text) => line(text)),
-              blank,
-            ]),
-            line(`🌐 ${t(profile.languages)}`, 'muted'),
-          ]
+      const lines = resolveFileLines(file, t)
+      if (!lines) return [line(`cat: ${file}: No such file or directory`, 'error')]
 
-        case 'skills.txt':
-        case 'competences.txt':
-          return wrap(skills.join('  ·  ')).map((text) => line(text, 'primary'))
-
-        case 'contact.txt':
-          return [
-            ...socials.map((s) => ({
-              text: `${s.label.padEnd(11)}  ${s.handle}`,
-              tone: 'accent' as const,
-              pre: true,
-            })),
-            blank,
-            line(t(availability), 'muted'),
-          ]
-
-        case SECRET_FILE:
-          return [...secretContents(t), ...announce('secret', t)]
-
-        default: {
-          const entry = resolveGuestbookFile(file)
-          if (entry) {
-            return [
-              line(`${entry.name} — ${new Date(entry.date).toLocaleDateString()}`, 'primary'),
-              ...wrap(entry.message).map((text) => line(`  ${text}`)),
-            ]
-          }
-          return [line(`cat: ${file}: No such file or directory`, 'error')]
-        }
-      }
+      return file === SECRET_FILE ? [...lines, ...announce('secret', t)] : lines
     },
   },
   {

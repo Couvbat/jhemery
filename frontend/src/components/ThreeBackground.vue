@@ -19,7 +19,7 @@ interface AnimatedShape {
   speed: { x: number; y: number; z: number }
 }
 
-const shapeCount = 10
+const shapeCount = 18
 const shapes: AnimatedShape[] = []
 
 let mouseX = 0
@@ -44,6 +44,8 @@ function createShapes(targetScene: THREE.Scene, aspect: number) {
     () => new THREE.TorusGeometry(0.8, 0.3, 8, 24),
     () => new THREE.BoxGeometry(1.2, 1.2, 1.2),
     () => new THREE.OctahedronGeometry(1, 0),
+    () => new THREE.TetrahedronGeometry(1, 0),
+    () => new THREE.DodecahedronGeometry(1, 0),
   ]
 
   // Horizontal spread derived from the camera frustum (fov 60, distance cameraBaseZ) so
@@ -52,7 +54,7 @@ function createShapes(targetScene: THREE.Scene, aspect: number) {
   const horizontalSpread = 2 * Math.tan(verticalFovRad / 2) * cameraBaseZ * aspect
 
   const cyanIndices = new Set<number>()
-  while (cyanIndices.size < 2) {
+  while (cyanIndices.size < 3) {
     cyanIndices.add(Math.floor(Math.random() * shapeCount))
   }
 

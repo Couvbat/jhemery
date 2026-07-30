@@ -4,16 +4,18 @@ import { profile } from '@/content'
 import { useLocale } from '@/i18n'
 import { useTerminal } from '@/composables/useTerminal'
 import TerminalOutput from './TerminalOutput.vue'
+import VimPane from './VimPane.vue'
 
 const { t, m } = useLocale()
 const {
   open,
   maximised,
   busy,
-  trapped,
   buffer,
   revision,
   pendingPrompt,
+  vimBuffer,
+  handleVimKeydown,
   closeTerminal,
   submit,
   cancel,
@@ -57,6 +59,24 @@ async function onSubmit() {
 }
 
 function onKeydown(event: KeyboardEvent) {
+  if (
+    vimBuffer.value &&
+    input.value === '' &&
+    !event.ctrlKey &&
+    !event.altKey &&
+    !event.metaKey &&
+    event.key !== ':'
+  ) {
+    if (handleVimKeydown(event)) {
+      // Escape leaving insert mode must not also reach onPanelKeydown's Escape
+      // handling below (which would additionally submit `:q`) — a key the vim
+      // editor consumed is fully consumed, not just its default action.
+      event.preventDefault()
+      event.stopPropagation()
+    }
+    return
+  }
+
   if (event.key === 'ArrowUp') {
     event.preventDefault()
     input.value = recallHistory(-1, input.value)
@@ -139,7 +159,7 @@ function onPanelKeydown(event: KeyboardEvent) {
           <span class="ml-3 text-xs text-muted-foreground flex-1"
             >{{ profile.handle }}@{{ profile.host }} ~ {{ t(m.terminal.title) }}</span
           >
-          <span v-if="trapped" class="text-xs text-yellow-400">-- INSERT --</span>
+          <span v-if="vimBuffer?.mode === 'insert'" class="text-xs text-yellow-400">-- INSERT --</span>
           <button
             class="text-xs text-muted-foreground hover:text-primary px-1 transition-colors"
             :aria-label="maximised ? t(m.terminal.restore) : t(m.terminal.maximise)"
@@ -160,6 +180,7 @@ function onPanelKeydown(event: KeyboardEvent) {
 
         <!-- Output -->
         <div
+          v-if="!vimBuffer"
           ref="scrollEl"
           class="flex-1 overflow-y-auto p-4 font-mono text-xs sm:text-sm space-y-0.5"
           aria-live="polite"
@@ -168,6 +189,7 @@ function onPanelKeydown(event: KeyboardEvent) {
         >
           <TerminalOutput v-for="(entry, i) in buffer" :key="i" :line="entry" />
         </div>
+        <VimPane v-else :buffer="vimBuffer" />
 
         <!-- Input -->
         <form
