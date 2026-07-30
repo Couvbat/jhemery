@@ -5,6 +5,12 @@ import { history, pushHistory } from '@/terminal/history'
 import { commonPrefix, complete, resolve, suggest } from '@/terminal/registry'
 import type { CommandContext, OutputLine, TerminalEffects, VimBufferState, VimFile } from '@/terminal/types'
 import { handleVimKey } from '@/terminal/vimEditor'
+import {
+  closeTerminal,
+  pendingInitialCommand,
+  terminalOpen as open,
+  terminalTrapped as trapped,
+} from './useTerminalShell'
 import { scrollToSection } from './useActiveSection'
 import { setCrt, glitch } from './useCrt'
 import { showMatrix } from './useMatrix'
@@ -12,11 +18,8 @@ import { requestPlayback } from './useMusicPlayer'
 
 const MAX_LINES = 500
 
-const open = ref(false)
 const maximised = ref(false)
 const busy = ref(false)
-/** While a vim trap is active, Esc no longer closes the overlay. That is the joke. */
-const trapped = ref(false)
 /** Non-null while the vim pane is showing in place of the normal scrolling output. */
 const vimBuffer = ref<VimBufferState | null>(null)
 
@@ -237,8 +240,11 @@ export function completeInput(value: string): string {
   return shared.length > value.length ? shared : value
 }
 
-export function openTerminal(initialCommand?: string) {
-  open.value = true
+/** Called by `TerminalOverlay` every time it opens — shows the welcome message
+ *  on the very first-ever open (buffer stays non-empty forever after, so it
+ *  never repeats), and runs whatever command the light `openTerminal()` queued
+ *  up for us, if any. */
+export function primeOverlay() {
   if (buffer.value.length === 0) {
     append([
       { text: messages.terminal.welcome[currentLocale()], tone: 'primary' },
@@ -246,15 +252,11 @@ export function openTerminal(initialCommand?: string) {
       { text: '' },
     ])
   }
+  const initialCommand = pendingInitialCommand.value
   if (initialCommand) {
+    pendingInitialCommand.value = null
     void nextTick(() => submit(initialCommand))
   }
-}
-
-export function closeTerminal() {
-  if (trapped.value) return false
-  open.value = false
-  return true
 }
 
 export function useTerminal() {
@@ -269,7 +271,7 @@ export function useTerminal() {
     revision: computed(() => revision.value),
     pendingPrompt: computed(() => pendingPrompt.value),
     history: computed(() => history.value),
-    openTerminal,
+    primeOverlay,
     closeTerminal,
     submit,
     cancel,

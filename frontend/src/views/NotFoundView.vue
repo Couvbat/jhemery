@@ -3,7 +3,7 @@ import { computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { profile } from '@/content'
 import { useLocale } from '@/i18n'
-import { openTerminal } from '@/composables/useTerminal'
+import { openTerminal } from '@/composables/useTerminalShell'
 
 const route = useRoute()
 const router = useRouter()

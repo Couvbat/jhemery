@@ -1,10 +1,9 @@
 <script setup lang="ts">
 import { onMounted, onUnmounted } from 'vue'
 import { useLocale } from '@/i18n'
-import { useTerminal } from '@/composables/useTerminal'
+import { closeTerminal, openTerminal, terminalOpen as open } from '@/composables/useTerminalShell'
 
 const { t, m } = useLocale()
-const { open, openTerminal, closeTerminal } = useTerminal()
 
 function isTypingTarget(target: EventTarget | null): boolean {
   const el = target as HTMLElement | null

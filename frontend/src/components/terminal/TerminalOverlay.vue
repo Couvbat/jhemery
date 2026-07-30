@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, nextTick, ref, watch } from 'vue'
+import { computed, nextTick, onMounted, ref, watch } from 'vue'
 import { profile } from '@/content'
 import { useLocale } from '@/i18n'
 import { useTerminal } from '@/composables/useTerminal'
@@ -16,6 +16,7 @@ const {
   pendingPrompt,
   vimBuffer,
   handleVimKeydown,
+  primeOverlay,
   closeTerminal,
   submit,
   cancel,
@@ -39,11 +40,24 @@ watch(revision, async () => {
   if (scrollEl.value) scrollEl.value.scrollTop = scrollEl.value.scrollHeight
 })
 
-watch(open, async (isOpen) => {
+async function handleOpened() {
+  previouslyFocused = document.activeElement as HTMLElement | null
+  primeOverlay()
+  await nextTick()
+  inputEl.value?.focus()
+}
+
+// This component only mounts because `open` just became true for the first time
+// ever (App.vue gates its very existence on that) — a `watch(open, ...)` alone
+// would miss that first transition, since it isn't registered until after it
+// already happened. `onMounted` handles that one; the watch covers every
+// open/close after that, same as before the code-split (the component just
+// stays alive from here on, so it's a normal watch from then on).
+onMounted(handleOpened)
+
+watch(open, (isOpen) => {
   if (isOpen) {
-    previouslyFocused = document.activeElement as HTMLElement | null
-    await nextTick()
-    inputEl.value?.focus()
+    void handleOpened()
   } else {
     previouslyFocused?.focus()
     previouslyFocused = null
