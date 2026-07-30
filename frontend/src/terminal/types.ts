@@ -63,6 +63,9 @@ export interface VimBufferState {
   cursor: VimCursor
   mode: VimMode
   dirty: boolean
+  /** A refused `:q`/`:wq` shows its error here — VimPane is the only visible
+   *  surface while it's open, so the terminal's own scrollback won't do. */
+  statusMessage: string | null
 }
 
 export interface VimFile {
@@ -75,6 +78,8 @@ export interface TerminalEffects {
   crt: (enabled?: boolean) => boolean
   vim: (enabled: boolean, file?: VimFile) => void
   vimIsDirty: () => boolean
+  /** Shows a status-line message in the vim pane (e.g. a refused `:q`). */
+  vimMessage: (text: string) => void
   glitch: (durationMs: number) => Promise<void>
   playMusic: () => void
 }

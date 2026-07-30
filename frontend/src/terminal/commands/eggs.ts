@@ -200,7 +200,9 @@ export const eggCommands: Command[] = [
 
       if (cmd === ':q' || cmd === ':quit') {
         if (effects.vimIsDirty()) {
-          return [line("E37: No write since last change (add ! to override)", 'error')]
+          const message = 'E37: No write since last change (add ! to override)'
+          effects.vimMessage(message)
+          return [line(message, 'error')]
         }
         effects.vim(false)
         return [line('you are free. that was the hard part.', 'success'), ...announce('vim', t)]
@@ -211,8 +213,10 @@ export const eggCommands: Command[] = [
         return [line('you are free. that was the hard part.', 'success'), ...announce('vim', t)]
       }
 
+      const message = "E45: 'readonly' option is set (add ! to override)"
+      effects.vimMessage(`${message} — try :q to quit without writing`)
       return [
-        line("E45: 'readonly' option is set (add ! to override)", 'error'),
+        line(message, 'error'),
         line('hint: try `:q` to quit without writing.', 'muted'),
       ]
     },
