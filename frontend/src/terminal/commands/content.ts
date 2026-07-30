@@ -18,7 +18,7 @@ import { blank, heading, keyValues, line, tags, wrap } from '../format'
 import type { Command, OutputLine } from '../types'
 
 /** Whole-number days since the first commit, for the neofetch "uptime" line. */
-function uptime(): string {
+export function uptime(): string {
   const days = Math.floor((Date.now() - new Date(profile.since).getTime()) / 86_400_000)
   const years = Math.floor(days / 365)
   const remainder = days % 365

@@ -62,10 +62,14 @@ const effects: TerminalEffects = {
             cursor: { row: 0, col: 0 },
             mode: 'normal',
             dirty: false,
+            statusMessage: null,
           }
         : null
   },
   vimIsDirty: () => vimBuffer.value?.dirty ?? false,
+  vimMessage: (text: string) => {
+    if (vimBuffer.value) vimBuffer.value.statusMessage = text
+  },
   glitch,
   playMusic: () => {
     requestPlayback()
@@ -78,6 +82,9 @@ const effects: TerminalEffects = {
  *  telling the caller to let the keystroke fall through normally. */
 export function handleVimKeydown(event: KeyboardEvent): boolean {
   if (!vimBuffer.value) return false
+  // A fresh editing action dismisses whatever status message is showing —
+  // it doesn't persist once the visitor has moved on.
+  vimBuffer.value.statusMessage = null
   return handleVimKey(vimBuffer.value, event)
 }
 

@@ -1,6 +1,7 @@
 import { setLocale } from '@/i18n'
 import type { Locale } from '@/content/types'
 import { profile } from '@/content'
+import { announce } from '../achievements'
 import { history } from '../history'
 import { allCommands, resolve, visibleCommands } from '../registry'
 import type { Command, CommandGroup, OutputLine } from '../types'
@@ -119,7 +120,7 @@ export const coreCommands: Command[] = [
     description: { en: 'Show or switch language', fr: 'Afficher ou changer la langue' },
     group: 'core',
     palette: true,
-    run({ args, locale }) {
+    run({ args, locale, t }) {
       const [requested] = args
       if (!requested) {
         return [line(`current: ${locale} — available: en, fr`, 'muted')]
@@ -129,7 +130,10 @@ export const coreCommands: Command[] = [
         return [line(`lang: unsupported locale \`${requested}\``, 'error')]
       }
       setLocale(next as Locale)
-      return [line(next === 'fr' ? 'Langue : français' : 'Language: English', 'success')]
+      return [
+        line(next === 'fr' ? 'Langue : français' : 'Language: English', 'success'),
+        ...announce('lang', t),
+      ]
     },
   },
   {

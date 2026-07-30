@@ -1,6 +1,7 @@
 import { profile } from '@/content'
 import { prefersReducedMotion } from '@/composables/useCrt'
 import { api, ApiError } from '@/lib/api'
+import { announce } from '../achievements'
 import { COW, TRAIN } from '../ascii'
 import { art, blank, line } from '../format'
 import type { Command, CommandContext, OutputLine } from '../types'
@@ -118,6 +119,7 @@ export const eggCommands: Command[] = [
           blank,
           line('just kidding. everything is fine.', 'success'),
           line('(you should still not run that on a real machine)', 'muted'),
+          ...announce('sudo', ctx.t),
         ]
       }
 
@@ -141,9 +143,10 @@ export const eggCommands: Command[] = [
     description: { en: 'Follow the white rabbit', fr: 'Suivre le lapin blanc' },
     group: 'fun',
     hidden: true,
-    run({ effects, close }) {
+    run({ effects, close, t }) {
+      const toast = announce('matrix', t)
       if (prefersReducedMotion()) {
-        return [line('Wake up, Neo… (animation skipped: reduced motion)', 'primary')]
+        return [line('Wake up, Neo… (animation skipped: reduced motion)', 'primary'), ...toast]
       }
       close()
       effects.matrix()
@@ -154,9 +157,12 @@ export const eggCommands: Command[] = [
     description: { en: 'Toggle CRT overdrive', fr: 'Basculer le mode CRT' },
     group: 'fun',
     hidden: true,
-    run({ effects }) {
+    run({ effects, t }) {
       const enabled = effects.crt()
-      return [line(enabled ? 'CRT overdrive: ON' : 'CRT overdrive: OFF', 'primary')]
+      return [
+        line(enabled ? 'CRT overdrive: ON' : 'CRT overdrive: OFF', 'primary'),
+        ...announce('crt', t),
+      ]
     },
   },
   {
@@ -189,24 +195,28 @@ export const eggCommands: Command[] = [
     description: { en: 'Escape', fr: 'Sortir' },
     group: 'fun',
     hidden: true,
-    run({ effects, raw }) {
+    run({ effects, raw, t }) {
       const cmd = raw.trim()
 
       if (cmd === ':q' || cmd === ':quit') {
         if (effects.vimIsDirty()) {
-          return [line("E37: No write since last change (add ! to override)", 'error')]
+          const message = 'E37: No write since last change (add ! to override)'
+          effects.vimMessage(message)
+          return [line(message, 'error')]
         }
         effects.vim(false)
-        return [line('you are free. that was the hard part.', 'success')]
+        return [line('you are free. that was the hard part.', 'success'), ...announce('vim', t)]
       }
 
       if (cmd === ':q!' || cmd === ':quit!') {
         effects.vim(false)
-        return [line('you are free. that was the hard part.', 'success')]
+        return [line('you are free. that was the hard part.', 'success'), ...announce('vim', t)]
       }
 
+      const message = "E45: 'readonly' option is set (add ! to override)"
+      effects.vimMessage(`${message} — try :q to quit without writing`)
       return [
-        line("E45: 'readonly' option is set (add ! to override)", 'error'),
+        line(message, 'error'),
         line('hint: try `:q` to quit without writing.', 'muted'),
       ]
     },
@@ -232,7 +242,7 @@ export const eggCommands: Command[] = [
       ]
       await paced(ctx, stages, 260)
       await sleep(prefersReducedMotion() ? 0 : 600, ctx.signal)
-      return [blank, line('ACCESS DENIED — nice try.', 'error')]
+      return [blank, line('ACCESS DENIED — nice try.', 'error'), ...announce('hack', ctx.t)]
     },
   },
   {
@@ -241,10 +251,11 @@ export const eggCommands: Command[] = [
     description: { en: 'Brew a coffee', fr: 'Préparer un café' },
     group: 'fun',
     hidden: true,
-    run() {
+    run({ t }) {
       return [
         line('HTTP/1.1 418 I\'m a teapot', 'error'),
         line('The requested entity body is short and stout.', 'muted'),
+        ...announce('coffee', t),
       ]
     },
   },
@@ -264,7 +275,7 @@ export const eggCommands: Command[] = [
     description: { en: 'A cow says something', fr: 'Une vache parle' },
     group: 'fun',
     hidden: true,
-    run({ args }) {
+    run({ args, t }) {
       const text = args.join(' ') || 'moo'
       const width = Math.min(text.length, 40)
       const wrapped: string[] = []
@@ -283,6 +294,7 @@ export const eggCommands: Command[] = [
       return [
         ...art([` ${border}`, ...body, ` ${'-'.repeat(width + 2)}`].join('\n'), 'default'),
         ...art(COW, 'muted'),
+        ...announce('cowsay', t),
       ]
     },
   },
@@ -291,8 +303,11 @@ export const eggCommands: Command[] = [
     description: { en: 'A dubious aphorism', fr: 'Un aphorisme douteux' },
     group: 'fun',
     hidden: true,
-    run() {
-      return [line(FORTUNES[Math.floor(Math.random() * FORTUNES.length)]!, 'accent')]
+    run({ t }) {
+      return [
+        line(FORTUNES[Math.floor(Math.random() * FORTUNES.length)]!, 'accent'),
+        ...announce('fortune', t),
+      ]
     },
   },
   {
@@ -303,7 +318,7 @@ export const eggCommands: Command[] = [
     async run(ctx) {
       const rows = TRAIN.split('\n')
       if (prefersReducedMotion()) {
-        return [...art(TRAIN, 'accent'), line('(you meant `ls`)', 'muted')]
+        return [...art(TRAIN, 'accent'), line('(you meant `ls`)', 'muted'), ...announce('sl', ctx.t)]
       }
 
       // Slide the train right-to-left by trimming a growing indent.
@@ -311,7 +326,7 @@ export const eggCommands: Command[] = [
         ctx.print(rows.map((row) => ({ text: ' '.repeat(offset) + row, tone: 'accent' as const, pre: true })))
         await sleep(120, ctx.signal)
       }
-      return [line('(you meant `ls`)', 'muted')]
+      return [line('(you meant `ls`)', 'muted'), ...announce('sl', ctx.t)]
     },
   },
   {
@@ -319,13 +334,13 @@ export const eggCommands: Command[] = [
     description: { en: 'Do not', fr: 'Ne faites pas ça' },
     group: 'fun',
     hidden: true,
-    async run({ prompt }) {
+    async run({ prompt, t }) {
       const answer = (await prompt('this will open a video. are you sure? [y/N]')).toLowerCase()
       if (answer !== 'y' && answer !== 'yes') {
         return [line('wise.', 'muted')]
       }
       window.open('https://www.youtube.com/watch?v=dQw4w9WgXcQ', '_blank', 'noopener,noreferrer')
-      return [line('never gonna give you up', 'accent')]
+      return [line('never gonna give you up', 'accent'), ...announce('rickroll', t)]
     },
   },
   {

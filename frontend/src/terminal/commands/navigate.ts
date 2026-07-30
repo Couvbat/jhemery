@@ -1,5 +1,6 @@
-import { findSection, profile, sections, socials } from '@/content'
+import { findSection, profile, sectionIds, sections, socials } from '@/content'
 import { currentSection } from '@/composables/useActiveSection'
+import { announce, toast, visitSection } from '../achievements'
 import type { Command } from '../types'
 import { line } from '../format'
 import { SECRET_FILE } from './secret'
@@ -36,17 +37,17 @@ export const navigateCommands: Command[] = [
     group: 'navigate',
     run({ args, navigate, t }) {
       const [target] = args
-      if (!target || target === '~' || target === '/') {
-        navigate('about')
-        return
-      }
+      const bare = !target || target === '~' || target === '/'
+      const section = bare ? sections[0] : findSection(target)
 
-      const section = findSection(target)
       if (!section) {
         return [line(`cd: ${target}: No such file or directory`, 'error')]
       }
+
       navigate(section.id)
-      return [line(`~/${t(section.label)}`, 'muted')]
+      const unlocks = toast(visitSection(section.id, sectionIds), t)
+      if (bare) return unlocks.length ? unlocks : undefined
+      return [line(`~/${t(section.label)}`, 'muted'), ...unlocks]
     },
   },
   {
@@ -66,7 +67,10 @@ export const navigateCommands: Command[] = [
       const [file] = args
       if (!file) return [line('cat: missing operand', 'error')]
 
-      return resolveFileLines(file, t) ?? [line(`cat: ${file}: No such file or directory`, 'error')]
+      const lines = resolveFileLines(file, t)
+      if (!lines) return [line(`cat: ${file}: No such file or directory`, 'error')]
+
+      return file === SECRET_FILE ? [...lines, ...announce('secret', t)] : lines
     },
   },
   {

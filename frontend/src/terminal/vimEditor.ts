@@ -159,18 +159,23 @@ function handleInsertKey(event: KeyboardEvent, state: VimBufferState): void {
 
 /**
  * Dispatches one keydown to the vim pane's cursor/mode/buffer state, mutating it
- * in place. Returns `false` only for `:` — the caller lets that fall through to
- * the existing command-line typing mechanism unchanged. Every other key is
- * considered handled, including ones this editor doesn't map to anything, since
- * real vim's normal mode silently swallows unmapped keys rather than leaking
- * them into the shell.
+ * in place. Returns `false` for `:` — the caller lets that fall through to the
+ * existing command-line typing mechanism unchanged — and for `Escape` in normal
+ * mode, since there's nothing for it to do there (real vim's normal-mode Escape
+ * is a no-op) and the caller needs it to bubble up to the "nudge toward `:q`"
+ * handling instead of silently going nowhere. Escape in insert mode is still
+ * fully handled here (drop back to normal mode) so it doesn't *also* trigger
+ * that nudge. Every other key is considered handled, including ones this editor
+ * doesn't map to anything, since real vim's normal mode silently swallows
+ * unmapped keys rather than leaking them into the shell.
  */
 export function handleVimKey(state: VimBufferState, event: KeyboardEvent): boolean {
   if (event.key === ':') return false
   if (state.mode === 'insert') {
     handleInsertKey(event, state)
-  } else {
-    handleNormalKey(event.key, state)
+    return true
   }
+  if (event.key === 'Escape') return false
+  handleNormalKey(event.key, state)
   return true
 }

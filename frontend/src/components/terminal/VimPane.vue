@@ -36,8 +36,9 @@ const statusText = computed(() => {
       ><template v-else>{{ text || ' ' }}</template></p>
       <p v-for="(_, i) in tildeRows" :key="`tilde-${i}`" class="text-muted-foreground">~</p>
     </div>
-    <p class="px-4 py-1 border-t border-border shrink-0 truncate text-muted-foreground bg-muted">{{
-      statusText
-    }}</p>
+    <p
+      class="px-4 py-1 border-t border-border shrink-0 truncate bg-muted"
+      :class="buffer.statusMessage ? 'text-destructive' : 'text-muted-foreground'"
+    >{{ buffer.statusMessage ?? statusText }}</p>
   </div>
 </template>
