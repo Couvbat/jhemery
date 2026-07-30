@@ -104,4 +104,10 @@ export const messages = {
   boot: {
     skip: { en: 'press any key to skip', fr: 'appuyez sur une touche pour passer' },
   },
+  achievements: {
+    title: { en: 'Achievements', fr: 'Succès' },
+    open: { en: 'View achievements', fr: 'Voir les succès' },
+    close: { en: 'Close achievements', fr: 'Fermer les succès' },
+    toastPrefix: { en: 'Achievement unlocked:', fr: 'Succès débloqué :' },
+  },
 } satisfies Record<string, Record<string, Localised>>
