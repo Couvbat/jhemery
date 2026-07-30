@@ -1,160 +1,117 @@
-# Design spec — easter egg achievements
+# Design spec — achievements modal, nav button, and floating toast
 
-Status: proposed.
+Status: proposed. Supersedes an earlier draft of this file that assumed no achievement tracker
+existed yet — it does, see below.
 
 ## Context
 
-The site's terminal (see [features-spec.md](features-spec.md) §5) hides a dozen easter eggs behind
-hidden commands, a keyboard sequence, and a hidden file. Finding them is unguided and, once found,
-leaves no trace — nothing tells a visitor how many they've found or what they're missing. This adds
-a lightweight achievement tracker: a modal listing all 12 eggs (locked ones show a hint, not the
-answer), a nav button to open it, and a toast at the moment of discovery.
+`frontend/src/terminal/achievements.ts` already ships (commit `f81d8a1`, same day as this spec) a
+full achievement tracker: 18 achievements covering the terminal's easter eggs, the guestbook,
+`mail`, `lang`, `crt`, `htop`, visiting every section (`explorer`), and a cascading `completionist`
+meta-achievement. Unlocking is already wired into every relevant command
+(`eggs.ts`, `navigate.ts`, `core.ts`, `live.ts`) and the Konami handler in `App.vue`. Progress is
+already visible via a terminal `achievements` command (alias `trophies`), and unlocking already
+prints a `🏆 achievement unlocked: …` line into the terminal's own output buffer.
 
-This is visitor-facing chrome around an already-shipped feature, not a change to the eggs
-themselves — no new easter eggs are added, no existing one changes behaviour.
+What's missing, and what this spec covers:
 
-## Achievement list
+1. **No hint for locked entries.** The terminal command currently shows locked rows as a bare
+   `✗ ??? — locked`, telling a visitor nothing about how to earn them.
+2. **No visibility outside the terminal.** There's no button or page chrome that surfaces
+   achievements without knowing to open the terminal and type a command.
+3. **Silent unlocks outside the terminal.** The Konami code unlocks `konami` from anywhere on the
+   page, but nothing is shown — the toast line only exists inside the terminal's output buffer,
+   which isn't rendered unless the terminal happens to be open.
 
-Fixed order, one entry per existing hidden trigger. `hint` is shown for locked entries instead of
-`name`/`description`; `name` + `description` replace it once unlocked.
+This spec adds hints, a modal + nav button, and a floating toast — it does not add new
+achievements, and does not change what already unlocks what.
 
-| id | name | hint | description | trigger |
-|---|---|---|---|---|
-| `sudo` | Superuser | Some commands need elevated privileges. | Tried to sudo your way in. | Running `sudo <anything>` (the standard denial path) |
-| `rm-rf` | Kernel Panic | Don't run this on a real machine. | Ran `sudo rm -rf /` and survived. | The `sudo rm -rf /` easter egg |
-| `matrix` | Red Pill | Follow the white rabbit. | Entered the Matrix. | `matrix` |
-| `vim` | Stuck In Vim | Real developers use ed. | Opened vim and made it out (eventually). | Opening the `vim` trap |
-| `secret` | Curious | Not everything shows up in `ls`. | Found the hidden file. | `cat .secret` |
-| `konami` | Cheat Code | ↑↑↓↓←→←→ rings a bell? | Entered the Konami code. | Konami code, anywhere on the page |
-| `hack` | Script Kiddie | Some targets are worth an nmap. | Breached the mainframe (not really). | `hack [target]` reaching `ACCESS DENIED` |
-| `coffee` | I'm a Teapot | Try brewing something. | Asked the server for coffee. | `coffee` |
-| `cowsay` | Moo | Ask a cow for its opinion. | Made a cow say something. | `cowsay <text>` |
-| `fortune` | Dubious Wisdom | Ask the terminal for advice. | Received a dubious aphorism. | `fortune` |
-| `sl` | Choo Choo | Typo `ls` and see what happens. | Watched the train go by. | `sl` |
-| `rickroll` | Never Gonna | Curiosity killed the cat. | Got rickrolled on purpose. | Confirming `rickroll` with `y` |
+## Achievements data
 
-Explicitly excluded: `play` (a real navigation command, not hidden) and the DevTools console art
-(not an interactive trigger — there's nothing reliable to detect, and trying to detect open
-DevTools is the kind of fragile hack this site's "progressive, never blocking" principle argues
-against).
+`Achievement` gains a `hint: Localised<string>` field, populated for all 18 existing entries.
+Locked entries show `hint` instead of `title`/`description`; unlocked entries are unchanged
+(`title` + `description`). This applies to **both** surfaces that render locked rows — the existing
+terminal `achievements` command and the new modal — so the two don't show inconsistent information
+for the same underlying data (§1 of features-spec.md: "one source of truth for content" applies to
+achievement data the same way it applies to profile/project content).
 
-Localisation: `name`, `hint`, `description` are all `Localised<string>` per the existing content
-convention (§1 of features-spec.md).
+Hints, matched to the 18 existing ids (`secret`, `explorer`, `sign`, `mail`, `lang`, `sudo`, `vim`,
+`matrix`, `hack`, `cowsay`, `fortune`, `sl`, `coffee`, `rickroll`, `crt`, `htop`, `konami`,
+`completionist`): each nudges toward the trigger without naming the exact command, mirroring the
+terse register of the existing `description` strings (e.g. `sudo`'s hint is "Some commands should
+never be run as root," not "type `sudo rm -rf /`"). Exact copy (English + French) is finalized in
+the implementation plan, not enumerated here, since it's straightforward content work with no
+architectural weight.
 
-## Architecture
+## Reactive access
 
-### `frontend/src/content/achievements.ts`
+`unlocked` (currently a module-private `Ref<Set<string>>`) is exported directly from
+`achievements.ts` — the same pattern `history.ts` already uses for `export const history =
+ref<string[]>(...)`. This lets Vue components read live unlock state reactively without a new
+wrapper composable; `isUnlocked`/`unlockedCount` (the existing plain functions, used by the terminal
+command which re-renders on each command rather than reactively) are untouched.
 
-New content module, same shape as the rest of `content/*`: dependency-free, exports
-`achievements: Achievement[]` in the fixed order above. No import of Vue or `@` aliases, consistent
-with the build-time résumé generator's requirement on this directory.
+## Toast queue
 
-```ts
-interface Achievement {
-  id: string
-  name: Localised<string>
-  hint: Localised<string>
-  description: Localised<string>
-}
-```
+`unlock()` already computes `newly: string[]` (the id just unlocked, plus `completionist` when it
+cascades). It gains one more effect: pushing `{ id, title }` for each newly-unlocked achievement
+onto a new exported `toastQueue: Ref<{ id: string; title: Localised<string> }[]>`, plus a
+`dismissToast(id: string)` helper that filters it out.
 
-### `frontend/src/composables/useAchievements.ts`
-
-A module-level singleton, matching the existing pattern of `useTerminal()` / `useCrt()` (state
-shared across every caller, not per-component).
-
-- `unlocked: Ref<Set<string>>` — hydrated once from `localStorage['couvbat:achievements']` (a JSON
-  array of ids) on first access; falls back to an empty set if absent or unparsable.
-- `unlock(id: string): void` — no-op if `id` is already in `unlocked` (including unknown ids, as a
-  guard against typos silently no-oping rather than throwing); otherwise adds it, persists the full
-  set back to `localStorage`, and pushes `{ id, name }` onto `toastQueue`.
-- `isUnlocked(id: string): boolean`.
-- `progress: ComputedRef<{ count: number; total: number }>`.
-- `toastQueue: Ref<{ id: string; name: Localised<string> }[]>` and `dismissToast(id)` — the toast
-  component owns display timing, this just owns the queue.
-
-Persistence mirrors how terminal `history` already persists to `localStorage` — same mechanism,
-new key, no shared code needed since the read/write is a handful of lines.
-
-### Wiring unlocks
-
-Each trigger calls `unlock(id)` inline, at the point the egg already fires. No event bus, no
-scanning command history after the fact (Approach A from the brainstorm — rejected alternatives:
-inferring unlocks from terminal history breaks for the Konami code, which isn't a terminal command
-at all; an event bus adds indirection with no benefit since these call sites already import
-composables directly).
-
-Call sites, all in files that already exist:
-
-- `frontend/src/terminal/commands/eggs.ts`
-  - `sudo` command, generic denial branch → `unlock('sudo')`
-  - `sudo` command, `rm -rf /` branch (before the fake deletion sequence) → `unlock('rm-rf')`
-  - `matrix` command → `unlock('matrix')` (unconditionally — discovery counts even when
-    `prefers-reduced-motion` shows the static fallback line instead of the animation)
-  - `vim` command, both the no-file and file-open branches → `unlock('vim')`
-  - `hack` command, after the paced stages resolve to `ACCESS DENIED` → `unlock('hack')`
-  - `coffee`, `cowsay`, `fortune`, `sl` commands → `unlock('coffee')` / `unlock('cowsay')` /
-    `unlock('fortune')` / `unlock('sl')` respectively
-  - `rickroll` command, the `y`/`yes` branch only → `unlock('rickroll')`
-- `frontend/src/terminal/commands/secret.ts` — `secretContents()` → `unlock('secret')`
-- `frontend/src/App.vue` — `useKonami(() => { setCrt(); unlock('konami') })`
+This lives inside `unlock()` itself, not `announce()`/`toast()` (the existing terminal-rendering
+helpers) — every call site funnels through `unlock()` regardless of whether it goes on to call
+`announce`, including the raw `unlock('konami')` call in `App.vue` that currently has no rendering
+step at all. Centralizing here means the floating toast (below) covers every unlock, including that
+one, without touching any of the five existing call sites.
 
 ## UI
 
 ### `frontend/src/components/AchievementsModal.vue`
 
-A fixed-position dialog, hand-rolled to match `TerminalOverlay.vue`'s existing pattern exactly
-rather than introducing a new dialog primitive (there is none in `components/ui/` today, and one
-component doesn't justify adding shadcn-vue's Dialog):
-
-- `role="dialog"`, `aria-modal="true"`, `aria-label` from a new i18n key.
-- Manual focus trap on `Tab`/`Shift+Tab` cycling within the panel; focus moves to the panel on open
-  and restores to the button that opened it on close — same `previouslyFocused` pattern as
-  `TerminalOverlay.vue`.
-- `Esc` closes.
-- Header: `{count}/12 found` from `progress`.
-- Body: the 12 entries in fixed order. Unlocked rows show `name` + `description` + a ✓. Locked rows
-  show a 🔒 + `hint` only — never `name` or `description`, so the modal itself can't spoil what an
-  egg does.
+A fixed-position dialog, hand-rolled to match `TerminalOverlay.vue`'s existing focus-trap pattern
+exactly (`role="dialog"`, `aria-modal`, manual `Tab`/`Shift+Tab` cycling, focus moved to the panel's
+close button on open and restored to the triggering element on close, `Esc` closes) — there's no
+dialog primitive in `components/ui/` today, and one component doesn't justify adding shadcn-vue's.
+Takes `open` as a `v-model` (`defineModel`). Header shows `🏆 Achievements — {count}/18`. Body lists
+all 18 in fixed order; unlocked rows show `title` + `description` + ✓, locked rows show `🔒` + `???`
++ `hint`.
 
 ### Nav button
 
-A small trophy-icon button in `NavBar.vue`, placed next to the existing language toggle, in both
-the desktop (`hidden md:flex`) list and the mobile controls row. Shown unconditionally on mobile
-too, even though none of the 12 are reachable there without a keyboard — the terminal launcher is
-`md:`-hidden per §9 of features-spec.md, but the achievements button isn't gated the same way, so a
-mobile visitor still sees "0/12 found" with locked hints as a nudge to come back on desktop. This
-was a deliberate choice (confirmed during design), not an oversight.
+A small `🏆` icon button in `NavBar.vue`, next to the existing language toggle, in both the
+desktop (`hidden md:flex`) list and the mobile controls row — shown on mobile too, even though every
+achievement currently requires the terminal or a keyboard (neither reliably available on a phone),
+same reasoning as the original draft: locked entries with hints double as a "come back on desktop"
+nudge rather than a dead end. Toggles a local `ref` that's passed to `AchievementsModal` via
+`v-model:open`; no new global singleton state needed since there's exactly one place that opens it.
+
+Icon choice: a plain `🏆` emoji character, not an SVG or `lucide-vue-next` icon (a declared but
+currently unused dependency in this project). `NavBar.vue` already hand-rolls its hamburger icon as
+inline SVG, and the terminal's own toast line already uses `🏆` for the same concept — matching
+either existing convention is reasonable, and emoji is less code for a single-glyph button.
 
 ### `frontend/src/components/AchievementToast.vue`
 
-Mounted once in `App.vue`. Watches `toastQueue`; shows one "🏆 Achievement unlocked: *name*" toast
-at a time, auto-dismissing after ~3.5s, then advances to the next queued one if any. Positioned
-top-right so it never overlaps the terminal launcher (bottom-right) or the terminal overlay itself
-(bottom-anchored). `aria-live="polite"` region. Under `prefers-reduced-motion`, skips the
-slide/fade transition — the toast still appears and dismisses on the same timer, just without
-motion, consistent with how `matrix`/`sl`/CRT overdrive already degrade.
+Mounted once in `App.vue`. Watches `toastQueue`'s length; whenever it grows and nothing is
+currently shown, displays the first entry's `title` as `🏆 Achievement unlocked: {title}`, calls
+`dismissToast` and clears itself after a timeout, then checks the queue again — so a burst of
+several unlocks (e.g. the `completionist` cascade) shows one at a time rather than overlapping.
+Positioned top-right (`fixed top-16 right-4`, below the fixed navbar) so it never collides with the
+terminal launcher (bottom-right) or the terminal overlay (bottom-anchored). `role="status"
+aria-live="polite"`. Under `prefers-reduced-motion`, skips the slide/fade transition and uses a
+shorter fixed display time — consistent with how `matrix`/`sl`/CRT overdrive already degrade.
 
 ## i18n
 
-New keys under a `m.achievements` namespace: modal title, the `{count}/{total} found` template, the
-nav button's `aria-label`/`title`, and the toast's "Achievement unlocked" prefix. Achievement
-`name`/`hint`/`description` strings live in `content/achievements.ts` itself, following the existing
-convention that content data carries its own `Localised<T>` fields rather than routing through the
-`m.*` i18n message tree.
-
-## Accessibility
-
-- Modal: see focus-trap details above — this is the same treatment `TerminalOverlay.vue` already
-  has, applied to a second dialog.
-- Toast: `aria-live="polite"`, non-interactive (no dismiss button needed since it self-clears), so
-  it doesn't compete for keyboard focus.
-- Nav button: real `<button>`, `aria-label`, reachable by keyboard on both breakpoints.
+New `m.achievements` namespace in `messages.ts`: `title`, `open` (button label), `close`,
+`toastPrefix`. Achievement `title`/`hint`/`description` strings stay on the `Achievement` objects
+themselves, matching the existing convention already established by `achievements.ts` (content data
+carries its own `Localised<T>` fields rather than routing through `m.*`).
 
 ## Out of scope
 
-- No cross-device or account sync — `localStorage` only, per browser, matching how terminal history
-  already persists.
-- No progress reset UI (a hidden terminal command for this could be a later addition, not required
-  now).
-- No new achievements beyond the 12 listed — this specs the tracker, not new easter eggs.
+- No new achievements, and no change to what unlocks what — this is presentation only.
+- No cross-device sync — unlock state is already `localStorage`-only in the existing
+  implementation; unchanged here.
+- No removal of the terminal `achievements` command — it stays, and gets the same hint treatment as
+  the modal, so the two surfaces agree.
