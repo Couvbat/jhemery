@@ -3,10 +3,12 @@ import { ref, onMounted, onUnmounted } from 'vue'
 import { sections, profile } from '@/content'
 import { useLocale } from '@/i18n'
 import { activeSection, scrollToSection } from '@/composables/useActiveSection'
+import AchievementsModal from '@/components/AchievementsModal.vue'
 
 const { t, m, locale, toggleLocale } = useLocale()
 
 const menuOpen = ref(false)
+const achievementsOpen = ref(false)
 
 function go(id: string) {
   scrollToSection(id)
@@ -65,10 +67,27 @@ onUnmounted(() => window.removeEventListener('scroll', onScroll))
             {{ locale.toUpperCase() }}
           </button>
         </li>
+        <li>
+          <button
+            @click="achievementsOpen = true"
+            :title="t(m.achievements.open)"
+            :aria-label="t(m.achievements.open)"
+            class="ml-1 px-2 py-1 text-xs rounded border border-border text-muted-foreground hover:text-primary hover:border-primary/50 transition-colors"
+          >
+            🏆
+          </button>
+        </li>
       </ul>
 
       <!-- Mobile controls -->
       <div class="flex items-center gap-2 md:hidden">
+        <button
+          @click="achievementsOpen = true"
+          :aria-label="t(m.achievements.open)"
+          class="px-2 py-1 text-xs rounded border border-border text-muted-foreground"
+        >
+          🏆
+        </button>
         <button
           @click="toggleLocale"
           :aria-label="t(m.nav.language)"
@@ -129,5 +148,7 @@ onUnmounted(() => window.removeEventListener('scroll', onScroll))
         </li>
       </ul>
     </div>
+
+    <AchievementsModal v-model:open="achievementsOpen" />
   </header>
 </template>

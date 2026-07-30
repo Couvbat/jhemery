@@ -6,6 +6,7 @@ import type { OutputLine } from './types'
 export interface Achievement {
   id: string
   title: Localised<string>
+  hint: Localised<string>
   description: Localised<string>
 }
 
@@ -16,86 +17,127 @@ export const achievementList: Achievement[] = [
   {
     id: 'secret',
     title: { en: 'Read the Manual', fr: 'A lu le manuel' },
+    hint: {
+      en: 'Not everything shows up in a normal listing.',
+      fr: 'Tout ne s’affiche pas dans une liste normale.',
+    },
     description: { en: '`ls -a` then `cat .secret`.', fr: '`ls -a` puis `cat .secret`.' },
   },
   {
     id: 'explorer',
     title: { en: 'Grand Tour', fr: 'Grand tour' },
+    hint: {
+      en: 'Have you seen everywhere this site has to offer?',
+      fr: 'Avez-vous vu tout ce que ce site a à offrir ?',
+    },
     description: { en: '`cd` into every section.', fr: '`cd` dans chaque section.' },
   },
   {
     id: 'sign',
     title: { en: 'Kilroy Was Here', fr: 'Kilroy est passé ici' },
+    hint: { en: 'Leave your mark somewhere public.', fr: 'Laissez votre marque quelque part de public.' },
     description: { en: 'Signed the guestbook.', fr: 'Signé le livre d’or.' },
   },
   {
     id: 'mail',
     title: { en: "You've Got Mail", fr: 'Vous avez un message' },
+    hint: {
+      en: 'There’s a way to reach out without leaving the terminal.',
+      fr: 'Il y a un moyen de me contacter sans quitter le terminal.',
+    },
     description: { en: 'Sent a message with `mail`.', fr: 'Envoyé un message avec `mail`.' },
   },
   {
     id: 'lang',
     title: { en: 'Bilingual', fr: 'Bilingue' },
+    hint: { en: 'This site speaks more than one language.', fr: 'Ce site parle plus d’une langue.' },
     description: { en: 'Switched language with `lang`.', fr: 'Changé de langue avec `lang`.' },
   },
   {
     id: 'sudo',
     title: { en: 'Script Kiddie', fr: 'Script kiddie' },
+    hint: {
+      en: 'Some commands should never be run as root.',
+      fr: 'Certaines commandes ne devraient jamais être lancées en root.',
+    },
     description: { en: 'Ran `sudo rm -rf /`.', fr: 'Lancé `sudo rm -rf /`.' },
   },
   {
     id: 'vim',
     title: { en: 'Vi Improved', fr: 'Vi amélioré' },
+    hint: {
+      en: 'Getting in is easy. Getting out is the achievement.',
+      fr: 'Entrer est facile. Sortir, c’est l’exploit.',
+    },
     description: { en: 'Escaped vim with `:q!`.', fr: 'Échappé de vim avec `:q!`.' },
   },
   {
     id: 'matrix',
     title: { en: 'Red Pill', fr: 'Pilule rouge' },
+    hint: { en: 'There’s a red pill somewhere in here.', fr: 'Il y a une pilule rouge quelque part ici.' },
     description: { en: 'Followed the white rabbit.', fr: 'Suivi le lapin blanc.' },
   },
   {
     id: 'hack',
     title: { en: '1337 h4x0r', fr: '1337 h4x0r' },
+    hint: { en: 'Some targets are worth an nmap.', fr: 'Certaines cibles méritent un bon nmap.' },
     description: { en: 'Tried to `hack` the mainframe.', fr: 'Tenté de `hack` le mainframe.' },
   },
   {
     id: 'cowsay',
     title: { en: 'Bovine Wisdom', fr: 'Sagesse bovine' },
+    hint: { en: 'Ask a cow for its opinion.', fr: 'Demandez son avis à une vache.' },
     description: { en: 'Asked a cow for advice.', fr: 'Demandé conseil à une vache.' },
   },
   {
     id: 'fortune',
     title: { en: 'Fortune Cookie', fr: 'Biscuit chinois' },
+    hint: {
+      en: 'The terminal has opinions, if you ask nicely.',
+      fr: 'Le terminal a des opinions, si on lui demande gentiment.',
+    },
     description: { en: 'Requested a `fortune`.', fr: 'Demandé une `fortune`.' },
   },
   {
     id: 'sl',
     title: { en: 'Choo Choo', fr: 'Tchou tchou' },
+    hint: {
+      en: 'Everyone mistypes `ls` eventually.',
+      fr: 'Tout le monde tape `sl` au lieu de `ls` un jour ou l’autre.',
+    },
     description: { en: 'Typo\'d `ls` into `sl`.', fr: 'Tapé `sl` au lieu de `ls`.' },
   },
   {
     id: 'coffee',
     title: { en: "I'm a Teapot", fr: 'Je suis une théière' },
+    hint: { en: 'Try brewing something.', fr: 'Essayez de préparer quelque chose.' },
     description: { en: 'Tried to `coffee`.', fr: 'Tenté un `coffee`.' },
   },
   {
     id: 'rickroll',
     title: { en: 'Never Gonna', fr: 'Never Gonna' },
+    hint: { en: 'Curiosity killed the cat.', fr: 'La curiosité est un vilain défaut.' },
     description: { en: 'Clicked through a `rickroll`.', fr: 'Cliqué sur un `rickroll`.' },
   },
   {
     id: 'crt',
     title: { en: 'CRT Overdrive', fr: 'Surtension CRT' },
+    hint: { en: 'This terminal has a retro mode.', fr: 'Ce terminal a un mode rétro.' },
     description: { en: 'Toggled `crt` mode.', fr: 'Activé le mode `crt`.' },
   },
   {
     id: 'htop',
     title: { en: 'Task Manager', fr: 'Gestionnaire de tâches' },
+    hint: {
+      en: 'Ever wonder what’s running under the hood?',
+      fr: 'Vous êtes-vous demandé ce qui tourne sous le capot ?',
+    },
     description: { en: 'Watched `htop`.', fr: 'Surveillé `htop`.' },
   },
   {
     id: 'konami',
     title: { en: 'Cheat Code', fr: 'Code de triche' },
+    hint: { en: '↑↑↓↓←→←→ rings a bell?', fr: '↑↑↓↓←→←→ ça vous dit quelque chose ?' },
     description: {
       en: 'Entered the Konami code — not even in the terminal.',
       fr: 'Entré le code Konami — même pas dans le terminal.',
@@ -104,6 +146,7 @@ export const achievementList: Achievement[] = [
   {
     id: COMPLETIONIST,
     title: { en: '100%', fr: '100%' },
+    hint: { en: 'For those who leave no stone unturned.', fr: 'Pour ceux qui ne laissent rien au hasard.' },
     description: { en: 'Unlocked everything else.', fr: 'Tout débloqué.' },
   },
 ]
@@ -130,8 +173,16 @@ function persist(key: string, value: Set<string>) {
   }
 }
 
-const unlocked = ref<Set<string>>(loadSet(ACHIEVEMENTS_KEY))
+export const unlocked = ref<Set<string>>(loadSet(ACHIEVEMENTS_KEY))
 const visitedSections = ref<Set<string>>(loadSet(SECTIONS_KEY))
+
+/** Newly-unlocked achievements waiting to be shown as a floating toast, oldest first. */
+export const toastQueue = ref<{ id: string; title: Localised<string> }[]>([])
+
+/** Removes one entry from the toast queue once it's been shown. */
+export function dismissToast(id: string) {
+  toastQueue.value = toastQueue.value.filter((entry) => entry.id !== id)
+}
 
 /** Unlocks an achievement, cascading into `completionist` if it was the last one. Returns newly-unlocked ids. */
 export function unlock(id: string): string[] {
@@ -149,6 +200,13 @@ export function unlock(id: string): string[] {
 
   unlocked.value = next
   persist(ACHIEVEMENTS_KEY, next)
+  toastQueue.value = [
+    ...toastQueue.value,
+    ...newly.map((gained) => ({
+      id: gained,
+      title: achievementList.find((a) => a.id === gained)!.title,
+    })),
+  ]
   return newly
 }
 

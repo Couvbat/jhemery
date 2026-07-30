@@ -10,6 +10,7 @@ import { restoreCrt, setCrt } from '@/composables/useCrt'
 import { useMatrix } from '@/composables/useMatrix'
 import { terminalOpen } from '@/composables/useTerminalShell'
 import { unlock } from '@/terminal/achievements'
+import AchievementToast from '@/components/AchievementToast.vue'
 
 const ThreeBackground = defineAsyncComponent(() => import('@/components/ThreeBackground.vue'))
 // Only pulled in when someone actually types `matrix`.
@@ -64,6 +65,7 @@ onMounted(() => {
   <TerminalLauncher />
   <TerminalOverlay v-if="terminalEverOpened" />
   <CommandPalette />
+  <AchievementToast />
 
   <MatrixRain v-if="matrixActive" />
   <BootSequence />
