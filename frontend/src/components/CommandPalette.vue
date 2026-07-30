@@ -1,10 +1,10 @@
 <script setup lang="ts">
-import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
+import { computed, nextTick, onMounted, onUnmounted, ref, shallowRef, watch } from 'vue'
 import { sections } from '@/content'
 import { useLocale } from '@/i18n'
-import { paletteCommands } from '@/terminal/registry'
-import { openTerminal } from '@/composables/useTerminal'
+import { openTerminal } from '@/composables/useTerminalShell'
 import { scrollToSection } from '@/composables/useActiveSection'
+import type { Command } from '@/terminal/types'
 
 const { t, m } = useLocale()
 
@@ -21,6 +21,20 @@ interface Entry {
   run: () => void
 }
 
+// The full command registry (every command, the guestbook client, the vim
+// editor...) is a separate chunk — fetched only the first time the palette is
+// actually opened, so it costs nothing for visitors who never press Ctrl+K.
+const registryCommands = shallowRef<Command[]>([])
+let registryRequested = false
+
+function loadRegistryCommands() {
+  if (registryRequested) return
+  registryRequested = true
+  void import('@/terminal/registry').then(({ paletteCommands }) => {
+    registryCommands.value = paletteCommands()
+  })
+}
+
 /**
  * Sections come first — jumping around the page is what most visitors actually want
  * from Ctrl+K. Registry commands follow, so the palette never needs its own list.
@@ -32,7 +46,7 @@ const entries = computed<Entry[]>(() => [
     hint: t(s.heading),
     run: () => scrollToSection(s.id),
   })),
-  ...paletteCommands().map((c) => ({
+  ...registryCommands.value.map((c) => ({
     id: `cmd:${c.name}`,
     label: c.name,
     hint: t(c.description),
@@ -62,6 +76,7 @@ async function show() {
   open.value = true
   query.value = ''
   cursor.value = 0
+  loadRegistryCommands()
   await nextTick()
   inputEl.value?.focus()
 }
