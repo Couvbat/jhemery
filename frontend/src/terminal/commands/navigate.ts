@@ -1,5 +1,6 @@
-import { findSection, profile, sections, socials, skills, availability } from '@/content'
+import { findSection, profile, sectionIds, sections, socials, skills, availability } from '@/content'
 import { currentSection } from '@/composables/useActiveSection'
+import { announce, toast, visitSection } from '../achievements'
 import type { Command } from '../types'
 import { blank, line, wrap } from '../format'
 import { SECRET_FILE, secretContents } from './secret'
@@ -36,17 +37,17 @@ export const navigateCommands: Command[] = [
     group: 'navigate',
     run({ args, navigate, t }) {
       const [target] = args
-      if (!target || target === '~' || target === '/') {
-        navigate('about')
-        return
-      }
+      const bare = !target || target === '~' || target === '/'
+      const section = bare ? sections[0] : findSection(target)
 
-      const section = findSection(target)
       if (!section) {
         return [line(`cd: ${target}: No such file or directory`, 'error')]
       }
+
       navigate(section.id)
-      return [line(`~/${t(section.label)}`, 'muted')]
+      const unlocks = toast(visitSection(section.id, sectionIds), t)
+      if (bare) return unlocks.length ? unlocks : undefined
+      return [line(`~/${t(section.label)}`, 'muted'), ...unlocks]
     },
   },
   {
@@ -93,7 +94,7 @@ export const navigateCommands: Command[] = [
           ]
 
         case SECRET_FILE:
-          return secretContents(t)
+          return [...secretContents(t), ...announce('secret', t)]
 
         default: {
           const entry = resolveGuestbookFile(file)

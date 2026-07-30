@@ -9,6 +9,7 @@ import TerminalOverlay from '@/components/terminal/TerminalOverlay.vue'
 import { useKonami } from '@/composables/useKonami'
 import { restoreCrt, setCrt } from '@/composables/useCrt'
 import { useMatrix } from '@/composables/useMatrix'
+import { unlock } from '@/terminal/achievements'
 
 const ThreeBackground = defineAsyncComponent(() => import('@/components/ThreeBackground.vue'))
 // Only pulled in when someone actually types `matrix`.
@@ -21,7 +22,10 @@ const { matrixActive } = useMatrix()
 // doesn't compete with hero content for bandwidth/CPU during first paint.
 const showThreeBackground = ref(false)
 
-useKonami(() => setCrt())
+useKonami(() => {
+  setCrt()
+  unlock('konami')
+})
 
 onMounted(() => {
   restoreCrt()

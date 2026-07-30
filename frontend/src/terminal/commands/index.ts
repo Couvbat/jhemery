@@ -4,6 +4,7 @@ import { navigateCommands } from './navigate'
 import { contentCommands } from './content'
 import { liveCommands } from './live'
 import { eggCommands } from './eggs'
+import { systemCommands } from './system'
 
 export const commands: Command[] = [
   ...coreCommands,
@@ -11,4 +12,5 @@ export const commands: Command[] = [
   ...contentCommands,
   ...liveCommands,
   ...eggCommands,
+  ...systemCommands,
 ]

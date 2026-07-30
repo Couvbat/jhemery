@@ -2,6 +2,7 @@ import { gaming, profile } from '@/content'
 import { fetchSteam, formatPlaytime, useSteam } from '@/composables/useSteam'
 import { fetchCommits, relativeTime, shortRepo, useGithub } from '@/composables/useGithub'
 import { api, ApiError } from '@/lib/api'
+import { announce } from '../achievements'
 import { blank, heading, line } from '../format'
 import type { Command, OutputLine } from '../types'
 import { cacheGuestbookEntries, filenameFor } from './guestbook-fs'
@@ -112,7 +113,7 @@ export const liveCommands: Command[] = [
     usage: 'sign <message>',
     description: { en: 'Leave a message in the guestbook', fr: 'Laisser un message' },
     group: 'live',
-    async run({ args, prompt, print }) {
+    async run({ args, prompt, print, t }) {
       const message = args.join(' ').trim()
       if (!message) return [line('sign: usage — sign <message>', 'error')]
 
@@ -122,7 +123,7 @@ export const liveCommands: Command[] = [
       print(line('signing…', 'muted'))
       try {
         await api.sign(name, message)
-        return [line('✓ signed. run `guestbook` to see it.', 'success')]
+        return [line('✓ signed. run `guestbook` to see it.', 'success'), ...announce('sign', t)]
       } catch (error) {
         const detail = error instanceof ApiError ? error.message : 'request failed'
         return [line(`sign: ${detail}`, 'error')]
@@ -135,7 +136,7 @@ export const liveCommands: Command[] = [
     description: { en: 'Send me a message', fr: 'M’envoyer un message' },
     group: 'live',
     palette: true,
-    async run({ prompt, print }) {
+    async run({ prompt, print, t }) {
       print([
         line(`composing a message to ${profile.email}`, 'muted'),
         line('ctrl+c at any point to abort', 'muted'),
@@ -171,7 +172,7 @@ export const liveCommands: Command[] = [
       print(line('sending…', 'muted'))
       try {
         await api.contact({ name, email, subject: subject || undefined, message })
-        return [line('✓ sent. I will get back to you shortly.', 'success')]
+        return [line('✓ sent. I will get back to you shortly.', 'success'), ...announce('mail', t)]
       } catch (error) {
         const detail = error instanceof ApiError ? error.message : 'request failed'
         return [
