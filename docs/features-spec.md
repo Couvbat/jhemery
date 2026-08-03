@@ -4,11 +4,17 @@ Status: implemented. This document is the reference for what was built, why, and
 seams are. It describes the target state; where a decision was contentious the trade-off is
 recorded inline rather than in a separate changelog.
 
+Per-feature design specs and their implementation plans live in [superpowers/](superpowers/) —
+each carries its own status line and the PR it shipped in. They are kept as a record of the
+reasoning behind a change; this file is the one that describes the current system. Deployment and
+Apache config are in [deploy.md](deploy.md).
+
 ## Context
 
 The site is a single-page Vue 3 portfolio with a cyberpunk terminal aesthetic. Six sections
 (`about`, `projects`, `music`, `gaming`, `hardware`, `contact`) render on one route, backed by a
-NestJS API exposing `/contact`, `/steam/activity` and `/github/activity`.
+NestJS API exposing `/contact`, `/steam/activity`, `/github/activity`,
+`/github/contributions`, `/github/pinned-repos` and `/guestbook`.
 
 The hero already renders a *fake* terminal — `whoami`, `cat about.txt`, `ls skills/`. The features
 below add a *real* one. The distinction matters: if the interactive terminal only reprinted the
@@ -88,17 +94,22 @@ interface Command {
   group: 'core' | 'navigate' | 'content' | 'live' | 'fun'
   hidden?: boolean       // excluded from help + completion, still runnable
   palette?: boolean      // surfaced in the Ctrl+K palette
-  run(ctx: CommandContext): OutputLine[] | Promise<OutputLine[]> | void
+  run(ctx: CommandContext): OutputLine[] | void | Promise<OutputLine[] | void>
 }
 ```
 
-`CommandContext` carries the parsed `args`, the raw input, the current `locale`, and side-effect
-handles the command may use: `print()`, `clear()`, `close()`, `navigate(sectionId)`,
-`prompt(question)` (returns a promise resolving to the next line the user types), and `effects`
-(matrix, crt, vim-trap).
+`CommandContext` carries the parsed `args`, the `raw` input, the current `locale`, the `t()`
+resolver, and the side-effect handles a command may use: `print()`, `clear()`, `close()`,
+`navigate(sectionId)`, `prompt(question)` (resolves to the next line the user types, rejects on
+`Ctrl+C`), `run(input)` (runs another command as if typed — how `git log` delegates to `gitlog`),
+a `signal: AbortSignal` so animated commands stop cleanly when cancelled, and `effects`:
+`matrix`, `crt`, `vim`/`vimIsDirty`/`vimMessage` (§5.1), `glitch` and `playMusic`.
 
-`OutputLine` is `{ text: string; tone?: 'default'|'muted'|'primary'|'accent'|'secondary'|'error'|'success'; href?: string }`.
-Deliberately *not* HTML — output is rendered as text nodes so no command can inject markup.
+`OutputLine` is
+`{ text: string; tone?: Tone; href?: string; pre?: boolean; prompt?: boolean }`, where `Tone` is
+`default|muted|primary|accent|secondary|error|success|warning`. `pre` preserves runs of spaces for
+ASCII art and tables; `prompt` marks an echoed prompt line rather than output. Deliberately *not*
+HTML — output is rendered as text nodes, so a guestbook entry cannot inject markup.
 
 ### Registry
 
@@ -122,9 +133,13 @@ page all talk to the same session, so history survives closing the panel).
 - `TerminalLauncher.vue` — sticky bottom-right button, `md:` and up only (see accessibility).
 - `TerminalOverlay.vue` — bottom-anchored panel, `max-w-4xl`, with a maximise toggle. Title bar
   matches the existing fake-terminal chrome (three dots + `couvbat@portfolio ~ bash`).
+- `VimPane.vue` — replaces the scrolling buffer while a vim buffer is open (§5.1).
 
 Open/close: click the launcher, press `` ` `` (backtick) anywhere outside an input, or `Ctrl+``.
-`Esc` closes — unless a vim trap is active (§5), which is the joke.
+`Esc` closes — unless the vim pane is open (§5.1), which is the joke.
+
+The overlay is lazily mounted (`v-if="terminalEverOpened"`) and the whole terminal is a separate
+Rollup chunk, so a visitor who never opens it never downloads it.
 
 ---
 
@@ -140,8 +155,9 @@ Grouped as they appear in `help`.
 | `history` | Numbered list of past commands |
 | `echo <text>` | Prints its arguments |
 | `date` | Local date/time |
+| `whoami` | Prints the current user |
 | `lang [en\|fr]` | Prints or switches locale |
-| `exit` | Closes the overlay |
+| `exit` (aliases `quit`, `logout`) | Closes the overlay |
 
 ### navigate
 | Command | Behaviour |
@@ -154,17 +170,18 @@ Grouped as they appear in `help`.
 
 ### content
 Reads from §1, so it can never contradict the page: `about`, `skills`, `projects [--json]`,
-`music`, `gaming`, `hardware [pc|nas|peripherals]`, `resume`, `neofetch`.
+`music`, `gaming`, `hardware [pc|nas|peripherals]`, `contact`, `resume`, `neofetch`, `curl`.
 
 `neofetch` renders an ASCII logo beside a spec block — stack, locale, "uptime" since the first
-commit, and the live Steam status if available.
+commit, and the live Steam status if available. `curl <domain>` re-runs `resume` when pointed at
+this site (or `localhost`), mirroring what a real `curl jhemery.xyz` returns (§7); any other host
+gets `curl: (6) Could not resolve host` and a note that a browser tab cannot open a raw socket.
 
 ### live
 | Command | Endpoint | Fallback |
 |---|---|---|
 | `steam` / `playing` | `GET /steam/activity` | static game log from `content/gaming.ts` |
 | `gitlog` (alias `git log`) | `GET /github/activity` | "no activity available" |
-| `contrib` | `GET /github/contributions` | hidden if unconfigured |
 | `guestbook` | `GET /guestbook` | "guestbook is closed" |
 | `sign <message>` | `POST /guestbook` | error line |
 | `mail` | `POST /contact` | error line |
@@ -190,8 +207,9 @@ It shares the registry, so it needs no separate maintenance.
 
 ## 5. Easter eggs
 
-**Where:** `frontend/src/terminal/commands/eggs.ts`, `frontend/src/components/effects/*`,
-`frontend/src/composables/useKonami.ts`, `useCrt.ts`
+**Where:** `frontend/src/terminal/commands/eggs.ts`, `commands/system.ts`, `commands/secret.ts`,
+`frontend/src/components/effects/*`, `frontend/src/composables/useKonami.ts`, `useCrt.ts`,
+`useMatrix.ts`
 
 | Trigger | Effect |
 |---|---|
@@ -199,7 +217,8 @@ It shares the registry, so it needs no separate maintenance.
 | `sudo rm -rf /` | Fake cascading deletion, page desaturates, then restores with a wink |
 | `matrix` | Full-screen canvas digital rain; any key or click exits |
 | Konami code (anywhere) | CRT overdrive — scanlines intensify, chromatic aberration, background wireframes speed up. Toggles off on repeat |
-| `vim` | Traps the terminal; `Esc` no longer closes it; only `:q!` escapes, with escalating hints |
+| `crt` | The same overdrive, toggled from the terminal for anyone who doesn't know the Konami code |
+| `vim` (aliases `vi`, `nvim`, `emacs`) | Opens a real modal editor pane — see §5.1 |
 | `ls -a` → `cat .secret` | Hidden file with a message aimed at whoever is curious enough to look |
 | `hack [target]` | Fake nmap/progress output ending in `ACCESS DENIED — nice try` |
 | `coffee` | `HTTP 418: I'm a teapot` |
@@ -208,14 +227,70 @@ It shares the registry, so it needs no separate maintenance.
 | `fortune` | Random dev aphorism |
 | `sl` | ASCII train, animated across the buffer |
 | `rickroll` | Asks for confirmation first, because doing it unprompted is rude |
+| `ps` (aliases `ps aux`, `ps -ef`) | Fake process table of the site's own "services", partly derived from real page state — `crt-shader.ko` only appears while overdrive is on, `soundcloud-embed --autoplay` only after playback starts, and `[rm -rf /] <defunct>` is a permanent zombie |
+| `top` (alias `htop`) | The same table as a monitor, six refresh frames with jittered CPU/MEM (one frame under reduced motion) |
+| `uname` | `couvsh 1.0 jhemery.xyz x86_64 GNU/Portfolio` |
 | DevTools console | ASCII art + a short hiring pitch on load |
 
-Hidden commands (`sudo`, `vim`, `matrix`, `hack`, `coffee`, `sl`, `rickroll`, `cowsay`, `fortune`)
-are `hidden: true` — they don't appear in `help`. Finding them is the point. `help --all` lists
-them for the impatient.
+Hidden commands (`sudo`, `vim`, `:q`, `matrix`, `crt`, `hack`, `coffee`, `sl`, `rickroll`,
+`cowsay`, `fortune`, `ps`, `top`, `uname`) are `hidden: true` — they don't appear in `help`.
+Finding them is the point. `help --all` lists them for the impatient. `play` and `achievements`
+are deliberately *not* hidden: they are signposts rather than secrets.
 
-**Motion:** `matrix`, `sl` and CRT overdrive check `prefers-reduced-motion` and degrade to a
-static frame or a plain text response.
+**Motion:** every animated surface funnels through one `prefersReducedMotion()` helper in
+`useCrt.ts` rather than each re-reading the media query. `matrix` prints a one-line reply instead
+of opening the canvas, `sl` renders a static train, `top` draws one frame instead of six, the
+boot sequence and the Three.js background are skipped entirely, CRT overdrive resolves without
+animating, and the achievement toast shortens its dwell time.
+
+### 5.1 The vim pane
+
+**Where:** `frontend/src/components/terminal/VimPane.vue`, `frontend/src/terminal/vimEditor.ts`
+
+`vim` began as a joke that printed `~` lines and refused to close. It grew into a real modal
+editor, because a fake one that ignores `hjkl` is a worse joke than no joke.
+
+- `vim` with no args opens a splash buffer (`[No Name]`); `vim <file>` opens any file the shared
+  fake-filesystem resolver knows (the same resolver `cat` uses, so the two can't disagree).
+  A missing file errors in the normal buffer and the pane never opens.
+- Normal mode: `hjkl` and arrow keys move within bounds, `0`/`$` jump to line start/end,
+  `x` deletes under the cursor, `i`/`I`/`a`/`A`/`o`/`O` enter insert mode.
+- Insert mode: real text entry, `Enter` splits the line, `Backspace` merges into the previous
+  line at the right join column, `Esc` returns to normal mode and steps the cursor back one
+  column. The status line gains `[+]` once the buffer is dirty.
+- Nothing persists: `:wq` and `:x` always fail with vim's real
+  `E45: 'readonly' option is set`, dirty or not. A dirty buffer refuses `:q` with `E37` and needs
+  `:q!`. Re-opening a file always restores the original content.
+- While the pane is open `Esc` does not close the overlay — that is still the joke. Only `:q!`
+  (and friends) escapes. Modifier combos (`Ctrl+C`/`Ctrl+L`) keep working throughout.
+
+### 5.2 Achievements
+
+**Where:** `frontend/src/terminal/achievements.ts`, `components/AchievementsModal.vue`,
+`components/AchievementToast.vue`
+
+Eighteen achievements covering the easter eggs above, the guestbook, `mail`, `lang`, `crt`,
+`htop`, visiting every section (`explorer`), and a `completionist` that cascades when the other
+seventeen are done. Unlock state is `localStorage` only (`couvbat:achievements`, plus
+`couvbat:achievements:sections` for `explorer`'s progress) — there is no account and no sync.
+
+The problem this solves: the eggs are hidden on purpose, so without a tracker most visitors never
+learn there was anything to find. Achievements make the hidden layer *discoverable* without
+spoiling it — locked rows show a `hint` that nudges toward the trigger rather than naming the
+command ("Some commands should never be run as root", not "type `sudo rm -rf /`").
+
+Three surfaces, one source of truth:
+
+- **`achievements` terminal command** (alias `trophies`) — the full list with a `n/18` counter.
+- **Modal** — a nav-bar button opens the same list for visitors who never open the terminal.
+- **Toast** — `unlock()` pushes onto an exported `toastQueue` that a globally-mounted
+  `AchievementToast` drains one at a time. Centralising it in `unlock()` rather than at each call
+  site is what makes the Konami code (handled in `App.vue`, far from any terminal) announce
+  itself at all.
+
+`unlocked` is exported as a `Ref<Set<string>>` so Vue components read live state directly — the
+same pattern `history.ts` already uses — while the terminal command keeps using the plain
+`isUnlocked`/`unlockedCount` helpers, since it re-renders per command rather than reactively.
 
 ---
 
@@ -263,15 +338,17 @@ GitHub's REST API does not expose the contribution graph; the GraphQL
 `{ configured: false }` when `GITHUB_TOKEN` is absent, and the frontend hides the card. Cached for
 one hour — the graph updates at most daily.
 
+Rendered in `ProjectsSection` as an ASCII heatmap (`ContributionHeatmap.vue`) using `·░▒▓█`,
+53 weeks × 7 days, horizontally scrollable on narrow viewports. The page section is the only
+surface for it: the graph is a wide 2-D grid, and there is no terminal command that would render
+it legibly inside the output buffer.
+
 ### `GET /github/pinned-repos`
 
 Also GraphQL-only (`user.pinnedItems`), so it shares the same `GITHUB_TOKEN` requirement and
 one-hour cache as contributions. `ProjectsSection` renders these as extra cards alongside the
 hand-curated `content/projects.ts` list, deduplicated by repo URL so a pinned repo that's already
 written up manually doesn't show twice.
-
-Rendered in `ProjectsSection` as an ASCII heatmap using `·░▒▓█`, 53 weeks × 7 days, horizontally
-scrollable on narrow viewports.
 
 ### Guestbook
 
@@ -306,6 +383,11 @@ Retrofitting these is painful, so they are part of the definition of done:
 - Output buffer: `aria-live="polite"` with `aria-atomic="false"` so screen readers announce new
   lines rather than re-reading the whole buffer.
 - Command palette: `role="listbox"`, arrow-key navigation, `aria-activedescendant`.
+- Achievements modal: same hand-rolled pattern as the terminal overlay — `role="dialog"`,
+  `aria-modal="true"`, `Tab`/`Shift+Tab` cycled inside the panel, focus moved to the close button
+  on open and restored to the nav button on close.
+- Achievement toast: `role="status"` with `aria-live="polite"`, so an unlock is announced without
+  stealing focus from whatever the visitor was doing.
 - Every animated feature honours `prefers-reduced-motion`.
 - The launcher is `hidden` below `md`. Mobile virtual keyboards fight fixed-position input panels
   badly enough that a bad terminal is worse than none; mobile users get the full rendered page,

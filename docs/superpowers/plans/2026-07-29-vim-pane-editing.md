@@ -1,5 +1,10 @@
 # Vim Pane Real Navigation and Editing Implementation Plan
 
+**Status: complete.** Shipped in PR #10 (`fab290e`), alongside
+[the pane plan](2026-07-29-vim-pane-terminal.md) it builds on. A follow-up fix in PR #11
+(`85bd5ec`) corrected `Escape` handling. Kept as a record of the reasoning, not as an open work
+item.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Give the vim terminal pane real cursor navigation and real insert-mode editing (in-memory only, never persisted), with `:q` now genuinely refusing to quit a modified buffer without a bang.
@@ -29,7 +34,7 @@
 - Produces: `VimCursor { row: number; col: number }`, `VimMode = 'normal' | 'insert'`, `VimBufferState { name: string; lines: string[]; cursor: VimCursor; mode: VimMode; dirty: boolean }` — all exported from `frontend/src/terminal/types.ts`. `handleVimKey(state: VimBufferState, event: KeyboardEvent): boolean` — exported from `frontend/src/terminal/vimEditor.ts`. Returns `false` only for `event.key === ':'`; every other key returns `true` (handled, including silent no-ops for unmapped keys). Task 2 consumes both.
 - This task does **not** touch `TerminalEffects` or any other existing type/file — `vimIsDirty` is added to `TerminalEffects` in Task 2, bundled with the composable code that implements it (adding it here would make `useTerminal.ts`'s existing `effects` object literal fail type-check, since it wouldn't yet satisfy the interface).
 
-- [ ] **Step 1: Add the new types to `types.ts`**
+- [x] **Step 1: Add the new types to `types.ts`**
 
 In `frontend/src/terminal/types.ts`, insert directly above the existing `export interface VimFile { ... }` block:
 
@@ -53,7 +58,7 @@ export interface VimBufferState {
 
 (`VimFile` itself is unchanged — it keeps its existing role as the "open with this content" payload the `vim` command passes when starting a session. `VimBufferState` is the richer runtime state built from it.)
 
-- [ ] **Step 2: Create `frontend/src/terminal/vimEditor.ts`**
+- [x] **Step 2: Create `frontend/src/terminal/vimEditor.ts`**
 
 ```ts
 import type { VimBufferState } from './types'
@@ -234,12 +239,12 @@ export function handleVimKey(state: VimBufferState, event: KeyboardEvent): boole
 }
 ```
 
-- [ ] **Step 3: Type-check**
+- [x] **Step 3: Type-check**
 
 Run: `npm run type-check` (from `frontend/`)
 Expected: no errors.
 
-- [ ] **Step 4: Write and run a throwaway verification script**
+- [x] **Step 4: Write and run a throwaway verification script**
 
 Create `frontend/tmp-vim-editor-check.ts` (temporary — deleted in Step 5, never committed):
 
@@ -361,7 +366,7 @@ console.log('all vimEditor checks passed')
 Run: `node tmp-vim-editor-check.ts` (from `frontend/`)
 Expected output: `all vimEditor checks passed`, exit code 0. If any assertion fails, Node prints an `AssertionError` with the expected/actual values — fix `vimEditor.ts` (not the test) until all pass, since these assertions encode the spec's exact documented behavior.
 
-- [ ] **Step 5: Delete the throwaway script**
+- [x] **Step 5: Delete the throwaway script**
 
 ```bash
 rm frontend/tmp-vim-editor-check.ts
@@ -369,7 +374,7 @@ rm frontend/tmp-vim-editor-check.ts
 
 This script is not part of the shipped code and must not be committed — it exists purely to verify Step 2's logic deterministically before moving on.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add frontend/src/terminal/types.ts frontend/src/terminal/vimEditor.ts
@@ -392,7 +397,7 @@ git commit -m "feat: add vim pane cursor/editing state machine"
 - Consumes: `VimBufferState`, `handleVimKey` (Task 1).
 - Produces: `TerminalEffects.vimIsDirty(): boolean`. From `useTerminal()`: `handleVimKeydown(event: KeyboardEvent): boolean`. `vimBuffer` now typed `ComputedRef<VimBufferState | null>` (was `VimFile | null`). `VimPane` now takes a single prop `buffer: VimBufferState` (the `file`/`error` props are gone). Task 3 consumes `effects.vimIsDirty()`.
 
-- [ ] **Step 1: Add `vimIsDirty` to `TerminalEffects` in `types.ts`**
+- [x] **Step 1: Add `vimIsDirty` to `TerminalEffects` in `types.ts`**
 
 Change the existing `TerminalEffects` interface from:
 
@@ -419,7 +424,7 @@ export interface TerminalEffects {
 }
 ```
 
-- [ ] **Step 2: Update `useTerminal.ts`**
+- [x] **Step 2: Update `useTerminal.ts`**
 
 1. Change the type-only import line from:
    ```ts
@@ -486,7 +491,7 @@ export interface TerminalEffects {
 
 6. In the `useTerminal()` return object, remove the `vimError: computed(() => vimError.value),` line and the `triggerVimReadonlyError,` line; add `handleVimKeydown,` in their place (anywhere in the object — grouping it near `vimBuffer: computed(() => vimBuffer.value),` is tidiest).
 
-- [ ] **Step 3: Update `TerminalOverlay.vue`**
+- [x] **Step 3: Update `TerminalOverlay.vue`**
 
 1. In the `useTerminal()` destructure, replace `vimError,` and `triggerVimReadonlyError,` with `handleVimKeydown,` (keep `vimBuffer,` as-is).
 
@@ -547,7 +552,7 @@ export interface TerminalEffects {
            <VimPane v-else :buffer="vimBuffer" />
    ```
 
-- [ ] **Step 4: Rewrite `VimPane.vue`**
+- [x] **Step 4: Rewrite `VimPane.vue`**
 
 Replace the whole file with:
 
@@ -597,12 +602,12 @@ const statusText = computed(() => {
 </template>
 ```
 
-- [ ] **Step 5: Type-check**
+- [x] **Step 5: Type-check**
 
 Run: `npm run type-check` (from `frontend/`)
 Expected: no errors.
 
-- [ ] **Step 6: Manual verification in the browser**
+- [x] **Step 6: Manual verification in the browser**
 
 `eggs.ts` hasn't changed yet in this task, so `:q`'s dirty-refusal behavior isn't wired up — `:q` will still close immediately even on a dirty buffer at this point. That's expected; it's covered in Task 3. For this task, verify:
 
@@ -619,7 +624,7 @@ Expected: no errors.
 - With the pane open, press Ctrl+C and Ctrl+L → still cancel / clear as before (regression check for the modifier-key exemption).
 - `cat about.txt` still prints identically to before (regression check — `files.ts`/`navigate.ts` untouched by this task).
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add frontend/src/terminal/types.ts frontend/src/composables/useTerminal.ts frontend/src/components/terminal/TerminalOverlay.vue frontend/src/components/terminal/VimPane.vue
@@ -637,7 +642,7 @@ git commit -m "feat: wire real vim cursor navigation and insert-mode editing"
 - Consumes: `effects.vimIsDirty()` (Task 2).
 - Produces: nothing further depends on this task — it's the final piece.
 
-- [ ] **Step 1: Rewrite the `:q` command**
+- [x] **Step 1: Rewrite the `:q` command**
 
 In `frontend/src/terminal/commands/eggs.ts`, replace the whole `:q` command object:
 
@@ -696,12 +701,12 @@ with:
   },
 ```
 
-- [ ] **Step 2: Type-check**
+- [x] **Step 2: Type-check**
 
 Run: `npm run type-check` (from `frontend/`)
 Expected: no errors.
 
-- [ ] **Step 3: Full manual verification in the browser**
+- [x] **Step 3: Full manual verification in the browser**
 
 This is the first point the complete feature (navigation + editing + dirty-aware quitting) is observable end to end. Work through every item:
 
@@ -719,7 +724,7 @@ This is the first point the complete feature (navigation + editing + dirty-aware
 - Confirm `Esc` still does not close the terminal overlay while a vim pane is open (existing `trapped` behavior, unchanged by this plan).
 - `cat about.txt`, `cat skills.txt`, `cat contact.txt`, `cat .secret`, a guestbook file, `cat nope.txt` — all still print identically to before either vim plan (final full regression check).
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add frontend/src/terminal/commands/eggs.ts

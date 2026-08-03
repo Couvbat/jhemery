@@ -1,5 +1,8 @@
 # Fond animé Three.js — formes wireframe
 
+Statut : implémenté (PR #6, `1a6cd5c`) — chargement différé et garde WebGL inclus (`6708adc`).
+La densité des formes a été ajustée ensuite dans la PR #8 (`22e646b`).
+
 ## Contexte
 
 Le portfolio (thème "terminal cyberpunk", vert néon `#00ff41` sur fond très sombre) manque de profondeur visuelle en arrière-plan. Objectif : un fond animé en Three.js avec des primitives géométriques simples en wireframe, flottant derrière tout le contenu du site.

@@ -1,5 +1,8 @@
 # GitHub recent-commits card for the Projects section
 
+Status: implemented (PR #3, `a0b0808`). The contribution heatmap and pinned-repos cards that share
+this module landed later; heatmap width was fixed in PR #8 (`22e646b`).
+
 ## Context
 
 Following the same real-data pattern as the SoundCloud embed and the Steam

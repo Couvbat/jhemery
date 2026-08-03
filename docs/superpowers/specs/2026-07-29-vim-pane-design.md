@@ -1,5 +1,9 @@
 # A real vim-style pane for the `vim` terminal command
 
+Status: implemented (PR #10, `fab290e`). The read-only behaviour described here was superseded
+within the same PR by [the editing spec](2026-07-29-vim-pane-editing-design.md) — the pane now
+takes real input. See [features-spec.md §5.1](../../features-spec.md) for the shipped result.
+
 ## Context
 
 The `vim` easter egg (`frontend/src/terminal/commands/eggs.ts`) currently just prints a few

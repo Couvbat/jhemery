@@ -1,5 +1,8 @@
 # Steam-backed game-log for the Gaming section
 
+Status: implemented (PR #2, `8652ad7`), with one caveat — the `configured: true` path has still
+never been exercised against real credentials. See Verification.
+
 ## Context
 
 The "Game log terminal" card in

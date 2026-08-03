@@ -1,5 +1,8 @@
 # SoundCloud embed for the Music section
 
+Status: implemented (PR #1, `f8c5d8e`). Playlist visibility was later adjusted in PR #8
+(`22e646b`).
+
 ## Context
 
 The "Terminal music player mock" card in [`MusicSection.vue`](../../../frontend/src/components/sections/MusicSection.vue)

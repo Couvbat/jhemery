@@ -1,7 +1,8 @@
 # Design spec — achievements modal, nav button, and floating toast
 
-Status: proposed. Supersedes an earlier draft of this file that assumed no achievement tracker
-existed yet — it does, see below.
+Status: implemented (PR #13, `6f8b707`). Supersedes an earlier draft of this file that assumed no
+achievement tracker existed yet — it does, see below. The shipped result is summarised in
+[features-spec.md §5.2](../../features-spec.md).
 
 ## Context
 

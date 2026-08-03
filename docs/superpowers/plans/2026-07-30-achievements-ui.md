@@ -1,5 +1,8 @@
 # Achievements Modal, Nav Button & Toast Implementation Plan
 
+**Status: complete.** Shipped in PR #13 (`6f8b707`). All 18 achievements carry a `hint`, and the
+modal, nav button and toast are live. Kept as a record of the reasoning, not as an open work item.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Give the existing terminal achievement tracker (`frontend/src/terminal/achievements.ts`) a hint for every locked entry, and a UI surface outside the terminal — a nav button, a modal, and a floating toast on unlock — so a visitor doesn't need to know the `achievements` terminal command exists.
@@ -28,7 +31,7 @@
 - Consumes: nothing new — this task only touches `achievements.ts` itself.
 - Task 2 consumes `Achievement.hint`. Tasks 4/5/6 consume `unlocked`, `toastQueue`, `dismissToast`.
 
-- [ ] **Step 1: Add `hint` to the `Achievement` interface and every entry**
+- [x] **Step 1: Add `hint` to the `Achievement` interface and every entry**
 
 In `frontend/src/terminal/achievements.ts`, change the interface:
 
@@ -185,7 +188,7 @@ export const achievementList: Achievement[] = [
 
 (`COMPLETIONIST` is the existing `const COMPLETIONIST = 'completionist'` already defined above the array — unchanged, just referenced here same as before.)
 
-- [ ] **Step 2: Export `unlocked` and add the toast queue**
+- [x] **Step 2: Export `unlocked` and add the toast queue**
 
 Change the existing `const unlocked = ref<Set<string>>(loadSet(ACHIEVEMENTS_KEY))` to:
 
@@ -205,7 +208,7 @@ export function dismissToast(id: string) {
 }
 ```
 
-- [ ] **Step 3: Push newly-unlocked achievements onto the toast queue**
+- [x] **Step 3: Push newly-unlocked achievements onto the toast queue**
 
 In `unlock()`, change:
 
@@ -230,7 +233,7 @@ to:
   return newly
 ```
 
-- [ ] **Step 4: Write and run a throwaway verification script**
+- [x] **Step 4: Write and run a throwaway verification script**
 
 Create `frontend/tmp-achievements-check.ts` (temporary — deleted in Step 6, never committed):
 
@@ -288,18 +291,18 @@ console.log('all achievements checks passed')
 Run: `node tmp-achievements-check.ts` (from `frontend/`)
 Expected output: `all achievements checks passed`, exit code 0. If an assertion fails, Node prints an `AssertionError` with expected/actual values — fix `achievements.ts` (not the script) until all pass.
 
-- [ ] **Step 5: Type-check**
+- [x] **Step 5: Type-check**
 
 Run: `npm run type-check` (from `frontend/`)
 Expected: no errors.
 
-- [ ] **Step 6: Delete the throwaway script**
+- [x] **Step 6: Delete the throwaway script**
 
 ```bash
 rm frontend/tmp-achievements-check.ts
 ```
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add frontend/src/terminal/achievements.ts
@@ -317,7 +320,7 @@ git commit -m "feat: add hints, reactive unlock state, and a toast queue to achi
 - Consumes: `Achievement.hint` from Task 1.
 - Produces: nothing new — this only changes what one existing command prints.
 
-- [ ] **Step 1: Render the hint instead of the literal `'locked'`**
+- [x] **Step 1: Render the hint instead of the literal `'locked'`**
 
 In the `achievements` command's `run({ t })`, change:
 
@@ -331,12 +334,12 @@ to:
             : { text: `  ✗ ${'???'.padEnd(24)}  ${t(achievement.hint)}`, tone: 'muted', pre: true },
 ```
 
-- [ ] **Step 2: Type-check**
+- [x] **Step 2: Type-check**
 
 Run: `npm run type-check` (from `frontend/`)
 Expected: no errors.
 
-- [ ] **Step 3: Verify in the browser**
+- [x] **Step 3: Verify in the browser**
 
 Start the dev server preview, open the terminal (backtick or the launcher button), run `achievements`. Confirm:
 - Unlocked rows (if any from prior local testing) show a real title + description with `✓`.
@@ -344,7 +347,7 @@ Start the dev server preview, open the terminal (backtick or the launcher button
 
 Then run `lang fr` and `achievements` again — confirm the hints are now in French. (Running `lang fr` itself unlocks the `lang` achievement, which is expected — that achievement's row should flip from locked to unlocked with a French title/description.)
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add frontend/src/terminal/commands/system.ts
@@ -362,7 +365,7 @@ git commit -m "feat: show real hints for locked achievements in the terminal com
 - Produces: `messages.achievements.{title, open, close, toastPrefix}`, each `Localised<string>`.
 - Consumed by Tasks 4, 5, 6.
 
-- [ ] **Step 1: Add the namespace**
+- [x] **Step 1: Add the namespace**
 
 In `frontend/src/i18n/messages.ts`, add a new top-level key (anywhere in the object — alongside the existing `footer`/`boot` entries at the end reads naturally):
 
@@ -375,12 +378,12 @@ In `frontend/src/i18n/messages.ts`, add a new top-level key (anywhere in the obj
   },
 ```
 
-- [ ] **Step 2: Type-check**
+- [x] **Step 2: Type-check**
 
 Run: `npm run type-check` (from `frontend/`)
 Expected: no errors (the `satisfies Record<string, Record<string, Localised>>` at the bottom of the file will catch a malformed entry).
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 git add frontend/src/i18n/messages.ts
@@ -398,7 +401,7 @@ git commit -m "feat: add i18n messages for the achievements UI"
 - Consumes: `achievementList`, `unlocked` from `@/terminal/achievements` (Task 1); `messages` from `@/i18n/messages` (Task 3); `useLocale` from `@/i18n`.
 - Produces: a component with a `v-model:open: boolean` prop (via `defineModel`). Task 5 consumes this exact prop name.
 
-- [ ] **Step 1: Create the component**
+- [x] **Step 1: Create the component**
 
 ```vue
 <script setup lang="ts">
@@ -524,12 +527,12 @@ function onKeydown(event: KeyboardEvent) {
 </template>
 ```
 
-- [ ] **Step 2: Type-check**
+- [x] **Step 2: Type-check**
 
 Run: `npm run type-check` (from `frontend/`)
 Expected: no errors. (This component isn't wired to anything yet — Task 5 does that, where it gets its real browser verification.)
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 git add frontend/src/components/AchievementsModal.vue
@@ -546,7 +549,7 @@ git commit -m "feat: add AchievementsModal component"
 **Interfaces:**
 - Consumes: `AchievementsModal` from Task 4; `m.achievements` from Task 3 (already available via the existing `const { t, m, locale, toggleLocale } = useLocale()` destructure — `m` is `messages`).
 
-- [ ] **Step 1: Import the modal and add local state**
+- [x] **Step 1: Import the modal and add local state**
 
 At the top of `<script setup>`, add:
 
@@ -560,7 +563,7 @@ Below the existing `const menuOpen = ref(false)`, add:
 const achievementsOpen = ref(false)
 ```
 
-- [ ] **Step 2: Add the desktop button**
+- [x] **Step 2: Add the desktop button**
 
 In the `<ul class="hidden md:flex gap-1 items-center">` list, immediately after the existing language-toggle `<li>`, add:
 
@@ -577,7 +580,7 @@ In the `<ul class="hidden md:flex gap-1 items-center">` list, immediately after 
         </li>
 ```
 
-- [ ] **Step 3: Add the mobile button**
+- [x] **Step 3: Add the mobile button**
 
 In the `<div class="flex items-center gap-2 md:hidden">` block, immediately before the existing language-toggle button, add:
 
@@ -591,7 +594,7 @@ In the `<div class="flex items-center gap-2 md:hidden">` block, immediately befo
         </button>
 ```
 
-- [ ] **Step 4: Mount the modal**
+- [x] **Step 4: Mount the modal**
 
 Immediately before the closing `</header>` tag, add:
 
@@ -599,12 +602,12 @@ Immediately before the closing `</header>` tag, add:
     <AchievementsModal v-model:open="achievementsOpen" />
 ```
 
-- [ ] **Step 5: Type-check**
+- [x] **Step 5: Type-check**
 
 Run: `npm run type-check` (from `frontend/`)
 Expected: no errors.
 
-- [ ] **Step 6: Verify in the browser (desktop)**
+- [x] **Step 6: Verify in the browser (desktop)**
 
 Start the dev server preview at the default desktop viewport. Confirm:
 - A `🏆` button appears in the navbar next to the `EN`/`FR` toggle.
@@ -613,11 +616,11 @@ Start the dev server preview at the default desktop viewport. Confirm:
 - Pressing `Escape` closes the modal and returns focus to the `🏆` button.
 - Clicking the background overlay (outside the panel) closes it.
 
-- [ ] **Step 7: Verify in the browser (mobile)**
+- [x] **Step 7: Verify in the browser (mobile)**
 
 Resize the preview to the `mobile` preset. Confirm the `🏆` button is present in the mobile controls row (next to `EN`/`FR` and the hamburger) and opens the same modal.
 
-- [ ] **Step 8: Commit**
+- [x] **Step 8: Commit**
 
 ```bash
 git add frontend/src/components/NavBar.vue
@@ -635,7 +638,7 @@ git commit -m "feat: add achievements button to the navbar"
 - Consumes: `toastQueue`, `dismissToast` from `@/terminal/achievements` (Task 1); `messages.achievements.toastPrefix` from Task 3; `prefersReducedMotion` from `@/composables/useCrt`.
 - Produces: a component with no props — Task 7 mounts it with no bindings.
 
-- [ ] **Step 1: Create the component**
+- [x] **Step 1: Create the component**
 
 ```vue
 <script setup lang="ts">
@@ -689,12 +692,12 @@ watch(() => toastQueue.value.length, scheduleNext, { immediate: true })
 </template>
 ```
 
-- [ ] **Step 2: Type-check**
+- [x] **Step 2: Type-check**
 
 Run: `npm run type-check` (from `frontend/`)
 Expected: no errors.
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 git add frontend/src/components/AchievementToast.vue
@@ -711,7 +714,7 @@ git commit -m "feat: add AchievementToast component"
 **Interfaces:**
 - Consumes: `AchievementToast` from Task 6.
 
-- [ ] **Step 1: Import and mount**
+- [x] **Step 1: Import and mount**
 
 Add the import alongside the other component imports:
 
@@ -726,12 +729,12 @@ Add `<AchievementToast />` in the template, next to the other always-mounted chr
   <AchievementToast />
 ```
 
-- [ ] **Step 2: Type-check**
+- [x] **Step 2: Type-check**
 
 Run: `npm run type-check` (from `frontend/`)
 Expected: no errors.
 
-- [ ] **Step 3: Verify in the browser**
+- [x] **Step 3: Verify in the browser**
 
 Start the dev server preview. If `localStorage` already has achievements unlocked from earlier manual testing in this session, clear it first: open the browser devtools console and run `localStorage.removeItem('couvbat:achievements')`, then reload.
 
@@ -740,7 +743,7 @@ Start the dev server preview. If `localStorage` already has achievements unlocke
 - Open the achievements modal (the navbar button from Task 5) and confirm the `Bovine Wisdom` row now shows as unlocked with its real description, and the header count went up by one.
 - Close the terminal, then run the Konami code (↑↑↓↓←→←→ b a) using keyboard input anywhere on the page. Confirm the toast still appears even with the terminal closed — this is the gap this task set out to close.
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add frontend/src/App.vue
