@@ -97,7 +97,18 @@ Push a commit touching `frontend/` or `backend/` to `master`, or go to **Actions
 
 **Actions** tab → open the run → expand each step. Failures are almost always a wrong secret value (typo'd path, wrong server hostname) rather than a workflow bug — the whitelist and rsync steps print enough output to tell which.
 
+## Apache config
+
+[frontend/public/.htaccess](../frontend/public/.htaccess) is copied into `dist/` by the build and rsynced with everything else. It needs `mod_rewrite` only — no `mod_proxy` — so it works on o2switch shared hosting. It does four things:
+
+- **SPA fallback.** Vue Router uses `createWebHistory`, so every non-file request is handed to `index.html`. Without this, a hard refresh on any path other than `/` 404s before Vue Router ever sees the URL.
+- **`curl jhemery.xyz` → the ANSI résumé.** Matches on `User-Agent` at the site root and serves `resume.txt`, generated at build time by [vite-plugins/resume.ts](../frontend/vite-plugins/resume.ts). The same rule covers LLM crawlers, which would otherwise fetch an empty `<div id="app">`.
+- **Charset.** `UTF-8` by default, and explicitly for `.txt` so the résumé's box-drawing characters survive.
+- **Caching.** Hashed assets are `immutable` for a year; `index.html` and `resume.txt` are `no-cache`, so a deploy takes effect immediately.
+
+If `mod_headers` or `mod_mime` is unavailable the `<IfModule>` guards make those blocks no-ops — the site still works, just without the cache and charset hints.
+
 ## Known gaps
 
 - **Backend restart mechanism is unverified.** It assumes the o2switch Node.js App (Passenger) picks up `tmp/restart.txt`. If the app is managed a different way (PM2, systemd, etc.), update the "Install production dependencies & restart app" step in [backend-deploy.yml](../.github/workflows/backend-deploy.yml).
-- **No `.htaccess` for SPA routing.** The frontend uses Vue Router's `createWebHistory`, but [frontend/public](../frontend/public) has no `.htaccess`. Without an Apache rewrite rule, refreshing on any route other than `/` will 404 once deployed.
+- **Steam live data is unverified.** `GET /steam/activity` has only ever been exercised with no credentials, where it correctly returns `{"configured": false}` and the site falls back to the static game log. The `configured: true` path needs a real `STEAM_API_KEY` / `STEAM_ID` in `backend/.env` and a manual check once set.
