@@ -1,5 +1,9 @@
 # Three.js Wireframe Background Implementation Plan
 
+**Status: complete.** Shipped in PR #6 (`1a6cd5c`). Every step below is done and verified against
+`frontend/src/components/ThreeBackground.vue`; the plan is kept as a record of the reasoning, not
+as an open work item.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Add an animated, full-site fixed background made of simple wireframe 3D shapes (Three.js) behind all page content, matching the existing cyberpunk/neon-green terminal theme.
@@ -31,7 +35,7 @@
 **Interfaces:**
 - Produces: `three` importable as `import * as THREE from 'three'` in later tasks; types available via `@types/three`.
 
-- [ ] **Step 1: Install the packages**
+- [x] **Step 1: Install the packages**
 
 Run:
 ```bash
@@ -39,12 +43,12 @@ cd frontend && npm install three && npm install -D @types/three
 ```
 Expected: `frontend/package.json` gains `"three": "^<version>"` under `dependencies` and `"@types/three": "^<version>"` under `devDependencies`; `frontend/package-lock.json` updates.
 
-- [ ] **Step 2: Verify the install**
+- [x] **Step 2: Verify the install**
 
 Run: `cd frontend && npm ls three @types/three`
 Expected: both packages listed with resolved versions, no `UNMET DEPENDENCY` errors.
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 git add frontend/package.json frontend/package-lock.json
@@ -63,7 +67,7 @@ git commit -m "Add three.js dependency for animated background"
 - Consumes: `three` (Task 1), CSS custom properties `--neon-green` / `--neon-cyan` defined in `frontend/src/assets/main.css:105-107`.
 - Produces: `ThreeBackground.vue` as a zero-prop, zero-emit component (`<ThreeBackground />`) that later tasks will extend with animation logic in the same file.
 
-- [ ] **Step 1: Create the component with scene setup and static shapes**
+- [x] **Step 1: Create the component with scene setup and static shapes**
 
 ```vue
 <!-- frontend/src/components/ThreeBackground.vue -->
@@ -167,7 +171,7 @@ onUnmounted(() => {
 </template>
 ```
 
-- [ ] **Step 2: Mount the component in App.vue**
+- [x] **Step 2: Mount the component in App.vue**
 
 ```vue
 <!-- frontend/src/App.vue -->
@@ -184,12 +188,12 @@ import ThreeBackground from '@/components/ThreeBackground.vue'
 </template>
 ```
 
-- [ ] **Step 3: Verify visually in the browser**
+- [x] **Step 3: Verify visually in the browser**
 
 Run: `cd frontend && npm run dev` (or use the project's preview tooling), open the app in a browser.
 Expected: a dark canvas background with ~10 faint green/cyan wireframe shapes (icosahedrons, toruses, cubes, octahedrons) scattered around, visible behind the terminal-window Hero content; scrolling down keeps the shapes visible behind Projects/Music/Gaming/Hardware/Contact sections; clicking buttons/links in the page still works (canvas doesn't intercept clicks).
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add frontend/src/components/ThreeBackground.vue frontend/src/App.vue
@@ -207,7 +211,7 @@ git commit -m "Add static Three.js wireframe background behind site content"
 - Consumes: `shapes: THREE.Mesh[]`, `renderer`/`scene`/`camera` module-level state from Task 2.
 - Produces: a running `requestAnimationFrame` loop (`animationFrameId`) that later tasks (Task 4) will extend with parallax and reduced-motion gating.
 
-- [ ] **Step 1: Give each shape its own rotation speed and add the animation loop**
+- [x] **Step 1: Give each shape its own rotation speed and add the animation loop**
 
 Replace the `createShapes` loop body's mesh creation section (after `mesh.rotation.set(...)`) by attaching per-mesh speeds, and add a render loop:
 
@@ -260,12 +264,12 @@ onUnmounted(() => {
   // ...rest unchanged
 ```
 
-- [ ] **Step 2: Verify visually in the browser**
+- [x] **Step 2: Verify visually in the browser**
 
 Run: `cd frontend && npm run dev`, open the app.
 Expected: shapes continuously and independently rotate (different axes/speeds, not synchronized); no visible stutter; browser dev tools show no console errors; CPU/GPU usage stays reasonable (no runaway frame queue — confirm via a quick check that only one `requestAnimationFrame` is scheduled at a time, e.g. no duplicate animation after a hot-reload).
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 git add frontend/src/components/ThreeBackground.vue
@@ -283,7 +287,7 @@ git commit -m "Animate wireframe shapes with continuous per-shape rotation"
 - Consumes: `animate()`, `camera`, `handleResize` from Task 3.
 - Produces: final public behavior of `ThreeBackground.vue` — no further tasks depend on its internals.
 
-- [ ] **Step 1: Add mouse tracking and camera parallax**
+- [x] **Step 1: Add mouse tracking and camera parallax**
 
 Add module-level target/current mouse state and a listener, then apply parallax inside `animate`:
 
@@ -339,12 +343,12 @@ Register/unregister the listener in `onMounted`/`onUnmounted`:
   window.removeEventListener('mousemove', handleMouseMove)
 ```
 
-- [ ] **Step 2: Verify parallax visually**
+- [x] **Step 2: Verify parallax visually**
 
 Run: `cd frontend && npm run dev`, open the app, move the mouse across the window.
 Expected: the whole shape field subtly shifts opposite/with the mouse (small amplitude, smooth easing, no sudden jumps), while rotation keeps running independently.
 
-- [ ] **Step 3: Add `prefers-reduced-motion` support**
+- [x] **Step 3: Add `prefers-reduced-motion` support**
 
 Guard the animation loop so it never starts when the user prefers reduced motion, rendering a single static frame instead:
 
@@ -360,12 +364,12 @@ Guard the animation loop so it never starts when the user prefers reduced motion
   }
 ```
 
-- [ ] **Step 4: Verify reduced-motion behavior**
+- [x] **Step 4: Verify reduced-motion behavior**
 
 Run: enable "reduce motion" in the OS/browser accessibility settings (or in Chrome DevTools: Rendering tab → "Emulate CSS media feature prefers-reduced-motion" → `reduce`), reload the app.
 Expected: shapes render in their initial scattered positions but do not rotate or parallax; no console errors. Re-disable the emulation afterward and confirm animation resumes on reload.
 
-- [ ] **Step 5: Final full-cleanup check**
+- [x] **Step 5: Final full-cleanup check**
 
 Read through `onUnmounted` and confirm it now removes both listeners (`resize`, `mousemove`), cancels the animation frame, disposes every shape's geometry and material, and disposes the renderer — matching this shape:
 
@@ -391,12 +395,12 @@ onUnmounted(() => {
 })
 ```
 
-- [ ] **Step 6: Run the frontend type check**
+- [x] **Step 6: Run the frontend type check**
 
 Run: `cd frontend && npm run type-check`
 Expected: no TypeScript errors.
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add frontend/src/components/ThreeBackground.vue

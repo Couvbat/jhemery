@@ -1,5 +1,8 @@
 # Real navigation and insert-mode editing for the vim pane
 
+Status: implemented (PR #10, `fab290e`), with a follow-up `Escape` fix in PR #11 (`85bd5ec`).
+See [features-spec.md §5.1](../../features-spec.md) for the shipped result.
+
 ## Context
 
 The vim pane (built in a prior plan, see [`2026-07-29-vim-pane-design.md`](2026-07-29-vim-pane-design.md)

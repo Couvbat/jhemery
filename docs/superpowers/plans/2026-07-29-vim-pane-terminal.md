@@ -1,5 +1,9 @@
 # Vim Pane Terminal Command Implementation Plan
 
+**Status: complete.** Shipped in PR #10 (`fab290e`), then followed immediately by
+[the editing plan](2026-07-29-vim-pane-editing.md), which supersedes the read-only behaviour
+described here. Kept as a record of the reasoning, not as an open work item.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Replace the `vim` terminal easter egg's static "prints a few ~ lines" behavior with a real vim-styled full-pane view inside the terminal overlay, capable of opening the same read-only fake files `cat` already supports.
@@ -27,7 +31,7 @@
 **Interfaces:**
 - Produces: `resolveFileLines(file: string, t: <T>(value: Localised<T>) => T): OutputLine[] | undefined` — exported from `frontend/src/terminal/commands/files.ts`. Returns the file's content as `OutputLine[]` (same shape `cat` already prints) or `undefined` if `file` doesn't resolve to anything (checked last against guestbook entries, same fallback order as the current `cat` switch). Task 2's `vim` command (Task 4) will call this too.
 
-- [ ] **Step 1: Create `frontend/src/terminal/commands/files.ts`**
+- [x] **Step 1: Create `frontend/src/terminal/commands/files.ts`**
 
 This moves the body of `cat`'s `switch` (currently inline in `navigate.ts`) into one shared function, verbatim in behavior.
 
@@ -88,7 +92,7 @@ export function resolveFileLines(file: string, t: TFunction): OutputLine[] | und
 }
 ```
 
-- [ ] **Step 2: Refactor `cat` in `navigate.ts` to use it**
+- [x] **Step 2: Refactor `cat` in `navigate.ts` to use it**
 
 Replace the full file content of `frontend/src/terminal/commands/navigate.ts` with:
 
@@ -197,12 +201,12 @@ export const navigateCommands: Command[] = [
 
 (Removed imports vs. the original: `skills`, `availability` from `@/content`; `secretContents` from `./secret`; the whole `./guestbook-fs` import — all now only used inside `files.ts`. Added: `resolveFileLines` from `./files`.)
 
-- [ ] **Step 3: Type-check**
+- [x] **Step 3: Type-check**
 
 Run: `npm run type-check` (from `frontend/`)
 Expected: no errors.
 
-- [ ] **Step 4: Manual regression check in the browser**
+- [x] **Step 4: Manual regression check in the browser**
 
 With the frontend dev server running, open the terminal (desktop viewport, `Ctrl+K` or the launcher) and run each of:
 - `cat about.txt` — bio text + 🌐 language line, same as before.
@@ -214,7 +218,7 @@ With the frontend dev server running, open the terminal (desktop viewport, `Ctrl
 
 All six must look identical (text, color, wrapping) to how they looked before this change.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add frontend/src/terminal/commands/files.ts frontend/src/terminal/commands/navigate.ts
@@ -236,7 +240,7 @@ git commit -m "refactor: extract shared fake-filesystem resolver from cat"
   - `TerminalEffects.vim` new signature: `(enabled: boolean, file?: VimFile) => void`.
   - From `useTerminal()`: `vimBuffer: ComputedRef<VimFile | null>`, `vimError: ComputedRef<string | null>`, `triggerVimReadonlyError: () => void`. Task 3 (component) and Task 4 (wiring + commands) depend on these exact names.
 
-- [ ] **Step 1: Add `VimFile` and update `TerminalEffects` in `types.ts`**
+- [x] **Step 1: Add `VimFile` and update `TerminalEffects` in `types.ts`**
 
 In `frontend/src/terminal/types.ts`, add the `VimFile` interface directly above `TerminalEffects`, and change the `vim` field:
 
@@ -257,7 +261,7 @@ export interface TerminalEffects {
 
 (This replaces the existing `vim: (enabled: boolean) => void` line inside `TerminalEffects` — everything else in the file is unchanged.)
 
-- [ ] **Step 2: Add state + update the `vim` effect in `useTerminal.ts`**
+- [x] **Step 2: Add state + update the `vim` effect in `useTerminal.ts`**
 
 In `frontend/src/composables/useTerminal.ts`:
 
@@ -310,12 +314,12 @@ export function triggerVimReadonlyError() {
     triggerVimReadonlyError,
 ```
 
-- [ ] **Step 3: Type-check**
+- [x] **Step 3: Type-check**
 
 Run: `npm run type-check` (from `frontend/`)
 Expected: no errors.
 
-- [ ] **Step 4: Manual regression check — old vim joke still works**
+- [x] **Step 4: Manual regression check — old vim joke still works**
 
 `eggs.ts` hasn't changed yet, so `effects.vim(true)` is still called with no second argument (`file` stays `undefined`, so `vimBuffer.value` stays `null`). In the browser terminal:
 - Run `vim` — same `~`-prefixed static lines print as before (nothing about this task's changes affects the printed content).
@@ -323,7 +327,7 @@ Expected: no errors.
 
 If either looks different, something in this task leaked into visible behavior — stop and check before moving on, since this task is supposed to be a no-visible-change addition.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add frontend/src/terminal/types.ts frontend/src/composables/useTerminal.ts
@@ -343,7 +347,7 @@ git commit -m "feat: add vim pane state to terminal composable"
 
 This component isn't mounted anywhere yet (that's Task 4), so it can't be manually exercised in the running app this task — verification here is limited to type-checking. Task 4's manual pass is where this component's actual behavior gets exercised end-to-end.
 
-- [ ] **Step 1: Create `frontend/src/components/terminal/VimPane.vue`**
+- [x] **Step 1: Create `frontend/src/components/terminal/VimPane.vue`**
 
 ```vue
 <script setup lang="ts">
@@ -388,12 +392,12 @@ const statusText = computed(() => {
 </template>
 ```
 
-- [ ] **Step 2: Type-check**
+- [x] **Step 2: Type-check**
 
 Run: `npm run type-check` (from `frontend/`)
 Expected: no errors. This confirms the component's props/types are internally consistent, even though it isn't mounted yet.
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 git add frontend/src/components/terminal/VimPane.vue
@@ -412,7 +416,7 @@ git commit -m "feat: add VimPane component"
 - Consumes: `resolveFileLines` (Task 1), `VimFile`/`TerminalEffects.vim` (Task 2), `VimPane` (Task 3), `vimBuffer`/`vimError`/`triggerVimReadonlyError` from `useTerminal()` (Task 2).
 - Produces: the finished, user-visible feature — nothing further depends on this task.
 
-- [ ] **Step 1: Wire `VimPane` into `TerminalOverlay.vue`**
+- [x] **Step 1: Wire `VimPane` into `TerminalOverlay.vue`**
 
 In `frontend/src/components/terminal/TerminalOverlay.vue`:
 
@@ -508,7 +512,7 @@ with:
         <VimPane v-else :file="vimBuffer" :error="vimError" />
 ```
 
-- [ ] **Step 2: Rewrite the `vim` and `:q` commands in `eggs.ts`**
+- [x] **Step 2: Rewrite the `vim` and `:q` commands in `eggs.ts`**
 
 In `frontend/src/terminal/commands/eggs.ts`:
 
@@ -589,12 +593,12 @@ const VIM_SPLASH: string[] = [
 
 (Note: the `:q` command's original `aliases` array was `[':q!', ':wq', ':x', ':quit']` — this replaces it with `[':q!', ':quit', ':quit!', ':wq', ':wq!', ':x']`, adding `:quit!` and `:wq!` so both bang and no-bang variants of every alias resolve.)
 
-- [ ] **Step 3: Type-check**
+- [x] **Step 3: Type-check**
 
 Run: `npm run type-check` (from `frontend/`)
 Expected: no errors.
 
-- [ ] **Step 4: Full manual verification in the browser**
+- [x] **Step 4: Full manual verification in the browser**
 
 With the dev server running, open the terminal and work through every item below:
 
@@ -608,7 +612,7 @@ With the dev server running, open the terminal and work through every item below
 - With a pane open, press `Esc` → overlay does not close (existing `trapped` behavior, unchanged).
 - Re-run the Task 1 `cat` checks once more (`cat about.txt`, `cat skills.txt`, `cat contact.txt`, `cat .secret`, a guestbook file, `cat nope.txt`) — still byte-for-byte identical to before this whole plan.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add frontend/src/components/terminal/TerminalOverlay.vue frontend/src/terminal/commands/eggs.ts
