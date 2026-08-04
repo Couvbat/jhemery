@@ -1,7 +1,7 @@
 # jhemery.xyz
 
 Personal portfolio of **Jules Hémery** (*Couvbat*) — a terminal-flavoured single-page site with a
-wireframe three.js background, a real command shell you can type into, two playable games, and 25
+wireframe three.js background, a real command shell you can type into, two playable games, and 30
 hidden achievements.
 
 Vue 3 + Vite + Tailwind on the front, NestJS on the back, bilingual (EN/FR) throughout.
@@ -38,13 +38,17 @@ docs/       design specs and implementation plans
 | — section-reactive | Each section has its own palette and rotation speed — green for *about*, cyan for *projects*, purple for *music*, pink for *gaming*, and so on. Materials are recoloured in place, so shapes keep their positions across a section change. |
 | — glitch burst | The same reactive flag that drives the CSS screen-tear on `sudo rm -rf /` also shakes the wireframes for exactly that window. |
 | — 100% palette | Unlocking every achievement swaps the background onto a pink/cyan palette no section can produce. |
+| — click to inspect | Clicking a wireframe names it (`icosahedron · 20 faces`) and holds the camera's gaze on it for a couple of seconds. Clicks on links, controls and text selections are left alone. |
+| — terminal control | `spawn`, `gravity on\|off`, `constellation on\|off` and `scene reset` drive the background from the shell. Shape count is capped at 60. |
+| — constellation | Lines drawn between shapes closer than 5.5 world units, recomputed each frame into a pre-allocated buffer. |
 | — performance | The whole component is `defineAsyncComponent`'d and only loaded on `requestIdleCallback`, so ~520 kB of three.js never competes with first paint. It is excluded from the PWA precache for the same reason. |
 | — accessibility | `prefers-reduced-motion` skips loading it entirely; WebGL failures are caught and the canvas is simply left blank. Geometries, materials and the renderer are disposed on unmount. |
 | **CRT overdrive** | `crt` in the terminal (or the Konami code anywhere on the page) toggles scanlines, flicker and a speed multiplier that the three.js loop reads live to spin the wireframes up. Persisted in `localStorage`. |
 | **Boot sequence** | A fake `couvsh 1.0` kernel log plays on first visit, then remembers it booted. `reboot` replays it on demand, and `ssh` ends by triggering it. Skipped for reduced-motion. |
 | **Status ticker** | The footer carries the same uptime `neofetch` reports (days since the first commit) plus how long ago this build shipped, re-read on a slow tick so a long-open tab stays honest. |
 | **Sections** | about · projects · music · gaming · hardware · contact — defined once in `src/content/sections.ts` and consumed by the navbar, the terminal's `ls`/`cd`/`pwd`, the command palette and every section header. |
-| **Live cards** | Steam "currently playing", GitHub recent commits, contribution heatmap and pinned repos, SoundCloud player, guestbook. |
+| **Live cards** | Steam "currently playing", GitHub recent commits, latest CI runs, contribution heatmap and pinned repos, SoundCloud player, guestbook. |
+| **Guestbook ticker** | A 20s poll (not SSE — see [the spec](docs/features-spec.md#8-backend-additions)) surfaces anyone who signs while you're on the page, as a floating notice that opens `guestbook` when clicked. Skipped while the tab is hidden, and it gives up if the guestbook is off. |
 | **Command palette** | `Ctrl/⌘+K` — fuzzy list of sections and palette-flagged commands, arrow-key navigable with the selection kept in view. |
 | **Matrix rain** | `matrix` follows the white rabbit; the effect component is lazy-loaded on demand. |
 | **i18n** | English and French, detected from `navigator.language`, overridable with the navbar toggle or `lang en|fr`, persisted in `localStorage`. All content and every terminal string is `Localised<T>`. |
@@ -87,6 +91,8 @@ the same fake filesystem, so a file can never show two different contents.
 | `date` | | Current date |
 | `whoami` | | Print the current user |
 | `lang` | | `lang [en|fr]` — show or switch language |
+| `alias` | | `alias gl='git log'` — name your own commands, persisted in `localStorage` |
+| `unalias` | | `unalias <name>` |
 | `exit` | `quit`, `logout` | Close the terminal |
 
 ### navigation
@@ -131,10 +137,13 @@ the same fake filesystem, so a file can never show two different contents.
 
 Playable: `games` / `arcade`, `2048`, `snake`, `play` (starts the music player).
 
+Background control: `spawn [n]`, `gravity [on|off]`, `constellation [on|off]` (alias `stars`) and
+`scene [reset]`.
+
 Hidden — not in `help`, only in `help --all`: `sudo`, `matrix`, `reboot` (`restart`), `ssh`,
 `whois`, `crt`, `vim` (`vi`/`nvim`/`emacs`), `:q` (`:q!`/`:wq`/`:x`/…), `hack`, `coffee` (`brew`),
-`cowsay`, `fortune`, `sl`, `rickroll`, `uname`, `ps` (`ps aux`/`ps -ef`), `top` (`htop`),
-`env` (`printenv`/`export`).
+`cowsay`, `fortune`, `sl`, `rickroll`, `banner`, `uname`, `ps` (`ps aux`/`ps -ef`), `top` (`htop`),
+`env` (`printenv`/`export`), `alias`, `unalias`, `gravity`, `spawn`, `constellation`, `scene`.
 
 Two files never show up in a plain `ls`: `.secret`, and a `.env` full of credentials that are as
 fake as they look. `ls -a` lists both; `cat` and `vim` both read them.
@@ -150,13 +159,13 @@ with `Ctrl+C`. High scores are kept per game in `localStorage` and shown by `gam
 
 ## Achievements
 
-25 in total, tracked in `localStorage` (`couvbat:achievements`, plus `couvbat:achievements:sections`
+30 in total, tracked in `localStorage` (`couvbat:achievements`, plus `couvbat:achievements:sections`
 for the exploration one). Unlocking one fires a floating toast and prints a line in the terminal;
-the trophy button in the navbar opens a modal listing all 25. Locked ones show `???` and an oblique
+the trophy button in the navbar opens a modal listing all 30. Locked ones show `???` and an oblique
 hint; unlocking one reveals its title and how it was done. `achievements` (alias `trophies`) prints
 the same progress in the terminal.
 
-The last one cascades: unlock the other twenty-four and **100%** unlocks itself — and the three.js
+The last one cascades: unlock the other twenty-nine and **100%** unlocks itself — and the three.js
 background changes palette to prove it.
 
 | Achievement | How to get it |
@@ -185,6 +194,11 @@ background changes palette to prove it.
 | Deja Vu | Replay the boot sequence with `reboot` |
 | Knock Knock | `ssh couvbat@jhemery.xyz` |
 | Spot the Difference | `diff` two files |
+| Make It Yours | Define an `alias` |
+| Big Text Energy | `banner <text>` |
+| Rare Find | Click one of the three accent-coloured wireframes |
+| Connect the Dots | `constellation on` |
+| Zero-G | `gravity off` |
 | 100% | Unlock everything else |
 
 Hints are deliberately oblique in the modal; the table above is the spoiler version.
@@ -202,11 +216,13 @@ limiter sees real clients behind Apache.
 | `GET /github/activity` | Recent public commits. |
 | `GET /github/contributions` | Contribution heatmap (GraphQL — needs a token). |
 | `GET /github/pinned-repos` | Pinned repositories (GraphQL — needs a token). |
+| `GET /github/workflow-status` | The four most recent Actions runs for `GITHUB_REPO`. Public REST, so the token is optional; cached for 60 s because a build in flight is the one case where a stale answer is the wrong answer. |
 | `GET /guestbook` · `POST /guestbook` | Read and sign. Sanitised, link-filtered, 1/min per IP, capped at 500 entries. Stored in a JSON file under `DATA_DIR`, or in MongoDB if `MONGODB_URI` is set. Disabled by default. |
 | `DELETE /guestbook/:id` | Moderation; requires the `x-admin-password` header. |
 
 Everything optional degrades gracefully: no Steam key hides live activity, no GitHub token drops the
-heatmap, an unreachable model makes the terminal say it's asleep and point at `mail`.
+heatmap, no `GITHUB_REPO` drops the build-status card, an unreachable model makes the terminal say
+it's asleep and point at `mail`.
 
 See `backend/.env.example` — it documents every variable, including why the risky ones are off by
 default.
