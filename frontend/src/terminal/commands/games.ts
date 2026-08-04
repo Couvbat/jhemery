@@ -173,6 +173,13 @@ async function play2048(ctx: CommandContext): Promise<OutputLine[]> {
       }
       render(hint)
     }
+  } catch (error) {
+    // Ctrl+C and Esc reject out of here, and `execute()` drops a command's
+    // return value when it throws — so an achievement earned just before
+    // quitting would leave no trace in the buffer. The frame is finished
+    // redrawing by now, so printing below it is safe.
+    if (unlocks.length) ctx.print(unlocks)
+    throw error
   } finally {
     keys.release()
     recordScore('2048', score)
@@ -242,6 +249,11 @@ async function playSnake(ctx: CommandContext): Promise<OutputLine[]> {
     }
 
     render(state.dead ? ctx.t(GAME_OVER) : '')
+  } catch (error) {
+    // See `play2048`: an abort discards the return value, so the unlock line
+    // has to be printed here or it is lost.
+    if (unlocks.length) ctx.print(unlocks)
+    throw error
   } finally {
     recordScore('snake', state.score)
   }
