@@ -26,6 +26,8 @@ jobs:
   build:
     name: Build
     uses: ./.github/workflows/frontend-build.yml
+    secrets:
+      FRONTEND_ENV: ${{ secrets.FRONTEND_ENV }}
 
   deploy:
     name: Deploy

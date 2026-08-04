@@ -8,7 +8,14 @@ on:
       - 'frontend/**'
       - '.github/workflows/frontend-*.yml'
   workflow_dispatch:
+  # A reusable workflow gets no secrets unless its caller passes them, so this
+  # has to be declared here and handed over in frontend-deploy*.yml — otherwise
+  # the deploy path would build with an empty FRONTEND_ENV while the `push`
+  # trigger, which reads repo secrets directly, worked fine.
   workflow_call:
+    secrets:
+      FRONTEND_ENV:
+        required: true
 
 permissions:
   contents: read
@@ -33,6 +40,24 @@ jobs:
 
       - name: Install dependencies
         run: npm ci
+
+      # frontend/.env is gitignored, and Vite inlines VITE_API_URL into the
+      # bundle at build time rather than anything reading it on the server — so
+      # the deployed API host is decided here, in this job, or not at all. This
+      # artifact is the one that ships, hence the hard failure: a build without
+      # it looks green and deploys a bundle whose live-data calls all fail.
+      # frontend-pr-check.yml deliberately has no equivalent step; its build is
+      # a type-check that never leaves the runner.
+      - name: Restore frontend/.env
+        env:
+          FRONTEND_ENV: ${{ secrets.FRONTEND_ENV }}
+        run: |
+          if [ -z "$FRONTEND_ENV" ]; then
+            echo "::error title=FRONTEND_ENV secret is not set::Set it to the contents of frontend/.env (at minimum VITE_API_URL=https://api.jhemery.xyz). Without it the bundle ships with no API host and every live-data call fails. See docs/deploy.md."
+            exit 1
+          fi
+          printf '%s\n' "$FRONTEND_ENV" > .env
+          echo "Wrote frontend/.env with keys: $(sed -n 's/^\([A-Za-z_][A-Za-z0-9_]*\)=.*/\1/p' .env | tr '\n' ' ')"
 
       - name: Build
         run: npm run build
