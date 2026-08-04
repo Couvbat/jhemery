@@ -13,7 +13,9 @@ async function bootstrap() {
     origin: allowedOrigins,
     // DELETE is used by the guestbook moderation endpoint.
     methods: ['GET', 'POST', 'DELETE'],
-    allowedHeaders: ['Content-Type', 'x-admin-token'],
+    // x-admin-password is what GuestbookController reads; the preflight for
+    // DELETE /guestbook/:id fails in the browser if it is not listed here.
+    allowedHeaders: ['Content-Type', 'x-admin-password'],
   });
   // Apache fronts this app, so req.ip must come from X-Forwarded-For for the
   // per-IP rate limiter to see real clients rather than the proxy.
