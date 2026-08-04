@@ -44,15 +44,47 @@ jobs:
         id: ip
         run: echo "ipv4=$(curl -sf https://api.ipify.org || curl -sf https://ipv4.icanhazip.com)" >> "$GITHUB_OUTPUT"
 
+      # cPanel caps the whitelist at five distinct addresses and answers a refusal
+      # with HTTP 200 and `"status":0` in the body, so an unchecked `curl` reads as
+      # a success. The run then fails two minutes later at the SSH probe instead,
+      # blaming the firewall for what is actually a full quota.
       - name: Whitelisting the runner IP
+        env:
+          CPANEL_AUTH: cpanel ${{ secrets.CPANEL_USERNAME }}:${{ secrets.CPANEL_API_TOKEN }}
+          CPANEL_SERVER: ${{ secrets.CPANEL_SERVER }}
+          IP: ${{ steps.ip.outputs.ipv4 }}
         run: |
-          curl -sm 45 -H"Authorization: cpanel ${{ secrets.CPANEL_USERNAME }}:${{ secrets.CPANEL_API_TOKEN }}" \
-          "https://${{ secrets.CPANEL_SERVER }}:2083/execute/SshWhitelist/add?address=${{ steps.ip.outputs.ipv4 }}&port=22&direction=in"
+          response=$(curl -sm 45 -H "Authorization: $CPANEL_AUTH" \
+            "https://$CPANEL_SERVER:2083/execute/SshWhitelist/add?address=$IP&port=22&direction=in")
+          if [ "$(jq -r '.status // empty' <<<"$response" 2>/dev/null)" != "1" ]; then
+            # An unauthenticated call returns the cPanel login page, not JSON, so
+            # jq fails outright here rather than falling back to its own default.
+            reason=$(jq -r '(.errors // ["cPanel reported no error"]) | join("; ")' <<<"$response" 2>/dev/null) || true
+            [ -n "$reason" ] || reason="the response was not JSON — check CPANEL_API_TOKEN"
+            echo "::error title=SSH whitelist refused::cPanel would not whitelist $IP — $reason. If the quota is full, prune cPanel → Accès SSH → the whitelist and re-run."
+            exit 1
+          fi
+          echo "Whitelisted $IP"
 
+      # `SshWhitelist/list` echoes the caller's own address back as a top-level
+      # `ip` field, so grepping the whole payload for the runner IP matches even
+      # when the entry was never added — which is how a refused `add` used to sail
+      # through this step. Match inside `data.list`, and never print the payload:
+      # this is a public repo and that list is every IP allowed to SSH in.
       - name: Making sure the IP is whitelisted
+        env:
+          CPANEL_AUTH: cpanel ${{ secrets.CPANEL_USERNAME }}:${{ secrets.CPANEL_API_TOKEN }}
+          CPANEL_SERVER: ${{ secrets.CPANEL_SERVER }}
+          IP: ${{ steps.ip.outputs.ipv4 }}
         run: |
-          curl -sm 45 -H"Authorization: cpanel ${{ secrets.CPANEL_USERNAME }}:${{ secrets.CPANEL_API_TOKEN }}" \
-          "https://${{ secrets.CPANEL_SERVER }}:2083/execute/SshWhitelist/list" | grep "${{ steps.ip.outputs.ipv4 }}"
+          response=$(curl -sm 45 -H "Authorization: $CPANEL_AUTH" \
+            "https://$CPANEL_SERVER:2083/execute/SshWhitelist/list")
+          if ! jq -e --arg ip "$IP" \
+            '.data.list[]? | select(.address == $ip and .direction == "in")' \
+            <<<"$response" >/dev/null 2>&1; then
+            echo "::error title=Whitelist entry missing::cPanel accepted the request but $IP is not in the whitelist."
+            exit 1
+          fi
 
       - name: Installing the SSH Key
         run: |
@@ -103,11 +135,23 @@ jobs:
           "${{ secrets.CPANEL_USERNAME }}@${{ secrets.CPANEL_SERVER }}" \
           "source ${{ secrets.BACKEND_APP_ENTRY }} && cd ${{ secrets.BACKEND_REMOTE_PATH }} && cp dist/package.json dist/package-lock.json . && npm ci --omit=dev && mkdir -p tmp && touch tmp/restart.txt"
 
+      # Both directions. `add?direction=in` also creates the matching `out` entry,
+      # so removing only `in` leaves one behind — and since the quota counts
+      # distinct addresses, every run permanently burned another of the five
+      # slots. Three leaked runner IPs are what took every deploy down on
+      # 4 August; a missing entry here is a normal outcome, not a failure.
       - name: Un-whitelisting the runner IP
         if: always()
+        env:
+          CPANEL_AUTH: cpanel ${{ secrets.CPANEL_USERNAME }}:${{ secrets.CPANEL_API_TOKEN }}
+          CPANEL_SERVER: ${{ secrets.CPANEL_SERVER }}
+          IP: ${{ steps.ip.outputs.ipv4 }}
         run: |
-          curl -sm 45 -H"Authorization: cpanel ${{ secrets.CPANEL_USERNAME }}:${{ secrets.CPANEL_API_TOKEN }}" \
-          "https://${{ secrets.CPANEL_SERVER }}:2083/execute/SshWhitelist/remove?address=${{ steps.ip.outputs.ipv4 }}&port=22&direction=in"
+          for direction in in out; do
+            response=$(curl -sm 45 -H "Authorization: $CPANEL_AUTH" \
+              "https://$CPANEL_SERVER:2083/execute/SshWhitelist/remove?address=$IP&port=22&direction=$direction" || true)
+            echo "$direction: status $(jq -r '.status' <<<"$response" 2>/dev/null || echo '?')"
+          done
 
       - name: Cleaning SSH keys
         if: always()

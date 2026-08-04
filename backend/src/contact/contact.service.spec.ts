@@ -61,8 +61,10 @@ describe('ContactService', () => {
     await service(smtp).send(dto);
     await service({ ...smtp, SMTP_PORT: '' }).send(dto);
 
-    for (const call of createTransport.mock.calls) {
-      expect(call[0]).toMatchObject({ port: 587 });
+    // `jest.Mock` with no type arguments makes every argument `any`, which the
+    // lint rule rejects; the options object is all this assertion needs.
+    for (const [options] of createTransport.mock.calls as [unknown][]) {
+      expect(options).toMatchObject({ port: 587 });
     }
   });
 

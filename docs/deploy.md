@@ -101,16 +101,17 @@ The frontend needs to know where the API lives, via `VITE_API_URL` (e.g. `https:
 
 > **`VITE_API_URL` is consumed at build time, not at runtime.** `vite build` replaces `import.meta.env.VITE_API_URL` with a string literal, and what deploys is static files served by Apache. The URL is frozen into `assets/index-*.js` before anything reaches the server, and there is no process on the server to read a `.env` afterwards. This is exactly where `backend/.env` differs — Nest reads that one at runtime, so it can live on the server; a `frontend/.env` on the server is inert.
 
-So `VITE_API_URL` has to be set **wherever `npm run build` runs**, which is either:
+So `VITE_API_URL` has to be set **wherever `npm run build` runs**. In CI that is a GitHub runner, and `frontend/.env` is gitignored, so the runner never has one — the value comes from a **repository variable** instead:
 
-- **In CI** — the deploy workflows build on a GitHub runner. `frontend/.env` is gitignored, so the runner does not have it; the value would have to reach the build step some other way.
-- **Locally** — a `frontend/.env` on your machine, then deploy the `dist/` that build produces.
+Repo → **Settings** → **Secrets and variables** → **Actions** → **Variables** → **New repository variable**, named `VITE_API_URL`, e.g. `https://api.jhemery.xyz`.
 
-**Neither is wired up today.** The deploy builds on a runner with no `VITE_API_URL`, so [frontend/src/lib/api.ts](../frontend/src/lib/api.ts) falls back to an empty base and the deployed bundle makes same-origin requests. Those hit the SPA rewrite below, come back as `index.html`, and fail to parse — every caller catches it, so the live-data cards stay hidden and the terminal's `gitlog` / `steam` / `guestbook` print an "unavailable" line instead of erroring.
+A variable rather than a secret: the value is inlined verbatim into a public bundle, so there is nothing to hide, and masking it would only make the build log harder to read.
 
-That is a deliberate quiet failure, not a working setup: **live data does not load in production.** It replaced a much louder one, where the bundle shipped with `http://localhost:3000` baked in and every visitor's browser fired five cross-origin requests at their own machine.
+[frontend-build.yml](../.github/workflows/frontend-build.yml) checks it before building and **fails the run** if it is unset. That guard is the point of the section: [frontend/src/lib/api.ts](../frontend/src/lib/api.ts) falls back to an empty base in a production build, which deploys and renders perfectly while every live-data call quietly goes to the SPA and comes back as `index.html`. A red run beats a green one that ships a site with no live data.
 
-To actually turn live data on, give the build the URL by whichever route above suits you. Whatever value you use has to agree with the CORS allowlist in the other direction — `FRONTEND_URL` in `backend/.env`. Neither host is sensitive; both end up inlined in a public bundle.
+Whatever value you use has to agree with the CORS allowlist in the other direction — `FRONTEND_URL` in `backend/.env`.
+
+Building locally instead — a `frontend/.env` on your machine, then deploying that `dist/` by hand — works the same way, and is the only route that does not go through the variable.
 
 ### 5. Set up the backend as a Node.js App
 
@@ -159,7 +160,7 @@ Repo → **Settings** → **Secrets and variables** → **Actions** → **New re
 
 All seven are required. Check them with `gh secret list` before expecting a deploy to pass — a missing secret expands to an empty string rather than failing the run outright.
 
-Note that `VITE_API_URL` is deliberately **not** in this table — it is a build-time value, not a deploy-time one. See [Where the frontend's API URL comes from](#where-the-frontends-api-url-comes-from).
+`VITE_API_URL` is deliberately **not** in this table — it is a repository *variable*, not a secret, because it ends up inlined in a public bundle. See [Where the frontend's API URL comes from](#where-the-frontends-api-url-comes-from). Without it the frontend build fails outright.
 
 ### 2. Trigger a run
 
@@ -171,8 +172,10 @@ Push a commit touching `frontend/` or `backend/` to `master`, or go to **Actions
 
 | Symptom | Cause |
 |---|---|
-| "Making sure the IP is whitelisted" exits 1, and the step above dumped cPanel login-page HTML | `CPANEL_API_TOKEN` is empty or invalid. An unauthenticated cPanel API call returns the login page, not a JSON error — easy to mistake for the API being disabled. Check the masked header in the log: `Authorization: cpanel ***:***` is right, `cpanel ***:` means the token is missing. |
-| Same step exits 1 with a JSON error about the whitelist | The 5-entry whitelist cap is full. Prune it in cPanel → **Accès SSH**. |
+| "Whitelisting the runner IP" exits 1 with *"the response was not JSON"* | `CPANEL_API_TOKEN` is empty or invalid. An unauthenticated cPanel API call returns the login page, not a JSON error — easy to mistake for the API being disabled. Check the masked header in the log: `Authorization: cpanel ***:***` is right, `cpanel ***:` means the token is missing. |
+| "Whitelisting the runner IP" exits 1 with *"Vous avez atteint la limite d'exceptions autorisées"* | The whitelist is full — it holds **five distinct addresses**, not five entries. Prune it in cPanel → **Accès SSH** → **Gérer les exceptions de pare-feu**, removing the leftover GitHub-runner addresses (Azure ranges: `13.*`, `20.*`, `52.*`, `64.*`). Two of the five slots are your own machines and should stay. |
+| The whitelist keeps filling up with runner IPs | Deploys before 4 August 2026 removed only the `direction=in` entry, while cPanel's `add` creates `in` **and** `out` — so each run leaked one address permanently. The cleanup step now removes both directions; anything leaked before that has to be pruned by hand, once. A leftover is recognisable as a port-22 `out` entry with no matching `in` — your own machines were whitelisted in both directions. |
+| "Making sure the IP is whitelisted" exits 1 | The `add` was accepted but the entry is not in the list. Re-run; if it persists, add it by hand in cPanel to confirm the account can hold another address at all. |
 | `Permission denied (publickey)` on rsync | `SSH_KEY` isn't the private half of the authorized key, or the key was imported but never **Authorized** in cPanel |
 | `kex_exchange_identification: Connection reset by peer` | The firewall hadn't applied the whitelist entry yet. The "Waiting for the firewall" step retries for two minutes; if it exhausts them, the entry was accepted by the API but never loaded. |
 | rsync succeeds but lands in the wrong place | `FRONTEND_REMOTE_PATH` / `BACKEND_REMOTE_PATH` typo — they're absolute paths |
@@ -234,6 +237,6 @@ The running build also answers `POST /ask`, which merged on 4 August 2026 at 13:
 
 ## Known gaps
 
-- **The automated backend deploy has never completed a run.** The backend is deployed and running — see [Verified in production](#verified-in-production) — but it did not get there through CI. Every `Deploy Backend` run so far has failed or been cancelled (9 failures and 1 cancellation as of 4 August 2026), each dying at the transfer step; the most recent still hit the `kex_exchange_identification: read: Connection reset by peer` firewall race that the retry loop is meant to absorb. Because the transfer never lands, the step behind it is skipped every time — **`npm ci --omit=dev`, the `package.json` / `package-lock.json` copy up to the app root, and `touch tmp/restart.txt` have still never run against the real server.** The live deployment was placed by hand. By contrast the frontend deploy does work end-to-end; it first landed on 4 August 2026.
+- **The automated backend deploy has never completed a run.** The backend is deployed and running — see [Verified in production](#verified-in-production) — but it did not get there through CI. Every `Deploy Backend` run so far has failed or been cancelled (9 failures and 1 cancellation as of 4 August 2026), each dying before the transfer. The last one never reached SSH at all: the whitelist was full of leaked runner addresses, `add` was refused, and the unchecked `curl` let the run walk into a two-minute SSH timeout — both now fixed in [backend-deploy.yml](../.github/workflows/backend-deploy.yml), but the end-to-end path is still unproven. Because the transfer never lands, the step behind it is skipped every time — **`npm ci --omit=dev`, the `package.json` / `package-lock.json` copy up to the app root, and `touch tmp/restart.txt` have still never run against the real server.** The live deployment was placed by hand. By contrast the frontend deploy does work end-to-end; it first landed on 4 August 2026.
 - **Backend restart mechanism is unverified.** It assumes the o2switch Node.js App (Passenger) picks up `tmp/restart.txt`. If the app is managed a different way (PM2, systemd, etc.), update the "Install production dependencies & restart app" step in [backend-deploy.yml](../.github/workflows/backend-deploy.yml).
 - **The FTP fallback is unverified.** Written against o2switch's documented FTPS setup, never run against the real account.
