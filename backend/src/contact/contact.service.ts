@@ -11,10 +11,14 @@ export class ContactService {
 
   async send(dto: ContactDto): Promise<void> {
     const host = this.config.get<string>('SMTP_HOST');
-    const port = this.config.get<number>('SMTP_PORT', 587);
+    // Env vars arrive as strings, so this has to be coerced before it is compared
+    // to 465 below — otherwise implicit-TLS setups silently connect in the clear.
+    const port = Number(this.config.get<string>('SMTP_PORT')) || 587;
     const user = this.config.get<string>('SMTP_USER');
     const pass = this.config.get<string>('SMTP_PASS');
-    const to   = this.config.get<string>('CONTACT_TO', user ?? '');
+    // An empty CONTACT_TO is present-but-useless, and `get`'s default only covers
+    // a missing key, so fall back here instead.
+    const to = this.config.get<string>('CONTACT_TO') || user;
 
     if (!host || !user || !pass) {
       this.logger.warn('SMTP not configured — logging message instead');
@@ -35,7 +39,26 @@ export class ContactService {
         text: `Name: ${dto.name}\nEmail: ${dto.email}\n\n${dto.message}`,
       });
     } catch (err) {
-      this.logger.error('Failed to send email', err);
+      // The client only ever sees a generic 500, so this line is the sole record of
+      // why a send failed. Nodemailer hangs its diagnosis off non-standard fields
+      // (`code`, `responseCode`, `response`), which a bare Error log would drop.
+      const { code, responseCode, response } = err as {
+        code?: string;
+        responseCode?: number;
+        response?: string;
+      };
+      this.logger.error(
+        `Failed to send email via ${host}:${port} (secure=${port === 465}) — ` +
+          [
+            err instanceof Error ? err.message : String(err),
+            code && `code=${code}`,
+            responseCode && `responseCode=${responseCode}`,
+            response && `response=${response}`,
+          ]
+            .filter(Boolean)
+            .join(' '),
+        err instanceof Error ? err.stack : undefined,
+      );
       throw new InternalServerErrorException('Could not send message');
     }
   }
