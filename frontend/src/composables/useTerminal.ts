@@ -206,19 +206,29 @@ async function execute(name: string, args: string[], raw: string): Promise<void>
   const command = resolve(name)
   if (!command) return
 
-  abortController = new AbortController()
+  const controller = new AbortController()
+  abortController = controller
   busy.value = true
+  let aborted = false
 
   try {
-    const result = await command.run(buildContext(args, raw, abortController.signal))
+    const result = await command.run(buildContext(args, raw, controller.signal))
     if (result) append(result)
   } catch (error) {
     if ((error as Error)?.name === 'AbortError') {
-      append({ text: messages.terminal.cancelled[currentLocale()], tone: 'muted' })
+      aborted = true
     } else {
       append({ text: String((error as Error)?.message ?? error), tone: 'error' })
     }
   } finally {
+    // The one `^C` line for this run, printed here rather than in `cancel()` so
+    // there is exactly one however the abort surfaced: commands that rethrow it
+    // (`sl`, `hack`, the games), commands that swallow it to keep the partial
+    // output they already have (`ask`), and a cancelled `ctx.prompt()` all land
+    // in the same place.
+    if (aborted || controller.signal.aborted) {
+      append({ text: messages.terminal.cancelled[currentLocale()], tone: 'muted' })
+    }
     busy.value = false
     abortController = null
     // Unconditional, for the same reason `busy` is: a game that throws must not
@@ -252,8 +262,11 @@ export function cancel() {
     pendingPrompt.value = null
     pending.reject(Object.assign(new Error('cancelled'), { name: 'AbortError' }))
   }
-  abortController?.abort()
-  append({ text: messages.terminal.cancelled[currentLocale()], tone: 'muted' })
+  const running = abortController
+  running?.abort()
+  // A run in flight prints its own `^C` as it unwinds, so only an idle prompt —
+  // where there is nothing to unwind — needs the line from here.
+  if (!running) append({ text: messages.terminal.cancelled[currentLocale()], tone: 'muted' })
 }
 
 /** ↑/↓ through submitted commands. Returns the value the input should show. */
