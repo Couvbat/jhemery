@@ -47,6 +47,7 @@ docs/       design specs and implementation plans
 | **CRT overdrive** | `crt` in the terminal (or the Konami code anywhere on the page) toggles scanlines, flicker and a speed multiplier that the three.js loop reads live to spin the wireframes up. Persisted in `localStorage`. |
 | **Boot sequence** | A fake `couvsh 1.0` kernel log plays on first visit, then remembers it booted. `reboot` replays it on demand, and `ssh` ends by triggering it. Skipped for reduced-motion. |
 | **Status ticker** | The footer carries the same uptime `neofetch` reports (days since the first commit) plus how long ago this build shipped, re-read on a slow tick so a long-open tab stays honest. |
+| **Live presence** | The same line says how many people are here right now, over SSE, moving as visitors arrive and leave. An aggregate count and nothing else — see the API table below. |
 | **Sections** | about · projects · music · gaming · hardware · contact — defined once in `src/content/sections.ts` and consumed by the navbar, the terminal's `ls`/`cd`/`pwd`, the command palette and every section header. |
 | **Live cards** | Steam "currently playing", GitHub recent commits, latest CI runs, contribution heatmap and pinned repos, SoundCloud player, guestbook. |
 | **Guestbook ticker** | A 20s poll (not SSE — see [the spec](docs/features-spec.md#8-backend-additions)) surfaces anyone who signs while you're on the page, as a floating notice that opens `guestbook` when clicked. Skipped while the tab is hidden, and it gives up if the guestbook is off. |
@@ -222,6 +223,8 @@ limiter sees real clients behind Apache.
 | `GET /github/workflow-status` | The four most recent Actions runs for `GITHUB_REPO`. Public REST, so the token is optional; cached for 60 s because a build in flight is the one case where a stale answer is the wrong answer. |
 | `GET /weather` | Current conditions and a short forecast from Open-Meteo (no key, no account). The coordinates are **mine**, from server config — nothing about the visitor is read or sent, so everyone gets the same answer and one 10-minute cache serves them all. Empty in `.env.example` on purpose. |
 | `GET /markets` | Crypto quotes and a 7-day series from CoinGecko (no key, no account). A proxy purely because CORS blocks the browser; the coin list is server-side config, so no caller data is forwarded. Cached 5 min, only fetched when someone runs `btc`. |
+| `GET /presence` | Server-sent events: how many people are on the site right now. One integer, pushed as visitors arrive and leave — no visitor id is sent or assigned, and nothing is written down. The only endpoint here that pushes rather than polls. |
+| `GET /stats` · `POST /stats/session` | A single running total of terminal sessions opened. Counted once when you open the shell, never per command — the server never learns which commands anyone runs. 5/hour per IP. |
 | `GET /guestbook` · `POST /guestbook` | Read and sign. Sanitised, link-filtered, 1/min per IP, capped at 500 entries. Stored in a JSON file under `DATA_DIR`, or in MongoDB if `MONGODB_URI` is set. Disabled by default. |
 | `DELETE /guestbook/:id` | Moderation; requires the `x-admin-password` header. |
 

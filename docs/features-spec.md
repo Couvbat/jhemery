@@ -530,6 +530,45 @@ The single request is made by `ThreeBackground` on mount — the surface that ac
 answer — and `weather` reuses the cached result rather than asking again. Under reduced motion the
 component is never mounted, so the call is never made for a scene that would sit still anyway.
 
+### `GET /presence` — the one thing that pushes
+
+Nest's own `@Sse()`, so no new dependency. The connection *is* the subscription: a visitor arriving
+increments a counter and pushes the new figure to everyone already connected, a closed tab is a
+plain unsubscribe that pushes it back down. A 25-second heartbeat keeps Apache from reaping an idle
+stream. The count lives in memory — a restart resets it, which is correct, since every connection
+dies with the process anyway.
+
+**This is the opposite call from the guestbook ticker, for the opposite reason.** A presence count
+is only interesting *because* it moves as people come and go; a 20-second poll would show a number
+that is usually wrong and never seen to change. The guestbook's interesting event happens twice a
+week and its endpoint was already cached.
+
+**What crosses the wire is one integer.** No visitor id is sent, none is assigned, nothing is
+written to disk, and there is nothing on the server that could correlate one connection with
+another — not a policy applied afterwards, but the entire data model. A unit test asserts the
+payload has exactly one key, so a field creeping in alongside it fails the build.
+
+`usePresence.ts` holds the `EventSource`. It gives up after three failed connections rather than
+reconnecting for as long as the tab is open, and the footer segment stays out of the DOM entirely
+until a first message arrives — an unreachable backend shows nothing rather than a zero.
+
+### `GET /stats` · `POST /stats/session`
+
+A single running total: how many times anyone has opened the terminal. `useTerminal.ts`'s
+`primeOverlay()` posts once per session.
+
+**Once per session, not once per command.** Per-command would be chatter, and it would mean the
+server learning *which* commands people run — precisely what the `ask` route promises not to
+record. What is stored is one number, in one JSON file: `{"sessions":N}`, asserted by a test against
+the file that actually lands on disk.
+
+Rate-limited to 5/hour per IP through the existing `RateLimitGuard`, not because the write is
+expensive but because a number nobody can inflate with a `for` loop is the only kind worth
+printing. Increments accumulate in memory and flush at most every 30 seconds, write-then-rename like
+the guestbook, into `stats.json` under `DATA_DIR` — which the deploy excludes, so the total survives
+a release instead of resetting to zero. Surfaced as a `Sessions` row in `neofetch`, omitted rather
+than zeroed when the backend is unreachable.
+
 ### Live guestbook ticker
 
 **Polling, not SSE.** `useGuestbookTicker.ts` re-reads `GET /guestbook` every 20 s and announces

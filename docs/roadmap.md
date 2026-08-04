@@ -58,11 +58,11 @@ Passive data cards — no achievements (see §D).
 | ✔ | Feature | Approach | Files | Effort |
 |---|---|---|---|---|
 | [x] | Build/deploy status card | Reuses the **existing** `GITHUB_TOKEN` + `github.module` — one `GET /github/workflow-status` route on the Actions REST API. Cheapest live item. | `backend/src/github/*` (extend), frontend card | S–M |
-| [ ] | Visitor counter / presence | NestJS's native `@Sse()` (no new dep) broadcasting a periodic aggregate count. Aggregate only — no per-visitor data. | `backend/src/presence/*` (new), `usePresence.ts` (new) | M |
+| [x] | Visitor counter / presence | Nest's native `@Sse()`, no new dep. The connection *is* the subscription, so arriving pushes a new count to everyone and a closed tab is a plain unsubscribe — better than the planned periodic broadcast, since the number moves the moment someone comes or goes. 25s heartbeat so Apache doesn't reap the stream; count lives in memory. Payload is one integer: no visitor id sent or assigned, nothing written down, and a test asserts the payload has exactly one key. Shown in the footer status line; `usePresence.ts` gives up after 3 failed connections, and the segment stays out of the DOM until a first message arrives. | `backend/src/presence/*` (new), `usePresence.ts` (new), `SiteFooter.vue`, `messages.ts` | M |
 | [x] | Uptime/status ticker | Extends `neofetch`'s "days since first commit" calc into a visible status line; "last deploy" reuses already-fetched GitHub activity. | small status composable | S |
 | [x] | Weather-linked background mood | `useWeather.ts` maps the condition to a `{ speed, opacity }` pair `ThreeBackground` multiplies into what the section palette already decided — storm faster, fog dimmer, snow slower, night dimmer still. Opacity always scales from each shape's stored `baseOpacity`, so repeated changes cannot ratchet the scene to invisible. The single request is made by `ThreeBackground` on mount and `weather` reuses it; under reduced motion the component never mounts, so the call never happens. | `useWeather.ts`, `ThreeBackground.vue` | M |
 | [x] | Live guestbook ticker | **Polling, not SSE**: `GET /guestbook` every ~20s, diff for new entries, surface through `AchievementToast.vue`'s existing pattern. No new backend. | poller composable + toast component | S–M |
-| [ ] | Global command counter | Fire-and-forget, incremented once per **terminal session open** (`useTerminal.ts`'s `primeOverlay()`), not per command — matches the `ask` route's "never logs content" stance. | `backend/src/stats/*` (new, tiny), one call site | S–M |
+| [x] | Global command counter | `POST /stats/session` from `primeOverlay()`, once per session — per-command would be chatter and would mean the server learning *which* commands run, the thing `ask` promises not to record. Stored as `{"sessions":N}` in one JSON file under `DATA_DIR` (excluded from the deploy, so it survives a release), write-then-rename like the guestbook, flushed at most every 30s. Rate-limited 5/hour per IP through the existing guard, because a number anyone can inflate with a `for` loop is not worth printing. Surfaced as a `Sessions` row in `neofetch`, omitted rather than zeroed when the backend is unreachable. | `backend/src/stats/*` (new), `useStats.ts` (new), `useTerminal.ts`, `content.ts` | S–M |
 
 ## D. Achievement tie-ins
 
@@ -102,10 +102,21 @@ click-to-inspect, scene control, constellation, `banner`, `alias`, build/deploy 
 ticker — plus the five achievements those unlocked (`alias`, `banner`, `cyanSpotter`,
 `constellation`, `zeroG`).
 
-**Phase 3 — the rest, one at a time (M–L):**
-Argument autocompletion ✅ shipped on `feat/phase-3-completion` → `dev` — the only one that needed
-no backend, and it makes every command already shipped easier to find. Then the infra ones, still
-to do: `weather` (+ weather-linked mood), `btc`/`stonks`, presence SSE, command counter.
+**Phase 3 — the rest, one at a time (M–L):** ✅ all shipped, one branch each → `dev`.
+`feat/phase-3-completion` (argument autocompletion — the only one that needed no backend, and it
+makes every command already shipped easier to find), `feat/phase-3-weather` (`weather` +
+weather-linked background mood), `feat/phase-3-markets` (`btc`/`stonks`),
+`feat/phase-3-presence` (presence SSE), `feat/phase-3-stats` (command counter).
+
+Every roadmap row is now ticked.
+
+## Known issues
+
+- **`registry.ts` ↔ `commands/index.ts` is a circular import.** Pre-dates all of this: the command
+  modules import `resolve()` back from the registry, whose top-level code builds the lookup Map.
+  A clean load is fine because the registry is entered first, but entering `commands/index.ts`
+  first throws `Cannot access 'coreCommands' before initialization` — seen once in the dev server
+  during an HMR reload. The fix is to build the Map lazily so nothing runs at import time.
 
 ## Dropped
 
