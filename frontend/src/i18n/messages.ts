@@ -21,6 +21,19 @@ export const messages = {
     justNow: { en: 'just now', fr: "à l'instant" },
     noDescription: { en: 'No description provided.', fr: 'Aucune description fournie.' },
   },
+  build: {
+    title: { en: 'gh run list', fr: 'gh run list' },
+    running: { en: 'running', fr: 'en cours' },
+    queued: { en: 'queued', fr: 'en attente' },
+    success: { en: 'passed', fr: 'réussi' },
+    failure: { en: 'failed', fr: 'échoué' },
+    cancelled: { en: 'cancelled', fr: 'annulé' },
+    unknown: { en: 'unknown', fr: 'inconnu' },
+  },
+  guestbookTicker: {
+    signed: { en: 'just signed the guestbook', fr: "vient de signer le livre d'or" },
+    read: { en: 'run `guestbook` to read it', fr: 'tapez `guestbook` pour le lire' },
+  },
   music: {
     genres: { en: 'Genres', fr: 'Genres' },
     tools: { en: 'Tools', fr: 'Outils' },
