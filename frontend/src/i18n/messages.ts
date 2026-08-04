@@ -84,6 +84,10 @@ export const messages = {
     didYouMean: { en: 'did you mean', fr: 'vouliez-vous dire' },
     // Shown instead of a typo suggestion when the input reads as a sentence.
     askInstead: { en: 'that reads like a question — try', fr: 'on dirait une question — essayez' },
+    playing: {
+      en: '-- playing: arrows/wasd · q or ctrl+c to quit --',
+      fr: '-- en jeu : flèches/wasd · q ou ctrl+c pour quitter --',
+    },
     cancelled: { en: '^C cancelled', fr: '^C annulé' },
   },
   // Chrome around `ask` only. The *answer* is generated in the requested locale

@@ -276,9 +276,9 @@ editor, because a fake one that ignores `hjkl` is a worse joke than no joke.
 **Where:** `frontend/src/terminal/achievements.ts`, `components/AchievementsModal.vue`,
 `components/AchievementToast.vue`
 
-Achievements covering the easter eggs above, the guestbook, `mail`, `ask`, `lang`, `crt`,
-`htop`, visiting every section (`explorer`), and a `completionist` that cascades when every other
-one is done. Nothing counts them by hand — every surface reads `achievementList.length` — so the
+Achievements covering the easter eggs above, the guestbook, `mail`, `ask`, the games, `lang`,
+`crt`, `htop`, visiting every section (`explorer`), and a `completionist` that cascades when every
+other one is done. Nothing counts them by hand — every surface reads `achievementList.length` — so the
 list is free to grow. Unlock state is `localStorage` only (`couvbat:achievements`, plus
 `couvbat:achievements:sections` for `explorer`'s progress) — there is no account and no sync.
 
@@ -367,7 +367,7 @@ make for them.
 When enabled:
 - Storage: MongoDB (via Mongoose) when `MONGODB_URI` is set, in a `guestbook_entries` collection.
   Otherwise falls back to a JSON file under `DATA_DIR` (default `uploads/`) — chosen because the
-  backend deploy rsync already excludes `uploads`, so entries survive deploys. The Mongo connection
+  backend deploy already excludes `uploads`, so entries survive deploys. The Mongo connection
   is lazy (first request) and a failed/absent connection silently falls back to the JSON file.
 - `POST /guestbook` — `{ name, message }`, both required. Name ≤ 40 chars, message ≤ 280.
 - Sanitisation: strips control characters and angle brackets, collapses whitespace, rejects
