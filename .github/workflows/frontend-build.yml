@@ -34,7 +34,23 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      # Vite inlines VITE_API_URL into the bundle at build time, so it has to be
+      # set here -- a .env on the server does nothing for a static build. Guarded
+      # rather than defaulted: src/lib/api.ts falls back to http://localhost:3000,
+      # which deploys and renders perfectly while every API call goes nowhere.
+      - name: Check the API URL is configured
+        env:
+          VITE_API_URL: ${{ vars.VITE_API_URL }}
+        run: |
+          if [ -z "$VITE_API_URL" ]; then
+            echo "::error title=VITE_API_URL is not set::Add it under Settings -> Secrets and variables -> Actions -> Variables, e.g. https://api.jhemery.xyz. Without it the build bakes in http://localhost:3000."
+            exit 1
+          fi
+          echo "Building against $VITE_API_URL"
+
       - name: Build
+        env:
+          VITE_API_URL: ${{ vars.VITE_API_URL }}
         run: npm run build
 
       # `.htaccess` is a dotfile and upload-artifact drops those by default, so

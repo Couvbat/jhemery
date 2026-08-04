@@ -17,9 +17,13 @@ Two runs at once would put two entries in that 5-slot whitelist and race the fir
 
 ### Frontend configuration
 
-`VITE_API_URL` is **inlined into the JavaScript at build time**, so it has to be set where the build runs — in CI, from [frontend/.env.production](../frontend/.env.production) in the repo. A `.env` placed on the server does nothing for a static bundle; the file is read by Vite during `npm run build`, never by the browser.
+`VITE_API_URL` is **inlined into the JavaScript at build time**, so it has to be set where the build runs. It comes from a repository **variable** (not a secret — it ships in the JavaScript either way):
 
-Getting this wrong is quiet rather than loud: `src/lib/api.ts` falls back to `http://localhost:3000`, so the site deploys and renders perfectly while every API call goes nowhere. To check what a deployed bundle actually contains:
+Repo → **Settings** → **Secrets and variables** → **Actions** → **Variables** → `VITE_API_URL` = `https://api.jhemery.xyz`
+
+A `.env` placed on the server does nothing for a static bundle; the file is read by Vite during `npm run build`, never by the browser.
+
+Getting this wrong is quiet rather than loud: `src/lib/api.ts` falls back to `http://localhost:3000`, so the site deploys and renders perfectly while every API call goes nowhere. [frontend-build.yml](../.github/workflows/frontend-build.yml) therefore fails the build outright when the variable is unset rather than letting the fallback through. To check what a deployed bundle actually contains:
 
 ```bash
 curl -s https://jhemery.xyz/$(curl -s https://jhemery.xyz/ | grep -oE '/assets/[^"]+\.js' | head -1) | grep -o 'https://api[^"]*'
