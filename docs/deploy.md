@@ -241,6 +241,26 @@ So the live backend carries the three commits that make `ask` work — the corpu
 
 > **What this does not prove: that Passenger acted on the restart.** `touch tmp/restart.txt` succeeding means the file was touched, nothing more. The observable test is the response ceiling: the deployed code answers `POST /ask` within 45 seconds under every failure it has (20s to detach a cold model, 45s absolute). **A request that runs past 45 seconds is the old process still serving, not a slow model** — see the gap below.
 
+### `/ask` on the wire
+
+Both halves of the CORS exchange, captured 4 August 2026 at 16:54 UTC. Worth keeping because `ask` is the only endpoint a browser preflights, and because a console that reports a CORS failure is not evidence that any of this is wrong — twice now it has been something else entirely:
+
+```
+OPTIONS /ask  ->  204
+  access-control-allow-origin:  https://jhemery.xyz
+  access-control-allow-methods: GET,POST,DELETE
+  access-control-allow-headers: Content-Type,x-admin-password
+
+POST /ask     ->  200 in ~1.1s
+  content-type:                 text/event-stream; charset=utf-8
+  cache-control:                no-cache, no-transform
+  access-control-allow-origin:  https://jhemery.xyz
+```
+
+Reproduce with the two `curl` commands in [Known gaps](#known-gaps). If they still look like this, the server is not the problem, whatever the browser says — check the client next, in this order: a private window (extensions), then site data for `jhemery.xyz` (Firefox serves cached permanent redirects as internal `307`s, which reach the console as a missing CORS header on a request that never touched the network).
+
+Note `curl -X POST` does **not** reproduce a browser here: it sends the POST directly, while a browser preflights it first because of the JSON content type. Testing only the POST leaves the half that actually fails untested.
+
 ## Known gaps
 
 - ~~**The automated backend deploy has never completed a run.**~~ **Fixed 4 August 2026.** Ten runs died before the transfer; the last of them never reached SSH at all, because the whitelist was full of leaked runner addresses, `add` was refused, and an unchecked `curl` let the run walk into a two-minute SSH timeout. Both were fixed in [backend-deploy.yml](../.github/workflows/backend-deploy.yml) and the deploy has completed cleanly on every run since — see [Verified in production](#verified-in-production).
