@@ -12,7 +12,7 @@ export class ContactController {
   @HttpCode(200)
   // The terminal's `mail` command posts here too, so leaving this unlimited next to
   // a limited guestbook would just make it the weaker door.
-  @RateLimit({ limit: 3, windowMs: 10 * 60_000 })
+  @RateLimit({ limit: 2, windowMs: 60 * 60_000 })
   async send(@Body() dto: ContactDto): Promise<{ ok: boolean }> {
     await this.contactService.send(dto);
     return { ok: true };

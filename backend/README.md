@@ -32,7 +32,7 @@ unconfigured rather than failing.
 | Route | Module | Notes |
 |---|---|---|
 | `POST /ask` | `ask` | SSE stream of an answer from a self-hosted, OpenAI-compatible model. 5/hour per IP. |
-| `POST /contact` | `contact` | Sends the terminal's `mail` message over SMTP. 3 per 10 min per IP. |
+| `POST /contact` | `contact` | Sends the terminal's `mail` message over SMTP. 2 per hour per IP. |
 | `GET /steam/activity` | `steam` | Profile + recently played, 5-minute cache. |
 | `GET /github/activity` | `github` | Recent public commits, 5-minute cache. |
 | `GET /github/contributions` | `github` | Contribution heatmap — GraphQL, needs a token. |
