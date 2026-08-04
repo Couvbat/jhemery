@@ -7,22 +7,26 @@ import { Label } from '@/components/ui/label'
 import SectionHeader from '@/components/SectionHeader.vue'
 import { socials } from '@/content'
 import { useLocale } from '@/i18n'
-import { api } from '@/lib/api'
+import { api, ApiError } from '@/lib/api'
 
 const { t, m } = useLocale()
 
 const form = ref({ name: '', email: '', subject: '', message: '' })
 const status = ref<'idle' | 'sending' | 'success' | 'error'>('idle')
+/** Server-side reason (rate limit, validation, SMTP), as the terminal's `mail` shows it. */
+const errorDetail = ref('')
 
 async function submit() {
   if (!form.value.name || !form.value.email || !form.value.message) return
   status.value = 'sending'
+  errorDetail.value = ''
   try {
     await api.contact(form.value)
     status.value = 'success'
     form.value = { name: '', email: '', subject: '', message: '' }
-  } catch {
+  } catch (err) {
     status.value = 'error'
+    errorDetail.value = err instanceof ApiError ? err.message : ''
   }
 }
 </script>
@@ -109,6 +113,7 @@ async function submit() {
               class="text-xs text-destructive border border-destructive/30 rounded p-3"
             >
               ✗ {{ t(m.contact.error) }}
+              <span v-if="errorDetail" class="block mt-1 opacity-70">{{ errorDetail }}</span>
             </div>
 
             <Button
