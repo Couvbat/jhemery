@@ -27,8 +27,23 @@ const MAX_CORPUS_CHARS = 16_000;
 
 /** Terminal answers should be short. This also caps the cost of any one request. */
 const MAX_OUTPUT_TOKENS = 300;
-/** A hung model must not sit on the single concurrency slot. */
-const REQUEST_TIMEOUT_MS = 20_000;
+
+/**
+ * How long a visitor waits for the first token before being told the model is
+ * asleep. Reaching it stops the *waiting*, never the request — see `stream()`.
+ */
+const FIRST_TOKEN_TIMEOUT_MS = 20_000;
+/**
+ * Longest silence mid-answer before the model counts as hung. Once tokens are
+ * flowing they arrive milliseconds apart, so a gap this size is a dead stream,
+ * not a slow one.
+ */
+const IDLE_TIMEOUT_MS = 15_000;
+/**
+ * Hard ceiling on a detached warm-up. Generous, because it is racing a model
+ * load off disk; it exists only so a wedged upstream cannot leak forever.
+ */
+const WARMUP_CEILING_MS = 5 * 60_000;
 
 /** Keeps `ask` alive when the frontend is down, rather than taking it with it. */
 const FALLBACK_CORPUS = `# Jules Hémery (Couvbat)
@@ -58,6 +73,12 @@ export class AskService {
    * `RateLimitGuard` because that guard is per-IP by construction.
    */
   private inFlight = false;
+  /**
+   * A detached request that is still bringing the model up. While one exists,
+   * further questions are answered "asleep" straight away rather than dialling
+   * again — a cold model would otherwise get a fresh load request per visitor.
+   */
+  private warming: Promise<unknown> | null = null;
 
   constructor(private readonly config: ConfigService) {}
 
@@ -96,6 +117,11 @@ export class AskService {
       // one degraded path rather than two.
       throw new BadGatewayException('The model is unavailable');
     }
+    if (this.warming) {
+      // Still loading from an earlier question. Say so immediately instead of
+      // queueing a second load behind the first.
+      throw new BadGatewayException('The model is still waking up');
+    }
     this.inFlight = true;
 
     const startedAt = Date.now();
@@ -118,7 +144,29 @@ export class AskService {
     }
   }
 
-  /** Returns how many deltas made it out. */
+  /**
+   * Returns how many deltas made it out.
+   *
+   * **Giving up waiting is not the same as cancelling.** Ollama aborts a model
+   * load the moment its client disconnects:
+   *
+   * ```
+   * client connection closed before llama-server finished loading, aborting load
+   * Load failed … error="timed out waiting for llama-server to start: context canceled"
+   * ```
+   *
+   * A cold load of this model measures ~34s against a 20s deadline, so an
+   * aborting timeout killed the very load that would have made the next
+   * question fast — every visitor restarted it from nothing and no visitor ever
+   * got an answer. Keeping the model warm cannot fix that on its own, because
+   * it never finishes loading in the first place.
+   *
+   * So the deadline detaches instead: the visitor is told the model is asleep,
+   * which is true, while the request runs on in the background until the load
+   * completes and the model goes resident. The next question — a visitor or two
+   * later — gets a real answer in about a second. The upstream is only ever
+   * aborted by a genuine fault: silence mid-answer, or the hard ceiling.
+   */
   private async stream(
     dto: AskDto,
     onDelta: (delta: string) => void,
@@ -130,21 +178,46 @@ export class AskService {
     const corpus = this.corpusNow();
 
     const controller = new AbortController();
-    let timedOut = false;
-    const timer = setTimeout(() => {
-      timedOut = true;
-      controller.abort();
-    }, REQUEST_TIMEOUT_MS);
-    const onClientAbort = () => controller.abort();
-    signal?.addEventListener('abort', onClientAbort, { once: true });
+    const ceiling = setTimeout(() => controller.abort(), WARMUP_CEILING_MS);
 
     let delivered = 0;
-    try {
-      const headers: Record<string, string> = {
-        'Content-Type': 'application/json',
-      };
-      if (apiKey) headers.Authorization = `Bearer ${apiKey}`;
+    let detached = false;
+    let idle: ReturnType<typeof setTimeout> | null = null;
+    let onFirstToken!: () => void;
+    const firstToken = new Promise<void>((resolve) => {
+      onFirstToken = resolve;
+    });
 
+    // A visitor who closes the tab stops being written to, but their request
+    // still finishes warming the model. Aborting here would cancel the load for
+    // everyone behind them — and a 34s wait is exactly when tabs get closed.
+    const onClientGone = () => {
+      detached = true;
+    };
+    signal?.addEventListener('abort', onClientGone, { once: true });
+
+    const headers: Record<string, string> = {
+      'Content-Type': 'application/json',
+    };
+    if (apiKey) headers.Authorization = `Bearer ${apiKey}`;
+
+    const visible = stripThinking();
+    const emit = (text: string) => {
+      if (!text) return;
+      // Once tokens flow they arrive milliseconds apart, so a long gap is a
+      // dead stream rather than a slow one. This is the only clock that may
+      // abort, and it cannot fire during a load.
+      if (idle) clearTimeout(idle);
+      idle = setTimeout(() => controller.abort(), IDLE_TIMEOUT_MS);
+
+      delivered += 1;
+      onFirstToken();
+      // A detached run is only here to finish warming the model; the visitor
+      // it started for has already been answered.
+      if (!detached) onDelta(text);
+    };
+
+    const work = (async () => {
       const res = await fetch(
         `${baseUrl.replace(/\/+$/, '')}/chat/completions`,
         {
@@ -172,29 +245,63 @@ export class AskService {
         throw new BadGatewayException(`The model answered ${res.status}`);
       }
 
-      const visible = stripThinking();
-      const emit = (text: string) => {
-        if (!text) return;
-        delivered += 1;
-        onDelta(text);
-      };
       await readEventStream(res.body, (delta) => emit(visible.push(delta)));
       emit(visible.flush());
+    })();
+
+    const gaveUp = Symbol('deadline');
+    let deadline: ReturnType<typeof setTimeout> | null = null;
+
+    try {
+      const raced = await Promise.race([
+        work.then(() => undefined),
+        firstToken.then(() => undefined),
+        new Promise<symbol>((resolve) => {
+          deadline = setTimeout(() => resolve(gaveUp), FIRST_TOKEN_TIMEOUT_MS);
+        }),
+      ]);
+
+      if (raced === gaveUp && delivered === 0) {
+        // Detach. Deliberately no `controller.abort()` — that is the line that
+        // used to cancel the load.
+        detached = true;
+        this.warming = work
+          .catch(() => undefined)
+          .finally(() => {
+            this.warming = null;
+            if (idle) clearTimeout(idle);
+            clearTimeout(ceiling);
+          });
+        this.logger.log(
+          'ask: model still loading, detaching so the load can finish',
+        );
+        throw new BadGatewayException('The model is still waking up');
+      }
+
+      await work;
       return delivered;
     } catch (err) {
-      // A timeout that arrives mid-answer is not worth throwing away what the
-      // visitor already has on screen; one that arrives before the first token
-      // is indistinguishable from an unreachable model, and reads as one.
-      if (timedOut && delivered > 0) return delivered;
+      if (detached) throw err;
+      // A fault mid-answer is not worth throwing away what the visitor already
+      // has on screen — including the few characters the thinking filter is
+      // sitting on, which would otherwise be truncated off the end.
+      if (delivered > 0) {
+        emit(visible.flush());
+        return delivered;
+      }
       if (err instanceof BadGatewayException) throw err;
       throw new BadGatewayException(
-        timedOut
-          ? 'The model timed out'
-          : `The model is unreachable: ${err instanceof Error ? err.message : String(err)}`,
+        `The model is unreachable: ${err instanceof Error ? err.message : String(err)}`,
       );
     } finally {
-      clearTimeout(timer);
-      signal?.removeEventListener('abort', onClientAbort);
+      if (deadline) clearTimeout(deadline);
+      signal?.removeEventListener('abort', onClientGone);
+      // A detached run owns its own cleanup; clearing here would disarm the
+      // ceiling that is the only thing bounding it.
+      if (!detached) {
+        if (idle) clearTimeout(idle);
+        clearTimeout(ceiling);
+      }
     }
   }
 

@@ -57,9 +57,31 @@ for a real question, short enough that the endpoint is not a free text-completio
 | Per-IP rate | `@RateLimit({ limit: 5, windowMs: 3_600_000 })` | The existing guard, reused. Five questions is a generous visit; the contact form's 1/60s window is the wrong shape for something this expensive |
 | Global concurrency | 1 in flight | Self-hosted inference serializes anyway. A second caller gets `503` and a *"one question at a time — the model lives in a flat, not a datacentre"* line, which is more charming than a queue and cannot be used to pile up work |
 | Max output | ~300 tokens | Terminal answers should be short. Also caps the cost of any single request |
-| Timeout | 20 s, `AbortController` | A hung model must not hold the single concurrency slot |
+| Timeout | 20 s to the first token; 15 s of silence thereafter | A hung model must not hold the single concurrency slot. See the correction below — the first of these must not *cancel* |
 
 The concurrency cap lives in the service, not the guard — the guard is per-IP by construction.
+
+> **Correction, from production.** "20 s, `AbortController`" was the right duration and the wrong
+> verb. Ollama drops a model load the moment its client disconnects:
+>
+> ```
+> client connection closed before llama-server finished loading, aborting load
+> Load failed … error="timed out waiting for llama-server to start: context canceled"
+> ```
+>
+> A cold load of `gemma4:e4b` measures **33.8 s to first token**. Against a 20 s abort, every
+> visitor started a load and then killed it, so the model never reached a state where it could
+> answer anyone — a deadlock that keeping it warm cannot break, because it never finishes warming.
+>
+> Giving up waiting and cancelling are now separate. At 20 s the visitor is told the model is
+> asleep, which is true, and the request **detaches**: it runs on until the load completes and the
+> model goes resident, so the next question is answered in about a second. Cancellation is reserved
+> for a genuine fault — 15 s of silence mid-answer, or a five-minute ceiling. A visitor closing the
+> tab detaches too, rather than aborting; a 34 s wait is precisely when tabs get closed, and that
+> abort would have cancelled the load for everyone behind them.
+>
+> While a detached warm-up is in flight, further questions are answered "asleep" immediately instead
+> of queueing a second load behind the first.
 
 **Logging:** latency and outcome only. Not the question, not the answer, not the IP. There is no
 value in a transcript of what strangers asked, and storing one turns a toy into a privacy
