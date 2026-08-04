@@ -222,6 +222,7 @@ gets `curl: (6) Could not resolve host` and a note that a browser tab cannot ope
 |---|---|---|
 | `steam` / `playing` | `GET /steam/activity` | static game log from `content/gaming.ts` |
 | `gitlog` (alias `git log`) | `GET /github/activity` | "no activity available" |
+| `weather` / `wttr` | `GET /weather` | "weather: unavailable" |
 | `guestbook` | `GET /guestbook` | "guestbook is closed" |
 | `sign <message>` | `POST /guestbook` | error line |
 | `mail` | `POST /contact` | error line |
@@ -470,6 +471,42 @@ a stale answer is the wrong answer. `durationMs` is only computed for completed 
 `BuildStatusCard.vue` renders the four most recent runs in the same terminal-window frame as the
 commit log — state dot, workflow name, branch, short SHA, duration, relative time — each linking to
 its run on GitHub. A queued or in-progress run pulses (`motion-safe:` only).
+
+### `GET /weather`
+
+Open-Meteo, which needs no key and no account — the reason it is the source here. Reads
+`WEATHER_LATITUDE`, `WEATHER_LONGITUDE` and a display-only `WEATHER_LOCATION` from config; without
+a usable coordinate pair it returns `{ configured: false }`. Cached ten minutes.
+
+**The coordinates are Jules's, not the caller's.** Nothing about the visitor is read, requested or
+stored, no browser geolocation is involved, and every visitor gets the same answer — which is also
+what makes a single shared cache correct. A portfolio has no business asking anyone where they are.
+They are deliberately left empty in `.env.example`: the site says only "France" about where Jules
+is, and a committed lat/long would be more precise than that.
+
+WMO codes are bucketed server-side by `conditionFor()` into `clear | cloudy | fog | drizzle | rain
+| snow | thunder`, so the glyph, the label and the background mood all read one mapping instead of
+three.
+
+`weather` renders wttr.in's layout — a glyph on the left, readings on the right — from
+`terminal/weather-art.ts`. The glyphs are hand-drawn, fixed at 11×5 and padded on read so the
+detail column always starts in the same place, and contain no emoji: those render double-width in
+some monospace stacks and would shear the column. Two forecast days follow, today omitted (the
+current conditions above already cover it).
+
+### Weather-linked background mood
+
+`useWeather.ts` turns the current condition into a `{ speed, opacity }` pair that `ThreeBackground`
+multiplies into what the section palette already decided — a storm spins the wireframes up, fog
+dims them, snow slows them, and night dims everything a little further. The multipliers are
+deliberately small: the section palette owns the colour and the CRT owns the speed ceiling, and
+weather that overrode either would read as a bug rather than as atmosphere. Opacity always scales
+from each shape's stored `baseOpacity`, so a run of weather changes cannot ratchet the scene down
+to invisible.
+
+The single request is made by `ThreeBackground` on mount — the surface that actually reacts to the
+answer — and `weather` reuses the cached result rather than asking again. Under reduced motion the
+component is never mounted, so the call is never made for a scene that would sit still anyway.
 
 ### Live guestbook ticker
 

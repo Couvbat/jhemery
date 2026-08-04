@@ -41,6 +41,7 @@ docs/       design specs and implementation plans
 | — click to inspect | Clicking a wireframe names it (`icosahedron · 20 faces`) and holds the camera's gaze on it for a couple of seconds. Clicks on links, controls and text selections are left alone. |
 | — terminal control | `spawn`, `gravity on\|off`, `constellation on\|off` and `scene reset` drive the background from the shell. Shape count is capped at 60. |
 | — constellation | Lines drawn between shapes closer than 5.5 world units, recomputed each frame into a pre-allocated buffer. |
+| — weather mood | The real sky nudges it: a storm spins the wireframes up, fog dims them, snow slows them, night dims a little further. Small multipliers on top of the section palette, never a replacement for it. |
 | — performance | The whole component is `defineAsyncComponent`'d and only loaded on `requestIdleCallback`, so ~520 kB of three.js never competes with first paint. It is excluded from the PWA precache for the same reason. |
 | — accessibility | `prefers-reduced-motion` skips loading it entirely; WebGL failures are caught and the canvas is simply left blank. Geometries, materials and the renderer are disposed on unmount. |
 | **CRT overdrive** | `crt` in the terminal (or the Konami code anywhere on the page) toggles scanlines, flicker and a speed multiplier that the three.js loop reads live to spin the wireframes up. Persisted in `localStorage`. |
@@ -128,6 +129,7 @@ the same fake filesystem, so a file can never show two different contents.
 |---|---|---|
 | `steam` | `playing` | Live Steam activity |
 | `gitlog` | `git log`, `commits` | Recent public commits |
+| `weather` | `wttr` | Current conditions where I am, wttr.in-style, plus two forecast days |
 | `guestbook` | `gb` | Read what visitors left (entries are listed as files you can `cat`) |
 | `sign` | | `sign <message>` — leave a message |
 | `mail` | `sendmail`, `write` | Send me a message without leaving the terminal |
@@ -217,6 +219,7 @@ limiter sees real clients behind Apache.
 | `GET /github/contributions` | Contribution heatmap (GraphQL — needs a token). |
 | `GET /github/pinned-repos` | Pinned repositories (GraphQL — needs a token). |
 | `GET /github/workflow-status` | The four most recent Actions runs for `GITHUB_REPO`. Public REST, so the token is optional; cached for 60 s because a build in flight is the one case where a stale answer is the wrong answer. |
+| `GET /weather` | Current conditions and a short forecast from Open-Meteo (no key, no account). The coordinates are **mine**, from server config — nothing about the visitor is read or sent, so everyone gets the same answer and one 10-minute cache serves them all. Empty in `.env.example` on purpose. |
 | `GET /guestbook` · `POST /guestbook` | Read and sign. Sanitised, link-filtered, 1/min per IP, capped at 500 entries. Stored in a JSON file under `DATA_DIR`, or in MongoDB if `MONGODB_URI` is set. Disabled by default. |
 | `DELETE /guestbook/:id` | Moderation; requires the `x-admin-password` header. |
 
