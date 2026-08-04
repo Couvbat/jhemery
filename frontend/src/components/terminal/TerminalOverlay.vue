@@ -14,8 +14,10 @@ const {
   buffer,
   revision,
   pendingPrompt,
+  capturing,
   vimBuffer,
   handleVimKeydown,
+  handleCaptureKeydown,
   primeOverlay,
   closeTerminal,
   submit,
@@ -31,9 +33,11 @@ const panelEl = ref<HTMLElement | null>(null)
 /** Restored when the overlay closes, so keyboard users land back where they started. */
 let previouslyFocused: HTMLElement | null = null
 
-const promptLabel = computed(() =>
-  pendingPrompt.value ? pendingPrompt.value.question : `${profile.handle}:~$`,
-)
+const promptLabel = computed(() => {
+  if (pendingPrompt.value) return pendingPrompt.value.question
+  if (capturing.value) return t(m.terminal.playing)
+  return `${profile.handle}:~$`
+})
 
 watch(revision, async () => {
   await nextTick()
@@ -64,6 +68,15 @@ watch(open, (isOpen) => {
   }
 })
 
+// A command that takes the keyboard re-enables the input it was just disabled in
+// (games run with `busy === true`), so make sure focus is still on it — a blurred
+// input means the keys land nowhere and the game looks frozen.
+watch(capturing, async (active) => {
+  if (!active) return
+  await nextTick()
+  inputEl.value?.focus()
+})
+
 async function onSubmit() {
   const value = input.value
   input.value = ''
@@ -73,6 +86,17 @@ async function onSubmit() {
 }
 
 function onKeydown(event: KeyboardEvent) {
+  // A running command that took the keyboard wins over everything below,
+  // including the vim branch — in practice the two never overlap (vim commands
+  // return synchronously and hold no capture), but the precedence is written
+  // down rather than inferred. Escape is deliberately let through to
+  // `onPanelKeydown`, which turns it into an abort while a game is running.
+  if (capturing.value && event.key !== 'Escape' && handleCaptureKeydown(event)) {
+    event.preventDefault()
+    event.stopPropagation()
+    return
+  }
+
   if (
     vimBuffer.value &&
     input.value === '' &&
@@ -114,6 +138,11 @@ function onKeydown(event: KeyboardEvent) {
 function onPanelKeydown(event: KeyboardEvent) {
   if (event.key === 'Escape') {
     event.preventDefault()
+    if (capturing.value) {
+      // Quitting a game should not also dismiss the terminal.
+      cancel()
+      return
+    }
     if (!closeTerminal()) {
       // vim trap active — nudge rather than silently swallowing the key.
       void submit(':q')
@@ -197,7 +226,7 @@ function onPanelKeydown(event: KeyboardEvent) {
           v-if="!vimBuffer"
           ref="scrollEl"
           class="flex-1 overflow-y-auto p-4 font-mono text-xs sm:text-sm space-y-0.5"
-          aria-live="polite"
+          :aria-live="capturing ? 'off' : 'polite'"
           aria-atomic="false"
           @click="inputEl?.focus()"
         >
@@ -221,7 +250,8 @@ function onPanelKeydown(event: KeyboardEvent) {
             autocapitalize="off"
             autocorrect="off"
             spellcheck="false"
-            :disabled="busy && !pendingPrompt"
+            :disabled="busy && !pendingPrompt && !capturing"
+            :readonly="capturing"
             class="flex-1 bg-transparent outline-none text-foreground caret-primary disabled:opacity-50"
             @keydown="onKeydown"
           />

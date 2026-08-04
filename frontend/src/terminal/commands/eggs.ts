@@ -4,6 +4,7 @@ import { api, ApiError } from '@/lib/api'
 import { announce } from '../achievements'
 import { COW, TRAIN } from '../ascii'
 import { art, blank, line } from '../format'
+import { sleep } from '../timing'
 import type { Command, CommandContext, OutputLine } from '../types'
 import { forgetGuestbookFile, resolveGuestbookFile } from './guestbook-fs'
 import { resolveFileLines } from './files'
@@ -39,20 +40,6 @@ const VIM_SPLASH: string[] = [
   '',
   "(Esc still won't save you)",
 ]
-
-function sleep(ms: number, signal?: AbortSignal): Promise<void> {
-  return new Promise((resolve, reject) => {
-    const id = window.setTimeout(resolve, ms)
-    signal?.addEventListener(
-      'abort',
-      () => {
-        window.clearTimeout(id)
-        reject(Object.assign(new Error('aborted'), { name: 'AbortError' }))
-      },
-      { once: true },
-    )
-  })
-}
 
 /** Instant when the visitor asked for reduced motion, animated otherwise. */
 async function paced(ctx: CommandContext, output: OutputLine[], stepMs: number) {
