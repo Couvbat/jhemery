@@ -359,7 +359,7 @@ make for them.
 When enabled:
 - Storage: MongoDB (via Mongoose) when `MONGODB_URI` is set, in a `guestbook_entries` collection.
   Otherwise falls back to a JSON file under `DATA_DIR` (default `uploads/`) — chosen because the
-  backend deploy rsync already excludes `uploads`, so entries survive deploys. The Mongo connection
+  backend deploy already excludes `uploads`, so entries survive deploys. The Mongo connection
   is lazy (first request) and a failed/absent connection silently falls back to the JSON file.
 - `POST /guestbook` — `{ name, message }`, both required. Name ≤ 40 chars, message ≤ 280.
 - Sanitisation: strips control characters and angle brackets, collapses whitespace, rejects

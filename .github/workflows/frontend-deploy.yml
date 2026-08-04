@@ -28,42 +28,29 @@ jobs:
           name: frontend-build
           path: build
 
-      - name: Get runner's public IP
-        id: ip
-        run: echo "ipv4=$(curl -sf https://api.ipify.org || curl -sf https://ipv4.icanhazip.com)" >> "$GITHUB_OUTPUT"
-
-      - name: Whitelisting the runner IP
+      # FTP_FRONTEND_DIR is optional: leave it unset when the FTP account is
+      # rooted at the document root. Accepts `api/`, `/api`, `./api` alike.
+      - name: Resolve remote directory
+        id: remote
+        env:
+          FTP_DIR: ${{ secrets.FTP_FRONTEND_DIR }}
         run: |
-          curl -sm 45 -H"Authorization: cpanel ${{ secrets.CPANEL_USERNAME }}:${{ secrets.CPANEL_API_TOKEN }}" \
-          "https://${{ secrets.CPANEL_SERVER }}:2083/execute/SshWhitelist/add?address=${{ steps.ip.outputs.ipv4 }}&port=22&direction=in"
+          dir="${FTP_DIR:-}"
+          dir="${dir#./}"
+          dir="${dir#/}"
+          [ -n "$dir" ] && dir="${dir%/}/"
+          echo "dir=./$dir" >> "$GITHUB_OUTPUT"
 
-      - name: Making sure the IP is whitelisted
-        run: |
-          curl -sm 45 -H"Authorization: cpanel ${{ secrets.CPANEL_USERNAME }}:${{ secrets.CPANEL_API_TOKEN }}" \
-          "https://${{ secrets.CPANEL_SERVER }}:2083/execute/SshWhitelist/list" | grep "${{ steps.ip.outputs.ipv4 }}"
-
-      - name: Installing the SSH Key
-        run: |
-          mkdir -p ~/.ssh
-          chmod 700 ~/.ssh
-          echo "${{ secrets.SSH_KEY }}" > ~/.ssh/id_rsa
-          chmod 0400 ~/.ssh/id_rsa
-
-      - name: Sending data with RSYNC
-        run: |
-          rsync --timeout=60 -e "ssh -o StrictHostKeyChecking=no -i ~/.ssh/id_rsa" \
-          -av --delete build/ \
-          "${{ secrets.CPANEL_USERNAME }}@${{ secrets.CPANEL_SERVER }}:${{ secrets.FRONTEND_REMOTE_PATH }}"
-
-      - name: Un-whitelisting the runner IP
-        if: always()
-        run: |
-          curl -sm 45 -H"Authorization: cpanel ${{ secrets.CPANEL_USERNAME }}:${{ secrets.CPANEL_API_TOKEN }}" \
-          "https://${{ secrets.CPANEL_SERVER }}:2083/execute/SshWhitelist/remove?address=${{ steps.ip.outputs.ipv4 }}&port=22&direction=in"
-
-      - name: Cleaning SSH keys
-        if: always()
-        run: rm -fr ~/.ssh
+      - name: Sync build over FTPS
+        uses: SamKirkland/FTP-Deploy-Action@v4.3.5
+        with:
+          server: ${{ secrets.FTP_SERVER }}
+          username: ${{ secrets.FTP_FRONTEND_USERNAME }}
+          password: ${{ secrets.FTP_FRONTEND_PASSWORD }}
+          protocol: ftps
+          local-dir: ./build/
+          server-dir: ${{ steps.remote.outputs.dir }}
+          log-level: minimal
 
       - name: Cleaning artifacts
         uses: geekyeggo/delete-artifact@v5

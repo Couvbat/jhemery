@@ -54,8 +54,8 @@ export class GuestbookService implements OnModuleDestroy {
   }
 
   /**
-   * Stored under DATA_DIR (default `uploads`), which the deploy rsync excludes —
-   * so entries survive deploys. Falls back to this when MONGODB_URI is unset.
+   * Stored under DATA_DIR (default `uploads`), which the deploy excludes — so
+   * entries survive deploys. Falls back to this when MONGODB_URI is unset.
    */
   private get filePath(): string {
     const dir = this.config.get<string>('DATA_DIR') ?? 'uploads';
