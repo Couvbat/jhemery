@@ -1,8 +1,17 @@
 import { profile } from '@/content'
 import { prefersReducedMotion } from '@/composables/useCrt'
+import {
+  MAX_SHAPE_COUNT,
+  resetScene,
+  setConstellation,
+  setGravity,
+  spawnShapes,
+  useSceneControl,
+} from '@/composables/useSceneControl'
 import { api, ApiError } from '@/lib/api'
 import { announce, unlock } from '../achievements'
 import { COW, TRAIN } from '../ascii'
+import { bannerLines, BANNER_MAX_CHARS } from '../ascii-banner'
 import { art, blank, line, pre } from '../format'
 import { sleep } from '../timing'
 import type { Command, CommandContext, OutputLine } from '../types'
@@ -451,6 +460,119 @@ export const eggCommands: Command[] = [
       }
       window.open('https://www.youtube.com/watch?v=dQw4w9WgXcQ', '_blank', 'noopener,noreferrer')
       return [line('never gonna give you up', 'accent'), ...announce('rickroll', t)]
+    },
+  },
+  {
+    name: 'banner',
+    usage: 'banner <text>',
+    description: { en: 'Say it in block letters', fr: 'Le dire en grosses lettres' },
+    group: 'fun',
+    hidden: true,
+    run({ args, t }) {
+      const text = args.join(' ')
+      if (!text.trim()) return [line('banner: missing operand', 'error')]
+
+      const rendered = bannerLines(text)
+      if (!rendered.length) return [line('banner: nothing to print', 'error')]
+
+      return [
+        ...rendered.map((row) => pre(row, 'primary')),
+        ...(text.length > BANNER_MAX_CHARS
+          ? [blank, line(`(wrapped at ${BANNER_MAX_CHARS} characters a line)`, 'muted')]
+          : []),
+        ...announce('banner', t),
+      ]
+    },
+  },
+  {
+    name: 'gravity',
+    usage: 'gravity [on|off]',
+    description: { en: 'Toggle the background pull', fr: "Basculer l'attraction du fond" },
+    group: 'fun',
+    hidden: true,
+    run({ args, t }) {
+      const [requested] = args
+      if (requested && requested !== 'on' && requested !== 'off') {
+        return [line(`gravity: expected \`on\` or \`off\`, got \`${requested}\``, 'error')]
+      }
+
+      const on = setGravity(requested ? requested === 'on' : undefined)
+      return [
+        line(on ? 'gravity: ON — the shapes follow your cursor again.' : 'gravity: OFF', 'primary'),
+        // Turning it off is the interesting half; turning it back on is just undo.
+        ...(on ? [] : announce('zeroG', t)),
+      ]
+    },
+  },
+  {
+    name: 'spawn',
+    usage: 'spawn [count]',
+    description: { en: 'Add shapes to the background', fr: 'Ajouter des formes au fond' },
+    group: 'fun',
+    hidden: true,
+    run({ args }) {
+      const requested = args[0] ? Number(args[0]) : 1
+      if (!Number.isFinite(requested) || !Number.isInteger(requested)) {
+        return [line(`spawn: \`${args[0]}\` is not a whole number`, 'error')]
+      }
+
+      const before = useSceneControl().shapeCount.value
+      const after = spawnShapes(requested)
+      if (after === before) {
+        return [
+          line(
+            requested > 0
+              ? `spawn: already at the ceiling of ${MAX_SHAPE_COUNT} shapes`
+              : 'spawn: already at the floor of 1 shape',
+            'warning',
+          ),
+        ]
+      }
+      return [line(`${after} shapes in the scene (was ${before})`, 'primary')]
+    },
+  },
+  {
+    name: 'constellation',
+    aliases: ['stars'],
+    usage: 'constellation [on|off]',
+    description: { en: 'Connect the dots', fr: 'Relier les points' },
+    group: 'fun',
+    hidden: true,
+    run({ args, t }) {
+      const [requested] = args
+      if (requested && requested !== 'on' && requested !== 'off') {
+        return [line(`constellation: expected \`on\` or \`off\`, got \`${requested}\``, 'error')]
+      }
+
+      const on = setConstellation(requested ? requested === 'on' : undefined)
+      return [
+        line(on ? 'constellation: ON' : 'constellation: OFF', 'primary'),
+        ...(on ? announce('constellation', t) : []),
+      ]
+    },
+  },
+  {
+    name: 'scene',
+    usage: 'scene [reset]',
+    description: { en: 'Inspect or reset the background', fr: 'Inspecter ou réinitialiser le fond' },
+    group: 'fun',
+    hidden: true,
+    run({ args }) {
+      const control = useSceneControl()
+      if (args[0] === 'reset') {
+        resetScene()
+        return [line('scene reset.', 'success')]
+      }
+      if (args.length) return [line(`scene: unknown argument \`${args[0]}\``, 'error')]
+
+      return [
+        pre(`shapes         ${control.shapeCount.value}`, 'primary'),
+        pre(`gravity        ${control.gravityOn.value ? 'on' : 'off'}`, 'primary'),
+        pre(`constellation  ${control.constellationOn.value ? 'on' : 'off'}`, 'primary'),
+        blank,
+        line('try `spawn 10`, `gravity off`, `constellation on`, `scene reset`.', 'muted'),
+        line('clicking a shape tells you what it is.', 'muted'),
+      ]
     },
   },
   {

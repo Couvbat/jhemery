@@ -39,3 +39,24 @@ export interface GithubPinnedRepos {
   configured: boolean;
   repos?: GithubPinnedRepo[];
 }
+
+export interface WorkflowRun {
+  /** The workflow's display name, e.g. `deploy`. */
+  name: string;
+  /** `queued` | `in_progress` | `completed`. */
+  status: string;
+  /** `success` | `failure` | `cancelled` | … — null while still running. */
+  conclusion: string | null;
+  branch: string;
+  sha: string;
+  url: string;
+  startedAt: string;
+  /** Wall-clock length of a finished run; null while it is still going. */
+  durationMs: number | null;
+}
+
+export interface GithubWorkflowStatus {
+  configured: boolean;
+  repo?: string;
+  runs?: WorkflowRun[];
+}

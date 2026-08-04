@@ -157,7 +157,15 @@ Grouped as they appear in `help`.
 | `date` | Local date/time |
 | `whoami` | Prints the current user |
 | `lang [en\|fr]` | Prints or switches locale |
+| `alias` / `unalias` | Session-persistent command renames, expanded before anything else parses the line |
 | `exit` (aliases `quit`, `logout`) | Closes the overlay |
+
+Aliases live in `terminal/aliases.ts` and are rewritten in `useTerminal.ts`'s `run()`, ahead of
+`resolve()` — so the two-word fallback and the "did you mean …?" suggestion both reason about the
+command that will actually run, and `gl --oneline` works when `gl` is `git log`. Expansion follows
+a chain and gives up after 10 hops or the first repeat, because a definition that expands back to
+itself is a user error, not a reason to hang the tab. Aliasing over an existing command name is
+refused: it survives a reload, so `alias ls=rickroll` would be a lockout rather than a joke.
 
 ### navigate
 | Command | Behaviour |
@@ -237,6 +245,8 @@ It shares the registry, so it needs no separate maintenance.
 | `reboot` (alias `restart`) | Replays the first-visit boot sequence (§6) via a `useBoot` flag, the same shape `matrix` uses |
 | `ssh [user@]host` | Wrong host → `Could not resolve hostname`; wrong user → `Permission denied (publickey)`; `contact@` opens the contact section, because that is what the section's own prompt claims to do; the real handle gets a paced OpenSSH handshake that ends by triggering `reboot` |
 | `whois [domain]` | An invented registration record for this domain; anything else gets `No match for …` |
+| `banner <text>` | Block letters from a 5×7 font table in `terminal/ascii-banner.ts` — no dependency, no fetch. Wraps into stacked blocks past 12 characters, breaking on a space where it can; unknown characters render as `?` rather than vanishing |
+| `spawn`, `gravity`, `constellation`, `scene` | Terminal control over the background — see §5.3 |
 | `hack [target]` | Fake nmap/progress output ending in `ACCESS DENIED — nice try` |
 | `coffee` | `HTTP 418: I'm a teapot` |
 | `play` | Scrolls to the music section and starts the SoundCloud embed |
@@ -250,8 +260,8 @@ It shares the registry, so it needs no separate maintenance.
 | DevTools console | ASCII art + a short hiring pitch on load |
 
 Hidden commands (`sudo`, `vim`, `:q`, `matrix`, `reboot`, `ssh`, `whois`, `crt`, `hack`, `coffee`,
-`sl`, `rickroll`, `cowsay`, `fortune`, `env`, `ps`, `top`, `uname`) are `hidden: true` — they don't
-appear in `help`.
+`sl`, `rickroll`, `cowsay`, `fortune`, `banner`, `env`, `alias`, `unalias`, `ps`, `top`, `uname`,
+`spawn`, `gravity`, `constellation`, `scene`) are `hidden: true` — they don't appear in `help`.
 Finding them is the point. `help --all` lists them for the impatient. `play` and `achievements`
 are deliberately *not* hidden: they are signposts rather than secrets.
 
@@ -333,6 +343,27 @@ needed a new trigger:
 
 One watcher covers the last two inputs, because `currentPalette()` already encodes which wins.
 
+**Terminal control** (`composables/useSceneControl.ts`) adds three more knobs, in the same
+flag-and-watch shape as `useMatrix`/`useBoot` — the commands only ever set, the component is the
+only reader:
+
+- `spawn [n]` adds or removes shapes, capped at 60. Nobody gets to talk the page into melting a
+  GPU, and the floor is 1 so the scene can't be emptied into a blank canvas.
+- `gravity on|off` gates the pointer well. Off is the interesting half, so that's the half that
+  unlocks an achievement.
+- `constellation on|off` adds a `THREE.LineSegments` between shapes closer than 5.5 world units,
+  recomputed each frame. The position buffer is allocated once for the 60-shape ceiling and drawn
+  with `setDrawRange` — sizing it to the *current* count would silently truncate the lines the
+  moment someone spawned more.
+- `scene` prints the current state; `scene reset` puts all three back.
+
+**Click-to-inspect** raycasts from the click into the scene, names the shape in a small floating
+label, and holds the camera's gaze on it for 2.2s before easing back to the origin. The canvas
+stays `pointer-events-none` — a full-screen canvas that eats clicks is a worse bug than a missing
+easter egg — so the listener is on `window` and ignores anything that belongs to the page: links,
+controls, an open terminal, or a click that ended a text selection. Three of the eighteen opening
+shapes are the accent colour; clicking one of those is the `cyanSpotter` achievement.
+
 ---
 
 ## 6. Boot sequence, 404, footer, console
@@ -398,6 +429,37 @@ Also GraphQL-only (`user.pinnedItems`), so it shares the same `GITHUB_TOKEN` req
 one-hour cache as contributions. `ProjectsSection` renders these as extra cards alongside the
 hand-curated `content/projects.ts` list, deduplicated by repo URL so a pinned repo that's already
 written up manually doesn't show twice.
+
+### `GET /github/workflow-status`
+
+The cheapest live-data route on the site: Actions runs are public REST, so this needs no new
+credential — it reuses the optional `GITHUB_TOKEN` purely to raise the rate limit, and reads
+`GITHUB_REPO` (`owner/name`) for the target. Unset, it returns `{ configured: false }` and the card
+is not rendered.
+
+Cached for **60 seconds**, far shorter than its neighbours: a build in flight is the one case where
+a stale answer is the wrong answer. `durationMs` is only computed for completed runs, because
+`updated_at` keeps moving while a run is still going.
+
+`BuildStatusCard.vue` renders the four most recent runs in the same terminal-window frame as the
+commit log — state dot, workflow name, branch, short SHA, duration, relative time — each linking to
+its run on GitHub. A queued or in-progress run pulses (`motion-safe:` only).
+
+### Live guestbook ticker
+
+**Polling, not SSE.** `useGuestbookTicker.ts` re-reads `GET /guestbook` every 20 s and announces
+anything that appeared since the page loaded. The first pass only records what is already there —
+someone arriving after ten signatures should not be told about all ten.
+
+**Decision:** the payload is a handful of short entries, the interesting event happens maybe twice
+a week, and the endpoint is already cached. SSE would mean a new backend module, a long-lived
+connection per visitor, and a reconnect story, in exchange for latency nobody is measuring. The
+poll skips while `document.hidden` — a backgrounded tab has nobody to show a toast to — and gives
+up entirely after three consecutive failures, or the first response saying the guestbook is off.
+
+`GuestbookTicker.vue` drains the queue one at a time, the same way `AchievementToast` does; two
+floating notices fighting for the same corner reads as a bug. Clicking it opens the terminal with
+`guestbook` already running.
 
 ### Guestbook
 

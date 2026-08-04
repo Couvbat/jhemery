@@ -102,6 +102,25 @@ export interface GithubPinnedRepos {
   repos?: GithubPinnedRepo[]
 }
 
+export interface WorkflowRun {
+  name: string
+  /** `queued` | `in_progress` | `completed`. */
+  status: string
+  /** `success` | `failure` | `cancelled` | … — null while still running. */
+  conclusion: string | null
+  branch: string
+  sha: string
+  url: string
+  startedAt: string
+  durationMs: number | null
+}
+
+export interface GithubWorkflowStatus {
+  configured: boolean
+  repo?: string
+  runs?: WorkflowRun[]
+}
+
 export interface GuestbookEntry {
   id: string
   name: string
@@ -212,6 +231,7 @@ export const api = {
   githubActivity: () => request<GithubActivity>('/github/activity'),
   githubContributions: () => request<GithubContributions>('/github/contributions'),
   githubPinnedRepos: () => request<GithubPinnedRepos>('/github/pinned-repos'),
+  githubWorkflowStatus: () => request<GithubWorkflowStatus>('/github/workflow-status'),
   guestbook: () => request<GuestbookList>('/guestbook'),
   sign: (name: string, message: string) =>
     request<GuestbookEntry>('/guestbook', {

@@ -2,10 +2,11 @@ import { setLocale } from '@/i18n'
 import type { Locale } from '@/content/types'
 import { profile } from '@/content'
 import { announce } from '../achievements'
+import { aliases, parseDefinition, removeAlias, setAlias } from '../aliases'
 import { history } from '../history'
 import { allCommands, resolve, visibleCommands } from '../registry'
 import type { Command, CommandGroup, OutputLine } from '../types'
-import { blank, line } from '../format'
+import { blank, line, pre } from '../format'
 
 const GROUP_LABELS: Record<CommandGroup, { en: string; fr: string }> = {
   core: { en: 'shell', fr: 'shell' },
@@ -134,6 +135,66 @@ export const coreCommands: Command[] = [
         line(next === 'fr' ? 'Langue : français' : 'Language: English', 'success'),
         ...announce('lang', t),
       ]
+    },
+  },
+  {
+    name: 'alias',
+    usage: "alias [name='command']",
+    description: { en: 'Name your own commands', fr: 'Nommer vos propres commandes' },
+    group: 'core',
+    hidden: true,
+    run({ args, raw, t }) {
+      const definition = raw.trim().slice('alias'.length).trim()
+
+      if (!definition) {
+        const entries = Object.entries(aliases.value)
+        if (!entries.length) {
+          return [
+            line('(no aliases)', 'muted'),
+            line("try: alias gl='git log'", 'muted'),
+          ]
+        }
+        const width = entries.reduce((max, [name]) => Math.max(max, name.length), 0)
+        return entries
+          .sort(([a], [b]) => a.localeCompare(b))
+          .map(([name, value]) => pre(`${name.padEnd(width)}  →  ${value}`, 'primary'))
+      }
+
+      const parsed = parseDefinition(definition)
+      if (!parsed) {
+        return [
+          line(`alias: ${args[0] ?? definition}: not found`, 'error'),
+          line("usage: alias <name>='<command>'", 'muted'),
+        ]
+      }
+
+      const name = parsed.name.toLowerCase()
+      // Shadowing a real command would let someone lock themselves out of their
+      // own shell, and it survives a reload — so this one is a refusal, not a
+      // faithful reimplementation of bash.
+      if (resolve(name)) {
+        return [line(`alias: \`${name}\` is already a command — pick another name.`, 'error')]
+      }
+
+      setAlias(name, parsed.value)
+      return [
+        line(`alias ${name}='${parsed.value}'`, 'success'),
+        ...announce('alias', t),
+      ]
+    },
+  },
+  {
+    name: 'unalias',
+    usage: 'unalias <name>',
+    description: { en: 'Remove an alias', fr: 'Supprimer un alias' },
+    group: 'core',
+    hidden: true,
+    run({ args }) {
+      const [name] = args
+      if (!name) return [line('unalias: missing operand', 'error')]
+      return removeAlias(name.toLowerCase())
+        ? [line(`removed alias \`${name}\``, 'success')]
+        : [line(`unalias: ${name}: not found`, 'error')]
     },
   },
   {
