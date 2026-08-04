@@ -24,6 +24,7 @@ import { setCrt, glitch } from './useCrt'
 import { showMatrix } from './useMatrix'
 import { triggerBoot } from './useBoot'
 import { requestPlayback } from './useMusicPlayer'
+import { recordSession } from './useStats'
 
 const MAX_LINES = 500
 
@@ -375,6 +376,12 @@ export function completeInput(value: string): string {
  *  never repeats), and runs whatever command the light `openTerminal()` queued
  *  up for us, if any. */
 export function primeOverlay() {
+  // Once per session, here rather than in `run()`: a per-command ping would be
+  // chatter, and it would mean the server learning which commands people run —
+  // the thing `ask` explicitly promises not to record. Its own guard makes
+  // repeat opens free.
+  recordSession()
+
   if (buffer.value.length === 0) {
     append([
       { text: messages.terminal.welcome[currentLocale()], tone: 'primary' },

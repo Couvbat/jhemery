@@ -14,6 +14,7 @@ import {
 import { hardwareTab, isHardwareTab } from '@/composables/useHardwareTab'
 import { useSteam } from '@/composables/useSteam'
 import { uptime } from '@/composables/useStatus'
+import { useStats } from '@/composables/useStats'
 import { MARK } from '../ascii'
 import { blank, heading, keyValues, line, tags, wrap } from '../format'
 import type { Command, OutputLine } from '../types'
@@ -197,6 +198,13 @@ export const contentCommands: Command[] = [
       ]
       if (steam) {
         info.push(['Steam', steam.inGame ? `${steam.name} — ${steam.inGame}` : steam.status])
+      }
+      // Recorded by `primeOverlay()` when this session opened the shell, so by
+      // the time anyone can type `neofetch` the number is already there. Omitted
+      // rather than zeroed when the backend is unreachable.
+      const sessions = useStats().sessions.value
+      if (sessions !== null) {
+        info.push(['Sessions', `${sessions.toLocaleString(locale === 'fr' ? 'fr-FR' : 'en-GB')} ${t({ en: 'shells opened', fr: 'shells ouverts' })}`])
       }
 
       const markLines = MARK.split('\n')

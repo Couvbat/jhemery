@@ -173,6 +173,11 @@ export interface MarketsReport {
   quotes?: MarketQuote[]
 }
 
+export interface StatsReport {
+  /** Terminal sessions opened, ever. Aggregate — there is nothing else stored. */
+  sessions: number
+}
+
 export interface GuestbookEntry {
   id: string
   name: string
@@ -286,6 +291,8 @@ export const api = {
   githubWorkflowStatus: () => request<GithubWorkflowStatus>('/github/workflow-status'),
   weather: () => request<WeatherReport>('/weather'),
   markets: () => request<MarketsReport>('/markets'),
+  stats: () => request<StatsReport>('/stats'),
+  recordSession: () => request<StatsReport>('/stats/session', { method: 'POST' }),
   guestbook: () => request<GuestbookList>('/guestbook'),
   sign: (name: string, message: string) =>
     request<GuestbookEntry>('/guestbook', {
