@@ -37,6 +37,13 @@ export interface CommandContext {
   t: <T>(value: Localised<T>) => T
   /** Append lines to the buffer. Useful for commands that emit progressively. */
   print: (lines: OutputLine | OutputLine[] | string) => void
+  /**
+   * Opens a redrawable region at the end of the buffer and returns its draw
+   * function. Each call replaces the lines the previous one wrote instead of
+   * appending, so an animation shows one moving thing rather than a stack of
+   * stills. Anything printed after the last draw lands below the region.
+   */
+  frame: () => (lines: OutputLine[]) => void
   clear: () => void
   /** Closes the overlay. */
   close: () => void

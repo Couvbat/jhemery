@@ -52,6 +52,21 @@ function clearBuffer() {
   revision.value += 1
 }
 
+/** Backs `ctx.frame()`. The region is always the tail of the buffer, so a redraw
+ *  is "drop the rows I wrote last time, append the new ones" — which stays correct
+ *  when MAX_LINES trims the head out from under us. */
+function openFrame(): (input: OutputLine[]) => void {
+  let height = 0
+
+  return (input: OutputLine[]) => {
+    const kept = buffer.value.slice(0, Math.max(0, buffer.value.length - height))
+    buffer.value = [...kept, ...input].slice(-MAX_LINES)
+    // A frame taller than the whole buffer keeps only its own tail.
+    height = Math.min(input.length, MAX_LINES)
+    revision.value += 1
+  }
+}
+
 const effects: TerminalEffects = {
   matrix: showMatrix,
   crt: setCrt,
@@ -99,6 +114,7 @@ function buildContext(args: string[], raw: string, signal: AbortSignal): Command
     locale: currentLocale(),
     t,
     print: append,
+    frame: openFrame,
     clear: clearBuffer,
     close: () => {
       open.value = false

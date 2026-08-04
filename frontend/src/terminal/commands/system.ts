@@ -100,11 +100,17 @@ export const systemCommands: Command[] = [
     hidden: true,
     async run(ctx) {
       const frames = prefersReducedMotion() ? 1 : 6
+      // Redraws one table in place. It used to `clear()` between frames, which
+      // stopped the frames stacking but took the whole scrollback with them.
+      const draw = ctx.frame()
+
       for (let i = 0; i < frames; i++) {
-        const procs = [...processes()].sort(() => Math.random() - 0.5)
+        // Deliberately not reshuffled per frame: with a full repaint the churn
+        // read as "live", but redrawing in place just teleports the rows. The
+        // jittered %CPU/%MEM is what sells it now.
+        const procs = processes()
         const load = (Math.random() * 1.5).toFixed(2)
-        ctx.clear()
-        ctx.print([
+        draw([
           line(
             `top - ${new Date().toLocaleTimeString(ctx.locale === 'fr' ? 'fr-FR' : 'en-GB')} up ${uptime()}, load average: ${load}`,
             'accent',
