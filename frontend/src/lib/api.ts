@@ -157,6 +157,22 @@ export interface WeatherReport {
   forecast?: WeatherForecastDay[]
 }
 
+export interface MarketQuote {
+  id: string
+  symbol: string
+  name: string
+  price: number
+  currency: string
+  change24h: number | null
+  /** Seven days of closes, already downsampled by the backend. */
+  sparkline: number[]
+}
+
+export interface MarketsReport {
+  configured: boolean
+  quotes?: MarketQuote[]
+}
+
 export interface GuestbookEntry {
   id: string
   name: string
@@ -269,6 +285,7 @@ export const api = {
   githubPinnedRepos: () => request<GithubPinnedRepos>('/github/pinned-repos'),
   githubWorkflowStatus: () => request<GithubWorkflowStatus>('/github/workflow-status'),
   weather: () => request<WeatherReport>('/weather'),
+  markets: () => request<MarketsReport>('/markets'),
   guestbook: () => request<GuestbookList>('/guestbook'),
   sign: (name: string, message: string) =>
     request<GuestbookEntry>('/guestbook', {

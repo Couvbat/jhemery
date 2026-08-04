@@ -3,9 +3,16 @@ import type { Localised } from '@/content/types'
 import { fetchSteam, formatPlaytime, useSteam } from '@/composables/useSteam'
 import { fetchCommits, relativeTime, shortRepo, useGithub } from '@/composables/useGithub'
 import { fetchWeather, useWeather } from '@/composables/useWeather'
-import { api, ApiError, type WeatherCondition, type WeatherReport } from '@/lib/api'
+import {
+  api,
+  ApiError,
+  type MarketQuote,
+  type WeatherCondition,
+  type WeatherReport,
+} from '@/lib/api'
 import { announce } from '../achievements'
 import { blank, heading, line, pre } from '../format'
+import { formatChange, formatPrice, sparkline } from '../sparkline'
 import type { Command, OutputLine } from '../types'
 import { ART_WIDTH, compass, weatherArt, windArrow } from '../weather-art'
 import { cacheGuestbookEntries, filenameFor } from './guestbook-fs'
@@ -77,6 +84,21 @@ function weatherReport(data: WeatherReport, t: TFunction): OutputLine[] {
   }
 
   return rows
+}
+
+/** Ticker and price on one row, the week's shape on the next. */
+function quoteLines(quote: MarketQuote): OutputLine[] {
+  const up = (quote.change24h ?? 0) >= 0
+  return [
+    pre(
+      `${quote.symbol.padEnd(5)}${formatPrice(quote.price, quote.currency).padStart(12)}   ${
+        up ? '▲' : '▼'
+      } ${formatChange(quote.change24h)}`,
+      'primary',
+    ),
+    pre(`     ${sparkline(quote.sparkline)}`, up ? 'success' : 'error'),
+    blank,
+  ]
 }
 
 export const liveCommands: Command[] = [
@@ -162,6 +184,46 @@ export const liveCommands: Command[] = [
       }
 
       return [...heading(data.location ?? 'weather'), blank, ...weatherReport(data, t)]
+    },
+  },
+  {
+    name: 'btc',
+    aliases: ['stonks', 'crypto'],
+    description: { en: 'Crypto prices, 7-day trend', fr: 'Cours crypto, tendance 7 jours' },
+    group: 'live',
+    palette: true,
+    async run({ print, t }) {
+      print(line('fetching…', 'muted'))
+
+      // No client-side cache, unlike the page cards: running this is an explicit
+      // request for the current price, and the backend already holds a five-minute
+      // one that absorbs the repeats.
+      let data
+      try {
+        data = await api.markets()
+      } catch {
+        data = { configured: false } as const
+      }
+
+      if (!data.configured || !data.quotes?.length) {
+        return [
+          line('btc: quotes unavailable', 'muted'),
+          line('(the ticker is off, or the exchange is not answering)', 'muted'),
+        ]
+      }
+
+      const out: OutputLine[] = [...heading('markets'), blank]
+      for (const quote of data.quotes) out.push(...quoteLines(quote))
+      out.push(
+        line(
+          t({
+            en: 'not financial advice. it is a wireframe website.',
+            fr: "ceci n'est pas un conseil financier. c'est un site en fil de fer.",
+          }),
+          'muted',
+        ),
+      )
+      return out
     },
   },
   {
