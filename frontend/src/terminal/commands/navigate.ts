@@ -6,22 +6,17 @@ import { diffLines, hasChanges } from '../diff'
 import { sleep } from '../timing'
 import type { Command, OutputLine } from '../types'
 import { blank, line, pre } from '../format'
-import { SECRET_FILE } from './secret'
-import { ENV_FILE } from './env-file'
-import { resolveFileLines } from './files'
-
-const FILES = ['about.txt', 'skills.txt', 'contact.txt'] as const
-
-/** Hidden files `ls -a` reveals, in listing order. */
-const HIDDEN_FILES = [SECRET_FILE, ENV_FILE] as const
-
-/** Reading one of these is worth an achievement. */
-const FILE_ACHIEVEMENTS: Record<string, string> = {
-  [SECRET_FILE]: 'secret',
-  [ENV_FILE]: 'dotenv',
-}
+import { FILES, FILE_ACHIEVEMENTS, HIDDEN_FILES, listFiles, resolveFileLines } from './files'
 
 const PING_COUNT = 4
+
+/** `open`'s destinations, at module scope so Tab and `run` read the same map. */
+const OPEN_TARGETS: Record<string, string> = {
+  ...Object.fromEntries(socials.map((s) => [s.keyword, s.href])),
+  steam: 'https://steamcommunity.com/id/couvbat',
+  cv: `https://${profile.domain}/resume.txt`,
+  resume: `https://${profile.domain}/resume.txt`,
+}
 
 /** A plausible sub-millisecond round trip. */
 function latency(): number {
@@ -34,6 +29,7 @@ export const navigateCommands: Command[] = [
     usage: 'ls [-a]',
     description: { en: 'List sections and files', fr: 'Lister sections et fichiers' },
     group: 'navigate',
+    complete: ({ index }) => (index === 0 ? ['-a'] : []),
     run({ args, t }) {
       const showHidden = args.some((a) => a === '-a' || a === '-la' || a === '-al')
 
@@ -55,6 +51,7 @@ export const navigateCommands: Command[] = [
     usage: 'cd <section>',
     description: { en: 'Jump to a section', fr: 'Aller à une section' },
     group: 'navigate',
+    complete: ({ index }) => (index === 0 ? [...sectionIds] : []),
     run({ args, navigate, t }) {
       const [target] = args
       const bare = !target || target === '~' || target === '/'
@@ -83,6 +80,7 @@ export const navigateCommands: Command[] = [
     usage: 'cat <file>',
     description: { en: 'Print a file', fr: 'Afficher un fichier' },
     group: 'navigate',
+    complete: ({ index }) => (index === 0 ? listFiles() : []),
     run({ args, t }) {
       const [file] = args
       if (!file) return [line('cat: missing operand', 'error')]
@@ -99,6 +97,8 @@ export const navigateCommands: Command[] = [
     usage: 'diff <file> <file>',
     description: { en: 'Compare two files', fr: 'Comparer deux fichiers' },
     group: 'navigate',
+    // Both operands are filenames, so this one doesn't care which word it's on.
+    complete: ({ index }) => (index < 2 ? listFiles() : []),
     run({ args, t }) {
       const [left, right] = args
       if (!left || !right) {
@@ -139,6 +139,7 @@ export const navigateCommands: Command[] = [
     usage: 'ping <section>',
     description: { en: 'Ping a section, then go there', fr: 'Pinguer une section, puis y aller' },
     group: 'navigate',
+    complete: ({ index }) => (index === 0 ? [...sectionIds] : []),
     async run(ctx) {
       const [target] = ctx.args
       if (!target) {
@@ -194,23 +195,18 @@ export const navigateCommands: Command[] = [
     usage: 'open <github|linkedin|soundcloud|steam|email>',
     description: { en: 'Open an external link', fr: 'Ouvrir un lien externe' },
     group: 'navigate',
+    complete: ({ index }) => (index === 0 ? Object.keys(OPEN_TARGETS) : []),
     run({ args }) {
       const [target] = args
-      const targets: Record<string, string> = {
-        ...Object.fromEntries(socials.map((s) => [s.keyword, s.href])),
-        steam: 'https://steamcommunity.com/id/couvbat',
-        cv: `https://${profile.domain}/resume.txt`,
-        resume: `https://${profile.domain}/resume.txt`,
-      }
 
       if (!target) {
         return [
           line('open: missing target', 'error'),
-          line(`available: ${Object.keys(targets).join(', ')}`, 'muted'),
+          line(`available: ${Object.keys(OPEN_TARGETS).join(', ')}`, 'muted'),
         ]
       }
 
-      const href = targets[target.toLowerCase()]
+      const href = OPEN_TARGETS[target.toLowerCase()]
       if (!href) return [line(`open: unknown target \`${target}\``, 'error')]
 
       window.open(href, '_blank', 'noopener,noreferrer')

@@ -49,7 +49,7 @@ Conventions that apply to every row, so they are not repeated:
 | [x] | `ssh couvbat@jhemery.xyz` | Joke "Connecting…" sequence; ends by calling `effects.reboot()` rather than inventing a second boot animation. | `eggs.ts` | S |
 | [ ] | `btc` / `stonks` | Needs a backend proxy (CORS blocks browser→exchange). Tiny route, shape of steam's. ASCII sparkline reuses the games' box-drawing conventions. | backend proxy (new), command | M |
 | [x] | `banner <text>` | Client-side only: embedded 5×7 block-letter font table, rendered through `art()`/`pre`. Font table is the only real work. | `terminal/ascii-banner.ts` (new) + command | M |
-| [ ] | Argument autocompletion | Tab currently only completes the command word — `completeInput()` bails the moment the line has a space. Add an optional `complete?(ctx): string[]` to the `Command` interface so the registry stays the API: each command declares its own candidates, and `completeInput()` routes to it once the cursor is past the first word. Sources: a shared `listFiles()` in `files.ts` (visible + hidden + guestbook entries, one source `ls`, `cat`, `vim` and `diff` all read) for filenames; `sections` for `cd`/`ping`; alias names for `unalias`; literal `on`/`off` for `gravity`/`constellation`; command names for `help`. Alias names join the command-word candidates too. Reuses the existing `commonPrefix()` and the "print candidates when ambiguous" behaviour, so the UX is unchanged — it just applies one word later. | `types.ts`, `registry.ts`, `useTerminal.ts`, `files.ts`, per-command `complete` in `navigate.ts`/`core.ts`/`eggs.ts` | M |
+| [x] | Argument autocompletion | Optional `complete?(ctx): string[]` on the `Command` interface; `completeInput()` splits the line, works out which word the cursor is on and routes past the first word to the owning command — through an alias expansion, so `zz ab` completes against what `zz` runs. Sources: a shared `listFiles()` in `files.ts` (one source `ls`, `cat`, `vim` and `diff` all read) for filenames; `sectionIds` for `cd`/`ping`; alias names for `unalias`; `on`/`off` for `gravity`/`constellation`; visible command names for `help`; plus `open`, `lang`, `scene`, `ls -a`, `ssh`, `whois`. Alias names join the command-word candidates. Same `commonPrefix()` and print-when-ambiguous behaviour, one word later. **Departure from the plan:** a dotfile joins `listFiles()` only once its achievement is unlocked — `cat .`+Tab must not hand out `.secret`, same rule `suggest()` follows. | `types.ts`, `registry.ts`, `useTerminal.ts`, `files.ts`, `guestbook-fs.ts`, per-command `complete` in `navigate.ts`/`core.ts`/`eggs.ts`, `__tests__/completion.spec.ts` | M |
 
 ## C. Live information
 
@@ -103,9 +103,9 @@ ticker — plus the five achievements those unlocked (`alias`, `banner`, `cyanSp
 `constellation`, `zeroG`).
 
 **Phase 3 — the rest, one at a time (M–L):**
-Argument autocompletion first — it is the only one left that needs no backend, and it makes every
-command already shipped easier to find. Then the infra ones: `weather` (+ weather-linked mood),
-`btc`/`stonks`, presence SSE, command counter.
+Argument autocompletion ✅ shipped on `feat/phase-3-completion` → `dev` — the only one that needed
+no backend, and it makes every command already shipped easier to find. Then the infra ones, still
+to do: `weather` (+ weather-linked mood), `btc`/`stonks`, presence SSE, command counter.
 
 ## Dropped
 

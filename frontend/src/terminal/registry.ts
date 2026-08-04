@@ -1,4 +1,5 @@
 import type { Command } from './types'
+import { aliases } from './aliases'
 import { commands } from './commands'
 
 const byName = new Map<string, Command>()
@@ -36,6 +37,21 @@ export function completionNames(): string[] {
 export function complete(prefix: string): string[] {
   const needle = prefix.toLowerCase()
   return completionNames().filter((name) => name.startsWith(needle))
+}
+
+/** Keeps `prefix` matches, deduplicated and sorted — the shape Tab wants back. */
+export function filterByPrefix(candidates: readonly string[], prefix: string): string[] {
+  const needle = prefix.toLowerCase()
+  return [...new Set(candidates)].filter((c) => c.toLowerCase().startsWith(needle)).sort()
+}
+
+/**
+ * Candidates for the first word: every visible command and alias, plus whatever
+ * the visitor named themselves with `alias`. Their own names belong here for the
+ * same reason the built-in ones do — they are commands they can run.
+ */
+export function completeCommand(prefix: string): string[] {
+  return filterByPrefix([...completionNames(), ...Object.keys(aliases.value)], prefix)
 }
 
 /** Longest string that all candidates start with — the shell's usual Tab behaviour. */
