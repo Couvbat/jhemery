@@ -2,22 +2,20 @@
 
 This repo auto-deploys to o2switch on every push to `master`:
 
-- `frontend/**` changes → build the Vue app and upload `dist/` to the frontend document root
-- `backend/**` changes → build the Nest app, upload `dist/` to the backend app root, then restart the Node.js app
+- `frontend/**` changes → build the Vue app and rsync `dist/` to the frontend document root
+- `backend/**` changes → build the Nest app, rsync `dist/` to the backend app root, then `npm ci --omit=dev` and restart the Node.js app on the server
 
-Transfer happens over **FTPS**. There is also a legacy SSH/rsync path, kept as a manual fallback — see [SSH fallback](#ssh-fallback) for why it is not the default.
+Transfer happens over **SSH**. There is a second, FTPS-based path kept for when the cPanel API is unavailable — see [FTP fallback](#ftp-fallback).
 
-Workflow files: [frontend-build.yml](../.github/workflows/frontend-build.yml), [frontend-deploy.yml](../.github/workflows/frontend-deploy.yml), [frontend-deploy-ssh.yml](../.github/workflows/frontend-deploy-ssh.yml), [frontend-pr-check.yml](../.github/workflows/frontend-pr-check.yml), [backend-build.yml](../.github/workflows/backend-build.yml), [backend-deploy.yml](../.github/workflows/backend-deploy.yml), [backend-deploy-ssh.yml](../.github/workflows/backend-deploy-ssh.yml), [backend-pr-check.yml](../.github/workflows/backend-pr-check.yml).
+Workflow files: [frontend-build.yml](../.github/workflows/frontend-build.yml), [frontend-deploy.yml](../.github/workflows/frontend-deploy.yml), [frontend-deploy-ftp.yml](../.github/workflows/frontend-deploy-ftp.yml), [frontend-pr-check.yml](../.github/workflows/frontend-pr-check.yml), [backend-build.yml](../.github/workflows/backend-build.yml), [backend-deploy.yml](../.github/workflows/backend-deploy.yml), [backend-deploy-ftp.yml](../.github/workflows/backend-deploy-ftp.yml), [backend-pr-check.yml](../.github/workflows/backend-pr-check.yml).
 
-## How the FTP deploy works
+## How the deploy works
 
-Both deploy workflows use [SamKirkland/FTP-Deploy-Action](https://github.com/SamKirkland/FTP-Deploy-Action). It keeps a `.ftp-deploy-sync-state.json` file on the server listing what it last uploaded, and on each run diffs the fresh build against it — so only changed files go over the wire. The first run has no state file, so it uploads everything and, importantly, **does not delete files it has never tracked**. Leftovers from an older rsync deploy therefore survive the first FTP run; prune them by hand in the cPanel File Manager if any are stale.
+o2switch requires the connecting IP to be whitelisted before SSH will accept a connection, so each deploy run adds the GitHub Actions runner's IP to the whitelist via the cPanel API (`SshWhitelist/add`), rsyncs over SSH, then removes only that one entry afterwards (`SshWhitelist/remove`, `if: always()` so it runs even on failure). It only ever touches the entry it just added — it never calls `remove_all`, so any IPs you've whitelisted manually (e.g. your own machine) are left alone. Note: o2switch caps the whitelist at 5 entries total, per their [SSH whitelist FAQ](https://faq.o2switch.fr/cpanel/outils/exception-parefeu/).
 
-The backend has one wrinkle: without SSH there is no way to run `npm ci` on the server, so **dependencies are installed manually from cPanel**. The deploy stores a hash of the deployed `package-lock.json` on the server as `.deploy-deps-hash`, compares it at the start of each run, and if it changed the run ends with a warning and a job summary telling you to click **Run NPM Install**. When the lockfile is unchanged — the usual case — there is nothing to do. See [Updating backend dependencies](#updating-backend-dependencies).
+The backend deploy then runs `npm ci --omit=dev` inside the app's Node virtualenv and touches `tmp/restart.txt`, the standard Passenger reload convention. Dependencies therefore install themselves — a lockfile change needs nothing from you.
 
-Restarts are done by uploading `tmp/restart.txt`, the standard Passenger reload convention. That one file is uploaded with `curl` rather than the sync action, so it is written unconditionally on every deploy.
-
-Never deleted or overwritten on the backend: `.env`, `uploads/` (guestbook data), and `node_modules/` — all three are in the workflow's `exclude` list.
+Never overwritten on the backend: `.env` and `uploads/` (guestbook data), both excluded from the rsync.
 
 ## Part A — cPanel setup
 
@@ -25,62 +23,65 @@ Do this section first; you need the values it produces to fill in the GitHub sec
 
 ### 1. Find your server hostname
 
-cPanel home page → **Informations générales du compte**. Note the **Serveur** value, e.g. `c123.o2switch.net`. This becomes the `FTP_SERVER` secret.
+cPanel home page → **Informations générales du compte**. Note the **Serveur** value, e.g. `c123.o2switch.net`. This becomes the `CPANEL_SERVER` secret.
 
-Use this hostname rather than your own domain — it is what the server's TLS certificate is issued for, and the FTPS connection verifies it.
+### 2. Create a cPanel API token
 
-### 2. Set up the frontend domain and its FTP account
+cPanel → **Sécurité** → **Gérer les jetons API** → create a token (e.g. `github-actions`) and copy it immediately — it's shown once.
 
-cPanel → **Domaines** → confirm the domain's document root, e.g. `/home/<user>/jhemery.xyz` for an addon domain, or `/home/<user>/public_html` if it's the account's main domain.
+- `CPANEL_USERNAME` = your cPanel login username
+- `CPANEL_API_TOKEN` = the token you just created
 
-cPanel → **Fichiers** → **Comptes FTP** → **Ajouter un compte FTP**:
+Both are required. A request with an empty token doesn't fail loudly — cPanel answers with the HTML login page, and the deploy fails one step later at the whitelist check. See the troubleshooting table below.
 
-- Log in / username: e.g. `deploy-front` (cPanel appends `@jhemery.xyz`, giving `deploy-front@jhemery.xyz` — the **full** string is the username)
-- Password: generate a strong one and store it straight into the GitHub secret
-- Directory: the document root above
-- Quota: unlimited
+### 3. Generate an SSH deploy key and authorize it
 
-That gives you:
+Generate a dedicated key pair (don't reuse a personal one):
 
-- `FTP_FRONTEND_USERNAME` = the full `user@domain` login
-- `FTP_FRONTEND_PASSWORD` = its password
+```bash
+ssh-keygen -t ed25519 -C "github-actions-deploy" -f ~/gh-deploy-key
+```
 
-Because the account is rooted at the document root, `FTP_FRONTEND_DIR` can be left unset. Only set it if the FTP account lands somewhere above the target, in which case it is the path **relative to the FTP login directory** (e.g. `public_html/`).
+Press Enter at the passphrase prompts to leave it empty (a passphrase would block the non-interactive CI login).
 
-### 3. Set up the backend as a Node.js App
+- cPanel → **Sécurité** → **Accès SSH** → **Gérer les clés SSH** → **Importer une clé** → paste the contents of `gh-deploy-key.pub`
+- Click **Authorize** on the imported key
+- Confirm SSH access is enabled for the account
+
+Then:
+- `SSH_KEY` GitHub secret = the full contents of the **private** key file (`gh-deploy-key`, including the `BEGIN`/`END` lines)
+- Delete both local key files once they're stored in GitHub — don't leave the private key on disk.
+
+### 4. Set up the frontend domain
+
+cPanel → **Domaines** → confirm the domain's document root. That path is the `FRONTEND_REMOTE_PATH` secret (e.g. `/home/<user>/jhemery.xyz` for an addon domain, or `/home/<user>/public_html` if it's the account's main domain).
+
+### 5. Set up the backend as a Node.js App
 
 cPanel → **Logiciel** → **Setup Node.js App** → **Create Application**:
 
 - Node version: 24 (or closest available)
 - Application mode: Production
-- Application root: e.g. `api.jhemery.xyz` → the app root is `/home/<user>/api.jhemery.xyz`
+- Application root: e.g. `api.jhemery.xyz` → `BACKEND_REMOTE_PATH` = `/home/<user>/api.jhemery.xyz`
 - Application URL: `api.jhemery.xyz`
 - Application startup file: `main.js`
 
-Keep this page bookmarked — **Run NPM Install** and **Restart** live here.
+After creation, cPanel shows a command like:
 
-### 4. Create the backend FTP account
+```
+source /home/<user>/nodevenv/api.jhemery.xyz/24/bin/activate && cd /home/<user>/api.jhemery.xyz
+```
 
-Same as step 2, with the Node.js app root as the directory:
+Copy the `source .../bin/activate` part — that exact path is the `BACKEND_APP_ENTRY` secret. The deploy workflow uses it to run `npm ci` with the right Node version and to restart the app.
 
-- `FTP_BACKEND_USERNAME` = e.g. `deploy-api@jhemery.xyz`
-- `FTP_BACKEND_PASSWORD` = its password
-- `FTP_BACKEND_DIR` = leave unset when the account is rooted at the app root
-
-Use a **separate** account from the frontend one. It keeps each deploy unable to touch the other's files, and the two workflows write their own sync-state files.
-
-### 5. Create `backend/.env` on the server
+### 6. Create `backend/.env` on the server
 
 `backend/.env` is gitignored and excluded from every deploy on purpose, so it must exist on the server independently:
 
-- cPanel **File Manager** → go to the app root → create `.env`
+- cPanel **File Manager** (or SSH, once your key is authorized) → go to `BACKEND_REMOTE_PATH` → create `.env`
 - Fill it in based on [backend/.env.example](../backend/.env.example): real `SMTP_HOST`, `SMTP_USER`, `SMTP_PASS`, `FRONTEND_URL=https://jhemery.xyz`, etc.
 
-Because it's excluded from the sync, deploys never overwrite this file — edit it directly on the server when secrets change.
-
-### 6. Install backend dependencies once
-
-The first backend deploy uploads `dist/` (including `package.json` and `package-lock.json`) but no `node_modules`. After it finishes, go to **Setup Node.js App** → the api application → **Run NPM Install**, then **Restart**.
+Because it's excluded from the rsync, deploys never overwrite this file — edit it directly on the server when secrets change.
 
 ## Part B — GitHub setup
 
@@ -90,15 +91,15 @@ Repo → **Settings** → **Secrets and variables** → **Actions** → **New re
 
 | Secret | Value |
 |---|---|
-| `FTP_SERVER` | hostname from Part A.1 |
-| `FTP_FRONTEND_USERNAME` | full FTP login from Part A.2 |
-| `FTP_FRONTEND_PASSWORD` | its password |
-| `FTP_BACKEND_USERNAME` | full FTP login from Part A.4 |
-| `FTP_BACKEND_PASSWORD` | its password |
-| `FTP_FRONTEND_DIR` | optional, only if the FTP account isn't rooted at the document root |
-| `FTP_BACKEND_DIR` | optional, only if the FTP account isn't rooted at the app root |
+| `CPANEL_USERNAME` | cPanel username |
+| `CPANEL_API_TOKEN` | token from Part A.2 |
+| `CPANEL_SERVER` | hostname from Part A.1 |
+| `SSH_KEY` | private key from Part A.3 |
+| `FRONTEND_REMOTE_PATH` | document root from Part A.4 |
+| `BACKEND_REMOTE_PATH` | application root from Part A.5 |
+| `BACKEND_APP_ENTRY` | `source .../bin/activate` path from Part A.5 |
 
-The `CPANEL_*` / `SSH_KEY` / `*_REMOTE_PATH` secrets are only used by the SSH fallback workflows. Leave them in place if you want that fallback to stay usable.
+All seven are required. Check them with `gh secret list` before expecting a deploy to pass — a missing secret expands to an empty string rather than failing the run outright.
 
 ### 2. Trigger a run
 
@@ -106,49 +107,42 @@ Push a commit touching `frontend/` or `backend/` to `master`, or go to **Actions
 
 ### 3. Verify
 
-**Actions** tab → open the run → expand each step. Failures are almost always a wrong secret value rather than a workflow bug:
+**Actions** tab → open the run → expand each step. Failures are almost always a wrong or missing secret rather than a workflow bug:
 
 | Symptom | Cause |
 |---|---|
-| `530 Login authentication failed` | wrong username (it must include `@domain`) or password |
-| `550 ...: No such file or directory` | `FTP_*_DIR` points somewhere that doesn't exist, or isn't relative to the FTP account's login directory |
-| curl `SSL certificate problem` on the restart step | `FTP_SERVER` is set to your domain instead of the `cXXX.o2switch.net` hostname |
+| "Making sure the IP is whitelisted" exits 1, and the step above dumped cPanel login-page HTML | `CPANEL_API_TOKEN` is empty or invalid. An unauthenticated cPanel API call returns the login page, not a JSON error — easy to mistake for the API being disabled. Check the masked header in the log: `Authorization: cpanel ***:***` is right, `cpanel ***:` means the token is missing. |
+| Same step exits 1 with a JSON error about the whitelist | The 5-entry whitelist cap is full. Prune it in cPanel → **Accès SSH**. |
+| `Permission denied (publickey)` on rsync | `SSH_KEY` isn't the private half of the authorized key, or the key was imported but never **Authorized** in cPanel |
+| rsync succeeds but lands in the wrong place | `FRONTEND_REMOTE_PATH` / `BACKEND_REMOTE_PATH` typo — they're absolute paths |
+| Backend deploy fails at `npm ci` | `BACKEND_APP_ENTRY` doesn't point at the venv's `activate` script |
 | Deploy is green but the API still serves old code | Passenger didn't pick up `tmp/restart.txt` — hit **Restart** in cPanel and see [Known gaps](#known-gaps) |
-| API 500s right after a deploy | a dependency changed and `npm ci` hasn't run — see below |
 
-## Updating backend dependencies
+## FTP fallback
 
-Whenever `backend/package-lock.json` changes, the deploy uploads the new code but the server's `node_modules` stays as it was. The run's job summary says so explicitly. Fix it in two clicks:
+[frontend-deploy-ftp.yml](../.github/workflows/frontend-deploy-ftp.yml) and [backend-deploy-ftp.yml](../.github/workflows/backend-deploy-ftp.yml) deploy the same builds over FTPS, with no dependency on the cPanel API or on SSH. They are `workflow_dispatch`-only: **Actions** → **Deploy Frontend (FTP)** / **Deploy Backend (FTP)** → **Run workflow**.
 
-1. cPanel → **Setup Node.js App** → the api application
-2. **Run NPM Install**
-3. **Restart**
+Reach for them if o2switch disables the API again, or if the SSH whitelist is jammed and you need to ship.
 
-Between the deploy finishing and that install, the API runs against the old dependencies and may fail to boot. If a release adds or upgrades a package, deploy at a moment when you can follow it up immediately.
+Both use [SamKirkland/FTP-Deploy-Action](https://github.com/SamKirkland/FTP-Deploy-Action), which keeps a `.ftp-deploy-sync-state.json` on the server listing what it last uploaded and diffs the fresh build against it, so only changed files go over the wire. The first run has no state file, so it uploads everything and **does not delete files it has never tracked** — leftovers from an rsync deploy survive it. Restarts are done by uploading `tmp/restart.txt` with `curl`, so it is written unconditionally.
 
-## SSH fallback
+Setup, if you want this path ready before you need it:
 
-[frontend-deploy-ssh.yml](../.github/workflows/frontend-deploy-ssh.yml) and [backend-deploy-ssh.yml](../.github/workflows/backend-deploy-ssh.yml) are the previous rsync-over-SSH deploys, now `workflow_dispatch`-only. They handle dependencies themselves (`npm ci --omit=dev` on the server), so they need no manual cPanel step.
-
-They depend on the cPanel API: o2switch requires the connecting IP to be whitelisted before SSH will accept a connection, so each run adds the runner's IP via `SshWhitelist/add`, rsyncs, then removes only that one entry (`SshWhitelist/remove`, `if: always()` so it runs even on failure). It never calls `remove_all`, so IPs you whitelisted manually are left alone. o2switch caps the whitelist at 5 entries, per their [SSH whitelist FAQ](https://faq.o2switch.fr/cpanel/outils/exception-parefeu/).
-
-**o2switch currently has that API disabled**, which is why FTP is the default path — these workflows fail at the whitelist step until it comes back. Their secrets:
+1. cPanel → **Fichiers** → **Comptes FTP** → add one account rooted at the document root and another at the Node.js app root. The username is the **full** `user@domain` string cPanel builds.
+2. Add the secrets below. `FTP_SERVER` must be the `cXXX.o2switch.net` hostname, not your domain — it's what the TLS certificate is issued for, and the restart step's `curl` verifies it.
 
 | Secret | Value |
 |---|---|
-| `CPANEL_USERNAME` | cPanel login username |
-| `CPANEL_API_TOKEN` | cPanel → **Sécurité** → **Gérer les jetons API** (shown once) |
-| `CPANEL_SERVER` | same hostname as `FTP_SERVER` |
-| `SSH_KEY` | private half of a dedicated deploy key, imported and authorized under cPanel → **Sécurité** → **Accès SSH** |
-| `FRONTEND_REMOTE_PATH` | absolute document root |
-| `BACKEND_REMOTE_PATH` | absolute Node.js app root |
-| `BACKEND_APP_ENTRY` | the `source /home/<user>/nodevenv/<app>/24/bin/activate` path shown on the Setup Node.js App screen |
+| `FTP_SERVER` | same hostname as `CPANEL_SERVER` |
+| `FTP_FRONTEND_USERNAME` / `FTP_FRONTEND_PASSWORD` | frontend FTP account |
+| `FTP_BACKEND_USERNAME` / `FTP_BACKEND_PASSWORD` | backend FTP account |
+| `FTP_FRONTEND_DIR` / `FTP_BACKEND_DIR` | optional, only if an account isn't rooted at its target. Relative to the FTP login directory. |
 
-Generate the deploy key with `ssh-keygen -t ed25519 -C "github-actions-deploy" -f gh-deploy-key`, leaving the passphrase empty (a passphrase blocks the non-interactive CI login), then delete both local key files once the private one is stored in GitHub.
+**The one manual step:** without SSH there is no way to run `npm ci` on the server, so when `backend/package-lock.json` changes you have to install dependencies from cPanel → **Setup Node.js App** → the api application → **Run NPM Install** → **Restart**. The workflow stores a hash of the deployed lockfile on the server as `.deploy-deps-hash`, compares it each run, and ends with a warning annotation plus a job summary when it differs. Until you do it, the API runs against the old dependencies and may fail to boot.
 
 ## Apache config
 
-[frontend/public/.htaccess](../frontend/public/.htaccess) is copied into `dist/` by the build and uploaded with everything else. It needs `mod_rewrite` only — no `mod_proxy` — so it works on o2switch shared hosting. It does four things:
+[frontend/public/.htaccess](../frontend/public/.htaccess) is copied into `dist/` by the build and deployed with everything else. It needs `mod_rewrite` only — no `mod_proxy` — so it works on o2switch shared hosting. It does four things:
 
 - **SPA fallback.** Vue Router uses `createWebHistory`, so every non-file request is handed to `index.html`. Without this, a hard refresh on any path other than `/` 404s before Vue Router ever sees the URL.
 - **`curl jhemery.xyz` → the ANSI résumé.** Matches on `User-Agent` at the site root and serves `resume.txt`, generated at build time by [vite-plugins/resume.ts](../frontend/vite-plugins/resume.ts). The same rule covers LLM crawlers, which would otherwise fetch an empty `<div id="app">`.
@@ -159,8 +153,7 @@ If `mod_headers` or `mod_mime` is unavailable the `<IfModule>` guards make those
 
 ## Known gaps
 
-- **The FTP deploy is unverified end to end.** It was written against o2switch's documented FTPS setup but has not yet run against the real account. The first run of each workflow needs watching.
-- **Backend restart mechanism is unverified.** It assumes the o2switch Node.js App (Passenger) picks up `tmp/restart.txt`. If the app is managed a different way (PM2, systemd, etc.), replace the "Restart the Node.js app" step in [backend-deploy.yml](../.github/workflows/backend-deploy.yml) — and note that without SSH the only other lever is the **Restart** button in cPanel.
+- **No deploy has ever completed successfully.** As of 4 August 2026 every run since the workflows landed has failed on missing secrets, so nothing below the whitelist step has been exercised against the real server. Expect the first green run to need a couple of iterations.
+- **Backend restart mechanism is unverified.** It assumes the o2switch Node.js App (Passenger) picks up `tmp/restart.txt`. If the app is managed a different way (PM2, systemd, etc.), update the "Install production dependencies & restart app" step in [backend-deploy.yml](../.github/workflows/backend-deploy.yml).
+- **The FTP fallback is unverified.** Written against o2switch's documented FTPS setup, never run against the real account.
 - **Steam live data is unverified.** `GET /steam/activity` has only ever been exercised with no credentials, where it correctly returns `{"configured": false}` and the site falls back to the static game log. The `configured: true` path needs a real `STEAM_API_KEY` / `STEAM_ID` in `backend/.env` and a manual check once set.
-- **`POST /ask` cold starts may outrun the 20s timeout.** Verified working against a self-hosted Ollama (`gemma4:e4b`) at ~1.3s per answer *with the model resident*. Ollama's default `keep_alive` is 5 minutes, and a portfolio gets sporadic traffic, so most visitors will arrive to a cold model and pay a load of ~9.6 GB first. If that exceeds the 20s cap the terminal says the model is asleep. Fix it on the server, not in the app: set `OLLAMA_KEEP_ALIVE=-1` to keep it resident.
-- **`ask` points the public internet at a home network.** It is the only endpoint that does, which is why `ASK_ENABLED` defaults to `false` and why the real `LLM_BASE_URL` is not committed to `.env.example` — the 5/hour per-IP limit guards the Nest route, not the model behind it. If the Ollama host is reachable without auth, anyone who learns the URL can skip the limiter entirely.

@@ -1,3 +1,8 @@
+# Needs the cPanel API to whitelist the runner's IP before SSH will accept a
+# connection. If that API is ever unavailable again, backend-deploy-ftp.yml is
+# the fallback: Actions -> Deploy Backend (FTP) -> Run workflow. Unlike the FTP
+# path, this one installs dependencies on the server itself, so a lockfile
+# change needs no manual step in cPanel.
 name: Deploy Backend
 
 on:
@@ -28,108 +33,51 @@ jobs:
           name: backend-build
           path: build
 
-      # FTP_BACKEND_DIR is optional: leave it unset when the FTP account is
-      # rooted at the application root. Accepts `api/`, `/api`, `./api` alike.
-      # The curl steps below need the path without the leading `./`.
-      - name: Resolve remote directory
-        id: remote
-        env:
-          FTP_DIR: ${{ secrets.FTP_BACKEND_DIR }}
-        run: |
-          dir="${FTP_DIR:-}"
-          dir="${dir#./}"
-          dir="${dir#/}"
-          [ -n "$dir" ] && dir="${dir%/}/"
-          echo "path=$dir" >> "$GITHUB_OUTPUT"
-          echo "dir=./$dir" >> "$GITHUB_OUTPUT"
+      - name: Get runner's public IP
+        id: ip
+        run: echo "ipv4=$(curl -sf https://api.ipify.org || curl -sf https://ipv4.icanhazip.com)" >> "$GITHUB_OUTPUT"
 
-      # There is no SSH access, so `npm ci` cannot run on the server. Instead we
-      # keep a hash of the lockfile next to the app and compare, to tell whether
-      # this deploy needs a manual "Run NPM Install" in cPanel.
-      - name: Check whether dependencies changed
-        id: deps
-        env:
-          FTP_SERVER: ${{ secrets.FTP_SERVER }}
-          FTP_USER: ${{ secrets.FTP_BACKEND_USERNAME }}
-          FTP_PASS: ${{ secrets.FTP_BACKEND_PASSWORD }}
-          REMOTE_PATH: ${{ steps.remote.outputs.path }}
+      - name: Whitelisting the runner IP
         run: |
-          new_hash=$(sha256sum build/package-lock.json | cut -d' ' -f1)
-          old_hash=$(curl -sf --ssl-reqd --user "$FTP_USER:$FTP_PASS" \
-            "ftp://$FTP_SERVER/${REMOTE_PATH}.deploy-deps-hash" || true)
-          echo "hash=$new_hash" >> "$GITHUB_OUTPUT"
-          if [ "$new_hash" = "$old_hash" ]; then
-            echo "changed=false" >> "$GITHUB_OUTPUT"
-            echo "Dependencies unchanged since the last deploy."
-          else
-            echo "changed=true" >> "$GITHUB_OUTPUT"
-            echo "Lockfile differs from the one deployed to the server."
-          fi
+          curl -sm 45 -H"Authorization: cpanel ${{ secrets.CPANEL_USERNAME }}:${{ secrets.CPANEL_API_TOKEN }}" \
+          "https://${{ secrets.CPANEL_SERVER }}:2083/execute/SshWhitelist/add?address=${{ steps.ip.outputs.ipv4 }}&port=22&direction=in"
 
-      - name: Sync build over FTPS
-        uses: SamKirkland/FTP-Deploy-Action@v4.3.5
-        with:
-          server: ${{ secrets.FTP_SERVER }}
-          username: ${{ secrets.FTP_BACKEND_USERNAME }}
-          password: ${{ secrets.FTP_BACKEND_PASSWORD }}
-          protocol: ftps
-          local-dir: ./build/
-          server-dir: ${{ steps.remote.outputs.dir }}
-          log-level: minimal
-          # Server-side state that must survive a deploy. `node_modules` is a
-          # symlink into the cPanel Node.js virtualenv and is managed there;
-          # `.env` and `uploads` (guestbook data) only exist on the server.
-          exclude: |
-            **/.git*
-            **/.git*/**
-            **/node_modules/**
-            **/.env
-            uploads/**
-            tmp/**
-
-      # Passenger reloads the app when tmp/restart.txt changes. Done with curl
-      # rather than the sync action so it is uploaded unconditionally.
-      - name: Restart the Node.js app
-        env:
-          FTP_SERVER: ${{ secrets.FTP_SERVER }}
-          FTP_USER: ${{ secrets.FTP_BACKEND_USERNAME }}
-          FTP_PASS: ${{ secrets.FTP_BACKEND_PASSWORD }}
-          REMOTE_PATH: ${{ steps.remote.outputs.path }}
+      - name: Making sure the IP is whitelisted
         run: |
-          date -u +"restarted %Y-%m-%dT%H:%M:%SZ by run ${{ github.run_id }}" > restart.txt
-          curl -sSf --ssl-reqd --ftp-create-dirs -T restart.txt \
-            --user "$FTP_USER:$FTP_PASS" \
-            "ftp://$FTP_SERVER/${REMOTE_PATH}tmp/restart.txt"
+          curl -sm 45 -H"Authorization: cpanel ${{ secrets.CPANEL_USERNAME }}:${{ secrets.CPANEL_API_TOKEN }}" \
+          "https://${{ secrets.CPANEL_SERVER }}:2083/execute/SshWhitelist/list" | grep "${{ steps.ip.outputs.ipv4 }}"
 
-      - name: Record deployed lockfile hash
-        env:
-          FTP_SERVER: ${{ secrets.FTP_SERVER }}
-          FTP_USER: ${{ secrets.FTP_BACKEND_USERNAME }}
-          FTP_PASS: ${{ secrets.FTP_BACKEND_PASSWORD }}
-          REMOTE_PATH: ${{ steps.remote.outputs.path }}
-          NEW_HASH: ${{ steps.deps.outputs.hash }}
+      - name: Installing the SSH Key
         run: |
-          printf '%s' "$NEW_HASH" > deps-hash.txt
-          curl -sSf --ssl-reqd -T deps-hash.txt \
-            --user "$FTP_USER:$FTP_PASS" \
-            "ftp://$FTP_SERVER/${REMOTE_PATH}.deploy-deps-hash"
+          mkdir -p ~/.ssh
+          chmod 700 ~/.ssh
+          echo "${{ secrets.SSH_KEY }}" > ~/.ssh/id_rsa
+          chmod 0400 ~/.ssh/id_rsa
 
-      - name: Report whether a manual npm install is needed
+      - name: Sending data with RSYNC
         run: |
-          if [ "${{ steps.deps.outputs.changed }}" = "true" ]; then
-            echo "::warning title=Manual step required::backend/package-lock.json changed. Open cPanel -> Setup Node.js App -> the api app -> Run NPM Install, then Restart. Until then the app runs against the previously installed dependencies and may fail to boot."
-            {
-              echo "### :warning: Dependencies changed — manual step required"
-              echo
-              echo "The code is deployed, but \`node_modules\` on the server is stale."
-              echo
-              echo "1. cPanel → **Setup Node.js App** → the api application"
-              echo "2. **Run NPM Install**"
-              echo "3. **Restart**"
-            } >> "$GITHUB_STEP_SUMMARY"
-          else
-            echo "Dependencies unchanged — nothing to do in cPanel." >> "$GITHUB_STEP_SUMMARY"
-          fi
+          rsync --timeout=60 -e "ssh -o StrictHostKeyChecking=no -i ~/.ssh/id_rsa" \
+          --exclude=".env" --exclude="uploads" -av --delete build/ \
+          "${{ secrets.CPANEL_USERNAME }}@${{ secrets.CPANEL_SERVER }}:${{ secrets.BACKEND_REMOTE_PATH }}"
+
+      # Requires the app to be set up via cPanel "Setup Node.js App" (Passenger).
+      # BACKEND_APP_ENTRY must point to the venv's activate script shown on that
+      # cPanel screen, e.g. /home/<user>/nodevenv/api.jhemery.xyz/24/bin/activate
+      - name: Install production dependencies & restart app
+        run: |
+          ssh -o StrictHostKeyChecking=no -i ~/.ssh/id_rsa \
+          "${{ secrets.CPANEL_USERNAME }}@${{ secrets.CPANEL_SERVER }}" \
+          "source ${{ secrets.BACKEND_APP_ENTRY }} && cd ${{ secrets.BACKEND_REMOTE_PATH }} && npm ci --omit=dev && mkdir -p tmp && touch tmp/restart.txt"
+
+      - name: Un-whitelisting the runner IP
+        if: always()
+        run: |
+          curl -sm 45 -H"Authorization: cpanel ${{ secrets.CPANEL_USERNAME }}:${{ secrets.CPANEL_API_TOKEN }}" \
+          "https://${{ secrets.CPANEL_SERVER }}:2083/execute/SshWhitelist/remove?address=${{ steps.ip.outputs.ipv4 }}&port=22&direction=in"
+
+      - name: Cleaning SSH keys
+        if: always()
+        run: rm -fr ~/.ssh
 
       - name: Cleaning artifacts
         uses: geekyeggo/delete-artifact@v5
