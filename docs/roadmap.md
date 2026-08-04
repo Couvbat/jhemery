@@ -41,15 +41,15 @@ Conventions that apply to every row, so they are not repeated:
 | [x] | `reboot` | Replays `BootSequence.vue` on demand. Full spec in [appendix](#appendix--reboot-and-fake-env). | `useBoot.ts` (new), `BootSequence.vue`, `types.ts`, `useTerminal.ts`, `eggs.ts` | S |
 | [x] | fake `.env` | Joke env file in the fake filesystem. Full spec in [appendix](#appendix--reboot-and-fake-env). | `env-file.ts` (new), `files.ts`, `navigate.ts` | S |
 | [x] | `whois <name>` | Joke registration record via `line`/`art`. Static, no infra. | `eggs.ts` | S |
-| [ ] | `weather` | Open-Meteo (no API key) backend module mirroring `steam`/`github` controller+service; frontend `useWeather.ts`; ASCII glyph rendering. | `backend/src/weather/*` (new), `useWeather.ts` (new), `live.ts` | M |
+| [x] | `weather` | Open-Meteo (no key, no account) module mirroring `steam`/`github` controller+service, cached 10 min; `conditionFor()` buckets WMO codes server-side so the glyph, the label and the background mood read one mapping. Frontend `useWeather.ts` + hand-drawn 11×5 glyphs in `weather-art.ts` (padded on read, no emoji — they render double-width and shear the column). Alias `wttr`. **Privacy:** coordinates come from server config and are Jules's, never the caller's — no geolocation, same answer for everyone, which is what makes one shared cache correct. Left empty in `.env.example` because the site says only "France". | `backend/src/weather/*` (new), `useWeather.ts` (new), `weather-art.ts` (new), `live.ts`, `lib/api.ts` | M |
 | [x] | `ping <section>` | Fake latency lines via `terminal/timing.ts`'s `sleep()` + `ctx.frame()`, then the existing `navigate()`. | `navigate.ts` | S |
 | [x] | `diff <a> <b>` | Reuse `resolveFileLines()` for both files, small pure line-diff util. | `terminal/diff.ts` (new) + command | S |
 | [x] | `alias` | Session map persisted like `history.ts`; `registry.ts`'s `resolve()` checks it before `suggest()`. | `terminal/aliases.ts` (new), `registry.ts`, command | M |
 | [x] | `env` / `export` | **Shares its data with the fake `.env` file** (one source module, two renderers) so they cannot drift. `printenv`-style output. | reuses `env-file.ts`, new command | S |
 | [x] | `ssh couvbat@jhemery.xyz` | Joke "Connecting…" sequence; ends by calling `effects.reboot()` rather than inventing a second boot animation. | `eggs.ts` | S |
-| [ ] | `btc` / `stonks` | Needs a backend proxy (CORS blocks browser→exchange). Tiny route, shape of steam's. ASCII sparkline reuses the games' box-drawing conventions. | backend proxy (new), command | M |
+| [x] | `btc` / `stonks` | `GET /markets` proxies CoinGecko's public endpoint (no key, no account, like Open-Meteo), cached 5 min and only fetched when the command runs. The coin list is server config, never the request, so no caller data is forwarded. 168 hourly points downsampled to 48 server-side. `sparkline.ts` draws `▁▂▃▄▅▆▇█`; decimals follow the size of the number so 55 000 and 0.42 both read; a flat week draws flat instead of dividing by zero. **Departure from the plan:** "stonks" is an alias, not a second integration — every free stock API wants a key and an account, which is exactly what both live sources here were picked to avoid. | `backend/src/markets/*` (new), `terminal/sparkline.ts` (new), `live.ts`, `lib/api.ts` | M |
 | [x] | `banner <text>` | Client-side only: embedded 5×7 block-letter font table, rendered through `art()`/`pre`. Font table is the only real work. | `terminal/ascii-banner.ts` (new) + command | M |
-| [ ] | Argument autocompletion | Tab currently only completes the command word — `completeInput()` bails the moment the line has a space. Add an optional `complete?(ctx): string[]` to the `Command` interface so the registry stays the API: each command declares its own candidates, and `completeInput()` routes to it once the cursor is past the first word. Sources: a shared `listFiles()` in `files.ts` (visible + hidden + guestbook entries, one source `ls`, `cat`, `vim` and `diff` all read) for filenames; `sections` for `cd`/`ping`; alias names for `unalias`; literal `on`/`off` for `gravity`/`constellation`; command names for `help`. Alias names join the command-word candidates too. Reuses the existing `commonPrefix()` and the "print candidates when ambiguous" behaviour, so the UX is unchanged — it just applies one word later. | `types.ts`, `registry.ts`, `useTerminal.ts`, `files.ts`, per-command `complete` in `navigate.ts`/`core.ts`/`eggs.ts` | M |
+| [x] | Argument autocompletion | Optional `complete?(ctx): string[]` on the `Command` interface; `completeInput()` splits the line, works out which word the cursor is on and routes past the first word to the owning command — through an alias expansion, so `zz ab` completes against what `zz` runs. Sources: a shared `listFiles()` in `files.ts` (one source `ls`, `cat`, `vim` and `diff` all read) for filenames; `sectionIds` for `cd`/`ping`; alias names for `unalias`; `on`/`off` for `gravity`/`constellation`; visible command names for `help`; plus `open`, `lang`, `scene`, `ls -a`, `ssh`, `whois`. Alias names join the command-word candidates. Same `commonPrefix()` and print-when-ambiguous behaviour, one word later. **Departure from the plan:** a dotfile joins `listFiles()` only once its achievement is unlocked — `cat .`+Tab must not hand out `.secret`, same rule `suggest()` follows. | `types.ts`, `registry.ts`, `useTerminal.ts`, `files.ts`, `guestbook-fs.ts`, per-command `complete` in `navigate.ts`/`core.ts`/`eggs.ts`, `__tests__/completion.spec.ts` | M |
 
 ## C. Live information
 
@@ -58,11 +58,11 @@ Passive data cards — no achievements (see §D).
 | ✔ | Feature | Approach | Files | Effort |
 |---|---|---|---|---|
 | [x] | Build/deploy status card | Reuses the **existing** `GITHUB_TOKEN` + `github.module` — one `GET /github/workflow-status` route on the Actions REST API. Cheapest live item. | `backend/src/github/*` (extend), frontend card | S–M |
-| [ ] | Visitor counter / presence | NestJS's native `@Sse()` (no new dep) broadcasting a periodic aggregate count. Aggregate only — no per-visitor data. | `backend/src/presence/*` (new), `usePresence.ts` (new) | M |
+| [x] | Visitor counter / presence | Nest's native `@Sse()`, no new dep. The connection *is* the subscription, so arriving pushes a new count to everyone and a closed tab is a plain unsubscribe — better than the planned periodic broadcast, since the number moves the moment someone comes or goes. 25s heartbeat so Apache doesn't reap the stream; count lives in memory. Payload is one integer: no visitor id sent or assigned, nothing written down, and a test asserts the payload has exactly one key. Shown in the footer status line; `usePresence.ts` gives up after 3 failed connections, and the segment stays out of the DOM until a first message arrives. | `backend/src/presence/*` (new), `usePresence.ts` (new), `SiteFooter.vue`, `messages.ts` | M |
 | [x] | Uptime/status ticker | Extends `neofetch`'s "days since first commit" calc into a visible status line; "last deploy" reuses already-fetched GitHub activity. | small status composable | S |
-| [ ] | Weather-linked background mood | Depends on the `weather` route above; `ThreeBackground.vue` reads a shared weather summary and nudges tint/density. | weather backend + bridge composable | M |
+| [x] | Weather-linked background mood | `useWeather.ts` maps the condition to a `{ speed, opacity }` pair `ThreeBackground` multiplies into what the section palette already decided — storm faster, fog dimmer, snow slower, night dimmer still. Opacity always scales from each shape's stored `baseOpacity`, so repeated changes cannot ratchet the scene to invisible. The single request is made by `ThreeBackground` on mount and `weather` reuses it; under reduced motion the component never mounts, so the call never happens. | `useWeather.ts`, `ThreeBackground.vue` | M |
 | [x] | Live guestbook ticker | **Polling, not SSE**: `GET /guestbook` every ~20s, diff for new entries, surface through `AchievementToast.vue`'s existing pattern. No new backend. | poller composable + toast component | S–M |
-| [ ] | Global command counter | Fire-and-forget, incremented once per **terminal session open** (`useTerminal.ts`'s `primeOverlay()`), not per command — matches the `ask` route's "never logs content" stance. | `backend/src/stats/*` (new, tiny), one call site | S–M |
+| [x] | Global command counter | `POST /stats/session` from `primeOverlay()`, once per session — per-command would be chatter and would mean the server learning *which* commands run, the thing `ask` promises not to record. Stored as `{"sessions":N}` in one JSON file under `DATA_DIR` (excluded from the deploy, so it survives a release), write-then-rename like the guestbook, flushed at most every 30s. Rate-limited 5/hour per IP through the existing guard, because a number anyone can inflate with a `for` loop is not worth printing. Surfaced as a `Sessions` row in `neofetch`, omitted rather than zeroed when the backend is unreachable. | `backend/src/stats/*` (new), `useStats.ts` (new), `useTerminal.ts`, `content.ts` | S–M |
 
 ## D. Achievement tie-ins
 
@@ -102,10 +102,21 @@ click-to-inspect, scene control, constellation, `banner`, `alias`, build/deploy 
 ticker — plus the five achievements those unlocked (`alias`, `banner`, `cyanSpotter`,
 `constellation`, `zeroG`).
 
-**Phase 3 — the rest, one at a time (M–L):**
-Argument autocompletion first — it is the only one left that needs no backend, and it makes every
-command already shipped easier to find. Then the infra ones: `weather` (+ weather-linked mood),
-`btc`/`stonks`, presence SSE, command counter.
+**Phase 3 — the rest, one at a time (M–L):** ✅ all shipped, one branch each → `dev`.
+`feat/phase-3-completion` (argument autocompletion — the only one that needed no backend, and it
+makes every command already shipped easier to find), `feat/phase-3-weather` (`weather` +
+weather-linked background mood), `feat/phase-3-markets` (`btc`/`stonks`),
+`feat/phase-3-presence` (presence SSE), `feat/phase-3-stats` (command counter).
+
+Every roadmap row is now ticked.
+
+## Known issues
+
+- **`registry.ts` ↔ `commands/index.ts` is a circular import.** Pre-dates all of this: the command
+  modules import `resolve()` back from the registry, whose top-level code builds the lookup Map.
+  A clean load is fine because the registry is entered first, but entering `commands/index.ts`
+  first throws `Cannot access 'coreCommands' before initialization` — seen once in the dev server
+  during an HMR reload. The fix is to build the Map lazily so nothing runs at import time.
 
 ## Dropped
 

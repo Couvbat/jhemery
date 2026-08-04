@@ -5,6 +5,7 @@ import { useCrt } from '@/composables/useCrt'
 import { activeSection } from '@/composables/useActiveSection'
 import { terminalOpen } from '@/composables/useTerminalShell'
 import { BASE_SHAPE_COUNT, MAX_SHAPE_COUNT, useSceneControl } from '@/composables/useSceneControl'
+import { fetchWeather, weatherMood } from '@/composables/useWeather'
 import { unlock, unlocked } from '@/terminal/achievements'
 
 // CRT overdrive spins the wireframes up; reading the ref inside the loop keeps the
@@ -47,6 +48,8 @@ interface AnimatedShape {
   offset: THREE.Vector3
   /** Accent shapes take the palette's second colour — 3 of the initial 18. */
   accent: boolean
+  /** Opacity before the weather mood scales it, so the nudge stays reversible. */
+  baseOpacity: number
   kind: ShapeKind
 }
 
@@ -152,9 +155,14 @@ function applyPalette() {
   const palette = currentPalette()
   sectionSpeed = palette.speed
 
-  for (const { mesh, accent } of shapes) {
+  const mood = weatherMood.value
+  for (const { mesh, accent, baseOpacity } of shapes) {
+    const material = mesh.material as THREE.MeshBasicMaterial
     const colour = neon[accent ? palette.accent : palette.base]
-    if (colour) (mesh.material as THREE.MeshBasicMaterial).color.copy(colour)
+    if (colour) material.color.copy(colour)
+    // Scaled from `baseOpacity` rather than from the current value, so a run of
+    // weather changes can't ratchet every shape down to invisible.
+    material.opacity = Math.min(baseOpacity * mood.opacity, 0.6)
   }
   if (links) {
     const colour = neon[palette.base]
@@ -170,11 +178,12 @@ function addShape(accent: boolean) {
 
   const kind = KINDS[Math.floor(Math.random() * KINDS.length)]!
   const palette = currentPalette()
+  const baseOpacity = 0.15 + Math.random() * 0.25
   const material = new THREE.MeshBasicMaterial({
     color: neon[accent ? palette.accent : palette.base] ?? 0xffffff,
     wireframe: true,
     transparent: true,
-    opacity: 0.15 + Math.random() * 0.25,
+    opacity: baseOpacity * weatherMood.value.opacity,
   })
   const mesh = new THREE.Mesh(kind.make(), material)
 
@@ -193,6 +202,7 @@ function addShape(accent: boolean) {
     home,
     offset: new THREE.Vector3(),
     accent,
+    baseOpacity,
     kind,
     speed: {
       x: (Math.random() - 0.5) * 0.006,
@@ -350,7 +360,7 @@ function handleResize() {
 function animate() {
   animationFrameId = requestAnimationFrame(animate)
 
-  const boost = speedMultiplier.value * sectionSpeed
+  const boost = speedMultiplier.value * sectionSpeed * weatherMood.value.speed
   const shaking = glitching.value
   const pulling = pointerActive && gravityOn.value
 
@@ -413,7 +423,9 @@ function animate() {
 
 // Both the section and the completionist unlock change how the scene looks; one
 // watcher covers them because `currentPalette()` already knows which wins.
-watch([activeSection, unlocked], applyPalette)
+// The weather rides along on the same watcher: it only ever scales what the
+// palette already decided, so there is nothing for it to apply separately.
+watch([activeSection, unlocked, weatherMood], applyPalette)
 watch(shapeCount, syncShapeCount)
 watch(constellationOn, (on) => (on ? ensureLinks() : disposeLinks()))
 
@@ -448,6 +460,11 @@ onMounted(() => {
 
   window.addEventListener('resize', handleResize)
   window.addEventListener('click', handleClick)
+
+  // One request, from the surface that actually reacts to the answer. This
+  // component is not mounted under reduced motion, so the call is never made
+  // for a scene that would sit still anyway.
+  void fetchWeather()
 })
 
 onUnmounted(() => {

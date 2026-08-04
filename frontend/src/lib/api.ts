@@ -121,6 +121,63 @@ export interface GithubWorkflowStatus {
   runs?: WorkflowRun[]
 }
 
+export type WeatherCondition =
+  | 'clear'
+  | 'cloudy'
+  | 'fog'
+  | 'drizzle'
+  | 'rain'
+  | 'snow'
+  | 'thunder'
+
+export interface WeatherNow {
+  temperature: number
+  apparent: number
+  humidity: number
+  windSpeed: number
+  windDirection: number
+  precipitation: number
+  isDay: boolean
+  code: number
+  condition: WeatherCondition
+}
+
+export interface WeatherForecastDay {
+  date: string
+  min: number
+  max: number
+  code: number
+  condition: WeatherCondition
+}
+
+export interface WeatherReport {
+  configured: boolean
+  location?: string
+  now?: WeatherNow
+  forecast?: WeatherForecastDay[]
+}
+
+export interface MarketQuote {
+  id: string
+  symbol: string
+  name: string
+  price: number
+  currency: string
+  change24h: number | null
+  /** Seven days of closes, already downsampled by the backend. */
+  sparkline: number[]
+}
+
+export interface MarketsReport {
+  configured: boolean
+  quotes?: MarketQuote[]
+}
+
+export interface StatsReport {
+  /** Terminal sessions opened, ever. Aggregate — there is nothing else stored. */
+  sessions: number
+}
+
 export interface GuestbookEntry {
   id: string
   name: string
@@ -232,6 +289,10 @@ export const api = {
   githubContributions: () => request<GithubContributions>('/github/contributions'),
   githubPinnedRepos: () => request<GithubPinnedRepos>('/github/pinned-repos'),
   githubWorkflowStatus: () => request<GithubWorkflowStatus>('/github/workflow-status'),
+  weather: () => request<WeatherReport>('/weather'),
+  markets: () => request<MarketsReport>('/markets'),
+  stats: () => request<StatsReport>('/stats'),
+  recordSession: () => request<StatsReport>('/stats/session', { method: 'POST' }),
   guestbook: () => request<GuestbookList>('/guestbook'),
   sign: (name: string, message: string) =>
     request<GuestbookEntry>('/guestbook', {

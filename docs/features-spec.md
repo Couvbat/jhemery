@@ -94,6 +94,7 @@ interface Command {
   group: 'core' | 'navigate' | 'content' | 'live' | 'fun'
   hidden?: boolean       // excluded from help + completion, still runnable
   palette?: boolean      // surfaced in the Ctrl+K palette
+  complete?(ctx: CompleteContext): string[]   // Tab candidates for its arguments
   run(ctx: CommandContext): OutputLine[] | void | Promise<OutputLine[] | void>
 }
 ```
@@ -126,6 +127,31 @@ page all talk to the same session, so history survives closing the panel).
 - `history`: submitted commands, capped at 100, persisted to `localStorage`.
 - ↑/↓ walk history, `Tab` completes (common prefix first, then lists candidates),
   `Ctrl+L` clears, `Ctrl+C` cancels an in-flight interactive prompt.
+
+### Tab completion
+
+One routine handles both halves of a line. It splits on whitespace, works out which word the
+cursor is on, collects candidates for that position, then filters by prefix, inserts the single
+match (or the longest common prefix) and prints the list when the choice is still ambiguous.
+Only the *source* of the candidates changes:
+
+- **the first word** — every visible command and alias, plus whatever the visitor named with
+  `alias`. Hidden commands stay out, same as in `help`.
+- **anything after it** — the command's own `complete()`. Keeping it on the command is what keeps
+  the registry the API: `cd` knows it takes a section, `unalias` knows it takes an alias name, and
+  the shell needs no table of special cases. It receives the arguments, the index of the word being
+  completed and its partial text, and returns every candidate valid at that position — the shell
+  does the filtering. Commands whose arguments are free text (`echo`, `banner`, `ask`) simply
+  don't declare one.
+
+Filenames come from a single `listFiles()` in `commands/files.ts` that `ls`, `cat`, `vim` and
+`diff` all read, so the four can never disagree about what exists. A dotfile joins that list only
+once its achievement is unlocked — offering `.env` to someone who typed `cat .` would hand out an
+easter egg, which is the same reason `suggest()` never names a hidden command. Guestbook entries
+join it as soon as `guestbook` has cached them.
+
+An alias in the first position is expanded before the owning command is resolved, so `zz ab`
+completes against whatever `zz` will actually run.
 - `run(input)` handles `&&`-free single commands only — chaining is out of scope.
 
 ### Chrome
@@ -196,6 +222,8 @@ gets `curl: (6) Could not resolve host` and a note that a browser tab cannot ope
 |---|---|---|
 | `steam` / `playing` | `GET /steam/activity` | static game log from `content/gaming.ts` |
 | `gitlog` (alias `git log`) | `GET /github/activity` | "no activity available" |
+| `weather` / `wttr` | `GET /weather` | "weather: unavailable" |
+| `btc` / `stonks` / `crypto` | `GET /markets` | "btc: quotes unavailable" |
 | `guestbook` | `GET /guestbook` | "guestbook is closed" |
 | `sign <message>` | `POST /guestbook` | error line |
 | `mail` | `POST /contact` | error line |
@@ -444,6 +472,102 @@ a stale answer is the wrong answer. `durationMs` is only computed for completed 
 `BuildStatusCard.vue` renders the four most recent runs in the same terminal-window frame as the
 commit log — state dot, workflow name, branch, short SHA, duration, relative time — each linking to
 its run on GitHub. A queued or in-progress run pulses (`motion-safe:` only).
+
+### `GET /weather`
+
+Open-Meteo, which needs no key and no account — the reason it is the source here. Reads
+`WEATHER_LATITUDE`, `WEATHER_LONGITUDE` and a display-only `WEATHER_LOCATION` from config; without
+a usable coordinate pair it returns `{ configured: false }`. Cached ten minutes.
+
+**The coordinates are Jules's, not the caller's.** Nothing about the visitor is read, requested or
+stored, no browser geolocation is involved, and every visitor gets the same answer — which is also
+what makes a single shared cache correct. A portfolio has no business asking anyone where they are.
+They are deliberately left empty in `.env.example`: the site says only "France" about where Jules
+is, and a committed lat/long would be more precise than that.
+
+WMO codes are bucketed server-side by `conditionFor()` into `clear | cloudy | fog | drizzle | rain
+| snow | thunder`, so the glyph, the label and the background mood all read one mapping instead of
+three.
+
+`weather` renders wttr.in's layout — a glyph on the left, readings on the right — from
+`terminal/weather-art.ts`. The glyphs are hand-drawn, fixed at 11×5 and padded on read so the
+detail column always starts in the same place, and contain no emoji: those render double-width in
+some monospace stacks and would shear the column. Two forecast days follow, today omitted (the
+current conditions above already cover it).
+
+### `GET /markets`
+
+A proxy and nothing else: CORS stops the browser calling an exchange directly. CoinGecko's public
+endpoint is the source because — like Open-Meteo — it needs no key and no account.
+
+**No caller data reaches it.** The coin list comes from `MARKETS_COINS`, never from the request, so
+there is no query string a visitor can steer at a third party. Cached five minutes, and only
+fetched when someone actually runs the command: nothing on page load touches it.
+
+Sparkline series are downsampled server-side from CoinGecko's 168 hourly points to 48 — roughly a
+terminal's width — so the payload stays small and every renderer sees the same series.
+
+`btc` (aliases `stonks`, `crypto`) prints ticker, price and 24-hour change on one row and the
+week's shape on the next, drawn by `terminal/sparkline.ts` with `▁▂▃▄▅▆▇█`. Decimals follow the
+size of the number, because a coin at 55 000 and one at 0.42 both have to read sensibly. A flat
+week draws flat rather than dividing by zero.
+
+**Crypto only.** The "stonks" half of the idea stayed an alias rather than becoming a second
+integration: every free stock-quote API wants a key and an account, and the whole reason both live
+sources here were picked is that neither does.
+
+### Weather-linked background mood
+
+`useWeather.ts` turns the current condition into a `{ speed, opacity }` pair that `ThreeBackground`
+multiplies into what the section palette already decided — a storm spins the wireframes up, fog
+dims them, snow slows them, and night dims everything a little further. The multipliers are
+deliberately small: the section palette owns the colour and the CRT owns the speed ceiling, and
+weather that overrode either would read as a bug rather than as atmosphere. Opacity always scales
+from each shape's stored `baseOpacity`, so a run of weather changes cannot ratchet the scene down
+to invisible.
+
+The single request is made by `ThreeBackground` on mount — the surface that actually reacts to the
+answer — and `weather` reuses the cached result rather than asking again. Under reduced motion the
+component is never mounted, so the call is never made for a scene that would sit still anyway.
+
+### `GET /presence` — the one thing that pushes
+
+Nest's own `@Sse()`, so no new dependency. The connection *is* the subscription: a visitor arriving
+increments a counter and pushes the new figure to everyone already connected, a closed tab is a
+plain unsubscribe that pushes it back down. A 25-second heartbeat keeps Apache from reaping an idle
+stream. The count lives in memory — a restart resets it, which is correct, since every connection
+dies with the process anyway.
+
+**This is the opposite call from the guestbook ticker, for the opposite reason.** A presence count
+is only interesting *because* it moves as people come and go; a 20-second poll would show a number
+that is usually wrong and never seen to change. The guestbook's interesting event happens twice a
+week and its endpoint was already cached.
+
+**What crosses the wire is one integer.** No visitor id is sent, none is assigned, nothing is
+written to disk, and there is nothing on the server that could correlate one connection with
+another — not a policy applied afterwards, but the entire data model. A unit test asserts the
+payload has exactly one key, so a field creeping in alongside it fails the build.
+
+`usePresence.ts` holds the `EventSource`. It gives up after three failed connections rather than
+reconnecting for as long as the tab is open, and the footer segment stays out of the DOM entirely
+until a first message arrives — an unreachable backend shows nothing rather than a zero.
+
+### `GET /stats` · `POST /stats/session`
+
+A single running total: how many times anyone has opened the terminal. `useTerminal.ts`'s
+`primeOverlay()` posts once per session.
+
+**Once per session, not once per command.** Per-command would be chatter, and it would mean the
+server learning *which* commands people run — precisely what the `ask` route promises not to
+record. What is stored is one number, in one JSON file: `{"sessions":N}`, asserted by a test against
+the file that actually lands on disk.
+
+Rate-limited to 5/hour per IP through the existing `RateLimitGuard`, not because the write is
+expensive but because a number nobody can inflate with a `for` loop is the only kind worth
+printing. Increments accumulate in memory and flush at most every 30 seconds, write-then-rename like
+the guestbook, into `stats.json` under `DATA_DIR` — which the deploy excludes, so the total survives
+a release instead of resetting to zero. Surfaced as a `Sessions` row in `neofetch`, omitted rather
+than zeroed when the backend is unreachable.
 
 ### Live guestbook ticker
 

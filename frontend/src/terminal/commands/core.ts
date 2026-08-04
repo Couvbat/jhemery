@@ -4,7 +4,7 @@ import { profile } from '@/content'
 import { announce } from '../achievements'
 import { aliases, parseDefinition, removeAlias, setAlias } from '../aliases'
 import { history } from '../history'
-import { allCommands, resolve, visibleCommands } from '../registry'
+import { allCommands, completionNames, resolve, visibleCommands } from '../registry'
 import type { Command, CommandGroup, OutputLine } from '../types'
 import { blank, line, pre } from '../format'
 
@@ -24,6 +24,9 @@ export const coreCommands: Command[] = [
     description: { en: 'List commands, or explain one', fr: 'Lister les commandes' },
     group: 'core',
     palette: true,
+    // `completionNames()` and not `allCommands()`: `help vi<Tab>` must not hand
+    // out `vim`, for the same reason the command word itself doesn't.
+    complete: ({ index }) => (index === 0 ? [...completionNames(), '--all'] : []),
     run({ args, t }) {
       const [first] = args
 
@@ -121,6 +124,7 @@ export const coreCommands: Command[] = [
     description: { en: 'Show or switch language', fr: 'Afficher ou changer la langue' },
     group: 'core',
     palette: true,
+    complete: ({ index }) => (index === 0 ? ['en', 'fr'] : []),
     run({ args, locale, t }) {
       const [requested] = args
       if (!requested) {
@@ -189,6 +193,7 @@ export const coreCommands: Command[] = [
     description: { en: 'Remove an alias', fr: 'Supprimer un alias' },
     group: 'core',
     hidden: true,
+    complete: ({ index }) => (index === 0 ? Object.keys(aliases.value) : []),
     run({ args }) {
       const [name] = args
       if (!name) return [line('unalias: missing operand', 'error')]

@@ -30,6 +30,11 @@ export function cacheGuestbookEntries(entries: GuestbookEntry[]): void {
   }
 }
 
+/** Whatever the last `guestbook` run cached — empty until then. */
+export function guestbookFilenames(): string[] {
+  return [...cache.keys()]
+}
+
 /** Accepts either a bare filename or one prefixed with `guestbook/`. */
 export function resolveGuestbookFile(name: string): GuestbookEntry | undefined {
   const bare = name.replace(/^guestbook\//, '')
