@@ -27,6 +27,8 @@
     <text x="100" y="418" font-size="20" fill="#a9c2ad">Building web apps at In-Leed, based in France.</text>
     <text x="100" y="448" font-size="20" fill="#a9c2ad">Producing hard electronic music on the side.</text>
 
-    <text x="100" y="510" font-size="22" fill="#00ff41">$ <tspan fill="#e6f5e9">jhemery.xyz</tspan><tspan fill="#7a8b7f"> — try the terminal</tspan></text>
+    <!-- A leading space inside a tspan gets collapsed away by the renderer, so the
+         gap before the em dash is an explicit dx offset. -->
+    <text x="100" y="510" font-size="22" fill="#00ff41">$ <tspan fill="#e6f5e9">jhemery.xyz</tspan><tspan fill="#7a8b7f" dx="12">— try the terminal</tspan></text>
   </g>
 </svg>
