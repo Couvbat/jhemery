@@ -63,7 +63,7 @@ keyboards, and the rendered page carries the same content anyway.
 
 | Key | Does |
 |---|---|
-| `Tab` | Completion over every visible command and alias, longest-common-prefix style |
+| `Tab` | Completion, longest-common-prefix style — commands and your own aliases, then their arguments: filenames for `cat`/`vim`/`diff`, sections for `cd`/`ping`, `on`/`off` for the background toggles |
 | `↑` / `↓` | Command history (persisted) |
 | `Ctrl+L` | Clear |
 | `Ctrl+C` | Cancel a running command |

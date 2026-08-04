@@ -1,12 +1,40 @@
 import { profile, socials, skills, availability } from '@/content'
 import type { Localised } from '@/content/types'
+import { isUnlocked } from '../achievements'
 import { blank, line, wrap } from '../format'
 import type { OutputLine } from '../types'
 import { SECRET_FILE, secretContents } from './secret'
 import { ENV_FILE, envFileContents } from './env-file'
-import { resolveGuestbookFile } from './guestbook-fs'
+import { guestbookFilenames, resolveGuestbookFile } from './guestbook-fs'
 
 type TFunction = <T>(value: Localised<T>) => T
+
+/** Files `ls` always lists, in listing order. */
+export const FILES = ['about.txt', 'skills.txt', 'contact.txt'] as const
+
+/** Files only `ls -a` reveals, in listing order. */
+export const HIDDEN_FILES = [SECRET_FILE, ENV_FILE] as const
+
+/** Reading one of these is worth an achievement. */
+export const FILE_ACHIEVEMENTS: Record<string, string> = {
+  [SECRET_FILE]: 'secret',
+  [ENV_FILE]: 'dotenv',
+}
+
+/**
+ * Every filename tab-completion may offer — the one list `ls`, `cat`, `vim` and
+ * `diff` all agree on.
+ *
+ * A dotfile joins it only once its achievement is unlocked, i.e. once the
+ * visitor has already opened it. Handing `.secret` to someone who typed `cat .`
+ * would give away an easter egg, the same reason `suggest()` never names a
+ * hidden command. The French filenames (`a-propos.txt`) are deliberately absent:
+ * they are aliases for the same content, and `ls` doesn't list them either.
+ */
+export function listFiles(): string[] {
+  const found = HIDDEN_FILES.filter((file) => isUnlocked(FILE_ACHIEVEMENTS[file]!))
+  return [...FILES, ...found, ...guestbookFilenames()]
+}
 
 /**
  * The fake filesystem shared by `cat` and `vim` — one source of truth for what a

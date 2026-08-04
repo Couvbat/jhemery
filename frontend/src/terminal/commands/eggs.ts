@@ -17,7 +17,7 @@ import { sleep } from '../timing'
 import type { Command, CommandContext, OutputLine } from '../types'
 import { forgetGuestbookFile, resolveGuestbookFile } from './guestbook-fs'
 import { ENV_FILE } from './env-file'
-import { resolveFileLines } from './files'
+import { listFiles, resolveFileLines } from './files'
 
 /** The registration record `whois` invents for this domain. */
 const WHOIS_RECORD: Array<[string, string]> = [
@@ -196,6 +196,10 @@ export const eggCommands: Command[] = [
     description: { en: 'Connect to the host', fr: "Se connecter à l'hôte" },
     group: 'fun',
     hidden: true,
+    complete: ({ index }) =>
+      index === 0
+        ? [`${profile.handle}@${profile.domain}`, `contact@${profile.domain}`]
+        : [],
     async run(ctx) {
       const target = ctx.args[0]
       if (!target) {
@@ -246,6 +250,7 @@ export const eggCommands: Command[] = [
     description: { en: 'Look up a domain record', fr: 'Consulter un enregistrement de domaine' },
     group: 'fun',
     hidden: true,
+    complete: ({ index }) => (index === 0 ? [profile.domain, profile.handle] : []),
     run({ args }) {
       const query = (args[0] ?? profile.domain).toLowerCase().replace(/^https?:\/\//, '')
       const known = [profile.domain, profile.handle, profile.alias.toLowerCase(), 'localhost']
@@ -285,6 +290,7 @@ export const eggCommands: Command[] = [
     description: { en: 'Open the editor', fr: "Ouvrir l'éditeur" },
     group: 'fun',
     hidden: true,
+    complete: ({ index }) => (index === 0 ? listFiles() : []),
     run(ctx) {
       if (ctx.raw.startsWith('emacs')) {
         return [line('emacs: a great operating system, lacking only a decent editor.', 'muted')]
@@ -490,6 +496,7 @@ export const eggCommands: Command[] = [
     description: { en: 'Toggle the background pull', fr: "Basculer l'attraction du fond" },
     group: 'fun',
     hidden: true,
+    complete: ({ index }) => (index === 0 ? ['on', 'off'] : []),
     run({ args, t }) {
       const [requested] = args
       if (requested && requested !== 'on' && requested !== 'off') {
@@ -538,6 +545,7 @@ export const eggCommands: Command[] = [
     description: { en: 'Connect the dots', fr: 'Relier les points' },
     group: 'fun',
     hidden: true,
+    complete: ({ index }) => (index === 0 ? ['on', 'off'] : []),
     run({ args, t }) {
       const [requested] = args
       if (requested && requested !== 'on' && requested !== 'off') {
@@ -557,6 +565,7 @@ export const eggCommands: Command[] = [
     description: { en: 'Inspect or reset the background', fr: 'Inspecter ou réinitialiser le fond' },
     group: 'fun',
     hidden: true,
+    complete: ({ index }) => (index === 0 ? ['reset'] : []),
     run({ args }) {
       const control = useSceneControl()
       if (args[0] === 'reset') {

@@ -94,6 +94,7 @@ interface Command {
   group: 'core' | 'navigate' | 'content' | 'live' | 'fun'
   hidden?: boolean       // excluded from help + completion, still runnable
   palette?: boolean      // surfaced in the Ctrl+K palette
+  complete?(ctx: CompleteContext): string[]   // Tab candidates for its arguments
   run(ctx: CommandContext): OutputLine[] | void | Promise<OutputLine[] | void>
 }
 ```
@@ -126,6 +127,31 @@ page all talk to the same session, so history survives closing the panel).
 - `history`: submitted commands, capped at 100, persisted to `localStorage`.
 - ↑/↓ walk history, `Tab` completes (common prefix first, then lists candidates),
   `Ctrl+L` clears, `Ctrl+C` cancels an in-flight interactive prompt.
+
+### Tab completion
+
+One routine handles both halves of a line. It splits on whitespace, works out which word the
+cursor is on, collects candidates for that position, then filters by prefix, inserts the single
+match (or the longest common prefix) and prints the list when the choice is still ambiguous.
+Only the *source* of the candidates changes:
+
+- **the first word** — every visible command and alias, plus whatever the visitor named with
+  `alias`. Hidden commands stay out, same as in `help`.
+- **anything after it** — the command's own `complete()`. Keeping it on the command is what keeps
+  the registry the API: `cd` knows it takes a section, `unalias` knows it takes an alias name, and
+  the shell needs no table of special cases. It receives the arguments, the index of the word being
+  completed and its partial text, and returns every candidate valid at that position — the shell
+  does the filtering. Commands whose arguments are free text (`echo`, `banner`, `ask`) simply
+  don't declare one.
+
+Filenames come from a single `listFiles()` in `commands/files.ts` that `ls`, `cat`, `vim` and
+`diff` all read, so the four can never disagree about what exists. A dotfile joins that list only
+once its achievement is unlocked — offering `.env` to someone who typed `cat .` would hand out an
+easter egg, which is the same reason `suggest()` never names a hidden command. Guestbook entries
+join it as soon as `guestbook` has cached them.
+
+An alias in the first position is expanded before the owning command is resolved, so `zz ab`
+completes against whatever `zz` will actually run.
 - `run(input)` handles `&&`-free single commands only — chaining is out of scope.
 
 ### Chrome
