@@ -12,6 +12,7 @@ const open = ref(false)
 const query = ref('')
 const cursor = ref(0)
 const inputEl = ref<HTMLInputElement | null>(null)
+const listEl = ref<HTMLUListElement | null>(null)
 let previouslyFocused: HTMLElement | null = null
 
 interface Entry {
@@ -62,8 +63,28 @@ const filtered = computed(() => {
   )
 })
 
-watch(filtered, () => {
+/**
+ * The list is capped at `max-h-72`, so arrow-key navigation has to drag the
+ * viewport along with it. Rect maths rather than `offsetTop` (the `<ul>` is not
+ * the offset parent) and rather than `scrollIntoView` (which would also scroll
+ * the page behind the overlay).
+ */
+function scrollCursorIntoView() {
+  const list = listEl.value
+  const item = list?.children[cursor.value] as HTMLElement | undefined
+  if (!list || !item) return
+  const listBox = list.getBoundingClientRect()
+  const itemBox = item.getBoundingClientRect()
+  if (itemBox.top < listBox.top) list.scrollTop -= listBox.top - itemBox.top
+  else if (itemBox.bottom > listBox.bottom) list.scrollTop += itemBox.bottom - listBox.bottom
+}
+
+watch(cursor, () => scrollCursorIntoView())
+
+watch(filtered, async () => {
   cursor.value = 0
+  await nextTick()
+  if (listEl.value) listEl.value.scrollTop = 0
 })
 
 const activeDescendant = computed(() => {
@@ -85,6 +106,19 @@ function hide() {
   open.value = false
   previouslyFocused?.focus()
   previouslyFocused = null
+}
+
+/**
+ * Scrolling moves rows under a stationary pointer, and browsers report that as
+ * a `mousemove` — without this the mouse would yank the selection straight back
+ * off whatever the arrow keys just moved to.
+ */
+let pointer: { x: number; y: number } | null = null
+
+function onItemMousemove(event: MouseEvent, index: number) {
+  if (pointer && pointer.x === event.clientX && pointer.y === event.clientY) return
+  pointer = { x: event.clientX, y: event.clientY }
+  cursor.value = index
 }
 
 function choose(entry: Entry | undefined) {
@@ -161,6 +195,7 @@ onUnmounted(() => window.removeEventListener('keydown', onGlobalKeydown))
 
         <ul
           id="palette-list"
+          ref="listEl"
           role="listbox"
           :aria-label="t(m.palette.open)"
           class="max-h-72 overflow-y-auto py-1 font-mono text-sm"
@@ -176,7 +211,7 @@ onUnmounted(() => window.removeEventListener('keydown', onGlobalKeydown))
               i === cursor ? 'bg-primary/15 text-primary' : 'text-foreground hover:bg-muted',
             ]"
             @click="choose(entry)"
-            @mousemove="cursor = i"
+            @mousemove="onItemMousemove($event, i)"
           >
             <span class="truncate">{{ entry.label }}</span>
             <span class="ml-auto text-xs text-muted-foreground truncate">{{ entry.hint }}</span>
