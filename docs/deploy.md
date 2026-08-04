@@ -79,32 +79,22 @@ Then:
 
 cPanel → **Domaines** → confirm the domain's document root. That path is the `FRONTEND_REMOTE_PATH` secret (e.g. `/home/<user>/jhemery.xyz` for an addon domain, or `/home/<user>/public_html` if it's the account's main domain).
 
-The frontend also needs to know where the API lives, via `VITE_API_URL` (e.g. `https://api.jhemery.xyz`). This one works differently from every other setting on this page, and the difference matters:
+### Where the frontend's API URL comes from
 
-> **`VITE_API_URL` is consumed at build time, not at runtime.** `vite build` replaces `import.meta.env.VITE_API_URL` with a string literal and the deploy ships static files, so the URL is frozen into `assets/index-*.js` before anything reaches the server. Putting a `.env` next to the deployed `dist/` has no effect — nothing on the server ever reads it. It has to be set **wherever the build runs**.
+The frontend needs to know where the API lives, via `VITE_API_URL` (e.g. `https://api.jhemery.xyz`). It behaves unlike every other setting on this page, and the difference is the whole reason this section exists:
 
-`frontend/.env` is gitignored, so the deploy can't read it out of the repo. Instead, [frontend-build.yml](../.github/workflows/frontend-build.yml) recreates it on the runner from the `FRONTEND_ENV` secret immediately before `npm run build`:
+> **`VITE_API_URL` is consumed at build time, not at runtime.** `vite build` replaces `import.meta.env.VITE_API_URL` with a string literal, and what deploys is static files served by Apache. The URL is frozen into `assets/index-*.js` before anything reaches the server, and there is no process on the server to read a `.env` afterwards. This is exactly where `backend/.env` differs — Nest reads that one at runtime, so it can live on the server; a `frontend/.env` on the server is inert.
 
-```yaml
-- name: Restore frontend/.env
-  env:
-    FRONTEND_ENV: ${{ secrets.FRONTEND_ENV }}
-  run: printf '%s\n' "$FRONTEND_ENV" > .env
-```
+So `VITE_API_URL` has to be set **wherever `npm run build` runs**, which is either:
 
-So keep `frontend/.env` as the single source of truth, and mirror it into the secret whenever it changes:
+- **In CI** — the deploy workflows build on a GitHub runner. `frontend/.env` is gitignored, so the runner does not have it; the value would have to reach the build step some other way.
+- **Locally** — a `frontend/.env` on your machine, then deploy the `dist/` that build produces.
 
-```bash
-gh secret set FRONTEND_ENV < frontend/.env
-```
+**Neither is wired up today.** The deploy builds on a runner with no `VITE_API_URL`, so [frontend/src/lib/api.ts](../frontend/src/lib/api.ts) falls back to an empty base and the deployed bundle makes same-origin requests. Those hit the SPA rewrite below, come back as `index.html`, and fail to parse — every caller catches it, so the live-data cards stay hidden and the terminal's `gitlog` / `steam` / `guestbook` print an "unavailable" line instead of erroring.
 
-At minimum it needs `VITE_API_URL=https://api.jhemery.xyz`. The step fails the run if the secret is empty — otherwise a green build would deploy a bundle with no API host.
+That is a deliberate quiet failure, not a working setup: **live data does not load in production.** It replaced a much louder one, where the bundle shipped with `http://localhost:3000` baked in and every visitor's browser fired five cross-origin requests at their own machine.
 
-[frontend-pr-check.yml](../.github/workflows/frontend-pr-check.yml) has no equivalent step on purpose: its build only proves the app type-checks and compiles, and never leaves the runner.
-
-If `VITE_API_URL` is somehow unset anyway, [frontend/src/lib/api.ts](../frontend/src/lib/api.ts) falls back to an empty base, so calls go same-origin and fail locally instead of firing cross-origin requests at each visitor's own machine.
-
-Whatever value you use has to agree with the CORS allowlist in the other direction: `FRONTEND_URL` in `backend/.env`. Note that both hosts end up inlined in a public bundle, so neither is actually a secret — `FRONTEND_ENV` is a secret only because it is a whole `.env` file that may later hold things that are.
+To actually turn live data on, give the build the URL by whichever route above suits you. Whatever value you use has to agree with the CORS allowlist in the other direction — `FRONTEND_URL` in `backend/.env`. Neither host is sensitive; both end up inlined in a public bundle.
 
 ### 5. Set up the backend as a Node.js App
 
@@ -150,11 +140,10 @@ Repo → **Settings** → **Secrets and variables** → **Actions** → **New re
 | `FRONTEND_REMOTE_PATH` | document root from Part A.4 |
 | `BACKEND_REMOTE_PATH` | application root from Part A.5, **without** a trailing `/dist` |
 | `BACKEND_APP_ENTRY` | `source .../bin/activate` path from Part A.5 |
-| `FRONTEND_ENV` | the whole contents of `frontend/.env` — see Part A.4 |
 
-All eight are required. Check them with `gh secret list` before expecting a deploy to pass — a missing secret expands to an empty string rather than failing the run outright.
+All seven are required. Check them with `gh secret list` before expecting a deploy to pass — a missing secret expands to an empty string rather than failing the run outright.
 
-`FRONTEND_ENV` is the exception: [frontend-build.yml](../.github/workflows/frontend-build.yml) checks for it explicitly and fails the run with an annotation if it's empty, because an unset value there produces a green build that deploys a bundle with no API host.
+Note that `VITE_API_URL` is deliberately **not** in this table — it is a build-time value, not a deploy-time one. See [Where the frontend's API URL comes from](#where-the-frontends-api-url-comes-from).
 
 ### 2. Trigger a run
 
