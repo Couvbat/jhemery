@@ -14,7 +14,7 @@ defaults:
 
 jobs:
   check:
-    name: Type-check & Build
+    name: Test, Type-check & Build
     runs-on: ubuntu-latest
 
     steps:
@@ -29,5 +29,9 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Run tests
+        run: npm test
+
+      # `npm run build` runs type-check and build-only in parallel.
       - name: Build
         run: npm run build

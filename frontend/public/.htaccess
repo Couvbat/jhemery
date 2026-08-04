@@ -23,14 +23,31 @@
 <IfModule mod_mime.c>
   AddDefaultCharset UTF-8
   AddCharset UTF-8 .txt
+  AddType application/manifest+json .webmanifest
 </IfModule>
 
-# Hashed build assets are immutable; index.html and resume.txt must not be cached.
 <IfModule mod_headers.c>
-  <FilesMatch "\.(js|css|woff2?|svg|png|jpg|jpeg|webp|ico)$">
-    Header set Cache-Control "public, max-age=31536000, immutable"
+  # Only files under /assets/ carry a content hash in their name, so they are the
+  # only ones safe to freeze. Matching by extension instead would also freeze
+  # sw.js and the unhashed icons in the site root — a year-long immutable cache
+  # on the service worker means a deploy can never reach anyone who has visited.
+  <IfModule mod_setenvif.c>
+    SetEnvIf Request_URI "^/assets/" HASHED_ASSET=1
+    Header set Cache-Control "public, max-age=31536000, immutable" env=HASHED_ASSET
+  </IfModule>
+
+  # The service worker and its registration shim decide when every other cached
+  # file gets replaced, so they must always be revalidated.
+  <FilesMatch "^(sw\.js|registerSW\.js|workbox-.*\.js|manifest\.webmanifest)$">
+    Header set Cache-Control "public, max-age=0, must-revalidate"
   </FilesMatch>
+
   <FilesMatch "^(index\.html|resume\.txt)$">
     Header set Cache-Control "no-cache"
+  </FilesMatch>
+
+  # Unhashed root assets: cached, but not so long that fixing one is impossible.
+  <FilesMatch "^(favicon\.ico|icon\.svg|apple-touch-icon\.png|pwa-.*\.png|og-image\.(png|svg))$">
+    Header set Cache-Control "public, max-age=86400"
   </FilesMatch>
 </IfModule>

@@ -2,21 +2,35 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8">
-    <link rel="icon" href="/favicon.ico">
+    <link rel="icon" href="/favicon.ico" sizes="48x48">
+    <link rel="icon" href="/icon.svg" type="image/svg+xml">
+    <!-- iOS ignores the web manifest's icons and only reads this one. -->
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Jules Hémery — Full-Stack Developer, Musician & Gamer</title>
 
     <meta name="description" content="Jules Hémery (Couvbat) — Full-Stack Developer at In-Leed, based in France. Portfolio with live GitHub/Steam activity, music production and a fully interactive terminal.">
     <meta name="theme-color" content="#0d0f0d">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="Couvbat">
     <link rel="canonical" href="https://jhemery.xyz/">
 
-    <!-- Open Graph -->
+    <!--
+      Open Graph. The image MUST be a raster format: Twitter/X, LinkedIn, Discord,
+      Slack and iMessage all refuse an SVG og:image and render no preview at all.
+      `og-image.png` is generated from `og-image.svg` via `npm run og:image`.
+    -->
     <meta property="og:type" content="website">
     <meta property="og:url" content="https://jhemery.xyz/">
     <meta property="og:site_name" content="Jules Hémery">
     <meta property="og:title" content="Jules Hémery — Full-Stack Developer, Musician & Gamer">
     <meta property="og:description" content="Full-Stack Developer at In-Leed, based in France. Portfolio with live GitHub/Steam activity, music production and a fully interactive terminal.">
-    <meta property="og:image" content="https://jhemery.xyz/og-image.svg">
+    <meta property="og:image" content="https://jhemery.xyz/og-image.png">
+    <meta property="og:image:type" content="image/png">
+    <meta property="og:image:width" content="1200">
+    <meta property="og:image:height" content="630">
+    <meta property="og:image:alt" content="A terminal window reading: couvbat@portfolio:~$ whoami — Jules Hémery, Full-Stack Developer · Musician · Gamer.">
     <meta property="og:locale" content="en_US">
     <meta property="og:locale:alternate" content="fr_FR">
 
@@ -24,7 +38,8 @@
     <meta name="twitter:card" content="summary_large_image">
     <meta name="twitter:title" content="Jules Hémery — Full-Stack Developer, Musician & Gamer">
     <meta name="twitter:description" content="Full-Stack Developer at In-Leed, based in France. Portfolio with live GitHub/Steam activity, music production and a fully interactive terminal.">
-    <meta name="twitter:image" content="https://jhemery.xyz/og-image.svg">
+    <meta name="twitter:image" content="https://jhemery.xyz/og-image.png">
+    <meta name="twitter:image:alt" content="A terminal window reading: couvbat@portfolio:~$ whoami — Jules Hémery, Full-Stack Developer · Musician · Gamer.">
 
     <script type="application/ld+json">
       {

@@ -1,0 +1,21 @@
+<svg width="512" height="512" viewBox="0 0 512 512" xmlns="http://www.w3.org/2000/svg">
+  <title>Jules Hémery</title>
+  <!--
+    Vector version of the "JH" favicon mark. Source for every raster icon in this
+    folder — see `npm run icons`. The letterforms are stroked paths rather than
+    text so a render doesn't depend on which fonts the machine happens to have.
+  -->
+  <rect width="512" height="512" rx="96" fill="#0d0f0d"/>
+  <g transform="translate(-16 0)"
+     fill="none"
+     stroke="#00ff41"
+     stroke-width="38"
+     stroke-linecap="butt">
+    <!-- J -->
+    <path d="M 214 148 V 290 A 66 66 0 0 1 148 356"/>
+    <!-- H -->
+    <path d="M 306 148 V 356"/>
+    <path d="M 408 148 V 356"/>
+    <path d="M 306 252 H 408"/>
+  </g>
+</svg>
