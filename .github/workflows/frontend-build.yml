@@ -37,8 +37,13 @@ jobs:
       - name: Build
         run: npm run build
 
+      # `.htaccess` is a dotfile and upload-artifact drops those by default, so
+      # without this the SPA fallback and the curl/LLM resume rule never reach
+      # the server -- and the deploy's `rsync --delete` removes the copy already
+      # there. Silent: the site builds and renders, deep links just 404.
       - name: Upload Build Artifact
         uses: actions/upload-artifact@v4
         with:
           name: frontend-build
           path: frontend/dist
+          include-hidden-files: true
