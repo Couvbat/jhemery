@@ -32,8 +32,10 @@ jobs:
       - name: Lint
         run: npm run lint
 
+      # No --passWithNoTests: there are real suites now, so an empty run means
+      # the test glob broke rather than that there is nothing to check.
       - name: Run tests
-        run: npm test -- --passWithNoTests
+        run: npm test
 
       - name: Build
         run: npm run build
