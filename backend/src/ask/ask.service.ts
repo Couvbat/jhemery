@@ -17,6 +17,11 @@ import { AskDto } from './ask.dto';
 const CORPUS_URL = 'https://jhemery.xyz/llms.txt';
 const CORPUS_TTL_MS = 60 * 60 * 1000;
 const CORPUS_TIMEOUT_MS = 5_000;
+/**
+ * How long to sit on the fallback after a failed refresh. Without this, a host
+ * that hangs rather than refusing gets re-dialled on every single question.
+ */
+const CORPUS_RETRY_MS = 5 * 60 * 1000;
 /** The whole corpus is a couple of kilobytes; this only guards against a surprise. */
 const MAX_CORPUS_CHARS = 16_000;
 
@@ -45,6 +50,8 @@ interface CompletionChunk {
 export class AskService {
   private readonly logger = new Logger(AskService.name);
   private corpus: { text: string; expiresAt: number } | null = null;
+  /** At most one corpus refresh in flight, so questions cannot pile up dials. */
+  private corpusRefresh: Promise<void> | null = null;
   /**
    * Self-hosted inference serialises anyway, so a queue would only let callers
    * pile up work on someone's GPU. The cap lives here rather than in
@@ -120,7 +127,7 @@ export class AskService {
     const baseUrl = this.config.get<string>('LLM_BASE_URL')!;
     const model = this.config.get<string>('LLM_MODEL')!;
     const apiKey = this.config.get<string>('LLM_API_KEY');
-    const corpus = await this.getCorpus();
+    const corpus = this.corpusNow();
 
     const controller = new AbortController();
     let timedOut = false;
@@ -192,35 +199,66 @@ export class AskService {
   }
 
   /**
-   * Same fetch-and-cache shape as `github.service.ts` and `steam.service.ts`.
-   * A stale copy beats the baked-in fallback, so a failed refresh keeps serving
-   * whatever was last fetched.
+   * The corpus never blocks an answer.
+   *
+   * This used to `await` the fetch on the request path, which quietly made every
+   * answer depend on the backend reaching the *frontend* over HTTP. In
+   * production that is a loopback — the box resolving its own domain back to
+   * itself through Apache — and when it wedges it takes the whole endpoint with
+   * it: no corpus, no model call, no response, not even a timeout. Observed
+   * live as a request that hung indefinitely while the model was never
+   * contacted at all.
+   *
+   * So the refresh runs in the background and the question is answered from
+   * whatever is already in hand: the cached copy, a stale copy, or the baked-in
+   * fallback. The cost is that the first question after a restart is answered
+   * from the fallback; the benefit is that a second deploy unit can never again
+   * hang this one.
    */
-  private async getCorpus(): Promise<string> {
-    if (this.corpus && this.corpus.expiresAt > Date.now()) {
-      return this.corpus.text;
+  private corpusNow(): string {
+    if (!this.corpus || this.corpus.expiresAt <= Date.now()) {
+      void this.refreshCorpus();
     }
+    return this.corpus?.text ?? FALLBACK_CORPUS;
+  }
+
+  /**
+   * Same fetch-and-cache shape as `github.service.ts` and `steam.service.ts`,
+   * but off the request path. A failure parks the fallback for `CORPUS_RETRY_MS`
+   * rather than leaving the cache empty, so a wedged host is dialled once every
+   * few minutes instead of once per question.
+   */
+  private refreshCorpus(): Promise<void> {
+    if (this.corpusRefresh) return this.corpusRefresh;
 
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), CORPUS_TIMEOUT_MS);
-    try {
-      const res = await fetch(CORPUS_URL, {
-        signal: controller.signal,
-        headers: { 'User-Agent': 'jhemery-portfolio' },
-      });
-      if (!res.ok) throw new Error(`llms.txt returned ${res.status}`);
 
-      const text = (await res.text()).slice(0, MAX_CORPUS_CHARS);
-      this.corpus = { text, expiresAt: Date.now() + CORPUS_TTL_MS };
-      return text;
-    } catch (err) {
-      this.logger.warn(
-        `Could not refresh the ask corpus: ${err instanceof Error ? err.message : String(err)}`,
-      );
-      return this.corpus?.text ?? FALLBACK_CORPUS;
-    } finally {
-      clearTimeout(timer);
-    }
+    this.corpusRefresh = (async () => {
+      try {
+        const res = await fetch(CORPUS_URL, {
+          signal: controller.signal,
+          headers: { 'User-Agent': 'jhemery-portfolio' },
+        });
+        if (!res.ok) throw new Error(`llms.txt returned ${res.status}`);
+
+        const text = (await res.text()).slice(0, MAX_CORPUS_CHARS);
+        this.corpus = { text, expiresAt: Date.now() + CORPUS_TTL_MS };
+      } catch (err) {
+        this.logger.warn(
+          `Could not refresh the ask corpus: ${err instanceof Error ? err.message : String(err)}`,
+        );
+        this.corpus = {
+          text: this.corpus?.text ?? FALLBACK_CORPUS,
+          expiresAt: Date.now() + CORPUS_RETRY_MS,
+        };
+      } finally {
+        clearTimeout(timer);
+        this.corpusRefresh = null;
+      }
+    })();
+
+    return this.corpusRefresh;
   }
 }
 
