@@ -1,98 +1,120 @@
-<p align="center">
-  <a href="http://nestjs.com/" target="blank"><img src="https://nestjs.com/img/logo-small.svg" width="120" alt="Nest Logo" /></a>
-</p>
+# backend
 
-[circleci-image]: https://img.shields.io/circleci/build/github/nestjs/nest/master?token=abc123def456
-[circleci-url]: https://circleci.com/gh/nestjs/nest
+The `api.jhemery.xyz` service — NestJS 11, TypeScript. It backs the portfolio's live features:
+the terminal's `ask`, the contact form, Steam and GitHub activity, and the guestbook.
 
-  <p align="center">A progressive <a href="http://nodejs.org" target="_blank">Node.js</a> framework for building efficient and scalable server-side applications.</p>
-    <p align="center">
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/v/@nestjs/core.svg" alt="NPM Version" /></a>
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/l/@nestjs/core.svg" alt="Package License" /></a>
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/dm/@nestjs/common.svg" alt="NPM Downloads" /></a>
-<a href="https://circleci.com/gh/nestjs/nest" target="_blank"><img src="https://img.shields.io/circleci/build/github/nestjs/nest/master" alt="CircleCI" /></a>
-<a href="https://discord.gg/G7Qnnhy" target="_blank"><img src="https://img.shields.io/badge/discord-online-brightgreen.svg" alt="Discord"/></a>
-<a href="https://opencollective.com/nest#backer" target="_blank"><img src="https://opencollective.com/nest/backers/badge.svg" alt="Backers on Open Collective" /></a>
-<a href="https://opencollective.com/nest#sponsor" target="_blank"><img src="https://opencollective.com/nest/sponsors/badge.svg" alt="Sponsors on Open Collective" /></a>
-  <a href="https://paypal.me/kamilmysliwiec" target="_blank"><img src="https://img.shields.io/badge/Donate-PayPal-ff3f59.svg" alt="Donate us"/></a>
-    <a href="https://opencollective.com/nest#sponsor"  target="_blank"><img src="https://img.shields.io/badge/Support%20us-Open%20Collective-41B883.svg" alt="Support us"></a>
-  <a href="https://twitter.com/nestframework" target="_blank"><img src="https://img.shields.io/twitter/follow/nestframework.svg?style=social&label=Follow" alt="Follow us on Twitter"></a>
-</p>
-  <!--[![Backers on Open Collective](https://opencollective.com/nest/backers/badge.svg)](https://opencollective.com/nest#backer)
-  [![Sponsors on Open Collective](https://opencollective.com/nest/sponsors/badge.svg)](https://opencollective.com/nest#sponsor)-->
+For the site itself, see the [root README](../README.md).
 
-## Description
-
-[Nest](https://github.com/nestjs/nest) framework TypeScript starter repository.
-
-## Project setup
+## Setup
 
 ```bash
-$ npm install
+npm install
+cp .env.example .env
+npm run start:dev          # http://localhost:3000
 ```
 
-## Compile and run the project
+`.env.example` documents every variable, including why the risky ones ship disabled. Nothing is
+required to boot: with an empty `.env` the API starts and every optional feature reports itself as
+unconfigured rather than failing.
+
+| Script | Does |
+|---|---|
+| `npm run start:dev` | Watch mode |
+| `npm run start:prod` | `node dist/main` |
+| `npm run build` | `nest build` → `dist/` |
+| `npm run lint` | `eslint --fix` |
+| `npm test` | Jest unit tests |
+| `npm run test:e2e` | Jest e2e (`test/jest-e2e.json`) |
+| `npm run test:cov` | Coverage |
+
+## Modules and routes
+
+| Route | Module | Notes |
+|---|---|---|
+| `POST /ask` | `ask` | SSE stream of an answer from a self-hosted, OpenAI-compatible model. 5/hour per IP. |
+| `POST /contact` | `contact` | Sends the terminal's `mail` message over SMTP. 3 per 10 min per IP. |
+| `GET /steam/activity` | `steam` | Profile + recently played, 5-minute cache. |
+| `GET /github/activity` | `github` | Recent public commits, 5-minute cache. |
+| `GET /github/contributions` | `github` | Contribution heatmap — GraphQL, needs a token. |
+| `GET /github/pinned-repos` | `github` | Pinned repos — GraphQL, needs a token. |
+| `GET /guestbook` | `guestbook` | Newest 25 entries. |
+| `POST /guestbook` | `guestbook` | Sign. 1/min per IP. |
+| `DELETE /guestbook/:id` | `guestbook` | Moderation; requires the `x-admin-password` header. |
+
+Every optional integration degrades instead of erroring: no Steam key hides live activity, no
+GitHub token drops the heatmap and pinned repos, an unreachable model makes the terminal say the
+model is asleep and point at `mail`.
+
+## Cross-cutting bits
+
+**CORS** is limited to `localhost:5173` plus `FRONTEND_URL`, methods `GET`/`POST`/`DELETE`, and
+allows the `x-admin-password` header — without which the guestbook DELETE preflight fails in the
+browser.
+
+**`trust proxy`** is on: Apache fronts the app, so `req.ip` must come from `X-Forwarded-For` or the
+rate limiter would see one client (the proxy) for the whole internet.
+
+**Validation** is a global `ValidationPipe({ whitelist: true })`; DTOs use `class-validator`.
+
+**Rate limiting** is `common/rate-limit.guard.ts` — a per-IP fixed window held in memory, applied
+per handler with `@RateLimit({ limit, windowMs })`. Adequate for one low-traffic Node process
+behind Passenger; scaling out would need Redis or the platform's own limiter.
+
+## `ask`
+
+Disabled unless `ASK_ENABLED=true`. It is the only endpoint that opens a path towards a home
+network, and it spends a private machine's electricity, so it is opt-in by design.
+
+- Works with any OpenAI-compatible runtime — Ollama, llama.cpp, vLLM, LM Studio. Point
+  `LLM_BASE_URL` at whatever has `/chat/completions` under it.
+- Grounded on `https://jhemery.xyz/llms.txt`, cached for an hour, capped at 16k chars, with a
+  built-in fallback corpus. **The corpus never blocks an answer** — a cold or unreachable fetch is
+  skipped, not awaited.
+- Budgets: ~300 output tokens, 20 s to the first token (then it detaches and lets the model warm
+  up in the background), 15 s idle timeout, and a 45 s structural silence ceiling in the
+  controller.
+- `reasoning_effort: 'none'` is sent — a reasoning model otherwise spends the entire token budget
+  deliberating and the answer arrives truncated mid-sentence.
+- Streamed by writing SSE to the response directly rather than via `@Sse()`, which is built around
+  `Observable` and `GET`; this is a `POST` with a body. `X-Accel-Buffering: no` stops Apache
+  holding the whole answer back.
+- Questions and answers are never logged.
+
+The 45-second ceiling exists because Cloudflare gives the origin 100 s to produce headers and then
+serves its own 524 — a page with no `Access-Control-Allow-Origin`, so a hang reads in the browser
+as a CORS failure on an endpoint that is configured perfectly. Answering late is better than
+letting a proxy answer.
+
+## `guestbook`
+
+Disabled unless `GUESTBOOK_ENABLED=true` — it is a publicly writable field.
+
+- Entries are sanitised and link-filtered (the single highest-signal spam heuristic), rate-limited
+  to 1/min per IP, and capped at 500 with oldest-first eviction.
+- Storage is a JSON file under `DATA_DIR` (default `uploads`, excluded from the deploy so entries
+  survive it), or MongoDB when `MONGODB_URI` is set.
+- Writes are serialised through a queue and written via rename, so two concurrent signings can't
+  clobber each other.
+- `DELETE /guestbook/:id` refuses outright unless `ADMIN_PASSWORD` is set.
+
+## Tests
 
 ```bash
-# development
-$ npm run start
-
-# watch mode
-$ npm run start:dev
-
-# production mode
-$ npm run start:prod
-```
-
-## Run tests
-
-```bash
-# unit tests
-$ npm run test
-
-# e2e tests
-$ npm run test:e2e
-
-# test coverage
-$ npm run test:cov
+npm test          # guestbook service + controller, ask service + controller,
+                  # contact service, rate-limit guard
+npm run test:e2e
 ```
 
 ## Deployment
 
-When you're ready to deploy your NestJS application to production, there are some key steps you can take to ensure it runs as efficiently as possible. Check out the [deployment documentation](https://docs.nestjs.com/deployment) for more information.
+cPanel + CloudLinux Passenger; `.htaccess` in this directory is the Passenger config and its
+generated blocks must not be edited by hand.
 
-If you are looking for a cloud-based platform to deploy your NestJS application, check out [Mau](https://mau.nestjs.com), our official platform for deploying NestJS applications on AWS. Mau makes deployment straightforward and fast, requiring just a few simple steps:
+- `.github/workflows/backend-deploy.yml` — the default path. Whitelists the runner's IP through
+  the cPanel API, ships over SSH, and installs dependencies on the server.
+- `.github/workflows/backend-deploy-ftp.yml` — manual fallback for when the cPanel API is
+  unavailable. No SSH, so a lockfile change needs "Run NPM Install" in cPanel afterwards; the job
+  summary says so when it detects one.
 
-```bash
-$ npm install -g @nestjs/mau
-$ mau deploy
-```
-
-With Mau, you can deploy your application in just a few clicks, allowing you to focus on building features rather than managing infrastructure.
-
-## Resources
-
-Check out a few resources that may come in handy when working with NestJS:
-
-- Visit the [NestJS Documentation](https://docs.nestjs.com) to learn more about the framework.
-- For questions and support, please visit our [Discord channel](https://discord.gg/G7Qnnhy).
-- To dive deeper and get more hands-on experience, check out our official video [courses](https://courses.nestjs.com/).
-- Deploy your application to AWS with the help of [NestJS Mau](https://mau.nestjs.com) in just a few clicks.
-- Visualize your application graph and interact with the NestJS application in real-time using [NestJS Devtools](https://devtools.nestjs.com).
-- Need help with your project (part-time to full-time)? Check out our official [enterprise support](https://enterprise.nestjs.com).
-- To stay in the loop and get updates, follow us on [X](https://x.com/nestframework) and [LinkedIn](https://linkedin.com/company/nestjs).
-- Looking for a job, or have a job to offer? Check out our official [Jobs board](https://jobs.nestjs.com).
-
-## Support
-
-Nest is an MIT-licensed open source project. It can grow thanks to the sponsors and support by the amazing backers. If you'd like to join them, please [read more here](https://docs.nestjs.com/support).
-
-## Stay in touch
-
-- Author - [Kamil Myśliwiec](https://twitter.com/kammysliwiec)
-- Website - [https://nestjs.com](https://nestjs.com/)
-- Twitter - [@nestframework](https://twitter.com/nestframework)
-
-## License
-
-Nest is [MIT licensed](https://github.com/nestjs/nest/blob/master/LICENSE).
+Production `.env` lives on the server, not in this repo — a self-hosted LLM endpoint usually has no
+auth of its own, and the per-route limiter guards this API, not the model behind it.
