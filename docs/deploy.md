@@ -15,6 +15,18 @@ o2switch requires the connecting IP to be whitelisted before SSH will accept a c
 
 Two runs at once would put two entries in that 5-slot whitelist and race the firewall with them, which is exactly how the 4 August run failed — the frontend connected 13 seconds after whitelisting and worked, the backend connected 4 seconds after and had its TCP connection reset. So all four deploy workflows share a `concurrency: o2switch-deploy` group and queue behind each other, and each one probes SSH in a retry loop before rsyncing rather than assuming the packet filter has caught up with the API.
 
+### Frontend configuration
+
+`VITE_API_URL` is **inlined into the JavaScript at build time**, so it has to be set where the build runs — in CI, from [frontend/.env.production](../frontend/.env.production) in the repo. A `.env` placed on the server does nothing for a static bundle; the file is read by Vite during `npm run build`, never by the browser.
+
+Getting this wrong is quiet rather than loud: `src/lib/api.ts` falls back to `http://localhost:3000`, so the site deploys and renders perfectly while every API call goes nowhere. To check what a deployed bundle actually contains:
+
+```bash
+curl -s https://jhemery.xyz/$(curl -s https://jhemery.xyz/ | grep -oE '/assets/[^"]+\.js' | head -1) | grep -o 'https://api[^"]*'
+```
+
+Unlike the backend, the frontend deploys to the document root itself, so `--delete` has no subdirectory to be scoped to. Anything living there that the build doesn't produce — `.env`, `.well-known` (AutoSSL's ACME challenges), `cgi-bin`, `error_log` — has to be named in the rsync's `--exclude` list or it gets removed on the next deploy.
+
 ### Backend directory layout
 
 The build goes into **`dist/` under the app root**, not into the app root itself:
