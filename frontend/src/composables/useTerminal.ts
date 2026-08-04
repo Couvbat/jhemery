@@ -187,6 +187,14 @@ export async function run(input: string): Promise<void> {
         text: `${messages.terminal.didYouMean[currentLocale()]} \`${hint}\`?`,
         tone: 'muted',
       })
+    } else if (raw.includes(' ')) {
+      // Nothing is within two edits of it and it has a space in it, so it reads
+      // as a sentence rather than a typo. Someone who types `where does he work`
+      // into a terminal has told you exactly what they want.
+      append({
+        text: `${messages.terminal.askInstead[currentLocale()]} \`ask "${raw}"\``,
+        tone: 'muted',
+      })
     }
     return
   }

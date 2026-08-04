@@ -1,3 +1,5 @@
+import type { Locale } from '@/content/types'
+
 export const apiUrl: string = import.meta.env.VITE_API_URL ?? 'http://localhost:3000'
 
 export interface SteamRecentGame {
@@ -86,22 +88,78 @@ export class ApiError extends Error {
   }
 }
 
+async function errorFrom(res: Response): Promise<ApiError> {
+  let detail = `${res.status}`
+  try {
+    const body = (await res.json()) as { message?: string | string[] }
+    if (body?.message) {
+      detail = Array.isArray(body.message) ? body.message.join(', ') : body.message
+    }
+  } catch {
+    // Non-JSON error body — the status code is all we have.
+  }
+  return new ApiError(detail, res.status)
+}
+
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const res = await fetch(`${apiUrl}${path}`, init)
-  if (!res.ok) {
-    let detail = `${res.status}`
-    try {
-      const body = (await res.json()) as { message?: string | string[] }
-      if (body?.message) {
-        detail = Array.isArray(body.message) ? body.message.join(', ') : body.message
-      }
-    } catch {
-      // Non-JSON error body — the status code is all we have.
-    }
-    throw new ApiError(detail, res.status)
-  }
+  if (!res.ok) throw await errorFrom(res)
   if (res.status === 204) return undefined as T
   return (await res.json()) as T
+}
+
+/**
+ * `POST /ask`, yielding the model's answer a token at a time.
+ *
+ * A stream cannot go through `request()`: the interesting failures happen after
+ * the promise resolves. This throws `ApiError` for anything that goes wrong
+ * before the body starts, and simply stops yielding if the connection dies
+ * mid-answer — the caller keeps whatever arrived.
+ */
+export async function* askStream(
+  question: string,
+  locale: Locale,
+  signal?: AbortSignal,
+): AsyncGenerator<string> {
+  const res = await fetch(`${apiUrl}/ask`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ question, locale }),
+    signal,
+  })
+  if (!res.ok || !res.body) throw await errorFrom(res)
+
+  const reader = res.body.getReader()
+  const decoder = new TextDecoder()
+  let buffer = ''
+
+  try {
+    for (;;) {
+      const { done, value } = await reader.read()
+      if (done) return
+
+      buffer += decoder.decode(value, { stream: true })
+      let newline: number
+      // One `data:` field per event, read line by line so an event split across
+      // two network chunks still parses.
+      while ((newline = buffer.indexOf('\n')) !== -1) {
+        const raw = buffer.slice(0, newline).trim()
+        buffer = buffer.slice(newline + 1)
+        if (!raw.startsWith('data:')) continue
+
+        const payload = raw.slice('data:'.length).trim()
+        if (payload === '[DONE]') return
+        try {
+          const { delta } = JSON.parse(payload) as { delta?: string }
+          if (delta) yield delta
+        } catch {
+          // A malformed chunk is not worth throwing away the answer for.
+        }
+      }
+    }
+  } finally {
+    await reader.cancel().catch(() => undefined)
+  }
 }
 
 export const api = {
@@ -127,4 +185,5 @@ export const api = {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload),
     }),
+  askStream,
 }

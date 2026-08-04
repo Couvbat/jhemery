@@ -48,6 +48,18 @@ export const achievementList: Achievement[] = [
     description: { en: 'Sent a message with `mail`.', fr: 'Envoyé un message avec `mail`.' },
   },
   {
+    id: 'ask',
+    title: { en: 'Turing Test', fr: 'Test de Turing' },
+    hint: {
+      en: 'There’s someone else in here to talk to.',
+      fr: 'Il y a quelqu’un d’autre à qui parler ici.',
+    },
+    description: {
+      en: 'Got an answer out of the local model.',
+      fr: 'Obtenu une réponse du modèle local.',
+    },
+  },
+  {
     id: 'lang',
     title: { en: 'Bilingual', fr: 'Bilingue' },
     hint: { en: 'This site speaks more than one language.', fr: 'Ce site parle plus d’une langue.' },
