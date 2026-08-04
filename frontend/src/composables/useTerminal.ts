@@ -1,6 +1,7 @@
 import { computed, nextTick, ref, shallowRef } from 'vue'
 import { currentLocale, useLocale } from '@/i18n'
 import { messages } from '@/i18n/messages'
+import { expandAliases } from '@/terminal/aliases'
 import { history, pushHistory } from '@/terminal/history'
 import { commonPrefix, complete, resolve, suggest } from '@/terminal/registry'
 import type { CommandContext, OutputLine, TerminalEffects, VimBufferState, VimFile } from '@/terminal/types'
@@ -167,7 +168,12 @@ function buildContext(args: string[], raw: string, signal: AbortSignal): Command
 }
 
 export async function run(input: string): Promise<void> {
-  const raw = input.trim()
+  // Aliases are rewritten before anything else looks at the line, so `resolve`,
+  // the two-word fallback and the "did you mean …?" suggestion all reason about
+  // the command that will actually run. `alias` itself is never expanded — it
+  // reads its own raw line — because it is a real command and aliases cannot
+  // shadow those.
+  const raw = expandAliases(input)
   if (!raw) return
 
   const [name = '', ...args] = raw.split(/\s+/)
