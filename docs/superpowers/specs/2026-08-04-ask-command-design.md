@@ -83,6 +83,29 @@ The concurrency cap lives in the service, not the guard — the guard is per-IP 
 > While a detached warm-up is in flight, further questions are answered "asleep" immediately instead
 > of queueing a second load behind the first.
 
+> **Second correction, from a visitor's console.** Every limit above is a limit on the *model*.
+> None of them was a limit on the endpoint, and the difference showed up as a CORS error:
+>
+> ```
+> Cross-Origin Request Blocked … Reason: CORS header ‘Access-Control-Allow-Origin’ missing.
+> Status code: 524.
+> ```
+>
+> Nothing about CORS was wrong. Cloudflare fronts `api.jhemery.xyz` and gives the origin 100 seconds
+> to produce response headers; past that it discards the request and serves its own 524, a page with
+> no CORS headers on it. So a hang reaches the browser wearing a misconfiguration's clothes, and the
+> obvious diagnosis — check `enableCors`, check `FRONTEND_URL` — is a dead end every time.
+>
+> The response now starts within 45 seconds no matter what, with a degraded event in the stream if
+> there is nothing better to say. That number is not tuning: the service already answers in 20, and
+> a working answer is never cut off because the ceiling only applies before the first token. It is
+> there so that the guarantee is *structural* rather than emergent. The corpus hang got in
+> underneath the 20 s deadline precisely because that deadline lived somewhere else, and nothing on
+> the request path was responsible for the request's own worst case.
+>
+> The general shape: **an endpoint behind a proxy owns its worst case, or the proxy owns it and
+> answers in a vocabulary the client cannot read.**
+
 **Logging:** latency and outcome only. Not the question, not the answer, not the IP. There is no
 value in a transcript of what strangers asked, and storing one turns a toy into a privacy
 obligation.

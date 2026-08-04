@@ -166,12 +166,21 @@ export async function* askStream(
 
         const payload = raw.slice('data:'.length).trim()
         if (payload === '[DONE]') return
+
+        let event: { delta?: string; error?: string }
         try {
-          const { delta } = JSON.parse(payload) as { delta?: string }
-          if (delta) yield delta
+          event = JSON.parse(payload) as { delta?: string; error?: string }
         } catch {
           // A malformed chunk is not worth throwing away the answer for.
+          continue
         }
+
+        // A failure the backend only discovered after committing to the stream,
+        // so it could not be a status code. Raised as one anyway: `ask` decides
+        // what to draw from the error alone, and this keeps that one decision
+        // in one place.
+        if (event.error) throw new ApiError(event.error, event.error === 'busy' ? 503 : 502)
+        if (event.delta) yield event.delta
       }
     }
   } finally {
