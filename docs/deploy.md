@@ -95,6 +95,23 @@ Then:
 
 cPanel → **Domaines** → confirm the domain's document root. That path is the `FRONTEND_REMOTE_PATH` secret (e.g. `/home/<user>/jhemery.xyz` for an addon domain, or `/home/<user>/public_html` if it's the account's main domain).
 
+### Where the frontend's API URL comes from
+
+The frontend needs to know where the API lives, via `VITE_API_URL` (e.g. `https://api.jhemery.xyz`). It behaves unlike every other setting on this page, and the difference is the whole reason this section exists:
+
+> **`VITE_API_URL` is consumed at build time, not at runtime.** `vite build` replaces `import.meta.env.VITE_API_URL` with a string literal, and what deploys is static files served by Apache. The URL is frozen into `assets/index-*.js` before anything reaches the server, and there is no process on the server to read a `.env` afterwards. This is exactly where `backend/.env` differs — Nest reads that one at runtime, so it can live on the server; a `frontend/.env` on the server is inert.
+
+So `VITE_API_URL` has to be set **wherever `npm run build` runs**, which is either:
+
+- **In CI** — the deploy workflows build on a GitHub runner. `frontend/.env` is gitignored, so the runner does not have it; the value would have to reach the build step some other way.
+- **Locally** — a `frontend/.env` on your machine, then deploy the `dist/` that build produces.
+
+**Neither is wired up today.** The deploy builds on a runner with no `VITE_API_URL`, so [frontend/src/lib/api.ts](../frontend/src/lib/api.ts) falls back to an empty base and the deployed bundle makes same-origin requests. Those hit the SPA rewrite below, come back as `index.html`, and fail to parse — every caller catches it, so the live-data cards stay hidden and the terminal's `gitlog` / `steam` / `guestbook` print an "unavailable" line instead of erroring.
+
+That is a deliberate quiet failure, not a working setup: **live data does not load in production.** It replaced a much louder one, where the bundle shipped with `http://localhost:3000` baked in and every visitor's browser fired five cross-origin requests at their own machine.
+
+To actually turn live data on, give the build the URL by whichever route above suits you. Whatever value you use has to agree with the CORS allowlist in the other direction — `FRONTEND_URL` in `backend/.env`. Neither host is sensitive; both end up inlined in a public bundle.
+
 ### 5. Set up the backend as a Node.js App
 
 cPanel → **Logiciel** → **Setup Node.js App** → **Create Application**:
@@ -141,6 +158,8 @@ Repo → **Settings** → **Secrets and variables** → **Actions** → **New re
 | `BACKEND_APP_ENTRY` | `source .../bin/activate` path from Part A.5 |
 
 All seven are required. Check them with `gh secret list` before expecting a deploy to pass — a missing secret expands to an empty string rather than failing the run outright.
+
+Note that `VITE_API_URL` is deliberately **not** in this table — it is a build-time value, not a deploy-time one. See [Where the frontend's API URL comes from](#where-the-frontends-api-url-comes-from).
 
 ### 2. Trigger a run
 
