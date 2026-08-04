@@ -6,6 +6,7 @@ import { SteamModule } from './steam/steam.module';
 import { GithubModule } from './github/github.module';
 import { GuestbookModule } from './guestbook/guestbook.module';
 import { WeatherModule } from './weather/weather.module';
+import { MarketsModule } from './markets/markets.module';
 
 @Module({
   imports: [
@@ -16,6 +17,7 @@ import { WeatherModule } from './weather/weather.module';
     GithubModule,
     GuestbookModule,
     WeatherModule,
+    MarketsModule,
   ],
 })
 export class AppModule {}

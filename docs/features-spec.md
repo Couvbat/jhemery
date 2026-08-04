@@ -223,6 +223,7 @@ gets `curl: (6) Could not resolve host` and a note that a browser tab cannot ope
 | `steam` / `playing` | `GET /steam/activity` | static game log from `content/gaming.ts` |
 | `gitlog` (alias `git log`) | `GET /github/activity` | "no activity available" |
 | `weather` / `wttr` | `GET /weather` | "weather: unavailable" |
+| `btc` / `stonks` / `crypto` | `GET /markets` | "btc: quotes unavailable" |
 | `guestbook` | `GET /guestbook` | "guestbook is closed" |
 | `sign <message>` | `POST /guestbook` | error line |
 | `mail` | `POST /contact` | error line |
@@ -493,6 +494,27 @@ three.
 detail column always starts in the same place, and contain no emoji: those render double-width in
 some monospace stacks and would shear the column. Two forecast days follow, today omitted (the
 current conditions above already cover it).
+
+### `GET /markets`
+
+A proxy and nothing else: CORS stops the browser calling an exchange directly. CoinGecko's public
+endpoint is the source because — like Open-Meteo — it needs no key and no account.
+
+**No caller data reaches it.** The coin list comes from `MARKETS_COINS`, never from the request, so
+there is no query string a visitor can steer at a third party. Cached five minutes, and only
+fetched when someone actually runs the command: nothing on page load touches it.
+
+Sparkline series are downsampled server-side from CoinGecko's 168 hourly points to 48 — roughly a
+terminal's width — so the payload stays small and every renderer sees the same series.
+
+`btc` (aliases `stonks`, `crypto`) prints ticker, price and 24-hour change on one row and the
+week's shape on the next, drawn by `terminal/sparkline.ts` with `▁▂▃▄▅▆▇█`. Decimals follow the
+size of the number, because a coin at 55 000 and one at 0.42 both have to read sensibly. A flat
+week draws flat rather than dividing by zero.
+
+**Crypto only.** The "stonks" half of the idea stayed an alias rather than becoming a second
+integration: every free stock-quote API wants a key and an account, and the whole reason both live
+sources here were picked is that neither does.
 
 ### Weather-linked background mood
 

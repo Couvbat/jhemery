@@ -130,6 +130,7 @@ the same fake filesystem, so a file can never show two different contents.
 | `steam` | `playing` | Live Steam activity |
 | `gitlog` | `git log`, `commits` | Recent public commits |
 | `weather` | `wttr` | Current conditions where I am, wttr.in-style, plus two forecast days |
+| `btc` | `stonks`, `crypto` | Crypto prices with a 7-day ASCII sparkline. Not financial advice |
 | `guestbook` | `gb` | Read what visitors left (entries are listed as files you can `cat`) |
 | `sign` | | `sign <message>` — leave a message |
 | `mail` | `sendmail`, `write` | Send me a message without leaving the terminal |
@@ -220,6 +221,7 @@ limiter sees real clients behind Apache.
 | `GET /github/pinned-repos` | Pinned repositories (GraphQL — needs a token). |
 | `GET /github/workflow-status` | The four most recent Actions runs for `GITHUB_REPO`. Public REST, so the token is optional; cached for 60 s because a build in flight is the one case where a stale answer is the wrong answer. |
 | `GET /weather` | Current conditions and a short forecast from Open-Meteo (no key, no account). The coordinates are **mine**, from server config — nothing about the visitor is read or sent, so everyone gets the same answer and one 10-minute cache serves them all. Empty in `.env.example` on purpose. |
+| `GET /markets` | Crypto quotes and a 7-day series from CoinGecko (no key, no account). A proxy purely because CORS blocks the browser; the coin list is server-side config, so no caller data is forwarded. Cached 5 min, only fetched when someone runs `btc`. |
 | `GET /guestbook` · `POST /guestbook` | Read and sign. Sanitised, link-filtered, 1/min per IP, capped at 500 entries. Stored in a JSON file under `DATA_DIR`, or in MongoDB if `MONGODB_URI` is set. Disabled by default. |
 | `DELETE /guestbook/:id` | Moderation; requires the `x-admin-password` header. |
 
