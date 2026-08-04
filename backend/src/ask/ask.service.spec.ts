@@ -73,6 +73,35 @@ describe('AskService', () => {
     return { deltas, onDelta: (d) => deltas.push(d) };
   }
 
+  /** Lets the background corpus refresh settle. */
+  async function settle(): Promise<void> {
+    await Promise.resolve();
+    await Promise.resolve();
+  }
+
+  /** The system prompt the model was handed on fetch call `n`. */
+  function promptAt(n: number): string {
+    const [, init] = fetchMock.mock.calls[n] as [string, RequestInit];
+    const { messages } = JSON.parse(init.body as string) as {
+      messages: Array<{ role: string; content: string }>;
+    };
+    return messages[0].content;
+  }
+
+  /**
+   * A service that has already pulled llms.txt. The first question is always
+   * answered from the fallback, so a test about the real corpus has to get past
+   * it first. Fetch calls afterwards: 0 = llms.txt, 1 = the throwaway model
+   * call, 2+ = the test's own.
+   */
+  async function warmed(env?: Record<string, string>): Promise<AskService> {
+    const instance = service(env);
+    const { onDelta } = collect();
+    await instance.answer(dto, onDelta);
+    await settle();
+    return instance;
+  }
+
   beforeEach(() => {
     fetchMock = jest.fn();
     global.fetch = fetchMock;
@@ -193,16 +222,12 @@ describe('AskService', () => {
       respond(() => completion('data: [DONE]\n\n'));
       const { onDelta } = collect();
 
-      await service().answer({ ...dto, locale: 'fr' }, onDelta);
+      const instance = await warmed();
+      await instance.answer({ ...dto, locale: 'fr' }, onDelta);
 
-      const [, init] = fetchMock.mock.calls[1] as [string, RequestInit];
-      const { messages } = JSON.parse(init.body as string) as {
-        messages: Array<{ role: string; content: string }>;
-      };
-      expect(messages[0].role).toBe('system');
-      expect(messages[0].content).toContain('# corpus');
-      expect(messages[0].content).toContain('French');
-      expect(messages[0].content).toContain('CTF flag');
+      expect(promptAt(2)).toContain('# corpus');
+      expect(promptAt(2)).toContain('French');
+      expect(promptAt(2)).toContain('CTF flag');
     });
 
     it('asks the model not to think', async () => {
@@ -317,12 +342,14 @@ describe('AskService', () => {
     function stall(): { release: () => void } {
       let release!: () => void;
       const held = new Promise<Response>((resolve) => {
-        release = () => resolve(corpus as unknown as Response);
+        release = () => resolve(completion(delta('hi'), 'data: [DONE]\n\n'));
       });
+      // The model, not the corpus: the corpus is off the request path now, so
+      // holding it open would no longer keep anything in flight.
       fetchMock.mockImplementation((url: string | URL) =>
         String(url).includes('llms.txt')
-          ? held
-          : Promise.resolve(completion(delta('hi'), 'data: [DONE]\n\n')),
+          ? Promise.resolve(corpus as unknown as Response)
+          : held,
       );
       return { release };
     }
@@ -366,9 +393,61 @@ describe('AskService', () => {
   });
 
   describe('corpus', () => {
-    it('fetches llms.txt once and reuses it', async () => {
-      const instance = service();
+    it('does not make the answer wait on llms.txt', async () => {
+      // The production bug: awaiting this fetch put a loopback HTTP call to the
+      // frontend host on the request path, and when it hung the endpoint hung
+      // with it — the model was never contacted and nothing ever came back.
+      jest.useFakeTimers();
+      let dialled = false;
+      fetchMock.mockImplementation((url: string | URL, init?: RequestInit) =>
+        String(url).includes('llms.txt')
+          ? new Promise<Response>((_, reject) => {
+              dialled = true;
+              // A real fetch rejects when its signal fires; without that the
+              // refresh would never settle and leak its abort timer.
+              init?.signal?.addEventListener('abort', () =>
+                reject(new Error('aborted')),
+              );
+            })
+          : Promise.resolve(completion(delta('Yes.'), 'data: [DONE]\n\n')),
+      );
+      const { deltas, onDelta } = collect();
+
+      await expect(service().answer(dto, onDelta)).resolves.toBeUndefined();
+
+      expect(dialled).toBe(true);
+      expect(deltas.join('')).toBe('Yes.');
+
+      // Fire the 5s corpus timeout so the background refresh settles.
+      jest.runOnlyPendingTimers();
+      await settle();
+      jest.useRealTimers();
+    });
+
+    it('answers the first question from the baked-in fallback', async () => {
+      // The refresh has not landed yet, so this is the corpus every cold start
+      // uses. It has to be good enough to answer from.
       respond(() => completion('data: [DONE]\n\n'));
+      const { onDelta } = collect();
+
+      await service().answer(dto, onDelta);
+
+      expect(promptAt(1)).toContain('jhemery.xyz');
+    });
+
+    it('uses the real corpus once the background refresh lands', async () => {
+      respond(() => completion('data: [DONE]\n\n'));
+      const instance = await warmed();
+      const { onDelta } = collect();
+
+      await instance.answer(dto, onDelta);
+
+      expect(promptAt(2)).toContain('# corpus');
+    });
+
+    it('fetches llms.txt once, not once per question', async () => {
+      respond(() => completion('data: [DONE]\n\n'));
+      const instance = await warmed();
       const { onDelta } = collect();
 
       await instance.answer(dto, onDelta);
@@ -380,22 +459,24 @@ describe('AskService', () => {
       expect(corpusCalls).toHaveLength(1);
     });
 
-    it('falls back to a baked-in summary when llms.txt is unreachable', async () => {
-      // A frontend outage must not take `ask` down with it.
+    it('backs off instead of re-dialling a broken host every question', async () => {
+      // A host that hangs rather than refusing would otherwise get a fresh
+      // connection per visitor, forever.
       fetchMock.mockImplementation((url: string | URL) =>
         String(url).includes('llms.txt')
           ? Promise.reject(new Error('ENOTFOUND'))
           : Promise.resolve(completion('data: [DONE]\n\n')),
       );
+      const instance = await warmed();
       const { onDelta } = collect();
 
-      await service().answer(dto, onDelta);
+      await instance.answer(dto, onDelta);
+      await instance.answer(dto, onDelta);
 
-      const [, init] = fetchMock.mock.calls[1] as [string, RequestInit];
-      const { messages } = JSON.parse(init.body as string) as {
-        messages: Array<{ content: string }>;
-      };
-      expect(messages[0].content).toContain('jhemery.xyz');
+      const corpusCalls = fetchMock.mock.calls.filter(([url]) =>
+        String(url).includes('llms.txt'),
+      );
+      expect(corpusCalls).toHaveLength(1);
     });
   });
 

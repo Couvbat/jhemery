@@ -69,6 +69,19 @@ obligation.
 
 The model is given the whole corpus in its system prompt, because the whole corpus is a few kilobytes.
 
+> **Correction, from production.** "Fetched at first request" was wrong, and it broke the feature
+> outright. Awaiting that fetch on the request path made every answer depend on the backend reaching
+> the *frontend* over HTTP — which on this host is a loopback, the box resolving its own domain back
+> to itself through Apache. It wedged. Not slowly: requests hung past 120s with no status line, and
+> the model was never contacted at all (Ollama's `keep_alive` timer never moved across a live
+> request, which is how it was caught). The 5s `AbortController` on that fetch did not rescue it.
+>
+> The corpus now refreshes in the background and never blocks an answer: a question is served from
+> the cached copy, a stale copy, or the baked-in fallback, whichever is in hand. The first question
+> after a restart is answered from the fallback. That is the price of never letting a second deploy
+> unit hang this one, and it is worth paying — the fallback already existed for the case where the
+> fetch *fails*, so extending it to "has not landed yet" costs one degraded answer per restart.
+
 The source is `https://jhemery.xyz/llms.txt`, fetched at first request and cached for an hour —
 exactly the pattern `github.service.ts` and `steam.service.ts` already use for their upstreams. That
 file already exists and is already *"a machine-readable summary of the site for LLMs and agentic
