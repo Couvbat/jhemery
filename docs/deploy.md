@@ -183,6 +183,31 @@ Push a commit touching `frontend/` or `backend/` to `master`, or go to **Actions
 | Backend deploy fails at `npm ci` | `BACKEND_APP_ENTRY` doesn't point at the venv's `activate` script, or `package-lock.json` never made it to the app root |
 | App boots but 404s everything | `.htaccess` was deleted from the app root. Recreate it from [backend/.htaccess](../backend/.htaccess), fixing the paths for your account. |
 | Deploy is green but the API still serves old code | Passenger didn't pick up `tmp/restart.txt` — hit **Restart** in cPanel and see [Known gaps](#known-gaps) |
+| Browsers get a CORS error on `POST`, `curl` gets 200 | o2switch **Tiger Protect** is challenging the POST — see below |
+
+### Tiger Protect blocks every cross-origin POST
+
+Symptom: `ask`, the contact form and the guestbook fail in every browser, on every device, in a private window, with
+
+```
+CORS header ‘Access-Control-Allow-Origin’ missing. Status code: 307.
+```
+
+while `curl` gets a clean 200 and `OPTIONS` returns a textbook 204. The response that Firefox's Network tab shows for the POST:
+
+```
+307
+location:                https://api.jhemery.xyz/ask     <- the same URL
+set-cookie:              co-zhi=…; domain=api.jhemery.xyz; SameSite=Lax; HttpOnly
+tiger-protect-security:  https://faq.o2switch.fr/hebergement-mutualise/tutoriels-cpanel/tiger-protect
+content-type:            text/html; charset=UTF-8
+```
+
+o2switch's anti-bot layer is answering the POST with a cookie and a redirect back to the same URL — "take this and retry", which a normal navigation follows invisibly. A **cross-origin** request cannot: the challenge carries no `Access-Control-Allow-Origin`, so the browser refuses to follow it and reports the missing header. GETs and preflights are not challenged, which is why live data keeps loading while every POST dies, and `curl` is not challenged either, which is why the endpoint looks perfect from a shell.
+
+**Fix:** cPanel → **Tiger Protect** → disable it for `api.jhemery.xyz`, or whitelist the subdomain.
+
+**Nothing in this repository can cause or fix it.** The requests never reach Nest. Two things make that expensive to learn: the browser names CORS, which is the one layer that is definitely fine, and every other signal — clean preflight, clean `curl`, correct `VITE_API_URL`, correct `enableCors` — agrees the server is healthy, because it is. **When browsers and `curl` disagree about the same URL, the difference is never in the application; look for a header naming a vendor.**
 
 ## FTP fallback
 
