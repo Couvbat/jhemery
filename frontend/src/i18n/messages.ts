@@ -145,6 +145,10 @@ export const messages = {
     source: { en: 'source', fr: 'source' },
     nominal: { en: 'all systems nominal', fr: 'tous les systèmes sont nominaux' },
     status: { en: 'Site status', fr: 'État du site' },
+    // `{n}` is substituted by the caller — the count is aggregate, and there is
+    // never anything to say about who the others are.
+    online: { en: '{n} here now', fr: '{n} personnes ici' },
+    onlineOne: { en: 'just you here', fr: 'vous seul ici' },
   },
   boot: {
     skip: { en: 'press any key to skip', fr: 'appuyez sur une touche pour passer' },

@@ -1,7 +1,9 @@
 <script setup lang="ts">
+import { onMounted } from 'vue'
 import { profile } from '@/content'
 import { useLocale } from '@/i18n'
 import { useStatus } from '@/composables/useStatus'
+import { startPresence, usePresence } from '@/composables/usePresence'
 
 const { t, m } = useLocale()
 
@@ -19,6 +21,12 @@ const builtLabel = new Date(builtAt).toLocaleDateString(undefined, {
 // Days since the first commit, and how long ago this build went out — the same
 // numbers `neofetch` and `top` report inside the terminal, kept visible.
 const { uptime, lastDeploy } = useStatus(builtAt)
+
+// The status line is the only surface that shows the count, so it is also the
+// one that opens the stream. Stays null — and the segment stays out of the DOM
+// — if the backend isn't there.
+const { online } = usePresence()
+onMounted(startPresence)
 </script>
 
 <template>
@@ -61,6 +69,10 @@ const { uptime, lastDeploy } = useStatus(builtAt)
       <span class="text-muted-foreground/40" aria-hidden="true">·</span>
       <span>deploy {{ lastDeploy }}</span>
       <span class="text-muted-foreground/40" aria-hidden="true">·</span>
+      <template v-if="online !== null">
+        <span>{{ t(online === 1 ? m.footer.onlineOne : m.footer.online).replace('{n}', String(online)) }}</span>
+        <span class="text-muted-foreground/40" aria-hidden="true">·</span>
+      </template>
       <span class="inline-flex items-center gap-1.5 text-primary/80">
         <span
           class="w-1.5 h-1.5 rounded-full bg-primary motion-safe:animate-pulse"
