@@ -1,12 +1,20 @@
 import { computed, ref } from 'vue'
-import { api, type GithubCommit, type GithubContributions, type GithubPinnedRepo } from '@/lib/api'
+import {
+  api,
+  type GithubCommit,
+  type GithubContributions,
+  type GithubPinnedRepo,
+  type WorkflowRun,
+} from '@/lib/api'
 
 const commits = ref<GithubCommit[] | null>(null)
 const contributions = ref<GithubContributions | null>(null)
 const pinnedRepos = ref<GithubPinnedRepo[] | null>(null)
+const workflowRuns = ref<WorkflowRun[] | null>(null)
 let commitsInFlight: Promise<void> | null = null
 let contributionsInFlight: Promise<void> | null = null
 let pinnedReposInFlight: Promise<void> | null = null
+let workflowInFlight: Promise<void> | null = null
 
 export function fetchCommits(): Promise<void> {
   if (commits.value) return Promise.resolve()
@@ -65,6 +73,25 @@ export function fetchPinnedRepos(): Promise<void> {
   return pinnedReposInFlight
 }
 
+export function fetchWorkflowStatus(): Promise<void> {
+  if (workflowRuns.value) return Promise.resolve()
+  if (workflowInFlight) return workflowInFlight
+
+  workflowInFlight = api
+    .githubWorkflowStatus()
+    .then((data) => {
+      if (data.configured && data.runs?.length) workflowRuns.value = data.runs
+    })
+    .catch(() => {
+      // Unconfigured or rate-limited — the card stays hidden.
+    })
+    .finally(() => {
+      workflowInFlight = null
+    })
+
+  return workflowInFlight
+}
+
 export function relativeTime(iso: string, justNow = 'just now'): string {
   const minutes = Math.floor((Date.now() - new Date(iso).getTime()) / 60000)
   if (minutes < 1) return justNow
@@ -83,13 +110,16 @@ export function useGithub(autoFetch = true) {
     void fetchCommits()
     void fetchContributions()
     void fetchPinnedRepos()
+    void fetchWorkflowStatus()
   }
   return {
     commits: computed(() => commits.value),
     contributions: computed(() => contributions.value),
     pinnedRepos: computed(() => pinnedRepos.value),
+    workflowRuns: computed(() => workflowRuns.value),
     fetchCommits,
     fetchContributions,
     fetchPinnedRepos,
+    fetchWorkflowStatus,
   }
 }

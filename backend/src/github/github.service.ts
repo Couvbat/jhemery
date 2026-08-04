@@ -6,6 +6,8 @@ import {
   GithubCommit,
   GithubContributions,
   GithubPinnedRepos,
+  GithubWorkflowStatus,
+  WorkflowRun,
 } from './github.types';
 
 const CACHE_TTL_MS = 5 * 60 * 1000;
@@ -13,8 +15,12 @@ const CACHE_TTL_MS = 5 * 60 * 1000;
 const CONTRIBUTIONS_TTL_MS = 60 * 60 * 1000;
 // Pinned repos change even less often than contributions.
 const PINNED_REPOS_TTL_MS = 60 * 60 * 1000;
+// A build in flight is the one case where a stale answer is the wrong answer,
+// so this cache is the shortest of the lot.
+const WORKFLOW_TTL_MS = 60 * 1000;
 const MAX_COMMITS = 6;
 const MAX_PINNED_REPOS = 6;
+const MAX_WORKFLOW_RUNS = 4;
 
 const CONTRIBUTIONS_QUERY = `
   query($login: String!) {
@@ -88,6 +94,20 @@ interface CommitSearchResponse {
   }>;
 }
 
+interface WorkflowRunsResponse {
+  workflow_runs: Array<{
+    name: string | null;
+    status: string;
+    conclusion: string | null;
+    head_branch: string | null;
+    head_sha: string;
+    html_url: string;
+    run_started_at: string | null;
+    created_at: string;
+    updated_at: string;
+  }>;
+}
+
 interface PinnedReposResponse {
   data?: {
     user?: {
@@ -116,6 +136,10 @@ export class GithubService {
   } | null = null;
   private pinnedReposCache: {
     data: GithubPinnedRepos;
+    expiresAt: number;
+  } | null = null;
+  private workflowCache: {
+    data: GithubWorkflowStatus;
     expiresAt: number;
   } | null = null;
 
@@ -207,6 +231,71 @@ export class GithubService {
       );
       return { configured: false };
     }
+  }
+
+  /**
+   * The one live-data route that costs nothing new: Actions runs are public REST,
+   * so this reuses the token the other calls already optionally send, purely to
+   * raise the rate limit. Unset `GITHUB_REPO` and the card just doesn't render.
+   */
+  async getWorkflowStatus(): Promise<GithubWorkflowStatus> {
+    const repo = this.config.get<string>('GITHUB_REPO');
+    if (!repo || !repo.includes('/')) {
+      return { configured: false };
+    }
+
+    if (this.workflowCache && this.workflowCache.expiresAt > Date.now()) {
+      return this.workflowCache.data;
+    }
+
+    try {
+      const runs = await this.fetchWorkflowRuns(repo);
+      const data: GithubWorkflowStatus = { configured: true, repo, runs };
+      this.workflowCache = { data, expiresAt: Date.now() + WORKFLOW_TTL_MS };
+      return data;
+    } catch (err) {
+      this.logger.warn(
+        `Failed to fetch GitHub workflow runs: ${err instanceof Error ? err.message : String(err)}`,
+      );
+      return { configured: false };
+    }
+  }
+
+  private async fetchWorkflowRuns(repo: string): Promise<WorkflowRun[]> {
+    const token = this.config.get<string>('GITHUB_TOKEN');
+    const headers: Record<string, string> = {
+      Accept: 'application/vnd.github+json',
+      'User-Agent': 'jhemery-portfolio',
+    };
+    if (token) headers.Authorization = `Bearer ${token}`;
+
+    const url = new URL(
+      `https://api.github.com/repos/${repo}/actions/runs`,
+    );
+    url.searchParams.set('per_page', String(MAX_WORKFLOW_RUNS));
+
+    const res = await fetch(url, { headers });
+    if (!res.ok) throw new Error(`GitHub workflow runs failed: ${res.status}`);
+    const json = (await res.json()) as WorkflowRunsResponse;
+
+    return json.workflow_runs.slice(0, MAX_WORKFLOW_RUNS).map((run) => {
+      const startedAt = run.run_started_at ?? run.created_at;
+      return {
+        name: run.name ?? 'workflow',
+        status: run.status,
+        conclusion: run.conclusion,
+        branch: run.head_branch ?? 'unknown',
+        sha: run.head_sha.slice(0, 7),
+        url: run.html_url,
+        startedAt,
+        // `updated_at` keeps moving while a run is in flight, so a duration is
+        // only meaningful once it has actually finished.
+        durationMs:
+          run.status === 'completed'
+            ? new Date(run.updated_at).getTime() - new Date(startedAt).getTime()
+            : null,
+      };
+    });
   }
 
   private async fetchContributions(

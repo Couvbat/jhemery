@@ -4,6 +4,7 @@ import {
   GithubActivity,
   GithubContributions,
   GithubPinnedRepos,
+  GithubWorkflowStatus,
 } from './github.types';
 
 @Controller('github')
@@ -23,5 +24,10 @@ export class GithubController {
   @Get('pinned-repos')
   async getPinnedRepos(): Promise<GithubPinnedRepos> {
     return this.githubService.getPinnedRepos();
+  }
+
+  @Get('workflow-status')
+  async getWorkflowStatus(): Promise<GithubWorkflowStatus> {
+    return this.githubService.getWorkflowStatus();
   }
 }
