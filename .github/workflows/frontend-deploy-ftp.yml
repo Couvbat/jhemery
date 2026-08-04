@@ -9,6 +9,12 @@ on:
 permissions:
   contents: read
 
+# Shared with the SSH deploys, so a fallback run cannot land on top of
+# a normal one in the same directories.
+concurrency:
+  group: o2switch-deploy
+  cancel-in-progress: false
+
 jobs:
   build:
     name: Build

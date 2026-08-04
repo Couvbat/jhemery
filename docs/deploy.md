@@ -3,7 +3,7 @@
 This repo auto-deploys to o2switch on every push to `master`:
 
 - `frontend/**` changes → build the Vue app and rsync `dist/` to the frontend document root
-- `backend/**` changes → build the Nest app, rsync `dist/` to the backend app root, then `npm ci --omit=dev` and restart the Node.js app on the server
+- `backend/**` changes → build the Nest app, rsync it into `dist/` under the backend app root, then `npm ci --omit=dev` and restart the Node.js app on the server
 
 Transfer happens over **SSH**. There is a second, FTPS-based path kept for when the cPanel API is unavailable — see [FTP fallback](#ftp-fallback).
 
@@ -13,9 +13,32 @@ Workflow files: [frontend-build.yml](../.github/workflows/frontend-build.yml), [
 
 o2switch requires the connecting IP to be whitelisted before SSH will accept a connection, so each deploy run adds the GitHub Actions runner's IP to the whitelist via the cPanel API (`SshWhitelist/add`), rsyncs over SSH, then removes only that one entry afterwards (`SshWhitelist/remove`, `if: always()` so it runs even on failure). It only ever touches the entry it just added — it never calls `remove_all`, so any IPs you've whitelisted manually (e.g. your own machine) are left alone. Note: o2switch caps the whitelist at 5 entries total, per their [SSH whitelist FAQ](https://faq.o2switch.fr/cpanel/outils/exception-parefeu/).
 
-The backend deploy then runs `npm ci --omit=dev` inside the app's Node virtualenv and touches `tmp/restart.txt`, the standard Passenger reload convention. Dependencies therefore install themselves — a lockfile change needs nothing from you.
+Two runs at once would put two entries in that 5-slot whitelist and race the firewall with them, which is exactly how the 4 August run failed — the frontend connected 13 seconds after whitelisting and worked, the backend connected 4 seconds after and had its TCP connection reset. So all four deploy workflows share a `concurrency: o2switch-deploy` group and queue behind each other, and each one probes SSH in a retry loop before rsyncing rather than assuming the packet filter has caught up with the API.
 
-Never overwritten on the backend: `.env` and `uploads/` (guestbook data), both excluded from the rsync.
+### Backend directory layout
+
+The build goes into **`dist/` under the app root**, not into the app root itself:
+
+```
+/home/<user>/api.jhemery.xyz/     <- BACKEND_REMOTE_PATH
+  dist/                           <- rsync --delete target, build output only
+    main.js, package.json, package-lock.json, …
+  package.json                    <- lifted out of dist/ each deploy
+  package-lock.json               <- same; npm ci refuses to run without it
+  node_modules -> …/nodevenv/…    <- symlink into the cPanel virtualenv
+  .htaccess                       <- CloudLinux Passenger config, DO NOT REMOVE
+  .env                            <- created by hand, never deployed
+  public/  tmp/  uploads/
+```
+
+Two constraints force this shape, and they pull in opposite directions:
+
+- **Passenger runs `dist/main.js`.** That's what cPanel wrote into `.htaccess` as `PassengerStartupFile`, so the compiled entry point has to be at that path.
+- **`npm ci` has to run at the app root.** That's where cPanel puts the `node_modules` symlink; Node resolves it from `dist/main.js` by walking up. Installing inside `dist/` would create a second, real `node_modules` and orphan the virtualenv.
+
+Hence the deploy rsyncs into `dist/`, then copies `package.json` and `package-lock.json` up one level before installing. The build workflow puts both into `dist/` for exactly this purpose.
+
+The payoff is that `--delete` is confined to a directory containing nothing but build output. `.htaccess`, the `node_modules` symlink, `public/`, `tmp/`, `.env` and `uploads/` all sit above it and cannot be caught by it — no exclude list to keep in sync, and no way for a new server-side file to be deleted because someone forgot to add it.
 
 ## Part A — cPanel setup
 
@@ -64,7 +87,9 @@ cPanel → **Logiciel** → **Setup Node.js App** → **Create Application**:
 - Application mode: Production
 - Application root: e.g. `api.jhemery.xyz` → `BACKEND_REMOTE_PATH` = `/home/<user>/api.jhemery.xyz`
 - Application URL: `api.jhemery.xyz`
-- Application startup file: `main.js`
+- Application startup file: `dist/main.js`
+
+`BACKEND_REMOTE_PATH` is the **app root**, with no `/dist` on the end — the workflow appends that itself. Pointing it at `.../api.jhemery.xyz/dist` would deploy into `dist/dist/` and run `npm ci` in the wrong directory.
 
 After creation, cPanel shows a command like:
 
@@ -96,7 +121,7 @@ Repo → **Settings** → **Secrets and variables** → **Actions** → **New re
 | `CPANEL_SERVER` | hostname from Part A.1 |
 | `SSH_KEY` | private key from Part A.3 |
 | `FRONTEND_REMOTE_PATH` | document root from Part A.4 |
-| `BACKEND_REMOTE_PATH` | application root from Part A.5 |
+| `BACKEND_REMOTE_PATH` | application root from Part A.5, **without** a trailing `/dist` |
 | `BACKEND_APP_ENTRY` | `source .../bin/activate` path from Part A.5 |
 
 All seven are required. Check them with `gh secret list` before expecting a deploy to pass — a missing secret expands to an empty string rather than failing the run outright.
@@ -114,8 +139,11 @@ Push a commit touching `frontend/` or `backend/` to `master`, or go to **Actions
 | "Making sure the IP is whitelisted" exits 1, and the step above dumped cPanel login-page HTML | `CPANEL_API_TOKEN` is empty or invalid. An unauthenticated cPanel API call returns the login page, not a JSON error — easy to mistake for the API being disabled. Check the masked header in the log: `Authorization: cpanel ***:***` is right, `cpanel ***:` means the token is missing. |
 | Same step exits 1 with a JSON error about the whitelist | The 5-entry whitelist cap is full. Prune it in cPanel → **Accès SSH**. |
 | `Permission denied (publickey)` on rsync | `SSH_KEY` isn't the private half of the authorized key, or the key was imported but never **Authorized** in cPanel |
+| `kex_exchange_identification: Connection reset by peer` | The firewall hadn't applied the whitelist entry yet. The "Waiting for the firewall" step retries for two minutes; if it exhausts them, the entry was accepted by the API but never loaded. |
 | rsync succeeds but lands in the wrong place | `FRONTEND_REMOTE_PATH` / `BACKEND_REMOTE_PATH` typo — they're absolute paths |
-| Backend deploy fails at `npm ci` | `BACKEND_APP_ENTRY` doesn't point at the venv's `activate` script |
+| Files end up in `api.jhemery.xyz/dist/dist/` | `BACKEND_REMOTE_PATH` has `/dist` on the end; it should be the app root |
+| Backend deploy fails at `npm ci` | `BACKEND_APP_ENTRY` doesn't point at the venv's `activate` script, or `package-lock.json` never made it to the app root |
+| App boots but 404s everything | `.htaccess` was deleted from the app root. Recreate it from [backend/.htaccess](../backend/.htaccess), fixing the paths for your account. |
 | Deploy is green but the API still serves old code | Passenger didn't pick up `tmp/restart.txt` — hit **Restart** in cPanel and see [Known gaps](#known-gaps) |
 
 ## FTP fallback
@@ -153,7 +181,7 @@ If `mod_headers` or `mod_mime` is unavailable the `<IfModule>` guards make those
 
 ## Known gaps
 
-- **No deploy has ever completed successfully.** As of 4 August 2026 every run since the workflows landed has failed on missing secrets, so nothing below the whitelist step has been exercised against the real server. Expect the first green run to need a couple of iterations.
+- **The backend has never deployed successfully.** The frontend first landed on 4 August 2026; every backend run before that failed on missing secrets, then on the firewall race. Nothing past the rsync — `npm ci`, the manifest copy, the Passenger restart — has run against the real server.
 - **Backend restart mechanism is unverified.** It assumes the o2switch Node.js App (Passenger) picks up `tmp/restart.txt`. If the app is managed a different way (PM2, systemd, etc.), update the "Install production dependencies & restart app" step in [backend-deploy.yml](../.github/workflows/backend-deploy.yml).
 - **The FTP fallback is unverified.** Written against o2switch's documented FTPS setup, never run against the real account.
 - **Steam live data is unverified.** `GET /steam/activity` has only ever been exercised with no credentials, where it correctly returns `{"configured": false}` and the site falls back to the static game log. The `configured: true` path needs a real `STEAM_API_KEY` / `STEAM_ID` in `backend/.env` and a manual check once set.

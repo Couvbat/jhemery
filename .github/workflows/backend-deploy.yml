@@ -17,6 +17,13 @@ on:
 permissions:
   contents: read
 
+# Shared with the frontend deploy. Two runs at once means two entries in a
+# 5-slot SSH whitelist and two IPs racing the firewall, which is how the
+# 4 August run failed.
+concurrency:
+  group: o2switch-deploy
+  cancel-in-progress: false
+
 jobs:
   build:
     name: Build
@@ -54,20 +61,47 @@ jobs:
           echo "${{ secrets.SSH_KEY }}" > ~/.ssh/id_rsa
           chmod 0400 ~/.ssh/id_rsa
 
+      # The cPanel API confirms the whitelist entry before the packet filter has
+      # actually picked it up, so connecting immediately gets the TCP connection
+      # reset. Probe until SSH answers rather than letting rsync eat the failure.
+      - name: Waiting for the firewall to accept the runner IP
+        run: |
+          for attempt in $(seq 1 12); do
+            if ssh -o StrictHostKeyChecking=no -o ConnectTimeout=10 -i ~/.ssh/id_rsa \
+              "${{ secrets.CPANEL_USERNAME }}@${{ secrets.CPANEL_SERVER }}" true 2>&1; then
+              echo "SSH accepted on attempt $attempt"
+              exit 0
+            fi
+            echo "Not accepted yet (attempt $attempt), retrying in 10s"
+            sleep 10
+          done
+          echo "::error title=SSH unreachable::The IP was whitelisted but SSH never accepted a connection."
+          exit 1
+
+      # Deploys into `dist/` under the app root, which is where the Passenger
+      # config cPanel generated points (`PassengerStartupFile dist/main.js`).
+      # It also keeps `--delete` scoped to build output: `.htaccess`, the
+      # `node_modules` symlink into the venv, `public/`, `tmp/`, `.env` and
+      # `uploads/` all live at the app root and cannot be caught by it.
       - name: Sending data with RSYNC
         run: |
           rsync --timeout=60 -e "ssh -o StrictHostKeyChecking=no -i ~/.ssh/id_rsa" \
-          --exclude=".env" --exclude="uploads" -av --delete build/ \
-          "${{ secrets.CPANEL_USERNAME }}@${{ secrets.CPANEL_SERVER }}:${{ secrets.BACKEND_REMOTE_PATH }}"
+          -av --delete build/ \
+          "${{ secrets.CPANEL_USERNAME }}@${{ secrets.CPANEL_SERVER }}:${{ secrets.BACKEND_REMOTE_PATH }}/dist/"
 
       # Requires the app to be set up via cPanel "Setup Node.js App" (Passenger).
       # BACKEND_APP_ENTRY must point to the venv's activate script shown on that
       # cPanel screen, e.g. /home/<user>/nodevenv/api.jhemery.xyz/24/bin/activate
+      #
+      # `npm ci` has to run at the app root: that is where cPanel puts the
+      # `node_modules` symlink into the virtualenv, and Node resolves it from
+      # dist/main.js by walking up. The build copies package.json and
+      # package-lock.json into dist/, so they are lifted up before installing.
       - name: Install production dependencies & restart app
         run: |
           ssh -o StrictHostKeyChecking=no -i ~/.ssh/id_rsa \
           "${{ secrets.CPANEL_USERNAME }}@${{ secrets.CPANEL_SERVER }}" \
-          "source ${{ secrets.BACKEND_APP_ENTRY }} && cd ${{ secrets.BACKEND_REMOTE_PATH }} && npm ci --omit=dev && mkdir -p tmp && touch tmp/restart.txt"
+          "source ${{ secrets.BACKEND_APP_ENTRY }} && cd ${{ secrets.BACKEND_REMOTE_PATH }} && cp dist/package.json dist/package-lock.json . && npm ci --omit=dev && mkdir -p tmp && touch tmp/restart.txt"
 
       - name: Un-whitelisting the runner IP
         if: always()
