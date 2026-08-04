@@ -35,6 +35,9 @@ const pendingPrompt = shallowRef<{
   reject: (reason?: unknown) => void
 } | null>(null)
 
+/** Set while a running command holds the keyboard via `ctx.capture()`. */
+const keyCapture = shallowRef<((key: string) => void) | null>(null)
+
 let abortController: AbortController | null = null
 /** Bumped on every append so the view knows to scroll. */
 const revision = ref(0)
@@ -95,6 +98,19 @@ const effects: TerminalEffects = {
   },
 }
 
+/** Hands one keydown to a running command that has taken the keyboard. Returns
+ *  `false` when there is no capture, or the combo is one the command must not
+ *  swallow — `Ctrl+C` and `Ctrl+L` keep working throughout a game, which is how
+ *  a visitor quits one. Mirrors the modifier guard the vim pane uses. */
+export function handleCaptureKeydown(event: KeyboardEvent): boolean {
+  const handler = keyCapture.value
+  if (!handler) return false
+  if (event.ctrlKey || event.altKey || event.metaKey) return false
+
+  handler(event.key)
+  return true
+}
+
 /** Delegates one keydown to the vim editor's pure state machine. Returns `false`
  *  if there's no open vim buffer, or the key wasn't handled (currently only `:`),
  *  telling the caller to let the keystroke fall through normally. */
@@ -134,6 +150,14 @@ function buildContext(args: string[], raw: string, signal: AbortSignal): Command
           reject: rejectPrompt,
         }
       }),
+    capture: (handler: (key: string) => void) => {
+      // Only one capture at a time — commands don't nest, so a second call
+      // replaces the first rather than stacking.
+      keyCapture.value = handler
+      return () => {
+        if (keyCapture.value === handler) keyCapture.value = null
+      }
+    },
     run: (input: string) => run(input),
     effects,
     signal,
@@ -189,6 +213,9 @@ async function execute(name: string, args: string[], raw: string): Promise<void>
   } finally {
     busy.value = false
     abortController = null
+    // Unconditional, for the same reason `busy` is: a game that throws must not
+    // leave the keyboard routed at a handler nobody owns any more.
+    keyCapture.value = null
   }
 }
 
@@ -281,8 +308,10 @@ export function useTerminal() {
     maximised,
     busy: computed(() => busy.value),
     trapped: computed(() => trapped.value),
+    capturing: computed(() => keyCapture.value !== null),
     vimBuffer: computed(() => vimBuffer.value),
     handleVimKeydown,
+    handleCaptureKeydown,
     buffer: computed(() => buffer.value),
     revision: computed(() => revision.value),
     pendingPrompt: computed(() => pendingPrompt.value),

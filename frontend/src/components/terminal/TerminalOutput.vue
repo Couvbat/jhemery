@@ -35,6 +35,20 @@ const toneClass: Record<string, string> = {
     >
   </p>
 
+  <!-- Per-run tones, for surfaces that need a colour per character rather than
+       per line — the game boards. Still plain text, just sliced. -->
+  <p
+    v-else-if="line.segments"
+    :class="[
+      toneClass[line.tone ?? 'default'],
+      line.pre ? 'whitespace-pre' : 'whitespace-pre-wrap break-words',
+    ]"
+  ><span
+      v-for="(segment, i) in line.segments"
+      :key="i"
+      :class="segment.tone ? toneClass[segment.tone] : undefined"
+    >{{ segment.text }}</span></p>
+
   <!-- Plain output. `pre` keeps ASCII art and padded columns aligned. -->
   <p
     v-else

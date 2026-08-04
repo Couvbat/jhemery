@@ -1,4 +1,4 @@
-import type { OutputLine, Tone } from './types'
+import type { OutputLine, OutputSegment, Tone } from './types'
 
 export function line(text: string, tone: Tone = 'default'): OutputLine {
   return { text, tone }
@@ -12,6 +12,12 @@ export const blank: OutputLine = { text: '' }
 
 export function pre(text: string, tone: Tone = 'default'): OutputLine {
   return { text, tone, pre: true }
+}
+
+/** One line built from differently-toned runs — a game board row. Always `pre`,
+ *  since anything needing per-character colour is a grid. */
+export function segmented(parts: OutputSegment[]): OutputLine {
+  return { text: parts.map((part) => part.text).join(''), segments: parts, pre: true }
 }
 
 export function art(block: string, tone: Tone = 'primary'): OutputLine[] {

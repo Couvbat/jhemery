@@ -10,6 +10,12 @@ export type Tone =
   | 'success'
   | 'warning'
 
+/** A run of characters inside a line that carries its own tone. */
+export interface OutputSegment {
+  text: string
+  tone?: Tone
+}
+
 /**
  * Terminal output is a list of plain-text lines, never HTML. Commands can render
  * user-supplied data (guestbook entries) so there is deliberately no escape hatch
@@ -18,6 +24,12 @@ export type Tone =
 export interface OutputLine {
   text: string
   tone?: Tone
+  /**
+   * Splits the line into differently-toned runs — a game board needs a colour per
+   * cell, not per row. `text` stays the plain concatenation, so anything reading
+   * the buffer as text (tests, copy/paste) is unaffected.
+   */
+  segments?: OutputSegment[]
   /** Renders the line as a link. */
   href?: string
   /** Preserves runs of spaces — used by ASCII art and tables. */
@@ -51,6 +63,15 @@ export interface CommandContext {
   navigate: (sectionId: string) => boolean
   /** Ask the user for a line of input. Rejects if they hit Ctrl+C. */
   prompt: (question: string, options?: { mask?: boolean }) => Promise<string>
+  /**
+   * Routes raw keys to `handler` while the command runs — the primitive the games
+   * need to hold the keyboard for longer than one line. Returns a release
+   * function; the release also happens automatically when the command settles,
+   * so a command that throws cannot wedge the keyboard. Only one capture is
+   * active at a time: a second call replaces the first. Modifier combos never
+   * reach the handler, so `Ctrl+C` and `Ctrl+L` keep working throughout.
+   */
+  capture: (handler: (key: string) => void) => () => void
   /** Runs another command as if typed — used by aliases like `git log`. */
   run: (input: string) => Promise<void>
   effects: TerminalEffects

@@ -144,6 +144,24 @@ export const achievementList: Achievement[] = [
     },
   },
   {
+    id: 'game2048',
+    title: { en: 'Tile Merchant', fr: 'Marchand de tuiles' },
+    hint: {
+      en: 'Some tiles are worth more than others.',
+      fr: 'Certaines tuiles valent plus que d’autres.',
+    },
+    description: { en: 'Reached a 256 tile.', fr: 'Atteint une tuile 256.' },
+  },
+  {
+    id: 'snake',
+    title: { en: 'Nokia Nostalgia', fr: 'Nostalgie Nokia' },
+    hint: {
+      en: 'Something in here is longer than it started.',
+      fr: 'Quelque chose ici est plus long qu’au départ.',
+    },
+    description: { en: 'Grew a snake to length 10.', fr: 'Fait grandir un serpent jusqu’à 10.' },
+  },
+  {
     id: COMPLETIONIST,
     title: { en: '100%', fr: '100%' },
     hint: { en: 'For those who leave no stone unturned.', fr: 'Pour ceux qui ne laissent rien au hasard.' },

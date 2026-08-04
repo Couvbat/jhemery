@@ -108,7 +108,8 @@ export const contentCommands: Command[] = [
   },
   {
     name: 'gaming',
-    aliases: ['games'],
+    // `games` used to land here; it now lists the playable ones, which is what a
+    // terminal that has games in it should answer. The listing points back here.
     description: { en: 'What I play', fr: 'Ce que je joue' },
     group: 'content',
     palette: true,

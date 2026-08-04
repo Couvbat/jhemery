@@ -3,6 +3,7 @@ import { prefersReducedMotion, useCrt } from '@/composables/useCrt'
 import { useMusicPlayer } from '@/composables/useMusicPlayer'
 import { achievementList, announce, isUnlocked, unlockedCount } from '../achievements'
 import { blank, line } from '../format'
+import { sleep } from '../timing'
 import type { Command, OutputLine, Tone } from '../types'
 import { uptime } from './content'
 
@@ -65,20 +66,6 @@ function table(procs: Proc[]): OutputLine[] {
       pre: true,
     })),
   ]
-}
-
-function sleep(ms: number, signal?: AbortSignal): Promise<void> {
-  return new Promise((resolve, reject) => {
-    const id = window.setTimeout(resolve, ms)
-    signal?.addEventListener(
-      'abort',
-      () => {
-        window.clearTimeout(id)
-        reject(Object.assign(new Error('aborted'), { name: 'AbortError' }))
-      },
-      { once: true },
-    )
-  })
 }
 
 export const systemCommands: Command[] = [
