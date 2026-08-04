@@ -121,6 +121,42 @@ export interface GithubWorkflowStatus {
   runs?: WorkflowRun[]
 }
 
+export type WeatherCondition =
+  | 'clear'
+  | 'cloudy'
+  | 'fog'
+  | 'drizzle'
+  | 'rain'
+  | 'snow'
+  | 'thunder'
+
+export interface WeatherNow {
+  temperature: number
+  apparent: number
+  humidity: number
+  windSpeed: number
+  windDirection: number
+  precipitation: number
+  isDay: boolean
+  code: number
+  condition: WeatherCondition
+}
+
+export interface WeatherForecastDay {
+  date: string
+  min: number
+  max: number
+  code: number
+  condition: WeatherCondition
+}
+
+export interface WeatherReport {
+  configured: boolean
+  location?: string
+  now?: WeatherNow
+  forecast?: WeatherForecastDay[]
+}
+
 export interface GuestbookEntry {
   id: string
   name: string
@@ -232,6 +268,7 @@ export const api = {
   githubContributions: () => request<GithubContributions>('/github/contributions'),
   githubPinnedRepos: () => request<GithubPinnedRepos>('/github/pinned-repos'),
   githubWorkflowStatus: () => request<GithubWorkflowStatus>('/github/workflow-status'),
+  weather: () => request<WeatherReport>('/weather'),
   guestbook: () => request<GuestbookList>('/guestbook'),
   sign: (name: string, message: string) =>
     request<GuestbookEntry>('/guestbook', {
