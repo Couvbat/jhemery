@@ -162,11 +162,17 @@ Grouped as they appear in `help`.
 ### navigate
 | Command | Behaviour |
 |---|---|
-| `ls [-a]` | Lists sections as directories. `-a` also reveals `.secret` (§5) |
+| `ls [-a]` | Lists sections as directories. `-a` also reveals `.secret` and `.env` (§5) |
 | `cd <section>` | Scrolls to the section and closes the overlay |
 | `pwd` | Current section, derived from scroll position |
-| `cat <file>` | `about.txt`, `skills.txt`, `contact.txt`, `.secret` |
+| `cat <file>` | `about.txt`, `skills.txt`, `contact.txt`, `.secret`, `.env` |
+| `diff <a> <b>` | Line diff of any two files the fake filesystem resolves |
+| `ping <section>` | Four paced fake replies and an rtt summary, then `cd`s there |
 | `open <target>` | `github`, `linkedin`, `soundcloud`, `steam`, `email` — opens in a new tab |
+
+`diff` runs both operands through the same `resolveFileLines()` `cat` uses, then through a pure
+LCS line diff (`terminal/diff.ts`) rendered `-`/`+`/context. No dependency: the files are a few
+dozen lines each, so the O(n·m) table is cheaper than a diffing library.
 
 ### content
 Reads from §1, so it can never contradict the page: `about`, `skills`, `projects [--json]`,
@@ -215,8 +221,8 @@ It shares the registry, so it needs no separate maintenance.
 ## 5. Easter eggs
 
 **Where:** `frontend/src/terminal/commands/eggs.ts`, `commands/system.ts`, `commands/secret.ts`,
-`frontend/src/components/effects/*`, `frontend/src/composables/useKonami.ts`, `useCrt.ts`,
-`useMatrix.ts`
+`commands/env-file.ts`, `frontend/src/components/effects/*`,
+`frontend/src/composables/useKonami.ts`, `useCrt.ts`, `useMatrix.ts`, `useBoot.ts`
 
 | Trigger | Effect |
 |---|---|
@@ -227,6 +233,10 @@ It shares the registry, so it needs no separate maintenance.
 | `crt` | The same overdrive, toggled from the terminal for anyone who doesn't know the Konami code |
 | `vim` (aliases `vi`, `nvim`, `emacs`) | Opens a real modal editor pane — see §5.1 |
 | `ls -a` → `cat .secret` | Hidden file with a message aimed at whoever is curious enough to look |
+| `ls -a` → `cat .env` | A production-looking env file whose every value is a joke. `env` (aliases `printenv`, `export`) prints the same variables from the same module, so the file and the listing cannot drift; `export FOO=bar` answers that the environment is read-only |
+| `reboot` (alias `restart`) | Replays the first-visit boot sequence (§6) via a `useBoot` flag, the same shape `matrix` uses |
+| `ssh [user@]host` | Wrong host → `Could not resolve hostname`; wrong user → `Permission denied (publickey)`; `contact@` opens the contact section, because that is what the section's own prompt claims to do; the real handle gets a paced OpenSSH handshake that ends by triggering `reboot` |
+| `whois [domain]` | An invented registration record for this domain; anything else gets `No match for …` |
 | `hack [target]` | Fake nmap/progress output ending in `ACCESS DENIED — nice try` |
 | `coffee` | `HTTP 418: I'm a teapot` |
 | `play` | Scrolls to the music section and starts the SoundCloud embed |
@@ -239,8 +249,9 @@ It shares the registry, so it needs no separate maintenance.
 | `uname` | `couvsh 1.0 jhemery.xyz x86_64 GNU/Portfolio` |
 | DevTools console | ASCII art + a short hiring pitch on load |
 
-Hidden commands (`sudo`, `vim`, `:q`, `matrix`, `crt`, `hack`, `coffee`, `sl`, `rickroll`,
-`cowsay`, `fortune`, `ps`, `top`, `uname`) are `hidden: true` — they don't appear in `help`.
+Hidden commands (`sudo`, `vim`, `:q`, `matrix`, `reboot`, `ssh`, `whois`, `crt`, `hack`, `coffee`,
+`sl`, `rickroll`, `cowsay`, `fortune`, `env`, `ps`, `top`, `uname`) are `hidden: true` — they don't
+appear in `help`.
 Finding them is the point. `help --all` lists them for the impatient. `play` and `achievements`
 are deliberately *not* hidden: they are signposts rather than secrets.
 
@@ -300,20 +311,50 @@ Three surfaces, one source of truth:
 same pattern `history.ts` already uses — while the terminal command keeps using the plain
 `isUnlocked`/`unlockedCount` helpers, since it re-renders per command rather than reactively.
 
+### 5.3 Background reactions
+
+**Where:** `frontend/src/components/ThreeBackground.vue`
+
+The wireframe background reads the same refs the rest of the app already exports, so none of this
+needed a new trigger:
+
+- **Pointer gravity well** — shapes within `GRAVITY_RADIUS` of the cursor's projection onto the
+  z=0 plane lean towards it, hardest at the centre. Each shape keeps a `home` and an `offset`, and
+  the offset eases towards a per-frame target — so "let go" is just a zero target, not a special
+  case. The pointer goes idle after 2.5 s without movement and everything drifts home.
+- **Section-reactive palette** — `activeSection` (already maintained for `pwd`) picks a base
+  colour, an accent colour and a rotation multiplier. Materials are recoloured in place rather than
+  rebuilt, so a section change doesn't teleport the scene.
+- **Glitch burst** — `useCrt`'s `glitching` ref, which already drives the CSS screen-tear on
+  `sudo rm -rf /`, adds random jitter to the same offset for exactly that window, with a much
+  higher lerp factor so it snaps rather than drifts.
+- **Completionist palette** — `unlocked.value.has('completionist')` overrides the section palette
+  entirely. It is the only visual state no amount of scrolling can produce.
+
+One watcher covers the last two inputs, because `currentPalette()` already encodes which wins.
+
 ---
 
 ## 6. Boot sequence, 404, footer, console
 
-- **Boot sequence** (`BootSequence.vue`) — fake kernel log resolving into the page. Shown once,
-  gated on `localStorage['couvbat:booted']`, skippable with any key or click, ~2.2s at most.
-  Skipped entirely under `prefers-reduced-motion`.
+- **Boot sequence** (`BootSequence.vue`, `composables/useBoot.ts`) — fake kernel log resolving into
+  the page. Shown once, gated on `localStorage['couvbat:booted']`, skippable with any key or click,
+  ~2.2s at most. Skipped entirely under `prefers-reduced-motion`. `reboot` (and the tail of `ssh`)
+  raise a module-level flag the component watches, replaying the same `start()` the first visit
+  runs — no `alreadyBooted` gate, and `finish()` clears the flag so it is immediately repeatable.
+  The dismiss listeners are armed 300 ms late: the keypress that submitted `reboot` is still
+  propagating when the watcher fires, and a window listener attached synchronously would eat it.
 - **404** (`NotFoundView.vue`) — `bash: /<path>: No such file or directory`, a `cd ~` button, and
   (desktop only) a hint to open the terminal. Requires `frontend/public/.htaccess` with an SPA
   rewrite; without it Apache 404s before Vue Router ever sees the URL. This closes a gap already
   flagged in [deploy.md](deploy.md).
 - **Footer** (`SiteFooter.vue`) — commit SHA and build timestamp, injected by Vite `define` as
   `__BUILD_SHA__` / `__BUILD_TIME__`, read from `git rev-parse` at config time with a `dev`
-  fallback so a tarball build doesn't break.
+  fallback so a tarball build doesn't break. Below them, a status ticker
+  (`composables/useStatus.ts`) shows uptime since the first commit and how long ago this build
+  shipped, re-read every 60 s. `uptime()` lives in that composable rather than next to `neofetch`
+  so the footer can show the same number without pulling the terminal registry into the main
+  bundle; `commands/content.ts` re-exports it for the commands that already imported it there.
 - **Console art** — `console.log` in `main.ts`. Costs nothing; the people who open DevTools on a
   developer portfolio are exactly the target audience.
 

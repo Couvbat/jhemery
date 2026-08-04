@@ -26,27 +26,27 @@ Conventions that apply to every row, so they are not repeated:
 
 | ✔ | Feature | Approach | Files | Effort |
 |---|---|---|---|---|
-| [ ] | Pointer gravity well | Reuse already-tracked `mouseX`/`mouseY`; in `animate()`, spring each mesh toward/away from the projected pointer, ease back when idle. | `ThreeBackground.vue` | S |
+| [x] | Pointer gravity well | Reuse already-tracked `mouseX`/`mouseY`; in `animate()`, spring each mesh toward/away from the projected pointer, ease back when idle. | `ThreeBackground.vue` | S |
 | [ ] | Click-to-inspect a shape | Pointer events on the canvas, `THREE.Raycaster` on click, tween camera to the hit mesh, small DOM label (`"icosahedron · 20 faces"`). | `ThreeBackground.vue` + overlay | M |
-| [ ] | Section-reactive palette/motion | Read `currentSection` from `useActiveSection.ts`; map section id → colour mix / speed, alongside the existing CRT `speedMultiplier`. | `ThreeBackground.vue` | S |
+| [x] | Section-reactive palette/motion | Read `currentSection` from `useActiveSection.ts`; map section id → colour mix / speed, alongside the existing CRT `speedMultiplier`. | `ThreeBackground.vue` | S |
 | [ ] | Terminal-driven scene control | New `useSceneControl.ts` (shape of `useMatrix.ts`) exposing shape-count/gravity flags; `ThreeBackground.vue` watches them; hidden `spawn` / `gravity on\|off` commands. | `useSceneControl.ts` (new), `ThreeBackground.vue`, `eggs.ts` | M |
 | [ ] | Constellation / connect-the-dots | `THREE.LineSegments` recomputed each frame between shapes under a distance threshold (18 shapes ⇒ O(n²) is free), toggled by a reactive flag. | `ThreeBackground.vue`, composable, `eggs.ts` | M |
-| [ ] | Achievement-gated visual unlock | Import the already-reactive `unlocked` set from `achievements.ts`; branch the palette on `unlocked.value.has('completionist')`. | `ThreeBackground.vue` | S |
-| [ ] | Glitch burst | `useCrt.ts` already exports a reactive `glitching` ref (drives the CSS tear on `sudo rm -rf /`) — read it and jitter mesh positions for that window. No new trigger. | `ThreeBackground.vue` | S |
+| [x] | Achievement-gated visual unlock | Import the already-reactive `unlocked` set from `achievements.ts`; branch the palette on `unlocked.value.has('completionist')`. | `ThreeBackground.vue` | S |
+| [x] | Glitch burst | `useCrt.ts` already exports a reactive `glitching` ref (drives the CSS tear on `sudo rm -rf /`) — read it and jitter mesh positions for that window. No new trigger. | `ThreeBackground.vue` | S |
 
 ## B. Terminal commands
 
 | ✔ | Feature | Approach | Files | Effort |
 |---|---|---|---|---|
-| [ ] | `reboot` | Replays `BootSequence.vue` on demand. Full spec in [appendix](#appendix--reboot-and-fake-env). | `useBoot.ts` (new), `BootSequence.vue`, `types.ts`, `useTerminal.ts`, `eggs.ts` | S |
-| [ ] | fake `.env` | Joke env file in the fake filesystem. Full spec in [appendix](#appendix--reboot-and-fake-env). | `env-file.ts` (new), `files.ts`, `navigate.ts` | S |
-| [ ] | `whois <name>` | Joke registration record via `line`/`art`. Static, no infra. | `eggs.ts` | S |
+| [x] | `reboot` | Replays `BootSequence.vue` on demand. Full spec in [appendix](#appendix--reboot-and-fake-env). | `useBoot.ts` (new), `BootSequence.vue`, `types.ts`, `useTerminal.ts`, `eggs.ts` | S |
+| [x] | fake `.env` | Joke env file in the fake filesystem. Full spec in [appendix](#appendix--reboot-and-fake-env). | `env-file.ts` (new), `files.ts`, `navigate.ts` | S |
+| [x] | `whois <name>` | Joke registration record via `line`/`art`. Static, no infra. | `eggs.ts` | S |
 | [ ] | `weather` | Open-Meteo (no API key) backend module mirroring `steam`/`github` controller+service; frontend `useWeather.ts`; ASCII glyph rendering. | `backend/src/weather/*` (new), `useWeather.ts` (new), `live.ts` | M |
-| [ ] | `ping <section>` | Fake latency lines via `terminal/timing.ts`'s `sleep()` + `ctx.frame()`, then the existing `navigate()`. | `navigate.ts` | S |
-| [ ] | `diff <a> <b>` | Reuse `resolveFileLines()` for both files, small pure line-diff util. | `terminal/diff.ts` (new) + command | S |
+| [x] | `ping <section>` | Fake latency lines via `terminal/timing.ts`'s `sleep()` + `ctx.frame()`, then the existing `navigate()`. | `navigate.ts` | S |
+| [x] | `diff <a> <b>` | Reuse `resolveFileLines()` for both files, small pure line-diff util. | `terminal/diff.ts` (new) + command | S |
 | [ ] | `alias` | Session map persisted like `history.ts`; `registry.ts`'s `resolve()` checks it before `suggest()`. | `terminal/aliases.ts` (new), `registry.ts`, command | M |
-| [ ] | `env` / `export` | **Shares its data with the fake `.env` file** (one source module, two renderers) so they cannot drift. `printenv`-style output. | reuses `env-file.ts`, new command | S |
-| [ ] | `ssh couvbat@jhemery.xyz` | Joke "Connecting…" sequence; ends by calling `effects.reboot()` rather than inventing a second boot animation. | `eggs.ts` | S |
+| [x] | `env` / `export` | **Shares its data with the fake `.env` file** (one source module, two renderers) so they cannot drift. `printenv`-style output. | reuses `env-file.ts`, new command | S |
+| [x] | `ssh couvbat@jhemery.xyz` | Joke "Connecting…" sequence; ends by calling `effects.reboot()` rather than inventing a second boot animation. | `eggs.ts` | S |
 | [ ] | `btc` / `stonks` | Needs a backend proxy (CORS blocks browser→exchange). Tiny route, shape of steam's. ASCII sparkline reuses the games' box-drawing conventions. | backend proxy (new), command | M |
 | [ ] | `banner <text>` | Client-side only: embedded 5×7 block-letter font table, rendered through `art()`/`pre`. Font table is the only real work. | `terminal/ascii-banner.ts` (new) + command | M |
 
@@ -58,7 +58,7 @@ Passive data cards — no achievements (see §D).
 |---|---|---|---|---|
 | [ ] | Build/deploy status card | Reuses the **existing** `GITHUB_TOKEN` + `github.module` — one `GET /github/workflow-status` route on the Actions REST API. Cheapest live item. | `backend/src/github/*` (extend), frontend card | S–M |
 | [ ] | Visitor counter / presence | NestJS's native `@Sse()` (no new dep) broadcasting a periodic aggregate count. Aggregate only — no per-visitor data. | `backend/src/presence/*` (new), `usePresence.ts` (new) | M |
-| [ ] | Uptime/status ticker | Extends `neofetch`'s "days since first commit" calc into a visible status line; "last deploy" reuses already-fetched GitHub activity. | small status composable | S |
+| [x] | Uptime/status ticker | Extends `neofetch`'s "days since first commit" calc into a visible status line; "last deploy" reuses already-fetched GitHub activity. | small status composable | S |
 | [ ] | Weather-linked background mood | Depends on the `weather` route above; `ThreeBackground.vue` reads a shared weather summary and nudges tint/density. | weather backend + bridge composable | M |
 | [ ] | Live guestbook ticker | **Polling, not SSE**: `GET /guestbook` every ~20s, diff for new entries, surface through `AchievementToast.vue`'s existing pattern. No new backend. | poller composable + toast component | S–M |
 | [ ] | Lichess "recently played" | Lichess public REST needs no token; backend module mirrors `steam.module` exactly. | `backend/src/chess/*` (new), frontend card | M |
@@ -77,11 +77,11 @@ version, for README's achievements table once shipped.
 
 | ✔ | id | title (en / fr) | unlocks on | needs |
 |---|---|---|---|---|
-| [ ] | `dotenv` | Configuration Leak / Fuite de config | `cat .env` or `vim .env` | fake `.env` |
-| [ ] | `reboot` | Deja Vu / Déjà-vu | running `reboot` | `reboot` |
-| [ ] | `diffsy` | Spot the Difference / Trouvez l'erreur | `diff` on two real files | `diff` |
+| [x] | `dotenv` | Configuration Leak / Fuite de config | `cat .env` or `vim .env` | fake `.env` |
+| [x] | `reboot` | Deja Vu / Déjà-vu | running `reboot` | `reboot` |
+| [x] | `diffsy` | Spot the Difference / Trouvez l'erreur | `diff` on two real files | `diff` |
 | [ ] | `alias` | Make It Yours / À votre façon | defining an alias | `alias` |
-| [ ] | `ssh` | Knock Knock / Toc toc | running the `ssh` joke | `ssh` |
+| [x] | `ssh` | Knock Knock / Toc toc | running the `ssh` joke | `ssh` |
 | [ ] | `banner` | Big Text Energy / Grosses lettres | running `banner <text>` | `banner` |
 | [ ] | `cyanSpotter` | Rare Find / Trouvaille rare | clicking one of the 3 cyan wireframes (of 18) | click-to-inspect |
 | [ ] | `constellation` | Connect the Dots / Relier les points | toggling constellation mode | constellation |
@@ -91,9 +91,10 @@ version, for README's achievements table once shipped.
 
 ## Build order
 
-**Phase 1 — quick wins, no backend (S):**
+**Phase 1 — quick wins, no backend (S):** ✅ shipped on `feat/phase-1` → `dev`.
 `reboot`, fake `.env`, `whois`, `ping`, `diff`, `env`/`export`, `ssh`, achievement-gated visual
-unlock, glitch burst, section-reactive palette, pointer gravity well, uptime ticker.
+unlock, glitch burst, section-reactive palette, pointer gravity well, uptime ticker — plus the four
+achievements those unlocked (`dotenv`, `reboot`, `ssh`, `diffsy`).
 
 **Phase 2 — contained modules, mostly frontend or one small route (M):**
 click-to-inspect, scene control, constellation, `banner`, `alias`, build/deploy card, guestbook
