@@ -11,6 +11,12 @@ on:
 permissions:
   contents: read
 
+# Shared with the SSH deploys, so a fallback run cannot land on top of
+# a normal one in the same directories.
+concurrency:
+  group: o2switch-deploy
+  cancel-in-progress: false
+
 jobs:
   build:
     name: Build
@@ -65,6 +71,10 @@ jobs:
             echo "Lockfile differs from the one deployed to the server."
           fi
 
+      # Targets `dist/` under the app root, matching the Passenger config cPanel
+      # generated (`PassengerStartupFile dist/main.js`) and keeping the sync's
+      # deletions away from `.htaccess`, the `node_modules` symlink, `public/`,
+      # `tmp/`, `.env` and `uploads/`, which all live at the app root.
       - name: Sync build over FTPS
         uses: SamKirkland/FTP-Deploy-Action@v4.3.5
         with:
@@ -73,18 +83,23 @@ jobs:
           password: ${{ secrets.FTP_BACKEND_PASSWORD }}
           protocol: ftps
           local-dir: ./build/
-          server-dir: ${{ steps.remote.outputs.dir }}
+          server-dir: ${{ steps.remote.outputs.dir }}dist/
           log-level: minimal
-          # Server-side state that must survive a deploy. `node_modules` is a
-          # symlink into the cPanel Node.js virtualenv and is managed there;
-          # `.env` and `uploads` (guestbook data) only exist on the server.
-          exclude: |
-            **/.git*
-            **/.git*/**
-            **/node_modules/**
-            **/.env
-            uploads/**
-            tmp/**
+
+      # cPanel's "Run NPM Install" runs at the app root, so it needs the
+      # manifests there rather than in dist/.
+      - name: Copy manifests to the app root
+        env:
+          FTP_SERVER: ${{ secrets.FTP_SERVER }}
+          FTP_USER: ${{ secrets.FTP_BACKEND_USERNAME }}
+          FTP_PASS: ${{ secrets.FTP_BACKEND_PASSWORD }}
+          REMOTE_PATH: ${{ steps.remote.outputs.path }}
+        run: |
+          for f in package.json package-lock.json; do
+            curl -sSf --ssl-reqd -T "build/$f" \
+              --user "$FTP_USER:$FTP_PASS" \
+              "ftp://$FTP_SERVER/${REMOTE_PATH}$f"
+          done
 
       # Passenger reloads the app when tmp/restart.txt changes. Done with curl
       # rather than the sync action so it is uploaded unconditionally.

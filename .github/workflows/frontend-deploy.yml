@@ -15,6 +15,13 @@ on:
 permissions:
   contents: read
 
+# Shared with the backend deploy. Two runs at once means two entries in a
+# 5-slot SSH whitelist and two IPs racing the firewall, which is how the
+# 4 August run failed.
+concurrency:
+  group: o2switch-deploy
+  cancel-in-progress: false
+
 jobs:
   build:
     name: Build
@@ -51,6 +58,23 @@ jobs:
           chmod 700 ~/.ssh
           echo "${{ secrets.SSH_KEY }}" > ~/.ssh/id_rsa
           chmod 0400 ~/.ssh/id_rsa
+
+      # The cPanel API confirms the whitelist entry before the packet filter has
+      # actually picked it up, so connecting immediately gets the TCP connection
+      # reset. Probe until SSH answers rather than letting rsync eat the failure.
+      - name: Waiting for the firewall to accept the runner IP
+        run: |
+          for attempt in $(seq 1 12); do
+            if ssh -o StrictHostKeyChecking=no -o ConnectTimeout=10 -i ~/.ssh/id_rsa \
+              "${{ secrets.CPANEL_USERNAME }}@${{ secrets.CPANEL_SERVER }}" true 2>&1; then
+              echo "SSH accepted on attempt $attempt"
+              exit 0
+            fi
+            echo "Not accepted yet (attempt $attempt), retrying in 10s"
+            sleep 10
+          done
+          echo "::error title=SSH unreachable::The IP was whitelisted but SSH never accepted a connection."
+          exit 1
 
       - name: Sending data with RSYNC
         run: |
