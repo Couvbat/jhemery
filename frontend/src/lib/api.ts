@@ -3,10 +3,11 @@ import type { Locale } from '@/content/types'
 /**
  * Where the backend lives.
  *
- * `VITE_API_URL` is read from `frontend/.env` **by `vite build`**, and Vite
- * inlines it into the bundle as a literal — so it has to be set wherever the
- * build runs. Dropping a `.env` next to the deployed `dist/` does nothing: what
- * ships is static files with the URL already frozen in.
+ * `VITE_API_URL` is read **by `vite build`** — from `frontend/.env` locally, and
+ * from the `VITE_API_URL` repository variable in CI — and Vite inlines it into
+ * the bundle as a literal, so it has to be set wherever the build runs. Dropping
+ * a `.env` next to the deployed `dist/` does nothing: what ships is static files
+ * with the URL already frozen in.
  *
  * The localhost fallback is deliberately dev-only. It used to apply to every
  * build, so a production bundle with no `VITE_API_URL` aimed every live-data

@@ -40,9 +40,12 @@ describe('RateLimitGuard', () => {
     reflector = {
       getAllAndOverride: () => options,
     } as unknown as Reflector;
-    guard = new RateLimitGuard(reflector);
+    // Before the guard is built, not after: its `lastSweep` is stamped in the
+    // constructor, and stamping it from the real clock while `canActivate` reads
+    // the fake one makes the sweep test pass or fail on the time of day.
     jest.useFakeTimers({ doNotFake: ['nextTick'] });
     jest.setSystemTime(new Date('2026-08-04T10:00:00Z'));
+    guard = new RateLimitGuard(reflector);
   });
 
   afterEach(() => {
