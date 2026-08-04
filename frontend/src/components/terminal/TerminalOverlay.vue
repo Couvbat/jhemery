@@ -26,6 +26,12 @@ const {
   completeInput,
 } = useTerminal()
 
+/** Shared chrome for the three title-bar dots (they only differ by colour). */
+const BUTTON_CLASS =
+  'w-3 h-3 rounded-full flex items-center justify-center transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-primary focus-visible:ring-offset-1 focus-visible:ring-offset-muted'
+const GLYPH_CLASS =
+  'text-[8px] leading-none text-black/70 opacity-0 group-hover:opacity-100 transition-opacity'
+
 const input = ref('')
 const inputEl = ref<HTMLInputElement | null>(null)
 const scrollEl = ref<HTMLElement | null>(null)
@@ -134,6 +140,12 @@ function onKeydown(event: KeyboardEvent) {
   }
 }
 
+/** The red dot and Escape share one exit path, vim-trap nudge included — a
+ *  close button that silently does nothing just reads as broken. */
+function requestClose() {
+  if (!closeTerminal()) void submit(':q')
+}
+
 /** Focus trap: the panel is the only interactive region while open. */
 function onPanelKeydown(event: KeyboardEvent) {
   if (event.key === 'Escape') {
@@ -143,10 +155,7 @@ function onPanelKeydown(event: KeyboardEvent) {
       cancel()
       return
     }
-    if (!closeTerminal()) {
-      // vim trap active — nudge rather than silently swallowing the key.
-      void submit(':q')
-    }
+    requestClose()
     return
   }
 
@@ -196,29 +205,41 @@ function onPanelKeydown(event: KeyboardEvent) {
       >
         <!-- Title bar -->
         <div class="flex items-center gap-2 px-4 py-2 bg-muted border-b border-border shrink-0">
-          <span class="w-3 h-3 rounded-full bg-red-500/80"></span>
-          <span class="w-3 h-3 rounded-full bg-yellow-500/80"></span>
-          <span class="w-3 h-3 rounded-full bg-green-500/80"></span>
+          <!-- Traffic lights, macOS-style: the dots *are* the controls, and their
+               glyphs only show on hover so the idle bar stays quiet. -->
+          <div class="group flex items-center gap-2">
+            <button
+              type="button"
+              :class="[BUTTON_CLASS, 'bg-red-500/80 hover:bg-red-500']"
+              :aria-label="t(m.terminal.close)"
+              :title="t(m.terminal.close)"
+              @click="requestClose()"
+            >
+              <span :class="GLYPH_CLASS" aria-hidden="true">✕</span>
+            </button>
+            <button
+              type="button"
+              :class="[BUTTON_CLASS, 'bg-yellow-500/80 hover:bg-yellow-500']"
+              :aria-label="t(m.terminal.minimise)"
+              :title="t(m.terminal.minimise)"
+              @click="maximised = false"
+            >
+              <span :class="GLYPH_CLASS" aria-hidden="true">−</span>
+            </button>
+            <button
+              type="button"
+              :class="[BUTTON_CLASS, 'bg-green-500/80 hover:bg-green-500']"
+              :aria-label="t(m.terminal.maximise)"
+              :title="t(m.terminal.maximise)"
+              @click="maximised = true"
+            >
+              <span :class="GLYPH_CLASS" aria-hidden="true">+</span>
+            </button>
+          </div>
           <span class="ml-3 text-xs text-muted-foreground flex-1"
             >{{ profile.handle }}@{{ profile.host }} ~ {{ t(m.terminal.title) }}</span
           >
           <span v-if="vimBuffer?.mode === 'insert'" class="text-xs text-yellow-400">-- INSERT --</span>
-          <button
-            class="text-xs text-muted-foreground hover:text-primary px-1 transition-colors"
-            :aria-label="maximised ? t(m.terminal.restore) : t(m.terminal.maximise)"
-            :title="maximised ? t(m.terminal.restore) : t(m.terminal.maximise)"
-            @click="maximised = !maximised"
-          >
-            {{ maximised ? '▾' : '▴' }}
-          </button>
-          <button
-            class="text-xs text-muted-foreground hover:text-destructive px-1 transition-colors"
-            :aria-label="t(m.terminal.close)"
-            :title="t(m.terminal.close)"
-            @click="closeTerminal()"
-          >
-            ✕
-          </button>
         </div>
 
         <!-- Output -->

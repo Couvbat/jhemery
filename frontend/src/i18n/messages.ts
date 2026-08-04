@@ -66,7 +66,7 @@ export const messages = {
     open: { en: 'Open terminal', fr: 'Ouvrir le terminal' },
     close: { en: 'Close terminal', fr: 'Fermer le terminal' },
     maximise: { en: 'Maximise', fr: 'Agrandir' },
-    restore: { en: 'Restore', fr: 'Réduire' },
+    minimise: { en: 'Minimise', fr: 'Réduire' },
     title: { en: 'terminal', fr: 'terminal' },
     inputLabel: { en: 'Terminal input', fr: 'Entrée du terminal' },
     hint: {
