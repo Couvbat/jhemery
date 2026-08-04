@@ -49,6 +49,7 @@ Conventions that apply to every row, so they are not repeated:
 | [x] | `ssh couvbat@jhemery.xyz` | Joke "Connecting…" sequence; ends by calling `effects.reboot()` rather than inventing a second boot animation. | `eggs.ts` | S |
 | [ ] | `btc` / `stonks` | Needs a backend proxy (CORS blocks browser→exchange). Tiny route, shape of steam's. ASCII sparkline reuses the games' box-drawing conventions. | backend proxy (new), command | M |
 | [x] | `banner <text>` | Client-side only: embedded 5×7 block-letter font table, rendered through `art()`/`pre`. Font table is the only real work. | `terminal/ascii-banner.ts` (new) + command | M |
+| [ ] | Argument autocompletion | Tab currently only completes the command word — `completeInput()` bails the moment the line has a space. Add an optional `complete?(ctx): string[]` to the `Command` interface so the registry stays the API: each command declares its own candidates, and `completeInput()` routes to it once the cursor is past the first word. Sources: a shared `listFiles()` in `files.ts` (visible + hidden + guestbook entries, one source `ls`, `cat`, `vim` and `diff` all read) for filenames; `sections` for `cd`/`ping`; alias names for `unalias`; literal `on`/`off` for `gravity`/`constellation`; command names for `help`. Alias names join the command-word candidates too. Reuses the existing `commonPrefix()` and the "print candidates when ambiguous" behaviour, so the UX is unchanged — it just applies one word later. | `types.ts`, `registry.ts`, `useTerminal.ts`, `files.ts`, per-command `complete` in `navigate.ts`/`core.ts`/`eggs.ts` | M |
 
 ## C. Live information
 
@@ -61,7 +62,6 @@ Passive data cards — no achievements (see §D).
 | [x] | Uptime/status ticker | Extends `neofetch`'s "days since first commit" calc into a visible status line; "last deploy" reuses already-fetched GitHub activity. | small status composable | S |
 | [ ] | Weather-linked background mood | Depends on the `weather` route above; `ThreeBackground.vue` reads a shared weather summary and nudges tint/density. | weather backend + bridge composable | M |
 | [x] | Live guestbook ticker | **Polling, not SSE**: `GET /guestbook` every ~20s, diff for new entries, surface through `AchievementToast.vue`'s existing pattern. No new backend. | poller composable + toast component | S–M |
-| [ ] | Lichess "recently played" | Lichess public REST needs no token; backend module mirrors `steam.module` exactly. | `backend/src/chess/*` (new), frontend card | M |
 | [ ] | Global command counter | Fire-and-forget, incremented once per **terminal session open** (`useTerminal.ts`'s `primeOverlay()`), not per command — matches the `ask` route's "never logs content" stance. | `backend/src/stats/*` (new, tiny), one call site | S–M |
 
 ## D. Achievement tie-ins
@@ -102,12 +102,15 @@ click-to-inspect, scene control, constellation, `banner`, `alias`, build/deploy 
 ticker — plus the five achievements those unlocked (`alias`, `banner`, `cyanSpotter`,
 `constellation`, `zeroG`).
 
-**Phase 3 — real new infra, one at a time (M–L):**
-`weather` (+ weather-linked mood), `btc`/`stonks`, presence SSE, lichess, command counter.
+**Phase 3 — the rest, one at a time (M–L):**
+Argument autocompletion first — it is the only one left that needs no backend, and it makes every
+command already shipped easier to find. Then the infra ones: `weather` (+ weather-linked mood),
+`btc`/`stonks`, presence SSE, command counter.
 
 ## Dropped
 
 - **Spotify now-playing** — SoundCloud is the only player in use.
+- **Lichess "recently played"** — not a game Jules plays, so the card would sit empty.
 
 ---
 
