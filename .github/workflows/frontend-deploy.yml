@@ -76,9 +76,16 @@ jobs:
           echo "::error title=SSH unreachable::The IP was whitelisted but SSH never accepted a connection."
           exit 1
 
+      # Unlike the backend, this deploys to the document root itself -- there is
+      # no subdirectory to scope `--delete` to, so anything server-side that the
+      # build does not produce has to be named here or it gets deleted.
+      # `.well-known` is where AutoSSL puts its ACME challenges; `cgi-bin` and
+      # `error_log` are cPanel's.
       - name: Sending data with RSYNC
         run: |
           rsync --timeout=60 -e "ssh -o StrictHostKeyChecking=no -i ~/.ssh/id_rsa" \
+          --exclude=".env" --exclude=".well-known" --exclude="cgi-bin" \
+          --exclude=".htpasswd" --exclude="error_log" \
           -av --delete build/ \
           "${{ secrets.CPANEL_USERNAME }}@${{ secrets.CPANEL_SERVER }}:${{ secrets.FRONTEND_REMOTE_PATH }}"
 
