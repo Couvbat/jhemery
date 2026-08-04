@@ -1,0 +1,57 @@
+# Fallback for when the cPanel API is unavailable, which is what the default
+# SSH path in frontend-deploy.yml depends on to whitelist the runner's IP.
+# Manual only: Actions -> Deploy Frontend (FTP) -> Run workflow.
+name: Deploy Frontend (FTP)
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Build
+    uses: ./.github/workflows/frontend-build.yml
+
+  deploy:
+    name: Deploy
+    runs-on: ubuntu-latest
+    needs: build
+    steps:
+      - name: Download Build Artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: frontend-build
+          path: build
+
+      # FTP_FRONTEND_DIR is optional: leave it unset when the FTP account is
+      # rooted at the document root. Accepts `api/`, `/api`, `./api` alike.
+      - name: Resolve remote directory
+        id: remote
+        env:
+          FTP_DIR: ${{ secrets.FTP_FRONTEND_DIR }}
+        run: |
+          dir="${FTP_DIR:-}"
+          dir="${dir#./}"
+          dir="${dir#/}"
+          [ -n "$dir" ] && dir="${dir%/}/"
+          echo "dir=./$dir" >> "$GITHUB_OUTPUT"
+
+      - name: Sync build over FTPS
+        uses: SamKirkland/FTP-Deploy-Action@v4.3.5
+        with:
+          server: ${{ secrets.FTP_SERVER }}
+          username: ${{ secrets.FTP_FRONTEND_USERNAME }}
+          password: ${{ secrets.FTP_FRONTEND_PASSWORD }}
+          protocol: ftps
+          local-dir: ./build/
+          server-dir: ${{ steps.remote.outputs.dir }}
+          log-level: minimal
+
+      - name: Cleaning artifacts
+        uses: geekyeggo/delete-artifact@v5
+        if: always()
+        with:
+          name: frontend-build
+          failOnError: false
