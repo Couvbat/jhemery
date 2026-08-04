@@ -15,6 +15,22 @@ o2switch requires the connecting IP to be whitelisted before SSH will accept a c
 
 Two runs at once would put two entries in that 5-slot whitelist and race the firewall with them, which is exactly how the 4 August run failed — the frontend connected 13 seconds after whitelisting and worked, the backend connected 4 seconds after and had its TCP connection reset. So all four deploy workflows share a `concurrency: o2switch-deploy` group and queue behind each other, and each one probes SSH in a retry loop before rsyncing rather than assuming the packet filter has caught up with the API.
 
+### Frontend configuration
+
+`VITE_API_URL` is **inlined into the JavaScript at build time**, so it has to be set where the build runs. It comes from a repository **variable** (not a secret — it ships in the JavaScript either way):
+
+Repo → **Settings** → **Secrets and variables** → **Actions** → **Variables** → `VITE_API_URL` = `https://api.jhemery.xyz`
+
+A `.env` placed on the server does nothing for a static bundle; the file is read by Vite during `npm run build`, never by the browser.
+
+Getting this wrong is quiet rather than loud: `src/lib/api.ts` falls back to `http://localhost:3000`, so the site deploys and renders perfectly while every API call goes nowhere. [frontend-build.yml](../.github/workflows/frontend-build.yml) therefore fails the build outright when the variable is unset rather than letting the fallback through. To check what a deployed bundle actually contains:
+
+```bash
+curl -s https://jhemery.xyz/$(curl -s https://jhemery.xyz/ | grep -oE '/assets/[^"]+\.js' | head -1) | grep -o 'https://api[^"]*'
+```
+
+Unlike the backend, the frontend deploys to the document root itself, so `--delete` has no subdirectory to be scoped to. Anything living there that the build doesn't produce — `.env`, `.well-known` (AutoSSL's ACME challenges), `cgi-bin`, `error_log` — has to be named in the rsync's `--exclude` list or it gets removed on the next deploy.
+
 ### Backend directory layout
 
 The build goes into **`dist/` under the app root**, not into the app root itself:
@@ -79,6 +95,24 @@ Then:
 
 cPanel → **Domaines** → confirm the domain's document root. That path is the `FRONTEND_REMOTE_PATH` secret (e.g. `/home/<user>/jhemery.xyz` for an addon domain, or `/home/<user>/public_html` if it's the account's main domain).
 
+### Where the frontend's API URL comes from
+
+The frontend needs to know where the API lives, via `VITE_API_URL` (e.g. `https://api.jhemery.xyz`). It behaves unlike every other setting on this page, and the difference is the whole reason this section exists:
+
+> **`VITE_API_URL` is consumed at build time, not at runtime.** `vite build` replaces `import.meta.env.VITE_API_URL` with a string literal, and what deploys is static files served by Apache. The URL is frozen into `assets/index-*.js` before anything reaches the server, and there is no process on the server to read a `.env` afterwards. This is exactly where `backend/.env` differs — Nest reads that one at runtime, so it can live on the server; a `frontend/.env` on the server is inert.
+
+So `VITE_API_URL` has to be set **wherever `npm run build` runs**. In CI that is a GitHub runner, and `frontend/.env` is gitignored, so the runner never has one — the value comes from a **repository variable** instead:
+
+Repo → **Settings** → **Secrets and variables** → **Actions** → **Variables** → **New repository variable**, named `VITE_API_URL`, e.g. `https://api.jhemery.xyz`.
+
+A variable rather than a secret: the value is inlined verbatim into a public bundle, so there is nothing to hide, and masking it would only make the build log harder to read.
+
+[frontend-build.yml](../.github/workflows/frontend-build.yml) checks it before building and **fails the run** if it is unset. That guard is the point of the section: [frontend/src/lib/api.ts](../frontend/src/lib/api.ts) falls back to an empty base in a production build, which deploys and renders perfectly while every live-data call quietly goes to the SPA and comes back as `index.html`. A red run beats a green one that ships a site with no live data.
+
+Whatever value you use has to agree with the CORS allowlist in the other direction — `FRONTEND_URL` in `backend/.env`.
+
+Building locally instead — a `frontend/.env` on your machine, then deploying that `dist/` by hand — works the same way, and is the only route that does not go through the variable.
+
 ### 5. Set up the backend as a Node.js App
 
 cPanel → **Logiciel** → **Setup Node.js App** → **Create Application**:
@@ -126,6 +160,8 @@ Repo → **Settings** → **Secrets and variables** → **Actions** → **New re
 
 All seven are required. Check them with `gh secret list` before expecting a deploy to pass — a missing secret expands to an empty string rather than failing the run outright.
 
+`VITE_API_URL` is deliberately **not** in this table — it is a repository *variable*, not a secret, because it ends up inlined in a public bundle. See [Where the frontend's API URL comes from](#where-the-frontends-api-url-comes-from). Without it the frontend build fails outright.
+
 ### 2. Trigger a run
 
 Push a commit touching `frontend/` or `backend/` to `master`, or go to **Actions** → pick a deploy workflow → **Run workflow** (all deploy/build workflows support manual `workflow_dispatch`).
@@ -136,8 +172,10 @@ Push a commit touching `frontend/` or `backend/` to `master`, or go to **Actions
 
 | Symptom | Cause |
 |---|---|
-| "Making sure the IP is whitelisted" exits 1, and the step above dumped cPanel login-page HTML | `CPANEL_API_TOKEN` is empty or invalid. An unauthenticated cPanel API call returns the login page, not a JSON error — easy to mistake for the API being disabled. Check the masked header in the log: `Authorization: cpanel ***:***` is right, `cpanel ***:` means the token is missing. |
-| Same step exits 1 with a JSON error about the whitelist | The 5-entry whitelist cap is full. Prune it in cPanel → **Accès SSH**. |
+| "Whitelisting the runner IP" exits 1 with *"the response was not JSON"* | `CPANEL_API_TOKEN` is empty or invalid. An unauthenticated cPanel API call returns the login page, not a JSON error — easy to mistake for the API being disabled. Check the masked header in the log: `Authorization: cpanel ***:***` is right, `cpanel ***:` means the token is missing. |
+| "Whitelisting the runner IP" exits 1 with *"Vous avez atteint la limite d'exceptions autorisées"* | The whitelist is full — it holds **five distinct addresses**, not five entries. Prune it in cPanel → **Accès SSH** → **Gérer les exceptions de pare-feu**, removing the leftover GitHub-runner addresses (Azure ranges: `13.*`, `20.*`, `52.*`, `64.*`). Two of the five slots are your own machines and should stay. |
+| The whitelist keeps filling up with runner IPs | Deploys before 4 August 2026 removed only the `direction=in` entry, while cPanel's `add` creates `in` **and** `out` — so each run leaked one address permanently. The cleanup step now removes both directions; anything leaked before that has to be pruned by hand, once. A leftover is recognisable as a port-22 `out` entry with no matching `in` — your own machines were whitelisted in both directions. |
+| "Making sure the IP is whitelisted" exits 1 | The `add` was accepted but the entry is not in the list. Re-run; if it persists, add it by hand in cPanel to confirm the account can hold another address at all. |
 | `Permission denied (publickey)` on rsync | `SSH_KEY` isn't the private half of the authorized key, or the key was imported but never **Authorized** in cPanel |
 | `kex_exchange_identification: Connection reset by peer` | The firewall hadn't applied the whitelist entry yet. The "Waiting for the firewall" step retries for two minutes; if it exhausts them, the entry was accepted by the API but never loaded. |
 | rsync succeeds but lands in the wrong place | `FRONTEND_REMOTE_PATH` / `BACKEND_REMOTE_PATH` typo — they're absolute paths |
@@ -170,7 +208,7 @@ Setup, if you want this path ready before you need it:
 
 ## Apache config
 
-[frontend/public/.htaccess](../frontend/public/.htaccess) is copied into `dist/` by the build and deployed with everything else. It needs `mod_rewrite` only — no `mod_proxy` — so it works on o2switch shared hosting. It does four things:
+[frontend/public/.htaccess](../frontend/public/.htaccess) is copied into `dist/` by the build and deployed with everything else — but only because [frontend-build.yml](../.github/workflows/frontend-build.yml) sets `include-hidden-files: true` on the artifact upload. `actions/upload-artifact@v4` drops dotfiles by default, and with `.htaccess` missing from the artifact the deploy's `rsync --delete` removes the copy on the server too. The symptom is easy to misread: the site builds, deploys and renders fine, but deep links 404 and `curl jhemery.xyz` returns HTML instead of the résumé. It needs `mod_rewrite` only — no `mod_proxy` — so it works on o2switch shared hosting. It does four things:
 
 - **SPA fallback.** Vue Router uses `createWebHistory`, so every non-file request is handed to `index.html`. Without this, a hard refresh on any path other than `/` 404s before Vue Router ever sees the URL.
 - **`curl jhemery.xyz` → the ANSI résumé.** Matches on `User-Agent` at the site root and serves `resume.txt`, generated at build time by [vite-plugins/resume.ts](../frontend/vite-plugins/resume.ts). The same rule covers LLM crawlers, which would otherwise fetch an empty `<div id="app">`.
@@ -179,11 +217,28 @@ Setup, if you want this path ready before you need it:
 
 If `mod_headers` or `mod_mime` is unavailable the `<IfModule>` guards make those blocks no-ops — the site still works, just without the cache and charset hints.
 
+## Verified in production
+
+Both tiers are live. Checked against `https://api.jhemery.xyz` on 4 August 2026:
+
+| Endpoint | Result |
+|---|---|
+| `GET /github/activity` | 200, `{"configured":true,"commits":[…]}` |
+| `GET /github/contributions` | 200, `{"configured":true,"total":894,…}` |
+| `GET /github/pinned-repos` | 200, `{"configured":true,"repos":[…]}` |
+| `GET /steam/activity` | 200, `{"configured":true,"profile":{"name":"Couvbat",…}}` |
+| `GET /guestbook` | 200, `{"enabled":true,"entries":[…]}` |
+
+So the app boots under Passenger, `.htaccess` routes to `dist/main.js`, and the hand-written `.env` from Part A.6 is populated — every integration reports `configured: true`, which means the GitHub token and the `STEAM_API_KEY` / `STEAM_ID` pair are all present and accepted upstream. Steam's `configured: true` branch is exercised in production, not just the credential-less `{"configured": false}` fallback.
+
+CORS works in both directions: a request carrying `Origin: https://jhemery.xyz` comes back with `access-control-allow-origin: https://jhemery.xyz`, and the `OPTIONS /guestbook` preflight returns 204 with `access-control-allow-methods: GET,POST,DELETE` and `access-control-allow-headers: Content-Type,x-admin-password`.
+
+The running build also answers `POST /ask`, which merged on 4 August 2026 at 13:48 UTC, so the deployed code postdates every CI deploy attempt listed below.
+
 ## Known gaps
 
-- **The backend has never deployed successfully.** The frontend first landed on 4 August 2026; every backend run before that failed on missing secrets, then on the firewall race. Nothing past the rsync — `npm ci`, the manifest copy, the Passenger restart — has run against the real server.
+- **The automated backend deploy has never completed a run.** The backend is deployed and running — see [Verified in production](#verified-in-production) — but it did not get there through CI. Every `Deploy Backend` run so far has failed or been cancelled (9 failures and 1 cancellation as of 4 August 2026), each dying before the transfer. The last one never reached SSH at all: the whitelist was full of leaked runner addresses, `add` was refused, and the unchecked `curl` let the run walk into a two-minute SSH timeout — both now fixed in [backend-deploy.yml](../.github/workflows/backend-deploy.yml), but the end-to-end path is still unproven. Because the transfer never lands, the step behind it is skipped every time — **`npm ci --omit=dev`, the `package.json` / `package-lock.json` copy up to the app root, and `touch tmp/restart.txt` have still never run against the real server.** The live deployment was placed by hand. By contrast the frontend deploy does work end-to-end; it first landed on 4 August 2026.
 - **Backend restart mechanism is unverified.** It assumes the o2switch Node.js App (Passenger) picks up `tmp/restart.txt`. If the app is managed a different way (PM2, systemd, etc.), update the "Install production dependencies & restart app" step in [backend-deploy.yml](../.github/workflows/backend-deploy.yml).
 - **The FTP fallback is unverified.** Written against o2switch's documented FTPS setup, never run against the real account.
-- **Steam live data is unverified.** `GET /steam/activity` has only ever been exercised with no credentials, where it correctly returns `{"configured": false}` and the site falls back to the static game log. The `configured: true` path needs a real `STEAM_API_KEY` / `STEAM_ID` in `backend/.env` and a manual check once set.
 - **The first visitor to a cold `ask` model is told it is asleep, on purpose.** A cold load measures ~34s against a 20s deadline, so that visitor cannot be served. Rather than cancel — which used to abort the load itself and left the model permanently cold, since Ollama drops a load when its client disconnects — the request detaches and finishes loading in the background. The next visitor gets an answer in ~1.4s. Setting `OLLAMA_KEEP_ALIVE=-1` on the model host makes even that first miss a once-per-reboot event rather than once per idle period.
-- **Nothing on the server reports why `ask` failed.** The service logs latency and outcome to stdout, which on Passenger goes to the app's stderr log. When `ask` misbehaves that log is the only account of it, and the diagnosis above had to be reconstructed from black-box probing instead — see [ask-command-design.md](superpowers/specs/2026-08-04-ask-command-design.md).
+- **Nothing on the server reports why `ask` failed.** The service logs latency and outcome to stdout, which on Passenger goes to the app's stderr log. When `ask` misbehaves that log is the only account of it, and both diagnoses above had to be reconstructed from black-box probing plus the *model host's* log instead — see [ask-command-design.md](superpowers/specs/2026-08-04-ask-command-design.md).
