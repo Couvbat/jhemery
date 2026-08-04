@@ -82,7 +82,33 @@ export const messages = {
       fr: 'commande introuvable',
     },
     didYouMean: { en: 'did you mean', fr: 'vouliez-vous dire' },
+    // Shown instead of a typo suggestion when the input reads as a sentence.
+    askInstead: { en: 'that reads like a question — try', fr: 'on dirait une question — essayez' },
     cancelled: { en: '^C cancelled', fr: '^C annulé' },
+  },
+  // Chrome around `ask` only. The *answer* is generated in the requested locale
+  // by the model itself and is never translated client-side.
+  ask: {
+    question: { en: 'what do you want to know?', fr: 'que voulez-vous savoir ?' },
+    thinking: { en: 'thinking…', fr: 'réflexion…' },
+    // Non-negotiable, and always the first line: a model paraphrasing someone's
+    // CV in the first person without a label is a small lie.
+    disclaimer: {
+      en: 'a local model wrote this and it can be wrong — for the real answer, `mail`.',
+      fr: 'un modèle local a écrit ceci et il peut se tromper — pour la vraie réponse, `mail`.',
+    },
+    asleep: {
+      en: 'the model runs on a machine in my flat and it is currently asleep.',
+      fr: 'le modèle tourne sur une machine dans mon appart, et il dort en ce moment.',
+    },
+    asleepHint: {
+      en: 'try `mail` — that one reaches the human.',
+      fr: 'essayez `mail` — celui-là atteint l’humain.',
+    },
+    busy: {
+      en: 'one question at a time — the model lives in a flat, not a datacentre.',
+      fr: 'une question à la fois — le modèle vit dans un appart, pas dans un datacentre.',
+    },
   },
   palette: {
     placeholder: { en: 'Type a command or search…', fr: 'Tapez une commande ou cherchez…' },

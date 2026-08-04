@@ -185,10 +185,17 @@ gets `curl: (6) Could not resolve host` and a note that a browser tab cannot ope
 | `guestbook` | `GET /guestbook` | "guestbook is closed" |
 | `sign <message>` | `POST /guestbook` | error line |
 | `mail` | `POST /contact` | error line |
+| `ask <question>` | `POST /ask` | "the model is asleep — try `mail`" |
 
 `mail` is interactive: it prompts name → email → subject → message in sequence via
 `ctx.prompt()`, validates the email client-side, echoes a summary, and asks for `y/n` before
 posting. `Ctrl+C` aborts at any step.
+
+`ask` puts a self-hosted model behind the terminal, streaming its answer into a `ctx.frame()`
+region. Bare `ask` prompts for the question the way `mail` does. Every answer is preceded by a
+muted disclaimer, and the whole feature is off unless `ASK_ENABLED` is set — see
+[its own spec](superpowers/specs/2026-08-04-ask-command-design.md) for the limits, which are the
+interesting part.
 
 ---
 
@@ -269,9 +276,10 @@ editor, because a fake one that ignores `hjkl` is a worse joke than no joke.
 **Where:** `frontend/src/terminal/achievements.ts`, `components/AchievementsModal.vue`,
 `components/AchievementToast.vue`
 
-Eighteen achievements covering the easter eggs above, the guestbook, `mail`, `lang`, `crt`,
-`htop`, visiting every section (`explorer`), and a `completionist` that cascades when the other
-seventeen are done. Unlock state is `localStorage` only (`couvbat:achievements`, plus
+Achievements covering the easter eggs above, the guestbook, `mail`, `ask`, `lang`, `crt`,
+`htop`, visiting every section (`explorer`), and a `completionist` that cascades when every other
+one is done. Nothing counts them by hand — every surface reads `achievementList.length` — so the
+list is free to grow. Unlock state is `localStorage` only (`couvbat:achievements`, plus
 `couvbat:achievements:sections` for `explorer`'s progress) — there is no account and no sync.
 
 The problem this solves: the eggs are hidden on purpose, so without a tracker most visitors never
@@ -281,7 +289,7 @@ command ("Some commands should never be run as root", not "type `sudo rm -rf /`"
 
 Three surfaces, one source of truth:
 
-- **`achievements` terminal command** (alias `trophies`) — the full list with a `n/18` counter.
+- **`achievements` terminal command** (alias `trophies`) — the full list with an `n/total` counter.
 - **Modal** — a nav-bar button opens the same list for visitors who never open the terminal.
 - **Toast** — `unlock()` pushes onto an exported `toastQueue` that a globally-mounted
   `AchievementToast` drains one at a time. Centralising it in `unlock()` rather than at each call

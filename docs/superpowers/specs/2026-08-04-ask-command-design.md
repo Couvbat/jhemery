@@ -1,9 +1,14 @@
 # Design spec — `ask`, a self-hosted LLM in the terminal
 
-Status: proposed. Not implemented. Independent of
+Status: implemented, as described below, with two deviations noted inline (the busy/asleep status
+split under "Streaming", and the CTF hint left out). Independent of
 [terminal games](2026-08-04-terminal-games-design.md) and
 [the CTF chain](2026-08-04-ctf-flag-chain-design.md); the CTF spec describes an optional interplay
-where the model volunteers one hint, which this spec supports but does not require.
+where the model volunteers one hint, which this spec supports but does not require — **it was not
+built**, because the chain it depends on has not shipped. Nothing else here waits on it.
+
+Verified end to end against a self-hosted Ollama running `gemma4:e4b`, in both locales, at ~1.3s
+per answer with the model resident. See "Reasoning models" below for the one change that took.
 
 ## Context
 
@@ -92,11 +97,38 @@ has no tools, no write access, and nothing in its context that is not already pu
 public site. The worst outcome is that someone makes a portfolio's mascot say something silly, which
 is a cost worth accepting for the feature.
 
+### Reasoning models
+
+Not anticipated by this spec, and it breaks the 300-token cap outright.
+
+`gemma4:e4b` — and two of the other three models on the same box — emit chain-of-thought before the
+answer. Measured: **255 reasoning chunks, 1152 characters, then only 48 characters of answer before
+`finish_reason: length`.** The visitor gets `"Jules's core technical skills include TypeScript"` and
+nothing else, every time. Not an edge case; the normal outcome.
+
+The request therefore sends `reasoning_effort: 'none'`, which Ollama honours (0 reasoning
+characters, `finish_reason: stop`, a clean two-sentence answer). Runtimes that do not know the field
+ignore it. Ollama's own `think: false` is *not* honoured on the OpenAI-compatible route — only on its
+native `/api/chat` — so it is not an option without abandoning the one-runtime-agnostic-endpoint
+requirement in "Out of scope".
+
+Belt and braces, since `LLM_MODEL` can be repointed at any of them: Ollama keeps deliberation in a
+sibling `reasoning` field, which this service never reads, and llama.cpp inlines it as
+`<think>…</think>` in `content`, which is stripped by a small stateful filter that survives a tag
+split across two chunks. An answer that turns out to be *only* thinking counts as no answer, so the
+terminal shows the asleep line rather than a blank.
+
 ### Streaming
 
 SSE, `data: {"delta":"…"}` per chunk, terminated by `data: [DONE]`. Written directly to the
 response rather than via Nest's `@Sse()` decorator, which is built around `Observable` and `GET`;
 this is a `POST` with a body, so `EventSource` is out on the client side too.
+
+*Deviation:* busy and asleep needed distinguishing on the wire after all, because the i18n section
+below puts both lines client-side and the client has to pick one. Busy keeps its specified `503`;
+unconfigured and unreachable both answer `502`, which is what makes them one degraded path rather
+than two. Headers are held back until the first delta, so a failure before the answer starts is a
+real status code rather than a half-written stream.
 
 ## Frontend
 
@@ -143,7 +175,7 @@ timed-out request does not award it.
 
 The list grows from 18 to 19 (or more if the other specs ship first); the `n/18` counter in
 `AchievementsModal.vue` and the `achievements` command must read the list length rather than a
-literal.
+literal — both already did, so nothing had to change there.
 
 ## i18n
 
