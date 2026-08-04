@@ -321,10 +321,12 @@ export const eggCommands: Command[] = [
         return [...art(TRAIN, 'accent'), line('(you meant `ls`)', 'muted'), ...announce('sl', ctx.t)]
       }
 
-      // Slide the train right-to-left by trimming a growing indent.
-      for (let offset = 20; offset >= 0; offset -= 4) {
-        ctx.print(rows.map((row) => ({ text: ' '.repeat(offset) + row, tone: 'accent' as const, pre: true })))
-        await sleep(120, ctx.signal)
+      // Slide the train right-to-left by shrinking its indent. Each step redraws
+      // the same region — printing would stack a still of every position instead.
+      const draw = ctx.frame()
+      for (let offset = 40; offset >= 0; offset -= 2) {
+        draw(rows.map((row) => ({ text: ' '.repeat(offset) + row, tone: 'accent' as const, pre: true })))
+        await sleep(60, ctx.signal)
       }
       return [line('(you meant `ls`)', 'muted'), ...announce('sl', ctx.t)]
     },
