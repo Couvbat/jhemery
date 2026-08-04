@@ -183,6 +183,31 @@ Push a commit touching `frontend/` or `backend/` to `master`, or go to **Actions
 | Backend deploy fails at `npm ci` | `BACKEND_APP_ENTRY` doesn't point at the venv's `activate` script, or `package-lock.json` never made it to the app root |
 | App boots but 404s everything | `.htaccess` was deleted from the app root. Recreate it from [backend/.htaccess](../backend/.htaccess), fixing the paths for your account. |
 | Deploy is green but the API still serves old code | Passenger didn't pick up `tmp/restart.txt` — hit **Restart** in cPanel and see [Known gaps](#known-gaps) |
+| Browsers get a CORS error on `POST`, `curl` gets 200 | o2switch **Tiger Protect** is challenging the POST — see below |
+
+### Tiger Protect blocks every cross-origin POST
+
+Symptom: `ask`, the contact form and the guestbook fail in every browser, on every device, in a private window, with
+
+```
+CORS header ‘Access-Control-Allow-Origin’ missing. Status code: 307.
+```
+
+while `curl` gets a clean 200 and `OPTIONS` returns a textbook 204. The response that Firefox's Network tab shows for the POST:
+
+```
+307
+location:                https://api.jhemery.xyz/ask     <- the same URL
+set-cookie:              co-zhi=…; domain=api.jhemery.xyz; SameSite=Lax; HttpOnly
+tiger-protect-security:  https://faq.o2switch.fr/hebergement-mutualise/tutoriels-cpanel/tiger-protect
+content-type:            text/html; charset=UTF-8
+```
+
+o2switch's anti-bot layer is answering the POST with a cookie and a redirect back to the same URL — "take this and retry", which a normal navigation follows invisibly. A **cross-origin** request cannot: the challenge carries no `Access-Control-Allow-Origin`, so the browser refuses to follow it and reports the missing header. GETs and preflights are not challenged, which is why live data keeps loading while every POST dies, and `curl` is not challenged either, which is why the endpoint looks perfect from a shell.
+
+**Fix:** cPanel → **Tiger Protect** → disable it for `api.jhemery.xyz`, or whitelist the subdomain.
+
+**Nothing in this repository can cause or fix it.** The requests never reach Nest. Two things make that expensive to learn: the browser names CORS, which is the one layer that is definitely fine, and every other signal — clean preflight, clean `curl`, correct `VITE_API_URL`, correct `enableCors` — agrees the server is healthy, because it is. **When browsers and `curl` disagree about the same URL, the difference is never in the application; look for a header naming a vendor.**
 
 ## FTP fallback
 
@@ -235,12 +260,47 @@ CORS works in both directions: a request carrying `Origin: https://jhemery.xyz` 
 
 The running build also answers `POST /ask`, which merged on 4 August 2026 at 13:48 UTC, so the deployed code postdates every CI deploy attempt listed below.
 
-**But it predates every fix to it.** `ask` shipped at 13:48 UTC and was hand-placed; the three commits that made it actually work — the corpus fetch coming off the request path, the cold-load detach, and the endpoint's own response ceiling — all landed afterwards and none of them has been deployed, because the backend deploy has still never completed a run (below). Until one does, the live `/ask` is the original build, which hangs on every valid question and is served to visitors as a Cloudflare 524 with no CORS headers on it. **Deploying the backend is the fix; there is nothing left to change in the code.**
+**The CI deploy works.** It first completed end to end on 4 August 2026 at 15:40 UTC, after ten runs that never reached the transfer, and has succeeded on every run since — 15:40, 15:46 and 16:20 UTC. Run `30928557796` shipped `dd9377a`, and its log shows the whole path finally executing against the real server for the first time: rsync transferring, `cp dist/package.json dist/package-lock.json .`, `npm ci --omit=dev` reporting *"added 135 packages"*, and `touch tmp/restart.txt`. Everything the gaps below called unproven has now run.
+
+So the live backend carries the three commits that make `ask` work — the corpus fetch off the request path, the cold-load detach, and the endpoint's response ceiling — rather than the hand-placed 13:48 UTC build.
+
+> **What this does not prove: that Passenger acted on the restart.** `touch tmp/restart.txt` succeeding means the file was touched, nothing more. The observable test is the response ceiling: the deployed code answers `POST /ask` within 45 seconds under every failure it has (20s to detach a cold model, 45s absolute). **A request that runs past 45 seconds is the old process still serving, not a slow model** — see the gap below.
+
+### `/ask` on the wire
+
+Both halves of the CORS exchange, captured 4 August 2026 at 16:54 UTC. Worth keeping because `ask` is the only endpoint a browser preflights, and because a console that reports a CORS failure is not evidence that any of this is wrong — twice now it has been something else entirely:
+
+```
+OPTIONS /ask  ->  204
+  access-control-allow-origin:  https://jhemery.xyz
+  access-control-allow-methods: GET,POST,DELETE
+  access-control-allow-headers: Content-Type,x-admin-password
+
+POST /ask     ->  200 in ~1.1s
+  content-type:                 text/event-stream; charset=utf-8
+  cache-control:                no-cache, no-transform
+  access-control-allow-origin:  https://jhemery.xyz
+```
+
+Reproduce with the two `curl` commands in [Known gaps](#known-gaps). If they still look like this, the server is not the problem, whatever the browser says — check the client next, in this order: a private window (extensions), then site data for `jhemery.xyz` (Firefox serves cached permanent redirects as internal `307`s, which reach the console as a missing CORS header on a request that never touched the network).
+
+Note `curl -X POST` does **not** reproduce a browser here: it sends the POST directly, while a browser preflights it first because of the JSON content type. Testing only the POST leaves the half that actually fails untested.
 
 ## Known gaps
 
-- **The automated backend deploy has never completed a run.** The backend is deployed and running — see [Verified in production](#verified-in-production) — but it did not get there through CI. Every `Deploy Backend` run so far has failed or been cancelled (9 failures and 1 cancellation as of 4 August 2026), each dying before the transfer. The last one never reached SSH at all: the whitelist was full of leaked runner addresses, `add` was refused, and the unchecked `curl` let the run walk into a two-minute SSH timeout — both now fixed in [backend-deploy.yml](../.github/workflows/backend-deploy.yml), but the end-to-end path is still unproven. Because the transfer never lands, the step behind it is skipped every time — **`npm ci --omit=dev`, the `package.json` / `package-lock.json` copy up to the app root, and `touch tmp/restart.txt` have still never run against the real server.** The live deployment was placed by hand. By contrast the frontend deploy does work end-to-end; it first landed on 4 August 2026.
-- **Backend restart mechanism is unverified.** It assumes the o2switch Node.js App (Passenger) picks up `tmp/restart.txt`. If the app is managed a different way (PM2, systemd, etc.), update the "Install production dependencies & restart app" step in [backend-deploy.yml](../.github/workflows/backend-deploy.yml).
+- ~~**The automated backend deploy has never completed a run.**~~ **Fixed 4 August 2026.** Ten runs died before the transfer; the last of them never reached SSH at all, because the whitelist was full of leaked runner addresses, `add` was refused, and an unchecked `curl` let the run walk into a two-minute SSH timeout. Both were fixed in [backend-deploy.yml](../.github/workflows/backend-deploy.yml) and the deploy has completed cleanly on every run since — see [Verified in production](#verified-in-production).
+- **Backend restart mechanism is still unverified**, and it is now the only unproven link in the chain. `touch tmp/restart.txt` runs and succeeds, but nothing checks that o2switch's Passenger acts on it, so a green deploy is not evidence that the new code is serving. If the app is managed some other way (PM2, systemd), update the "Install production dependencies & restart app" step in [backend-deploy.yml](../.github/workflows/backend-deploy.yml).
+
+  Test it with the response ceiling rather than by reading a log — the deployed `/ask` cannot stay silent for 45 seconds:
+
+  ```bash
+  curl -sS -m 90 -o /dev/null -w 'status=%{http_code} time=%{time_total}\n' \
+    -X POST https://api.jhemery.xyz/ask \
+    -H 'Origin: https://jhemery.xyz' -H 'Content-Type: application/json' \
+    -d '{"question":"are you awake","locale":"en"}'
+  ```
+
+  A status inside 45s means the new process is live. A run to the 90s timeout means Passenger is still serving the old one, whatever the deploy said — restart the app from cPanel's Node.js app manager and try again. **This is the cheapest way to tell a stale process from a slow model, and worth reaching for first whenever the backend behaves like a version you did not ship.**
 - **The FTP fallback is unverified.** Written against o2switch's documented FTPS setup, never run against the real account.
 - **The first visitor to a cold `ask` model is told it is asleep, on purpose.** A cold load measures ~34s against a 20s deadline, so that visitor cannot be served. Rather than cancel — which used to abort the load itself and left the model permanently cold, since Ollama drops a load when its client disconnects — the request detaches and finishes loading in the background. The next visitor gets an answer in ~1.4s. Setting `OLLAMA_KEEP_ALIVE=-1` on the model host makes even that first miss a once-per-reboot event rather than once per idle period.
 - **Nothing on the server reports why `ask` failed.** The service logs latency and outcome to stdout, which on Passenger goes to the app's stderr log. When `ask` misbehaves that log is the only account of it, and both diagnoses above had to be reconstructed from black-box probing plus the *model host's* log instead — see [ask-command-design.md](superpowers/specs/2026-08-04-ask-command-design.md).

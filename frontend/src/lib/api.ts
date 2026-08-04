@@ -15,9 +15,28 @@ import type { Locale } from '@/content/types'
  * `http://localhost:3000` on each page load. Falling back to an empty base
  * makes that same mistake a same-origin request instead: still wrong, but it
  * fails quietly and locally rather than in every visitor's console.
+ *
+ * Trailing slashes are stripped because every caller below writes `${apiUrl}/path`.
+ * `https://api.jhemery.xyz/` — the obvious thing to type into a repository
+ * variable, and what a browser shows you when you visit the API — would otherwise
+ * make every request `//path`, which a proxy answers with a redirect to the single
+ * slash. A redirect is fatal to a cross-origin request unless it carries CORS
+ * headers, and no proxy's normalisation redirect does, so the browser reports it
+ * as a *missing CORS header* on an endpoint that is configured perfectly and
+ * answers `curl` without complaint. Nothing in the console names the extra
+ * character, and it is identical on every device, so it survives every clean
+ * profile and cache clear you try.
+ *
+ * `ask.service.ts` strips the same character off `LLM_BASE_URL` for the same reason.
  */
-export const apiUrl: string =
-  import.meta.env.VITE_API_URL ?? (import.meta.env.DEV ? 'http://localhost:3000' : '')
+/** Exported for the test; `apiUrl` below is the only caller in the app. */
+export function normaliseBase(url: string): string {
+  return url.replace(/\/+$/, '')
+}
+
+export const apiUrl: string = normaliseBase(
+  import.meta.env.VITE_API_URL ?? (import.meta.env.DEV ? 'http://localhost:3000' : ''),
+)
 
 export interface SteamRecentGame {
   appId: number

@@ -72,15 +72,27 @@ const { autoplayNonce } = useMusicPlayer()
               cookie warnings that nobody who never scrolls here should pay for. The `play`
               remount switches to eager — that iframe is wanted *now*, and waiting on the
               smooth scroll to cross the lazy-load threshold would delay playback.
+
+              `allow` rides along with the same nonce, for the same reason. The grant only
+              does anything for the remount, which starts playing with no user gesture
+              inside the frame; a visitor pressing play in the widget is gesturing at that
+              document directly and is allowed to play without it, which is why embeds
+              across the web work fine without the attribute. Requesting it unconditionally
+              cost every Firefox visitor a pair of
+
+                Feature Policy: Skipping unsupported feature name “autoplay”.
+
+              warnings on load — Firefox parses `allow` but implements no `autoplay`
+              feature to match — in exchange for a permission the page was not yet using.
             -->
             <iframe
               :key="autoplayNonce"
               :src="autoplayNonce > 0 ? `${soundcloudEmbedSrc}&auto_play=true` : soundcloudEmbedSrc"
               :loading="autoplayNonce > 0 ? 'eager' : 'lazy'"
+              :allow="autoplayNonce > 0 ? 'autoplay' : undefined"
               width="100%"
               height="400"
               frameborder="0"
-              allow="autoplay"
               class="rounded"
               :title="t(m.music.listen)"
             ></iframe>
