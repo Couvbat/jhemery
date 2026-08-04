@@ -1,7 +1,7 @@
 # jhemery.xyz
 
 Personal portfolio of **Jules Hémery** (*Couvbat*) — a terminal-flavoured single-page site with a
-wireframe three.js background, a real command shell you can type into, two playable games, and 21
+wireframe three.js background, a real command shell you can type into, two playable games, and 25
 hidden achievements.
 
 Vue 3 + Vite + Tailwind on the front, NestJS on the back, bilingual (EN/FR) throughout.
@@ -33,11 +33,16 @@ docs/       design specs and implementation plans
 
 | Feature | Notes |
 |---|---|
-| **three.js background** | 18 wireframe polyhedra (icosahedron, torus, box, octahedron, tetrahedron, dodecahedron) drifting in rotation, three of them cyan and the rest neon green, picked up from the CSS custom properties `--neon-green` / `--neon-cyan`. The camera eases towards the pointer for a parallax tilt. |
+| **three.js background** | 18 wireframe polyhedra (icosahedron, torus, box, octahedron, tetrahedron, dodecahedron) drifting in rotation, three of them in an accent colour and the rest in the base one, picked up from the CSS custom properties `--neon-green` / `--neon-cyan` / `--neon-purple` / `--neon-pink`. The camera eases towards the pointer for a parallax tilt. |
+| — pointer gravity | Shapes within ~5 world units of the cursor lean towards it, hardest at the centre, and drift back home once the pointer leaves or goes idle for 2.5 s. |
+| — section-reactive | Each section has its own palette and rotation speed — green for *about*, cyan for *projects*, purple for *music*, pink for *gaming*, and so on. Materials are recoloured in place, so shapes keep their positions across a section change. |
+| — glitch burst | The same reactive flag that drives the CSS screen-tear on `sudo rm -rf /` also shakes the wireframes for exactly that window. |
+| — 100% palette | Unlocking every achievement swaps the background onto a pink/cyan palette no section can produce. |
 | — performance | The whole component is `defineAsyncComponent`'d and only loaded on `requestIdleCallback`, so ~520 kB of three.js never competes with first paint. It is excluded from the PWA precache for the same reason. |
 | — accessibility | `prefers-reduced-motion` skips loading it entirely; WebGL failures are caught and the canvas is simply left blank. Geometries, materials and the renderer are disposed on unmount. |
 | **CRT overdrive** | `crt` in the terminal (or the Konami code anywhere on the page) toggles scanlines, flicker and a speed multiplier that the three.js loop reads live to spin the wireframes up. Persisted in `localStorage`. |
-| **Boot sequence** | A fake `couvsh 1.0` kernel log plays on first visit, then remembers it booted. Skipped for reduced-motion. |
+| **Boot sequence** | A fake `couvsh 1.0` kernel log plays on first visit, then remembers it booted. `reboot` replays it on demand, and `ssh` ends by triggering it. Skipped for reduced-motion. |
+| **Status ticker** | The footer carries the same uptime `neofetch` reports (days since the first commit) plus how long ago this build shipped, re-read on a slow tick so a long-open tab stays honest. |
 | **Sections** | about · projects · music · gaming · hardware · contact — defined once in `src/content/sections.ts` and consumed by the navbar, the terminal's `ls`/`cd`/`pwd`, the command palette and every section header. |
 | **Live cards** | Steam "currently playing", GitHub recent commits, contribution heatmap and pinned repos, SoundCloud player, guestbook. |
 | **Command palette** | `Ctrl/⌘+K` — fuzzy list of sections and palette-flagged commands, arrow-key navigable with the selection kept in view. |
@@ -63,7 +68,7 @@ keyboards, and the rendered page carries the same content anyway.
 
 Unknown commands get a Levenshtein "did you mean …?" suggestion. `help` groups commands into
 *shell · navigation · content · live data · misc* and says only that "not everything is listed
-here" — `help --all` gives up the 14 hidden ones.
+here" — `help --all` gives up the 18 hidden ones.
 
 **vim.** `vim` (or `vi`, `nvim`, `emacs`) opens a real modal editor pane: normal/insert modes,
 `hjkl` + arrows, `i`/`a`/`A`/`o`, `x`, `dd`, and yes, `:q!` gets you out. `cat` and `vim` read from
@@ -92,6 +97,8 @@ the same fake filesystem, so a file can never show two different contents.
 | `cd` | `cd <section>` — scrolls the page there; accepts English ids and French labels |
 | `pwd` | Print the current section |
 | `cat` | `cat <file>` — `about.txt`, `skills.txt`, `contact.txt`, guestbook entries, … |
+| `diff` | `diff <file> <file>` — unified line diff of any two files in the fake filesystem |
+| `ping` | `ping <section>` — four fake round trips, then it actually goes there |
 | `open` | `open <github|linkedin|soundcloud|steam|email>` |
 
 ### content
@@ -124,9 +131,13 @@ the same fake filesystem, so a file can never show two different contents.
 
 Playable: `games` / `arcade`, `2048`, `snake`, `play` (starts the music player).
 
-Hidden — not in `help`, only in `help --all`: `sudo`, `matrix`, `crt`, `vim` (`vi`/`nvim`/`emacs`),
-`:q` (`:q!`/`:wq`/`:x`/…), `hack`, `coffee` (`brew`), `cowsay`, `fortune`, `sl`, `rickroll`,
-`uname`, `ps` (`ps aux`/`ps -ef`), `top` (`htop`).
+Hidden — not in `help`, only in `help --all`: `sudo`, `matrix`, `reboot` (`restart`), `ssh`,
+`whois`, `crt`, `vim` (`vi`/`nvim`/`emacs`), `:q` (`:q!`/`:wq`/`:x`/…), `hack`, `coffee` (`brew`),
+`cowsay`, `fortune`, `sl`, `rickroll`, `uname`, `ps` (`ps aux`/`ps -ef`), `top` (`htop`),
+`env` (`printenv`/`export`).
+
+Two files never show up in a plain `ls`: `.secret`, and a `.env` full of credentials that are as
+fake as they look. `ls -a` lists both; `cat` and `vim` both read them.
 
 ## Games
 
@@ -139,13 +150,14 @@ with `Ctrl+C`. High scores are kept per game in `localStorage` and shown by `gam
 
 ## Achievements
 
-21 in total, tracked in `localStorage` (`couvbat:achievements`, plus `couvbat:achievements:sections`
+25 in total, tracked in `localStorage` (`couvbat:achievements`, plus `couvbat:achievements:sections`
 for the exploration one). Unlocking one fires a floating toast and prints a line in the terminal;
-the trophy button in the navbar opens a modal listing all 21. Locked ones show `???` and an oblique
+the trophy button in the navbar opens a modal listing all 25. Locked ones show `???` and an oblique
 hint; unlocking one reveals its title and how it was done. `achievements` (alias `trophies`) prints
 the same progress in the terminal.
 
-The last one cascades: unlock the other twenty and **100%** unlocks itself.
+The last one cascades: unlock the other twenty-four and **100%** unlocks itself — and the three.js
+background changes palette to prove it.
 
 | Achievement | How to get it |
 |---|---|
@@ -169,6 +181,10 @@ The last one cascades: unlock the other twenty and **100%** unlocks itself.
 | Cheat Code | Enter the Konami code (↑↑↓↓←→←→BA) anywhere on the page — no terminal needed |
 | Tile Merchant | Reach a 256 tile in `2048` |
 | Nokia Nostalgia | Grow a snake to length 10 in `snake` |
+| Configuration Leak | `cat .env` (or open it in `vim`) |
+| Deja Vu | Replay the boot sequence with `reboot` |
+| Knock Knock | `ssh couvbat@jhemery.xyz` |
+| Spot the Difference | `diff` two files |
 | 100% | Unlock everything else |
 
 Hints are deliberately oblique in the modal; the table above is the spoiler version.

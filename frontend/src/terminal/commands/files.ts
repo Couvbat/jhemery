@@ -3,6 +3,7 @@ import type { Localised } from '@/content/types'
 import { blank, line, wrap } from '../format'
 import type { OutputLine } from '../types'
 import { SECRET_FILE, secretContents } from './secret'
+import { ENV_FILE, envFileContents } from './env-file'
 import { resolveGuestbookFile } from './guestbook-fs'
 
 type TFunction = <T>(value: Localised<T>) => T
@@ -41,6 +42,9 @@ export function resolveFileLines(file: string, t: TFunction): OutputLine[] | und
 
     case SECRET_FILE:
       return secretContents(t)
+
+    case ENV_FILE:
+      return envFileContents(t)
 
     default: {
       const entry = resolveGuestbookFile(file)

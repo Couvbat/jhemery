@@ -130,6 +130,8 @@ export const messages = {
   footer: {
     built: { en: 'built', fr: 'build' },
     source: { en: 'source', fr: 'source' },
+    nominal: { en: 'all systems nominal', fr: 'tous les systèmes sont nominaux' },
+    status: { en: 'Site status', fr: 'État du site' },
   },
   boot: {
     skip: { en: 'press any key to skip', fr: 'appuyez sur une touche pour passer' },
