@@ -13,17 +13,15 @@ import {
 } from '@/content'
 import { hardwareTab, isHardwareTab } from '@/composables/useHardwareTab'
 import { useSteam } from '@/composables/useSteam'
+import { uptime } from '@/composables/useStatus'
 import { MARK } from '../ascii'
 import { blank, heading, keyValues, line, tags, wrap } from '../format'
 import type { Command, OutputLine } from '../types'
 
-/** Whole-number days since the first commit, for the neofetch "uptime" line. */
-export function uptime(): string {
-  const days = Math.floor((Date.now() - new Date(profile.since).getTime()) / 86_400_000)
-  const years = Math.floor(days / 365)
-  const remainder = days % 365
-  return years > 0 ? `${years}y ${remainder}d` : `${days}d`
-}
+// `uptime` moved to `composables/useStatus` once the footer's status ticker needed
+// it too; re-exported here so `neofetch`'s neighbours keep importing it from where
+// they always did.
+export { uptime }
 
 export const contentCommands: Command[] = [
   {
