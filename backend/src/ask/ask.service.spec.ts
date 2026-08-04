@@ -50,6 +50,32 @@ describe('AskService', () => {
     return `data: ${JSON.stringify({ choices: [{ delta: { content } }] })}\n\n`;
   }
 
+  /** A completion whose tokens are released by hand, to model a slow load. */
+  function pending(): {
+    res: Response;
+    push: (chunk: string) => void;
+    close: () => void;
+    fail: (err: Error) => void;
+  } {
+    const encoder = new TextEncoder();
+    let push!: (chunk: string) => void;
+    let close!: () => void;
+    let fail!: (err: Error) => void;
+    const body = new ReadableStream<Uint8Array>({
+      start(c) {
+        push = (chunk) => c.enqueue(encoder.encode(chunk));
+        close = () => c.close();
+        fail = (err) => c.error(err);
+      },
+    });
+    return {
+      res: { ok: true, status: 200, body } as unknown as Response,
+      push,
+      close,
+      fail,
+    };
+  }
+
   const corpus = {
     ok: true,
     status: 200,
@@ -389,6 +415,129 @@ describe('AskService', () => {
 
       respond(() => completion(delta('hi'), 'data: [DONE]\n\n'));
       await expect(instance.answer(dto, onDelta)).resolves.toBeUndefined();
+    });
+  });
+
+  /**
+   * Ollama aborts a model load the instant its client disconnects — "client
+   * connection closed before llama-server finished loading, aborting load". A
+   * cold load of gemma4:e4b takes ~34s against a 20s deadline, so a timeout
+   * that cancelled killed the load every visitor started, and the model could
+   * never reach a state where it answers anything.
+   */
+  describe('a model that is still loading', () => {
+    /** Fires the 20s first-token deadline. */
+    const DEADLINE_MS = 20_000;
+
+    /** Captures the signal handed to the model fetch, to prove it stays unaborted. */
+    function slowModel(): {
+      upstream: () => AbortSignal | undefined;
+      push: (chunk: string) => void;
+      close: () => void;
+    } {
+      const held = pending();
+      let captured: AbortSignal | undefined;
+      fetchMock.mockImplementation((url: string | URL, init?: RequestInit) => {
+        if (String(url).includes('llms.txt')) {
+          return Promise.resolve(corpus as unknown as Response);
+        }
+        captured = init?.signal ?? undefined;
+        // A real body rejects when its signal fires; the stub has to as well,
+        // or an abort would look like a stream that simply never ends.
+        captured?.addEventListener('abort', () =>
+          held.fail(
+            Object.assign(new Error('aborted'), { name: 'AbortError' }),
+          ),
+        );
+        return Promise.resolve(held.res);
+      });
+      return { upstream: () => captured, push: held.push, close: held.close };
+    }
+
+    beforeEach(() => {
+      jest.useFakeTimers();
+    });
+
+    afterEach(() => {
+      jest.useRealTimers();
+    });
+
+    it('leaves the load running instead of cancelling it', async () => {
+      const model = slowModel();
+      const { onDelta } = collect();
+
+      const answered = service().answer(dto, onDelta);
+      const settled =
+        expect(answered).rejects.toBeInstanceOf(BadGatewayException);
+      await jest.advanceTimersByTimeAsync(DEADLINE_MS);
+      await settled;
+
+      // The whole point: the visitor has been answered, the load has not been
+      // touched. Aborting here is what kept the model permanently cold.
+      expect(model.upstream()?.aborted).toBe(false);
+
+      model.push(delta('finally'));
+      model.close();
+      await jest.advanceTimersByTimeAsync(0);
+    });
+
+    it('tells the next visitor it is waking, without starting a second load', async () => {
+      const model = slowModel();
+      const instance = service();
+      const { onDelta } = collect();
+
+      const first = expect(instance.answer(dto, onDelta)).rejects.toThrow();
+      await jest.advanceTimersByTimeAsync(DEADLINE_MS);
+      await first;
+
+      const dialsBefore = fetchMock.mock.calls.length;
+      await expect(instance.answer(dto, onDelta)).rejects.toBeInstanceOf(
+        BadGatewayException,
+      );
+      // A cold model would otherwise get one fresh load request per visitor.
+      expect(fetchMock.mock.calls).toHaveLength(dialsBefore);
+
+      model.push(delta('finally'));
+      model.close();
+      await jest.advanceTimersByTimeAsync(0);
+    });
+
+    it('answers normally again once the load has finished', async () => {
+      const model = slowModel();
+      const instance = service();
+      const { onDelta } = collect();
+
+      const first = expect(instance.answer(dto, onDelta)).rejects.toThrow();
+      await jest.advanceTimersByTimeAsync(DEADLINE_MS);
+      await first;
+
+      // The detached run completes: the model is now resident.
+      model.push(delta('warm now'));
+      model.close();
+      await jest.advanceTimersByTimeAsync(0);
+
+      respond(() => completion(delta('Yes, he does.'), 'data: [DONE]\n\n'));
+      const second = collect();
+      await expect(
+        instance.answer(dto, second.onDelta),
+      ).resolves.toBeUndefined();
+      expect(second.deltas.join('')).toBe('Yes, he does.');
+    });
+
+    it('still gives up on a model that goes silent mid-answer', async () => {
+      // Detaching must not turn a genuinely dead stream into a permanent hang.
+      const model = slowModel();
+      const { deltas, onDelta } = collect();
+
+      const answered = service().answer(dto, onDelta);
+      model.push(delta('starting'));
+      await jest.advanceTimersByTimeAsync(0);
+      // Silence past the idle timeout, having already said something.
+      await jest.advanceTimersByTimeAsync(15_000);
+
+      await expect(answered).resolves.toBeUndefined();
+      expect(deltas.join('')).toContain('starting');
+      expect(model.upstream()?.aborted).toBe(true);
     });
   });
 
