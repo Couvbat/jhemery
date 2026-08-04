@@ -1,12 +1,32 @@
 import { findSection, profile, sectionIds, sections, socials } from '@/content'
 import { currentSection } from '@/composables/useActiveSection'
+import { prefersReducedMotion } from '@/composables/useCrt'
 import { announce, toast, visitSection } from '../achievements'
-import type { Command } from '../types'
-import { line } from '../format'
+import { diffLines, hasChanges } from '../diff'
+import { sleep } from '../timing'
+import type { Command, OutputLine } from '../types'
+import { blank, line, pre } from '../format'
 import { SECRET_FILE } from './secret'
+import { ENV_FILE } from './env-file'
 import { resolveFileLines } from './files'
 
 const FILES = ['about.txt', 'skills.txt', 'contact.txt'] as const
+
+/** Hidden files `ls -a` reveals, in listing order. */
+const HIDDEN_FILES = [SECRET_FILE, ENV_FILE] as const
+
+/** Reading one of these is worth an achievement. */
+const FILE_ACHIEVEMENTS: Record<string, string> = {
+  [SECRET_FILE]: 'secret',
+  [ENV_FILE]: 'dotenv',
+}
+
+const PING_COUNT = 4
+
+/** A plausible sub-millisecond round trip. */
+function latency(): number {
+  return 0.02 + Math.random() * 0.08
+}
 
 export const navigateCommands: Command[] = [
   {
@@ -24,7 +44,7 @@ export const navigateCommands: Command[] = [
       }))
       const files = FILES.map((f) => ({ text: f, tone: 'default' as const, pre: true }))
       const hidden = showHidden
-        ? [{ text: SECRET_FILE, tone: 'muted' as const, pre: true }]
+        ? HIDDEN_FILES.map((f) => ({ text: f, tone: 'muted' as const, pre: true }))
         : []
 
       return [...dirs, ...files, ...hidden]
@@ -70,7 +90,103 @@ export const navigateCommands: Command[] = [
       const lines = resolveFileLines(file, t)
       if (!lines) return [line(`cat: ${file}: No such file or directory`, 'error')]
 
-      return file === SECRET_FILE ? [...lines, ...announce('secret', t)] : lines
+      const achievement = FILE_ACHIEVEMENTS[file]
+      return achievement ? [...lines, ...announce(achievement, t)] : lines
+    },
+  },
+  {
+    name: 'diff',
+    usage: 'diff <file> <file>',
+    description: { en: 'Compare two files', fr: 'Comparer deux fichiers' },
+    group: 'navigate',
+    run({ args, t }) {
+      const [left, right] = args
+      if (!left || !right) {
+        return [line('diff: missing operand', 'error'), line('usage: diff <file> <file>', 'muted')]
+      }
+
+      const a = resolveFileLines(left, t)
+      if (!a) return [line(`diff: ${left}: No such file or directory`, 'error')]
+      const b = resolveFileLines(right, t)
+      if (!b) return [line(`diff: ${right}: No such file or directory`, 'error')]
+
+      const ops = diffLines(
+        a.map((l) => l.text),
+        b.map((l) => l.text),
+      )
+      const unlocks = announce('diffsy', t)
+
+      if (!hasChanges(ops)) {
+        return [line(`diff: ${left} and ${right} are identical`, 'muted'), ...unlocks]
+      }
+
+      return [
+        pre(`--- ${left}`, 'muted'),
+        pre(`+++ ${right}`, 'muted'),
+        ...ops.map((op) =>
+          op.kind === 'remove'
+            ? pre(`- ${op.text}`, 'error')
+            : op.kind === 'add'
+              ? pre(`+ ${op.text}`, 'success')
+              : pre(`  ${op.text}`, 'muted'),
+        ),
+        ...unlocks,
+      ]
+    },
+  },
+  {
+    name: 'ping',
+    usage: 'ping <section>',
+    description: { en: 'Ping a section, then go there', fr: 'Pinguer une section, puis y aller' },
+    group: 'navigate',
+    async run(ctx) {
+      const [target] = ctx.args
+      if (!target) {
+        return [line('ping: usage error: Destination address required', 'error')]
+      }
+
+      const section = findSection(target)
+      if (!section) {
+        return [line(`ping: ${target}: Name or service not known`, 'error')]
+      }
+
+      const host = `${section.id}.${profile.domain}`
+      const times: number[] = []
+      const replies: OutputLine[] = []
+
+      ctx.print(line(`PING ${host} (127.0.0.1) 56(84) bytes of data.`, 'muted'))
+      for (let seq = 1; seq <= PING_COUNT; seq++) {
+        const time = latency()
+        times.push(time)
+        const reply = pre(
+          `64 bytes from ${host}: icmp_seq=${seq} ttl=64 time=${time.toFixed(3)} ms`,
+          'primary',
+        )
+        replies.push(reply)
+        if (prefersReducedMotion()) continue
+        ctx.print(reply)
+        await sleep(280, ctx.signal)
+      }
+      if (prefersReducedMotion()) ctx.print(replies)
+
+      const min = Math.min(...times)
+      const max = Math.max(...times)
+      const avg = times.reduce((sum, v) => sum + v, 0) / times.length
+
+      ctx.print([
+        blank,
+        line(`--- ${host} ping statistics ---`, 'muted'),
+        line(
+          `${PING_COUNT} packets transmitted, ${PING_COUNT} received, 0% packet loss`,
+          'muted',
+        ),
+        pre(`rtt min/avg/max = ${min.toFixed(3)}/${avg.toFixed(3)}/${max.toFixed(3)} ms`, 'muted'),
+        blank,
+      ])
+
+      // The payoff: a reachable section is one you can go to.
+      ctx.navigate(section.id)
+      return toast(visitSection(section.id, sectionIds), ctx.t)
     },
   },
   {

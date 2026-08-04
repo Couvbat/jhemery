@@ -14,6 +14,7 @@ import {
 import { scrollToSection } from './useActiveSection'
 import { setCrt, glitch } from './useCrt'
 import { showMatrix } from './useMatrix'
+import { triggerBoot } from './useBoot'
 import { requestPlayback } from './useMusicPlayer'
 
 const MAX_LINES = 500
@@ -72,6 +73,7 @@ function openFrame(): (input: OutputLine[]) => void {
 
 const effects: TerminalEffects = {
   matrix: showMatrix,
+  reboot: triggerBoot,
   crt: setCrt,
   vim: (enabled: boolean, file?: VimFile) => {
     trapped.value = enabled

@@ -174,6 +174,42 @@ export const achievementList: Achievement[] = [
     description: { en: 'Grew a snake to length 10.', fr: 'Fait grandir un serpent jusqu’à 10.' },
   },
   {
+    id: 'dotenv',
+    title: { en: 'Configuration Leak', fr: 'Fuite de config' },
+    hint: {
+      en: 'Some files are more dangerous to read than others.',
+      fr: 'Certains fichiers sont plus dangereux à lire que d’autres.',
+    },
+    description: { en: 'Read `.env`.', fr: 'Lu `.env`.' },
+  },
+  {
+    id: 'reboot',
+    title: { en: 'Deja Vu', fr: 'Déjà-vu' },
+    hint: {
+      en: 'Some sequences are worth watching twice.',
+      fr: 'Certaines séquences méritent d’être revues.',
+    },
+    description: { en: 'Replayed the boot sequence.', fr: 'Rejoué la séquence de démarrage.' },
+  },
+  {
+    id: 'ssh',
+    title: { en: 'Knock Knock', fr: 'Toc toc' },
+    hint: {
+      en: 'Some doors are worth trying, even locked ones.',
+      fr: 'Certaines portes méritent d’être essayées, même fermées.',
+    },
+    description: { en: 'Opened a shell on the host.', fr: 'Ouvert un shell sur l’hôte.' },
+  },
+  {
+    id: 'diffsy',
+    title: { en: 'Spot the Difference', fr: 'Trouvez l’erreur' },
+    hint: {
+      en: 'Two files, one command, and a very short attention span.',
+      fr: 'Deux fichiers, une commande, et très peu de patience.',
+    },
+    description: { en: 'Compared two files.', fr: 'Comparé deux fichiers.' },
+  },
+  {
     id: COMPLETIONIST,
     title: { en: '100%', fr: '100%' },
     hint: { en: 'For those who leave no stone unturned.', fr: 'Pour ceux qui ne laissent rien au hasard.' },

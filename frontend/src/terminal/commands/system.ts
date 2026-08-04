@@ -6,6 +6,7 @@ import { blank, line } from '../format'
 import { sleep } from '../timing'
 import type { Command, OutputLine, Tone } from '../types'
 import { uptime } from './content'
+import { ENV_FILE, envAssignments } from './env-file'
 
 interface Proc {
   pid: number
@@ -116,6 +117,35 @@ export const systemCommands: Command[] = [
         blank,
         line('(press q to quit — well, you already did)', 'muted'),
         ...announce('htop', ctx.t),
+      ]
+    },
+  },
+  {
+    name: 'env',
+    aliases: ['printenv', 'export'],
+    description: { en: 'Print the environment', fr: "Afficher l'environnement" },
+    group: 'fun',
+    hidden: true,
+    run({ raw, args, t }) {
+      // `export FOO=bar` looks like it should work, so it gets a real answer
+      // rather than silently printing the list it was not asked for.
+      if (raw.trim().startsWith('export') && args.length > 0) {
+        return [
+          line('export: this environment is read-only.', 'error'),
+          line(`(it is also entirely made up — see \`cat ${ENV_FILE}\`)`, 'muted'),
+        ]
+      }
+
+      return [
+        ...envAssignments(raw.trim().startsWith('export') ? 'declare -x ' : ''),
+        blank,
+        line(
+          t({
+            en: 'none of these are real. obviously.',
+            fr: 'aucune de ces valeurs n’est réelle. évidemment.',
+          }),
+          'muted',
+        ),
       ]
     },
   },

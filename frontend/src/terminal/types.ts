@@ -103,6 +103,8 @@ export interface VimFile {
 
 export interface TerminalEffects {
   matrix: () => void
+  /** Replays the full-screen boot sequence. */
+  reboot: () => void
   crt: (enabled?: boolean) => boolean
   vim: (enabled: boolean, file?: VimFile) => void
   vimIsDirty: () => boolean
