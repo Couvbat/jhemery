@@ -103,6 +103,8 @@ export interface VimFile {
 
 export interface TerminalEffects {
   matrix: () => void
+  /** Replays the full-screen boot sequence. */
+  reboot: () => void
   crt: (enabled?: boolean) => boolean
   vim: (enabled: boolean, file?: VimFile) => void
   vimIsDirty: () => boolean
@@ -110,6 +112,16 @@ export interface TerminalEffects {
   vimMessage: (text: string) => void
   glitch: (durationMs: number) => Promise<void>
   playMusic: () => void
+}
+
+/** What a command sees when the visitor hits Tab somewhere past its name. */
+export interface CompleteContext {
+  /** Arguments after the command name, including the word being completed. */
+  args: string[]
+  /** Index into `args` of the word the cursor sits on. */
+  index: number
+  /** The partial word being completed — `''` when the line ends in a space. */
+  word: string
 }
 
 export interface Command {
@@ -122,5 +134,14 @@ export interface Command {
   hidden?: boolean
   /** Surfaced in the Ctrl+K command palette. */
   palette?: boolean
+  /**
+   * Tab-completion candidates for the argument being typed. Return everything
+   * valid at that position — the shell filters by prefix, inserts the common
+   * prefix and prints the list when the choice is still ambiguous, exactly as
+   * it does for the command word. Keeping this on the command keeps the
+   * registry the API: a command declares its own candidates, and nothing in
+   * the shell needs a table of special cases.
+   */
+  complete?: (ctx: CompleteContext) => string[]
   run: (ctx: CommandContext) => OutputLine[] | void | Promise<OutputLine[] | void>
 }

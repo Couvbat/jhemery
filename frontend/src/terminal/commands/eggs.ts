@@ -1,13 +1,49 @@
 import { profile } from '@/content'
 import { prefersReducedMotion } from '@/composables/useCrt'
+import {
+  MAX_SHAPE_COUNT,
+  resetScene,
+  setConstellation,
+  setGravity,
+  spawnShapes,
+  useSceneControl,
+} from '@/composables/useSceneControl'
 import { api, ApiError } from '@/lib/api'
-import { announce } from '../achievements'
+import { announce, unlock } from '../achievements'
 import { COW, TRAIN } from '../ascii'
-import { art, blank, line } from '../format'
+import { bannerLines, BANNER_MAX_CHARS } from '../ascii-banner'
+import { art, blank, line, pre } from '../format'
 import { sleep } from '../timing'
 import type { Command, CommandContext, OutputLine } from '../types'
 import { forgetGuestbookFile, resolveGuestbookFile } from './guestbook-fs'
-import { resolveFileLines } from './files'
+import { ENV_FILE } from './env-file'
+import { listFiles, resolveFileLines } from './files'
+
+/** The registration record `whois` invents for this domain. */
+const WHOIS_RECORD: Array<[string, string]> = [
+  ['Domain Name', profile.domain.toUpperCase()],
+  ['Registry Domain ID', '1337-COUVBAT'],
+  ['Registrar', 'couvsh registrar services, inc.'],
+  ['Creation Date', `${profile.since}T00:00:00Z`],
+  ['Registry Expiry Date', 'the heat death of the universe'],
+  ['Registrant Name', profile.name],
+  ['Registrant Organization', profile.employer],
+  ['Registrant Country', 'FR'],
+  ['Registrant Email', profile.email],
+  ['Name Server', `NS1.${profile.domain.toUpperCase()}`],
+  ['Name Server', `NS2.${profile.domain.toUpperCase()}`],
+  ['DNSSEC', 'unsigned (living dangerously)'],
+  ['Domain Status', 'clientTransferProhibited — it is mine'],
+]
+
+const SSH_STAGES = [
+  `OpenSSH_9.6p1, OpenSSL 3.0.13`,
+  `debug1: Connecting to ${profile.domain} port 22.`,
+  'debug1: Server host key: ed25519 SHA256:c0uvb4t…',
+  'debug1: Authenticating with public key "id_ed25519"',
+  'debug1: Authentication succeeded (publickey).',
+  'Last login: never — nobody has ever actually logged in here',
+]
 
 const FORTUNES = [
   'Weeks of coding can save you hours of planning.',
@@ -140,6 +176,102 @@ export const eggCommands: Command[] = [
     },
   },
   {
+    name: 'reboot',
+    aliases: ['restart'],
+    description: { en: 'Replay the boot sequence', fr: 'Rejouer la séquence de démarrage' },
+    group: 'fun',
+    hidden: true,
+    run({ effects, close, t }) {
+      const toast = announce('reboot', t)
+      if (prefersReducedMotion()) {
+        return [line('rebooting… (animation skipped: reduced motion)', 'primary'), ...toast]
+      }
+      close()
+      effects.reboot()
+    },
+  },
+  {
+    name: 'ssh',
+    usage: `ssh ${profile.handle}@${profile.domain}`,
+    description: { en: 'Connect to the host', fr: "Se connecter à l'hôte" },
+    group: 'fun',
+    hidden: true,
+    complete: ({ index }) =>
+      index === 0
+        ? [`${profile.handle}@${profile.domain}`, `contact@${profile.domain}`]
+        : [],
+    async run(ctx) {
+      const target = ctx.args[0]
+      if (!target) {
+        return [line('usage: ssh [user@]hostname', 'error')]
+      }
+
+      const [user, host] = target.includes('@') ? target.split('@') : [profile.handle, target]
+      if (host !== profile.domain && host !== 'localhost') {
+        return [line(`ssh: Could not resolve hostname ${host}: Name or service not known`, 'error')]
+      }
+
+      // The contact section's own prompt is `ssh contact@jhemery.xyz`, so typing it
+      // does the thing it advertises rather than the joke.
+      if (user === 'contact') {
+        ctx.print(line(`${user}@${host}: opening a channel…`, 'primary'))
+        ctx.navigate('contact')
+        return
+      }
+
+      if (user !== profile.handle && user !== 'root') {
+        return [
+          line(`${user}@${host}: Permission denied (publickey).`, 'error'),
+          line(`hint: there is exactly one account here, and it is \`${profile.handle}\`.`, 'muted'),
+        ]
+      }
+
+      await paced(
+        ctx,
+        SSH_STAGES.map((text) => line(text, 'muted')),
+        220,
+      )
+
+      const toast = announce('ssh', ctx.t)
+      if (prefersReducedMotion()) {
+        return [blank, line('connected. (boot animation skipped: reduced motion)', 'success'), ...toast]
+      }
+
+      ctx.print([blank, line(`${user}@${host}'s shell is starting…`, 'success')])
+      await sleep(500, ctx.signal)
+      ctx.close()
+      ctx.effects.reboot()
+      return toast
+    },
+  },
+  {
+    name: 'whois',
+    usage: `whois ${profile.domain}`,
+    description: { en: 'Look up a domain record', fr: 'Consulter un enregistrement de domaine' },
+    group: 'fun',
+    hidden: true,
+    complete: ({ index }) => (index === 0 ? [profile.domain, profile.handle] : []),
+    run({ args }) {
+      const query = (args[0] ?? profile.domain).toLowerCase().replace(/^https?:\/\//, '')
+      const known = [profile.domain, profile.handle, profile.alias.toLowerCase(), 'localhost']
+
+      if (!known.includes(query)) {
+        return [
+          line(`No match for "${query.toUpperCase()}".`, 'error'),
+          blank,
+          line('>>> this registry only knows about one domain, and you are on it.', 'muted'),
+        ]
+      }
+
+      const width = WHOIS_RECORD.reduce((max, [key]) => Math.max(max, key.length), 0)
+      return [
+        ...WHOIS_RECORD.map(([key, value]) => pre(`${`${key}:`.padEnd(width + 2)}${value}`, 'primary')),
+        blank,
+        line('>>> Last update of whois database: just now, by hand, in a .ts file.', 'muted'),
+      ]
+    },
+  },
+  {
     name: 'crt',
     description: { en: 'Toggle CRT overdrive', fr: 'Basculer le mode CRT' },
     group: 'fun',
@@ -158,6 +290,7 @@ export const eggCommands: Command[] = [
     description: { en: 'Open the editor', fr: "Ouvrir l'éditeur" },
     group: 'fun',
     hidden: true,
+    complete: ({ index }) => (index === 0 ? listFiles() : []),
     run(ctx) {
       if (ctx.raw.startsWith('emacs')) {
         return [line('emacs: a great operating system, lacking only a decent editor.', 'muted')]
@@ -173,6 +306,9 @@ export const eggCommands: Command[] = [
       if (!lines) {
         return [line(`vim: ${file}: No such file or directory`, 'error')]
       }
+      // The vim pane hides the scrollback, so this one goes out as a floating
+      // toast rather than as output lines nobody would see.
+      if (file === ENV_FILE) unlock('dotenv')
       ctx.effects.vim(true, { name: file, lines: lines.map((l) => l.text) })
     },
   },
@@ -330,6 +466,122 @@ export const eggCommands: Command[] = [
       }
       window.open('https://www.youtube.com/watch?v=dQw4w9WgXcQ', '_blank', 'noopener,noreferrer')
       return [line('never gonna give you up', 'accent'), ...announce('rickroll', t)]
+    },
+  },
+  {
+    name: 'banner',
+    usage: 'banner <text>',
+    description: { en: 'Say it in block letters', fr: 'Le dire en grosses lettres' },
+    group: 'fun',
+    hidden: true,
+    run({ args, t }) {
+      const text = args.join(' ')
+      if (!text.trim()) return [line('banner: missing operand', 'error')]
+
+      const rendered = bannerLines(text)
+      if (!rendered.length) return [line('banner: nothing to print', 'error')]
+
+      return [
+        ...rendered.map((row) => pre(row, 'primary')),
+        ...(text.length > BANNER_MAX_CHARS
+          ? [blank, line(`(wrapped at ${BANNER_MAX_CHARS} characters a line)`, 'muted')]
+          : []),
+        ...announce('banner', t),
+      ]
+    },
+  },
+  {
+    name: 'gravity',
+    usage: 'gravity [on|off]',
+    description: { en: 'Toggle the background pull', fr: "Basculer l'attraction du fond" },
+    group: 'fun',
+    hidden: true,
+    complete: ({ index }) => (index === 0 ? ['on', 'off'] : []),
+    run({ args, t }) {
+      const [requested] = args
+      if (requested && requested !== 'on' && requested !== 'off') {
+        return [line(`gravity: expected \`on\` or \`off\`, got \`${requested}\``, 'error')]
+      }
+
+      const on = setGravity(requested ? requested === 'on' : undefined)
+      return [
+        line(on ? 'gravity: ON — the shapes follow your cursor again.' : 'gravity: OFF', 'primary'),
+        // Turning it off is the interesting half; turning it back on is just undo.
+        ...(on ? [] : announce('zeroG', t)),
+      ]
+    },
+  },
+  {
+    name: 'spawn',
+    usage: 'spawn [count]',
+    description: { en: 'Add shapes to the background', fr: 'Ajouter des formes au fond' },
+    group: 'fun',
+    hidden: true,
+    run({ args }) {
+      const requested = args[0] ? Number(args[0]) : 1
+      if (!Number.isFinite(requested) || !Number.isInteger(requested)) {
+        return [line(`spawn: \`${args[0]}\` is not a whole number`, 'error')]
+      }
+
+      const before = useSceneControl().shapeCount.value
+      const after = spawnShapes(requested)
+      if (after === before) {
+        return [
+          line(
+            requested > 0
+              ? `spawn: already at the ceiling of ${MAX_SHAPE_COUNT} shapes`
+              : 'spawn: already at the floor of 1 shape',
+            'warning',
+          ),
+        ]
+      }
+      return [line(`${after} shapes in the scene (was ${before})`, 'primary')]
+    },
+  },
+  {
+    name: 'constellation',
+    aliases: ['stars'],
+    usage: 'constellation [on|off]',
+    description: { en: 'Connect the dots', fr: 'Relier les points' },
+    group: 'fun',
+    hidden: true,
+    complete: ({ index }) => (index === 0 ? ['on', 'off'] : []),
+    run({ args, t }) {
+      const [requested] = args
+      if (requested && requested !== 'on' && requested !== 'off') {
+        return [line(`constellation: expected \`on\` or \`off\`, got \`${requested}\``, 'error')]
+      }
+
+      const on = setConstellation(requested ? requested === 'on' : undefined)
+      return [
+        line(on ? 'constellation: ON' : 'constellation: OFF', 'primary'),
+        ...(on ? announce('constellation', t) : []),
+      ]
+    },
+  },
+  {
+    name: 'scene',
+    usage: 'scene [reset]',
+    description: { en: 'Inspect or reset the background', fr: 'Inspecter ou réinitialiser le fond' },
+    group: 'fun',
+    hidden: true,
+    complete: ({ index }) => (index === 0 ? ['reset'] : []),
+    run({ args }) {
+      const control = useSceneControl()
+      if (args[0] === 'reset') {
+        resetScene()
+        return [line('scene reset.', 'success')]
+      }
+      if (args.length) return [line(`scene: unknown argument \`${args[0]}\``, 'error')]
+
+      return [
+        pre(`shapes         ${control.shapeCount.value}`, 'primary'),
+        pre(`gravity        ${control.gravityOn.value ? 'on' : 'off'}`, 'primary'),
+        pre(`constellation  ${control.constellationOn.value ? 'on' : 'off'}`, 'primary'),
+        blank,
+        line('try `spawn 10`, `gravity off`, `constellation on`, `scene reset`.', 'muted'),
+        line('clicking a shape tells you what it is.', 'muted'),
+      ]
     },
   },
   {

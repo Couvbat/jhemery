@@ -11,6 +11,8 @@ import { useMatrix } from '@/composables/useMatrix'
 import { terminalOpen } from '@/composables/useTerminalShell'
 import { unlock } from '@/terminal/achievements'
 import AchievementToast from '@/components/AchievementToast.vue'
+// Polls the guestbook on a slow interval, so it stays off the critical path.
+const GuestbookTicker = defineAsyncComponent(() => import('@/components/GuestbookTicker.vue'))
 
 const ThreeBackground = defineAsyncComponent(() => import('@/components/ThreeBackground.vue'))
 // Only pulled in when someone actually types `matrix`.
@@ -66,6 +68,7 @@ onMounted(() => {
   <TerminalOverlay v-if="terminalEverOpened" />
   <CommandPalette />
   <AchievementToast />
+  <GuestbookTicker />
 
   <MatrixRain v-if="matrixActive" />
   <BootSequence />

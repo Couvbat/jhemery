@@ -1,9 +1,17 @@
 import { computed, nextTick, ref, shallowRef } from 'vue'
 import { currentLocale, useLocale } from '@/i18n'
 import { messages } from '@/i18n/messages'
+import { expandAliases } from '@/terminal/aliases'
 import { history, pushHistory } from '@/terminal/history'
-import { commonPrefix, complete, resolve, suggest } from '@/terminal/registry'
-import type { CommandContext, OutputLine, TerminalEffects, VimBufferState, VimFile } from '@/terminal/types'
+import { commonPrefix, completeCommand, filterByPrefix, resolve, suggest } from '@/terminal/registry'
+import type {
+  Command,
+  CommandContext,
+  OutputLine,
+  TerminalEffects,
+  VimBufferState,
+  VimFile,
+} from '@/terminal/types'
 import { handleVimKey } from '@/terminal/vimEditor'
 import {
   closeTerminal,
@@ -14,7 +22,9 @@ import {
 import { scrollToSection } from './useActiveSection'
 import { setCrt, glitch } from './useCrt'
 import { showMatrix } from './useMatrix'
+import { triggerBoot } from './useBoot'
 import { requestPlayback } from './useMusicPlayer'
+import { recordSession } from './useStats'
 
 const MAX_LINES = 500
 
@@ -72,6 +82,7 @@ function openFrame(): (input: OutputLine[]) => void {
 
 const effects: TerminalEffects = {
   matrix: showMatrix,
+  reboot: triggerBoot,
   crt: setCrt,
   vim: (enabled: boolean, file?: VimFile) => {
     trapped.value = enabled
@@ -165,7 +176,12 @@ function buildContext(args: string[], raw: string, signal: AbortSignal): Command
 }
 
 export async function run(input: string): Promise<void> {
-  const raw = input.trim()
+  // Aliases are rewritten before anything else looks at the line, so `resolve`,
+  // the two-word fallback and the "did you mean …?" suggestion all reason about
+  // the command that will actually run. `alias` itself is never expanded — it
+  // reads its own raw line — because it is a real command and aliases cannot
+  // shadow those.
+  const raw = expandAliases(input)
   if (!raw) return
 
   const [name = '', ...args] = raw.split(/\s+/)
@@ -290,18 +306,69 @@ export function recallHistory(direction: -1 | 1, current: string): string {
   return history.value[next]!
 }
 
-/** Tab completion. Returns the replacement value, printing candidates when ambiguous. */
-export function completeInput(value: string): string {
-  // Only the command word completes; arguments are too varied to guess usefully.
-  if (/\s/.test(value.trimStart())) return value
+/** Resolves which command owns a half-typed line, and where its arguments start. */
+function ownerOf(words: string[]): { command: Command; argStart: number } | undefined {
+  const [first = '', second = ''] = words
 
-  const candidates = complete(value.trim())
+  // Two-word command names (`git log`, `ps aux`) resolve the way `run()` does —
+  // but only once a third word exists, or `git lo<Tab>` would look like an
+  // argument to a command called `git`.
+  if (words.length > 2) {
+    const twoWord = resolve(`${first} ${second}`)
+    if (twoWord) return { command: twoWord, argStart: 2 }
+  }
+
+  const direct = resolve(first)
+  if (direct) return { command: direct, argStart: 1 }
+
+  // `gl about.txt` where `gl` is the visitor's alias: complete against the
+  // command that will actually run, not the name they typed.
+  const expanded = expandAliases(first)
+  if (expanded === first) return undefined
+  const viaAlias = resolve(expanded) ?? resolve(expanded.split(/\s+/)[0] ?? '')
+  return viaAlias ? { command: viaAlias, argStart: 1 } : undefined
+}
+
+/** Candidates for a word past the command name — the command's own to declare. */
+function completeArgument(words: string[], index: number, word: string): string[] {
+  const owner = ownerOf(words)
+  if (!owner?.command.complete) return []
+
+  const argIndex = index - owner.argStart
+  if (argIndex < 0) return []
+
+  const args = words.slice(owner.argStart)
+  return filterByPrefix(owner.command.complete({ args, index: argIndex, word }), word)
+}
+
+/**
+ * Tab completion. Returns the replacement value, printing candidates when
+ * ambiguous.
+ *
+ * The command word and its arguments go through the same three steps — filter
+ * by prefix, insert the single match or the common prefix, list the rest — so
+ * completing an argument feels like completing a command, one word later. Only
+ * the source of the candidates differs.
+ */
+export function completeInput(value: string): string {
+  const indent = value.slice(0, value.length - value.trimStart().length)
+  const body = value.slice(indent.length)
+  // A trailing space splits into a final empty word, which is exactly right:
+  // the cursor is on a new argument nobody has typed a prefix for yet.
+  const words = body.split(/\s+/)
+  const index = words.length - 1
+  const word = words[index]!
+
+  const candidates =
+    index === 0 ? completeCommand(word) : completeArgument(words, index, word)
   if (candidates.length === 0) return value
-  if (candidates.length === 1) return `${candidates[0]!} `
+
+  const head = index === 0 ? indent : `${indent}${words.slice(0, index).join(' ')} `
+  if (candidates.length === 1) return `${head}${candidates[0]!} `
 
   const shared = commonPrefix(candidates)
   append({ text: candidates.join('  '), tone: 'muted', pre: true })
-  return shared.length > value.length ? shared : value
+  return shared.length > word.length ? `${head}${shared}` : value
 }
 
 /** Called by `TerminalOverlay` every time it opens — shows the welcome message
@@ -309,6 +376,12 @@ export function completeInput(value: string): string {
  *  never repeats), and runs whatever command the light `openTerminal()` queued
  *  up for us, if any. */
 export function primeOverlay() {
+  // Once per session, here rather than in `run()`: a per-command ping would be
+  // chatter, and it would mean the server learning which commands people run —
+  // the thing `ask` explicitly promises not to record. Its own guard makes
+  // repeat opens free.
+  recordSession()
+
   if (buffer.value.length === 0) {
     append([
       { text: messages.terminal.welcome[currentLocale()], tone: 'primary' },

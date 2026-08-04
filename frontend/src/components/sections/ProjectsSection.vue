@@ -12,12 +12,13 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import SectionHeader from '@/components/SectionHeader.vue'
 import ContributionHeatmap from '@/components/ContributionHeatmap.vue'
+import BuildStatusCard from '@/components/BuildStatusCard.vue'
 import { projects, type ProjectStatus } from '@/content'
 import { useLocale } from '@/i18n'
 import { useGithub, relativeTime, shortRepo } from '@/composables/useGithub'
 
 const { t, m } = useLocale()
-const { commits, contributions, pinnedRepos } = useGithub()
+const { commits, contributions, pinnedRepos, workflowRuns } = useGithub()
 
 const statusColor: Record<ProjectStatus, string> = {
   production: 'text-primary border-primary/50',
@@ -190,6 +191,9 @@ const extraPinnedRepos = computed(() =>
           </a>
         </div>
       </div>
+
+      <!-- Latest CI runs (hidden unless the API has GITHUB_REPO set) -->
+      <BuildStatusCard v-if="workflowRuns?.length" class="mt-4" :runs="workflowRuns" />
 
       <!-- Contribution heatmap (hidden unless the API has a GitHub token) -->
       <ContributionHeatmap

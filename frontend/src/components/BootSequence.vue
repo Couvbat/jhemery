@@ -1,17 +1,20 @@
 <script setup lang="ts">
-import { onMounted, onUnmounted, ref } from 'vue'
+import { onMounted, onUnmounted, ref, watch } from 'vue'
 import { profile } from '@/content'
 import { useLocale } from '@/i18n'
 import { prefersReducedMotion } from '@/composables/useCrt'
+import { useBoot } from '@/composables/useBoot'
 
 const STORAGE_KEY = 'couvbat:booted'
 const STEP_MS = 130
 
 const { t, m } = useLocale()
+const { bootActive, ackBoot } = useBoot()
 
 const visible = ref(false)
 const shown = ref<string[]>([])
 let timer: ReturnType<typeof setTimeout> | undefined
+let armTimer: ReturnType<typeof setTimeout> | undefined
 
 const STEPS = [
   '[    0.000000] couvsh 1.0 booting…',
@@ -27,9 +30,18 @@ const STEPS = [
   'welcome.',
 ]
 
+function disarm() {
+  clearTimeout(armTimer)
+  window.removeEventListener('keydown', finish)
+  window.removeEventListener('click', finish)
+}
+
 function finish() {
   clearTimeout(timer)
   visible.value = false
+  disarm()
+  // Clears the `reboot` flag, so the command can be run again straight away.
+  ackBoot()
   try {
     window.localStorage.setItem(STORAGE_KEY, '1')
   } catch {
@@ -46,6 +58,23 @@ function step(index: number) {
   timer = setTimeout(() => step(index + 1), STEP_MS)
 }
 
+/** Plays the sequence from the top. Shared by the first visit and by `reboot`,
+ *  so the two can never drift into showing different things. */
+function start() {
+  clearTimeout(timer)
+  disarm()
+  shown.value = []
+  visible.value = true
+  // The keypress or click that ran `reboot` is still propagating when the watcher
+  // fires, and a window listener attached now would catch it and dismiss the
+  // replay instantly. Arming a beat later leaves the sequence a chance to play.
+  armTimer = setTimeout(() => {
+    window.addEventListener('keydown', finish)
+    window.addEventListener('click', finish)
+  }, 300)
+  step(0)
+}
+
 onMounted(() => {
   let alreadyBooted = false
   try {
@@ -57,16 +86,17 @@ onMounted(() => {
   // First visit only, and never when the visitor asked for less motion.
   if (alreadyBooted || prefersReducedMotion()) return
 
-  visible.value = true
-  window.addEventListener('keydown', finish)
-  window.addEventListener('click', finish)
-  step(0)
+  start()
+})
+
+// `reboot` replays it on demand — no `alreadyBooted` gate, that's the whole point.
+watch(bootActive, (requested) => {
+  if (requested) start()
 })
 
 onUnmounted(() => {
   clearTimeout(timer)
-  window.removeEventListener('keydown', finish)
-  window.removeEventListener('click', finish)
+  disarm()
 })
 </script>
 

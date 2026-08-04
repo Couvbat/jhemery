@@ -94,6 +94,7 @@ interface Command {
   group: 'core' | 'navigate' | 'content' | 'live' | 'fun'
   hidden?: boolean       // excluded from help + completion, still runnable
   palette?: boolean      // surfaced in the Ctrl+K palette
+  complete?(ctx: CompleteContext): string[]   // Tab candidates for its arguments
   run(ctx: CommandContext): OutputLine[] | void | Promise<OutputLine[] | void>
 }
 ```
@@ -126,6 +127,31 @@ page all talk to the same session, so history survives closing the panel).
 - `history`: submitted commands, capped at 100, persisted to `localStorage`.
 - ↑/↓ walk history, `Tab` completes (common prefix first, then lists candidates),
   `Ctrl+L` clears, `Ctrl+C` cancels an in-flight interactive prompt.
+
+### Tab completion
+
+One routine handles both halves of a line. It splits on whitespace, works out which word the
+cursor is on, collects candidates for that position, then filters by prefix, inserts the single
+match (or the longest common prefix) and prints the list when the choice is still ambiguous.
+Only the *source* of the candidates changes:
+
+- **the first word** — every visible command and alias, plus whatever the visitor named with
+  `alias`. Hidden commands stay out, same as in `help`.
+- **anything after it** — the command's own `complete()`. Keeping it on the command is what keeps
+  the registry the API: `cd` knows it takes a section, `unalias` knows it takes an alias name, and
+  the shell needs no table of special cases. It receives the arguments, the index of the word being
+  completed and its partial text, and returns every candidate valid at that position — the shell
+  does the filtering. Commands whose arguments are free text (`echo`, `banner`, `ask`) simply
+  don't declare one.
+
+Filenames come from a single `listFiles()` in `commands/files.ts` that `ls`, `cat`, `vim` and
+`diff` all read, so the four can never disagree about what exists. A dotfile joins that list only
+once its achievement is unlocked — offering `.env` to someone who typed `cat .` would hand out an
+easter egg, which is the same reason `suggest()` never names a hidden command. Guestbook entries
+join it as soon as `guestbook` has cached them.
+
+An alias in the first position is expanded before the owning command is resolved, so `zz ab`
+completes against whatever `zz` will actually run.
 - `run(input)` handles `&&`-free single commands only — chaining is out of scope.
 
 ### Chrome
@@ -157,16 +183,30 @@ Grouped as they appear in `help`.
 | `date` | Local date/time |
 | `whoami` | Prints the current user |
 | `lang [en\|fr]` | Prints or switches locale |
+| `alias` / `unalias` | Session-persistent command renames, expanded before anything else parses the line |
 | `exit` (aliases `quit`, `logout`) | Closes the overlay |
+
+Aliases live in `terminal/aliases.ts` and are rewritten in `useTerminal.ts`'s `run()`, ahead of
+`resolve()` — so the two-word fallback and the "did you mean …?" suggestion both reason about the
+command that will actually run, and `gl --oneline` works when `gl` is `git log`. Expansion follows
+a chain and gives up after 10 hops or the first repeat, because a definition that expands back to
+itself is a user error, not a reason to hang the tab. Aliasing over an existing command name is
+refused: it survives a reload, so `alias ls=rickroll` would be a lockout rather than a joke.
 
 ### navigate
 | Command | Behaviour |
 |---|---|
-| `ls [-a]` | Lists sections as directories. `-a` also reveals `.secret` (§5) |
+| `ls [-a]` | Lists sections as directories. `-a` also reveals `.secret` and `.env` (§5) |
 | `cd <section>` | Scrolls to the section and closes the overlay |
 | `pwd` | Current section, derived from scroll position |
-| `cat <file>` | `about.txt`, `skills.txt`, `contact.txt`, `.secret` |
+| `cat <file>` | `about.txt`, `skills.txt`, `contact.txt`, `.secret`, `.env` |
+| `diff <a> <b>` | Line diff of any two files the fake filesystem resolves |
+| `ping <section>` | Four paced fake replies and an rtt summary, then `cd`s there |
 | `open <target>` | `github`, `linkedin`, `soundcloud`, `steam`, `email` — opens in a new tab |
+
+`diff` runs both operands through the same `resolveFileLines()` `cat` uses, then through a pure
+LCS line diff (`terminal/diff.ts`) rendered `-`/`+`/context. No dependency: the files are a few
+dozen lines each, so the O(n·m) table is cheaper than a diffing library.
 
 ### content
 Reads from §1, so it can never contradict the page: `about`, `skills`, `projects [--json]`,
@@ -182,6 +222,8 @@ gets `curl: (6) Could not resolve host` and a note that a browser tab cannot ope
 |---|---|---|
 | `steam` / `playing` | `GET /steam/activity` | static game log from `content/gaming.ts` |
 | `gitlog` (alias `git log`) | `GET /github/activity` | "no activity available" |
+| `weather` / `wttr` | `GET /weather` | "weather: unavailable" |
+| `btc` / `stonks` / `crypto` | `GET /markets` | "btc: quotes unavailable" |
 | `guestbook` | `GET /guestbook` | "guestbook is closed" |
 | `sign <message>` | `POST /guestbook` | error line |
 | `mail` | `POST /contact` | error line |
@@ -215,8 +257,8 @@ It shares the registry, so it needs no separate maintenance.
 ## 5. Easter eggs
 
 **Where:** `frontend/src/terminal/commands/eggs.ts`, `commands/system.ts`, `commands/secret.ts`,
-`frontend/src/components/effects/*`, `frontend/src/composables/useKonami.ts`, `useCrt.ts`,
-`useMatrix.ts`
+`commands/env-file.ts`, `frontend/src/components/effects/*`,
+`frontend/src/composables/useKonami.ts`, `useCrt.ts`, `useMatrix.ts`, `useBoot.ts`
 
 | Trigger | Effect |
 |---|---|
@@ -227,6 +269,12 @@ It shares the registry, so it needs no separate maintenance.
 | `crt` | The same overdrive, toggled from the terminal for anyone who doesn't know the Konami code |
 | `vim` (aliases `vi`, `nvim`, `emacs`) | Opens a real modal editor pane — see §5.1 |
 | `ls -a` → `cat .secret` | Hidden file with a message aimed at whoever is curious enough to look |
+| `ls -a` → `cat .env` | A production-looking env file whose every value is a joke. `env` (aliases `printenv`, `export`) prints the same variables from the same module, so the file and the listing cannot drift; `export FOO=bar` answers that the environment is read-only |
+| `reboot` (alias `restart`) | Replays the first-visit boot sequence (§6) via a `useBoot` flag, the same shape `matrix` uses |
+| `ssh [user@]host` | Wrong host → `Could not resolve hostname`; wrong user → `Permission denied (publickey)`; `contact@` opens the contact section, because that is what the section's own prompt claims to do; the real handle gets a paced OpenSSH handshake that ends by triggering `reboot` |
+| `whois [domain]` | An invented registration record for this domain; anything else gets `No match for …` |
+| `banner <text>` | Block letters from a 5×7 font table in `terminal/ascii-banner.ts` — no dependency, no fetch. Wraps into stacked blocks past 12 characters, breaking on a space where it can; unknown characters render as `?` rather than vanishing |
+| `spawn`, `gravity`, `constellation`, `scene` | Terminal control over the background — see §5.3 |
 | `hack [target]` | Fake nmap/progress output ending in `ACCESS DENIED — nice try` |
 | `coffee` | `HTTP 418: I'm a teapot` |
 | `play` | Scrolls to the music section and starts the SoundCloud embed |
@@ -239,8 +287,9 @@ It shares the registry, so it needs no separate maintenance.
 | `uname` | `couvsh 1.0 jhemery.xyz x86_64 GNU/Portfolio` |
 | DevTools console | ASCII art + a short hiring pitch on load |
 
-Hidden commands (`sudo`, `vim`, `:q`, `matrix`, `crt`, `hack`, `coffee`, `sl`, `rickroll`,
-`cowsay`, `fortune`, `ps`, `top`, `uname`) are `hidden: true` — they don't appear in `help`.
+Hidden commands (`sudo`, `vim`, `:q`, `matrix`, `reboot`, `ssh`, `whois`, `crt`, `hack`, `coffee`,
+`sl`, `rickroll`, `cowsay`, `fortune`, `banner`, `env`, `alias`, `unalias`, `ps`, `top`, `uname`,
+`spawn`, `gravity`, `constellation`, `scene`) are `hidden: true` — they don't appear in `help`.
 Finding them is the point. `help --all` lists them for the impatient. `play` and `achievements`
 are deliberately *not* hidden: they are signposts rather than secrets.
 
@@ -300,20 +349,71 @@ Three surfaces, one source of truth:
 same pattern `history.ts` already uses — while the terminal command keeps using the plain
 `isUnlocked`/`unlockedCount` helpers, since it re-renders per command rather than reactively.
 
+### 5.3 Background reactions
+
+**Where:** `frontend/src/components/ThreeBackground.vue`
+
+The wireframe background reads the same refs the rest of the app already exports, so none of this
+needed a new trigger:
+
+- **Pointer gravity well** — shapes within `GRAVITY_RADIUS` of the cursor's projection onto the
+  z=0 plane lean towards it, hardest at the centre. Each shape keeps a `home` and an `offset`, and
+  the offset eases towards a per-frame target — so "let go" is just a zero target, not a special
+  case. The pointer goes idle after 2.5 s without movement and everything drifts home.
+- **Section-reactive palette** — `activeSection` (already maintained for `pwd`) picks a base
+  colour, an accent colour and a rotation multiplier. Materials are recoloured in place rather than
+  rebuilt, so a section change doesn't teleport the scene.
+- **Glitch burst** — `useCrt`'s `glitching` ref, which already drives the CSS screen-tear on
+  `sudo rm -rf /`, adds random jitter to the same offset for exactly that window, with a much
+  higher lerp factor so it snaps rather than drifts.
+- **Completionist palette** — `unlocked.value.has('completionist')` overrides the section palette
+  entirely. It is the only visual state no amount of scrolling can produce.
+
+One watcher covers the last two inputs, because `currentPalette()` already encodes which wins.
+
+**Terminal control** (`composables/useSceneControl.ts`) adds three more knobs, in the same
+flag-and-watch shape as `useMatrix`/`useBoot` — the commands only ever set, the component is the
+only reader:
+
+- `spawn [n]` adds or removes shapes, capped at 60. Nobody gets to talk the page into melting a
+  GPU, and the floor is 1 so the scene can't be emptied into a blank canvas.
+- `gravity on|off` gates the pointer well. Off is the interesting half, so that's the half that
+  unlocks an achievement.
+- `constellation on|off` adds a `THREE.LineSegments` between shapes closer than 5.5 world units,
+  recomputed each frame. The position buffer is allocated once for the 60-shape ceiling and drawn
+  with `setDrawRange` — sizing it to the *current* count would silently truncate the lines the
+  moment someone spawned more.
+- `scene` prints the current state; `scene reset` puts all three back.
+
+**Click-to-inspect** raycasts from the click into the scene, names the shape in a small floating
+label, and holds the camera's gaze on it for 2.2s before easing back to the origin. The canvas
+stays `pointer-events-none` — a full-screen canvas that eats clicks is a worse bug than a missing
+easter egg — so the listener is on `window` and ignores anything that belongs to the page: links,
+controls, an open terminal, or a click that ended a text selection. Three of the eighteen opening
+shapes are the accent colour; clicking one of those is the `cyanSpotter` achievement.
+
 ---
 
 ## 6. Boot sequence, 404, footer, console
 
-- **Boot sequence** (`BootSequence.vue`) — fake kernel log resolving into the page. Shown once,
-  gated on `localStorage['couvbat:booted']`, skippable with any key or click, ~2.2s at most.
-  Skipped entirely under `prefers-reduced-motion`.
+- **Boot sequence** (`BootSequence.vue`, `composables/useBoot.ts`) — fake kernel log resolving into
+  the page. Shown once, gated on `localStorage['couvbat:booted']`, skippable with any key or click,
+  ~2.2s at most. Skipped entirely under `prefers-reduced-motion`. `reboot` (and the tail of `ssh`)
+  raise a module-level flag the component watches, replaying the same `start()` the first visit
+  runs — no `alreadyBooted` gate, and `finish()` clears the flag so it is immediately repeatable.
+  The dismiss listeners are armed 300 ms late: the keypress that submitted `reboot` is still
+  propagating when the watcher fires, and a window listener attached synchronously would eat it.
 - **404** (`NotFoundView.vue`) — `bash: /<path>: No such file or directory`, a `cd ~` button, and
   (desktop only) a hint to open the terminal. Requires `frontend/public/.htaccess` with an SPA
   rewrite; without it Apache 404s before Vue Router ever sees the URL. This closes a gap already
   flagged in [deploy.md](deploy.md).
 - **Footer** (`SiteFooter.vue`) — commit SHA and build timestamp, injected by Vite `define` as
   `__BUILD_SHA__` / `__BUILD_TIME__`, read from `git rev-parse` at config time with a `dev`
-  fallback so a tarball build doesn't break.
+  fallback so a tarball build doesn't break. Below them, a status ticker
+  (`composables/useStatus.ts`) shows uptime since the first commit and how long ago this build
+  shipped, re-read every 60 s. `uptime()` lives in that composable rather than next to `neofetch`
+  so the footer can show the same number without pulling the terminal registry into the main
+  bundle; `commands/content.ts` re-exports it for the commands that already imported it there.
 - **Console art** — `console.log` in `main.ts`. Costs nothing; the people who open DevTools on a
   developer portfolio are exactly the target audience.
 
@@ -357,6 +457,133 @@ Also GraphQL-only (`user.pinnedItems`), so it shares the same `GITHUB_TOKEN` req
 one-hour cache as contributions. `ProjectsSection` renders these as extra cards alongside the
 hand-curated `content/projects.ts` list, deduplicated by repo URL so a pinned repo that's already
 written up manually doesn't show twice.
+
+### `GET /github/workflow-status`
+
+The cheapest live-data route on the site: Actions runs are public REST, so this needs no new
+credential — it reuses the optional `GITHUB_TOKEN` purely to raise the rate limit, and reads
+`GITHUB_REPO` (`owner/name`) for the target. Unset, it returns `{ configured: false }` and the card
+is not rendered.
+
+Cached for **60 seconds**, far shorter than its neighbours: a build in flight is the one case where
+a stale answer is the wrong answer. `durationMs` is only computed for completed runs, because
+`updated_at` keeps moving while a run is still going.
+
+`BuildStatusCard.vue` renders the four most recent runs in the same terminal-window frame as the
+commit log — state dot, workflow name, branch, short SHA, duration, relative time — each linking to
+its run on GitHub. A queued or in-progress run pulses (`motion-safe:` only).
+
+### `GET /weather`
+
+Open-Meteo, which needs no key and no account — the reason it is the source here. Reads
+`WEATHER_LATITUDE`, `WEATHER_LONGITUDE` and a display-only `WEATHER_LOCATION` from config; without
+a usable coordinate pair it returns `{ configured: false }`. Cached ten minutes.
+
+**The coordinates are Jules's, not the caller's.** Nothing about the visitor is read, requested or
+stored, no browser geolocation is involved, and every visitor gets the same answer — which is also
+what makes a single shared cache correct. A portfolio has no business asking anyone where they are.
+They are deliberately left empty in `.env.example`: the site says only "France" about where Jules
+is, and a committed lat/long would be more precise than that.
+
+WMO codes are bucketed server-side by `conditionFor()` into `clear | cloudy | fog | drizzle | rain
+| snow | thunder`, so the glyph, the label and the background mood all read one mapping instead of
+three.
+
+`weather` renders wttr.in's layout — a glyph on the left, readings on the right — from
+`terminal/weather-art.ts`. The glyphs are hand-drawn, fixed at 11×5 and padded on read so the
+detail column always starts in the same place, and contain no emoji: those render double-width in
+some monospace stacks and would shear the column. Two forecast days follow, today omitted (the
+current conditions above already cover it).
+
+### `GET /markets`
+
+A proxy and nothing else: CORS stops the browser calling an exchange directly. CoinGecko's public
+endpoint is the source because — like Open-Meteo — it needs no key and no account.
+
+**No caller data reaches it.** The coin list comes from `MARKETS_COINS`, never from the request, so
+there is no query string a visitor can steer at a third party. Cached five minutes, and only
+fetched when someone actually runs the command: nothing on page load touches it.
+
+Sparkline series are downsampled server-side from CoinGecko's 168 hourly points to 48 — roughly a
+terminal's width — so the payload stays small and every renderer sees the same series.
+
+`btc` (aliases `stonks`, `crypto`) prints ticker, price and 24-hour change on one row and the
+week's shape on the next, drawn by `terminal/sparkline.ts` with `▁▂▃▄▅▆▇█`. Decimals follow the
+size of the number, because a coin at 55 000 and one at 0.42 both have to read sensibly. A flat
+week draws flat rather than dividing by zero.
+
+**Crypto only.** The "stonks" half of the idea stayed an alias rather than becoming a second
+integration: every free stock-quote API wants a key and an account, and the whole reason both live
+sources here were picked is that neither does.
+
+### Weather-linked background mood
+
+`useWeather.ts` turns the current condition into a `{ speed, opacity }` pair that `ThreeBackground`
+multiplies into what the section palette already decided — a storm spins the wireframes up, fog
+dims them, snow slows them, and night dims everything a little further. The multipliers are
+deliberately small: the section palette owns the colour and the CRT owns the speed ceiling, and
+weather that overrode either would read as a bug rather than as atmosphere. Opacity always scales
+from each shape's stored `baseOpacity`, so a run of weather changes cannot ratchet the scene down
+to invisible.
+
+The single request is made by `ThreeBackground` on mount — the surface that actually reacts to the
+answer — and `weather` reuses the cached result rather than asking again. Under reduced motion the
+component is never mounted, so the call is never made for a scene that would sit still anyway.
+
+### `GET /presence` — the one thing that pushes
+
+Nest's own `@Sse()`, so no new dependency. The connection *is* the subscription: a visitor arriving
+increments a counter and pushes the new figure to everyone already connected, a closed tab is a
+plain unsubscribe that pushes it back down. A 25-second heartbeat keeps Apache from reaping an idle
+stream. The count lives in memory — a restart resets it, which is correct, since every connection
+dies with the process anyway.
+
+**This is the opposite call from the guestbook ticker, for the opposite reason.** A presence count
+is only interesting *because* it moves as people come and go; a 20-second poll would show a number
+that is usually wrong and never seen to change. The guestbook's interesting event happens twice a
+week and its endpoint was already cached.
+
+**What crosses the wire is one integer.** No visitor id is sent, none is assigned, nothing is
+written to disk, and there is nothing on the server that could correlate one connection with
+another — not a policy applied afterwards, but the entire data model. A unit test asserts the
+payload has exactly one key, so a field creeping in alongside it fails the build.
+
+`usePresence.ts` holds the `EventSource`. It gives up after three failed connections rather than
+reconnecting for as long as the tab is open, and the footer segment stays out of the DOM entirely
+until a first message arrives — an unreachable backend shows nothing rather than a zero.
+
+### `GET /stats` · `POST /stats/session`
+
+A single running total: how many times anyone has opened the terminal. `useTerminal.ts`'s
+`primeOverlay()` posts once per session.
+
+**Once per session, not once per command.** Per-command would be chatter, and it would mean the
+server learning *which* commands people run — precisely what the `ask` route promises not to
+record. What is stored is one number, in one JSON file: `{"sessions":N}`, asserted by a test against
+the file that actually lands on disk.
+
+Rate-limited to 5/hour per IP through the existing `RateLimitGuard`, not because the write is
+expensive but because a number nobody can inflate with a `for` loop is the only kind worth
+printing. Increments accumulate in memory and flush at most every 30 seconds, write-then-rename like
+the guestbook, into `stats.json` under `DATA_DIR` — which the deploy excludes, so the total survives
+a release instead of resetting to zero. Surfaced as a `Sessions` row in `neofetch`, omitted rather
+than zeroed when the backend is unreachable.
+
+### Live guestbook ticker
+
+**Polling, not SSE.** `useGuestbookTicker.ts` re-reads `GET /guestbook` every 20 s and announces
+anything that appeared since the page loaded. The first pass only records what is already there —
+someone arriving after ten signatures should not be told about all ten.
+
+**Decision:** the payload is a handful of short entries, the interesting event happens maybe twice
+a week, and the endpoint is already cached. SSE would mean a new backend module, a long-lived
+connection per visitor, and a reconnect story, in exchange for latency nobody is measuring. The
+poll skips while `document.hidden` — a backgrounded tab has nobody to show a toast to — and gives
+up entirely after three consecutive failures, or the first response saying the guestbook is off.
+
+`GuestbookTicker.vue` drains the queue one at a time, the same way `AchievementToast` does; two
+floating notices fighting for the same corner reads as a bug. Clicking it opens the terminal with
+`guestbook` already running.
 
 ### Guestbook
 

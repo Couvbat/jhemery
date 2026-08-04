@@ -174,6 +174,90 @@ export const achievementList: Achievement[] = [
     description: { en: 'Grew a snake to length 10.', fr: 'Fait grandir un serpent jusqu’à 10.' },
   },
   {
+    id: 'dotenv',
+    title: { en: 'Configuration Leak', fr: 'Fuite de config' },
+    hint: {
+      en: 'Some files are more dangerous to read than others.',
+      fr: 'Certains fichiers sont plus dangereux à lire que d’autres.',
+    },
+    description: { en: 'Read `.env`.', fr: 'Lu `.env`.' },
+  },
+  {
+    id: 'reboot',
+    title: { en: 'Deja Vu', fr: 'Déjà-vu' },
+    hint: {
+      en: 'Some sequences are worth watching twice.',
+      fr: 'Certaines séquences méritent d’être revues.',
+    },
+    description: { en: 'Replayed the boot sequence.', fr: 'Rejoué la séquence de démarrage.' },
+  },
+  {
+    id: 'ssh',
+    title: { en: 'Knock Knock', fr: 'Toc toc' },
+    hint: {
+      en: 'Some doors are worth trying, even locked ones.',
+      fr: 'Certaines portes méritent d’être essayées, même fermées.',
+    },
+    description: { en: 'Opened a shell on the host.', fr: 'Ouvert un shell sur l’hôte.' },
+  },
+  {
+    id: 'diffsy',
+    title: { en: 'Spot the Difference', fr: 'Trouvez l’erreur' },
+    hint: {
+      en: 'Two files, one command, and a very short attention span.',
+      fr: 'Deux fichiers, une commande, et très peu de patience.',
+    },
+    description: { en: 'Compared two files.', fr: 'Comparé deux fichiers.' },
+  },
+  {
+    id: 'alias',
+    title: { en: 'Make It Yours', fr: 'À votre façon' },
+    hint: {
+      en: 'This shell lets you rename things.',
+      fr: 'Ce shell vous laisse renommer les choses.',
+    },
+    description: { en: 'Defined an alias.', fr: 'Défini un alias.' },
+  },
+  {
+    id: 'banner',
+    title: { en: 'Big Text Energy', fr: 'Grosses lettres' },
+    hint: {
+      en: 'Some messages deserve to take up more space.',
+      fr: 'Certains messages méritent de prendre plus de place.',
+    },
+    description: { en: 'Printed something in block letters.', fr: 'Affiché du texte en grosses lettres.' },
+  },
+  {
+    id: 'cyanSpotter',
+    title: { en: 'Rare Find', fr: 'Trouvaille rare' },
+    hint: {
+      en: 'Not all of them are the same colour. Look closely, then click.',
+      fr: 'Elles ne sont pas toutes de la même couleur. Regardez bien, puis cliquez.',
+    },
+    description: {
+      en: 'Clicked one of the three accent shapes.',
+      fr: 'Cliqué sur une des trois formes d’accent.',
+    },
+  },
+  {
+    id: 'constellation',
+    title: { en: 'Connect the Dots', fr: 'Relier les points' },
+    hint: {
+      en: 'There might be a pattern hiding in the drift.',
+      fr: 'Il y a peut-être un motif caché dans la dérive.',
+    },
+    description: { en: 'Turned constellation mode on.', fr: 'Activé le mode constellation.' },
+  },
+  {
+    id: 'zeroG',
+    title: { en: 'Zero-G', fr: 'Apesanteur' },
+    hint: {
+      en: 'Some commands turn gravity off.',
+      fr: 'Certaines commandes coupent la gravité.',
+    },
+    description: { en: 'Ran `gravity off`.', fr: 'Lancé `gravity off`.' },
+  },
+  {
     id: COMPLETIONIST,
     title: { en: '100%', fr: '100%' },
     hint: { en: 'For those who leave no stone unturned.', fr: 'Pour ceux qui ne laissent rien au hasard.' },
