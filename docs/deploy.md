@@ -195,11 +195,26 @@ Setup, if you want this path ready before you need it:
 
 If `mod_headers` or `mod_mime` is unavailable the `<IfModule>` guards make those blocks no-ops — the site still works, just without the cache and charset hints.
 
+## Verified in production
+
+Both tiers are live. Checked against `https://api.jhemery.xyz` on 4 August 2026:
+
+| Endpoint | Result |
+|---|---|
+| `GET /github/activity` | 200, `{"configured":true,"commits":[…]}` |
+| `GET /github/contributions` | 200, `{"configured":true,"total":894,…}` |
+| `GET /github/pinned-repos` | 200, `{"configured":true,"repos":[…]}` |
+| `GET /steam/activity` | 200, `{"configured":true,"profile":{"name":"Couvbat",…}}` |
+| `GET /guestbook` | 200, `{"enabled":true,"entries":[…]}` |
+
+So the app boots under Passenger, `.htaccess` routes to `dist/main.js`, and the hand-written `.env` from Part A.6 is populated — every integration reports `configured: true`, which means the GitHub token and the `STEAM_API_KEY` / `STEAM_ID` pair are all present and accepted upstream. Steam's `configured: true` branch is exercised in production, not just the credential-less `{"configured": false}` fallback.
+
+CORS works in both directions: a request carrying `Origin: https://jhemery.xyz` comes back with `access-control-allow-origin: https://jhemery.xyz`, and the `OPTIONS /guestbook` preflight returns 204 with `access-control-allow-methods: GET,POST,DELETE` and `access-control-allow-headers: Content-Type,x-admin-password`.
+
+The running build also answers `POST /ask`, which merged on 4 August 2026 at 13:48 UTC, so the deployed code postdates every CI deploy attempt listed below.
+
 ## Known gaps
 
-- **The backend has never deployed successfully.** The frontend first landed on 4 August 2026; every backend run before that failed on missing secrets, then on the firewall race. Nothing past the rsync — `npm ci`, the manifest copy, the Passenger restart — has run against the real server.
+- **The automated backend deploy has never completed a run.** The backend is deployed and running — see [Verified in production](#verified-in-production) — but it did not get there through CI. Every `Deploy Backend` run so far has failed or been cancelled (9 failures and 1 cancellation as of 4 August 2026), each dying at the transfer step; the most recent still hit the `kex_exchange_identification: read: Connection reset by peer` firewall race that the retry loop is meant to absorb. Because the transfer never lands, the step behind it is skipped every time — **`npm ci --omit=dev`, the `package.json` / `package-lock.json` copy up to the app root, and `touch tmp/restart.txt` have still never run against the real server.** The live deployment was placed by hand. By contrast the frontend deploy does work end-to-end; it first landed on 4 August 2026.
 - **Backend restart mechanism is unverified.** It assumes the o2switch Node.js App (Passenger) picks up `tmp/restart.txt`. If the app is managed a different way (PM2, systemd, etc.), update the "Install production dependencies & restart app" step in [backend-deploy.yml](../.github/workflows/backend-deploy.yml).
 - **The FTP fallback is unverified.** Written against o2switch's documented FTPS setup, never run against the real account.
-- **Steam live data is unverified.** `GET /steam/activity` has only ever been exercised with no credentials, where it correctly returns `{"configured": false}` and the site falls back to the static game log. The `configured: true` path needs a real `STEAM_API_KEY` / `STEAM_ID` in `backend/.env` and a manual check once set.
-- **`ask` needs the model kept warm, or it can never answer.** Measured against the live Ollama box: **33.8s from a cold start to the first token**, against a 20s timeout in the service. A portfolio gets sporadic traffic and Ollama's default `keep_alive` is 5 minutes, so cold is the *normal* state and every such visitor gets "the model is asleep". This is not fixable in the app — a longer timeout just means a longer stare at `thinking…`. Set `OLLAMA_KEEP_ALIVE=-1` on the model host so it stays resident.
-- **Nothing on the server reports why `ask` failed.** The service logs latency and outcome to stdout, which on Passenger goes to the app's stderr log. When `ask` misbehaves that log is the only account of it, and the diagnosis above had to be reconstructed from black-box probing instead — see [ask-command-design.md](superpowers/specs/2026-08-04-ask-command-design.md).
