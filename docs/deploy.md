@@ -79,6 +79,19 @@ Then:
 
 cPanel → **Domaines** → confirm the domain's document root. That path is the `FRONTEND_REMOTE_PATH` secret (e.g. `/home/<user>/jhemery.xyz` for an addon domain, or `/home/<user>/public_html` if it's the account's main domain).
 
+The frontend also needs to know where the API lives, via `VITE_API_URL` (e.g. `https://api.jhemery.xyz`). This one works differently from every other setting on this page, and the difference matters:
+
+> **`VITE_API_URL` is consumed at build time, not at runtime.** `vite build` replaces `import.meta.env.VITE_API_URL` with a string literal and the deploy ships static files, so the URL is frozen into `assets/index-*.js` before anything reaches the server. Putting a `.env` next to the deployed `dist/` has no effect — nothing on the server ever reads it. It has to be set **wherever the build runs**.
+
+That means one of:
+
+- **Building in CI** (what the deploy workflows do) — `VITE_API_URL` has to reach the `npm run build` step in [frontend-build.yml](../.github/workflows/frontend-build.yml), as a step `env:` entry.
+- **Building locally** — a `frontend/.env` on your machine, then deploy the `dist/` it produces.
+
+If it is set in neither place, [frontend/src/lib/api.ts](../frontend/src/lib/api.ts) falls back to an empty base, so calls go same-origin and fail locally instead of firing cross-origin requests at each visitor's own machine.
+
+Whatever value you use has to agree with the CORS allowlist in the other direction: `FRONTEND_URL` in `backend/.env`. Note that both hosts end up inlined in a public bundle, so neither is a secret and neither belongs in GitHub Actions *secrets* — a plain repo variable or literal is enough.
+
 ### 5. Set up the backend as a Node.js App
 
 cPanel → **Logiciel** → **Setup Node.js App** → **Create Application**:

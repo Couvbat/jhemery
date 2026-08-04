@@ -1,6 +1,22 @@
 import type { Locale } from '@/content/types'
 
-export const apiUrl: string = import.meta.env.VITE_API_URL ?? 'http://localhost:3000'
+/**
+ * Where the backend lives.
+ *
+ * `VITE_API_URL` is read from `frontend/.env` **by `vite build`**, and Vite
+ * inlines it into the bundle as a literal — so it has to be set wherever the
+ * build runs. Dropping a `.env` next to the deployed `dist/` does nothing: what
+ * ships is static files with the URL already frozen in.
+ *
+ * The localhost fallback is deliberately dev-only. It used to apply to every
+ * build, so a production bundle with no `VITE_API_URL` aimed every live-data
+ * call at the *visitor's* machine — five doomed cross-origin requests to
+ * `http://localhost:3000` on each page load. Falling back to an empty base
+ * makes that same mistake a same-origin request instead: still wrong, but it
+ * fails quietly and locally rather than in every visitor's console.
+ */
+export const apiUrl: string =
+  import.meta.env.VITE_API_URL ?? (import.meta.env.DEV ? 'http://localhost:3000' : '')
 
 export interface SteamRecentGame {
   appId: number

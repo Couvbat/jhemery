@@ -66,10 +66,17 @@ const { autoplayNonce } = useMusicPlayer()
             <!--
               The `key` remounts the iframe when the terminal `play` command fires, which is
               the only way to hand SoundCloud an autoplay flag it will honour.
+
+              Lazy on first mount: this section is well below the fold, and SoundCloud's
+              player drags in a widget bundle, a DataDome script and a pile of third-party
+              cookie warnings that nobody who never scrolls here should pay for. The `play`
+              remount switches to eager — that iframe is wanted *now*, and waiting on the
+              smooth scroll to cross the lazy-load threshold would delay playback.
             -->
             <iframe
               :key="autoplayNonce"
               :src="autoplayNonce > 0 ? `${soundcloudEmbedSrc}&auto_play=true` : soundcloudEmbedSrc"
+              :loading="autoplayNonce > 0 ? 'eager' : 'lazy'"
               width="100%"
               height="400"
               frameborder="0"
