@@ -150,6 +150,11 @@ npm run build        # → dist/
 does nothing. Trailing slashes are stripped in `lib/api.ts`; the comment there explains why that
 one character was worth a fix.
 
+`VITE_UMAMI_SRC` and `VITE_UMAMI_WEBSITE_ID` are inlined the same way and point at the self-hosted
+[Umami](https://umami.is) instance. Both unset — as they are in `.env.development` — means
+`lib/analytics.ts` injects no tracker at all, so dev never reaches the dashboard. See
+[docs/deploy.md](../docs/deploy.md#analytics-the-self-hosted-umami-at-umamijhemeryxyz).
+
 Deployment (SSH, with a manual FTP fallback) lives in `.github/workflows/frontend-*.yml`.
 
 ## Editor setup

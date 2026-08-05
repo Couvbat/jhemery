@@ -48,9 +48,30 @@ jobs:
           fi
           echo "Building against $VITE_API_URL"
 
+      # Unlike VITE_API_URL these are optional and deliberately not guarded: with
+      # them unset src/lib/analytics.ts injects nothing and the site works, it is
+      # just not counted. Failing the build over analytics would be the wrong
+      # trade. This step exists so a silently unmeasured deploy is visible in the
+      # run log rather than only in an empty dashboard weeks later.
+      - name: Report analytics configuration
+        env:
+          VITE_UMAMI_SRC: ${{ vars.VITE_UMAMI_SRC }}
+          VITE_UMAMI_WEBSITE_ID: ${{ vars.VITE_UMAMI_WEBSITE_ID }}
+        run: |
+          if [ -n "$VITE_UMAMI_SRC" ] && [ -n "$VITE_UMAMI_WEBSITE_ID" ]; then
+            echo "Umami enabled, tracker: $VITE_UMAMI_SRC"
+          else
+            echo "::notice title=Umami analytics is off::Set VITE_UMAMI_SRC and VITE_UMAMI_WEBSITE_ID under Settings -> Secrets and variables -> Actions -> Variables to enable it. Both are needed; the build ships without a tracker while either is missing."
+          fi
+
       - name: Build
         env:
           VITE_API_URL: ${{ vars.VITE_API_URL }}
+          # Repository variables, not secrets: a website ID and a public script
+          # URL are both visible to anyone who views source on the deployed site.
+          VITE_UMAMI_SRC: ${{ vars.VITE_UMAMI_SRC }}
+          VITE_UMAMI_WEBSITE_ID: ${{ vars.VITE_UMAMI_WEBSITE_ID }}
+          VITE_UMAMI_DOMAINS: ${{ vars.VITE_UMAMI_DOMAINS }}
         run: npm run build
 
       # `.htaccess` is a dotfile and upload-artifact drops those by default, so
