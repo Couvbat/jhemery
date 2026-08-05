@@ -21,7 +21,7 @@ Two runs at once would put two entries in that 5-slot whitelist and race the fir
 
 Repo → **Settings** → **Secrets and variables** → **Actions** → **Variables** → `VITE_API_URL` = `https://api.jhemery.xyz`
 
-A `.env` placed on the server does nothing for a static bundle; the file is read by Vite during `npm run build`, never by the browser.
+A `.env` placed on the server does nothing for a static bundle; the file is read by Vite during `npm run build`, never by the browser. `VITE_UMAMI_SRC` and `VITE_UMAMI_WEBSITE_ID` work the same way but are optional — see [Analytics](#analytics-the-self-hosted-umami-at-umamijhemeryxyz).
 
 Getting this wrong is quiet rather than loud: `src/lib/api.ts` falls back to `http://localhost:3000`, so the site deploys and renders perfectly while every API call goes nowhere. [frontend-build.yml](../.github/workflows/frontend-build.yml) therefore fails the build outright when the variable is unset rather than letting the fallback through. To check what a deployed bundle actually contains:
 
@@ -113,6 +113,35 @@ Whatever value you use has to agree with the CORS allowlist in the other directi
 
 Building locally instead — a `frontend/.env` on your machine, then deploying that `dist/` by hand — works the same way, and is the only route that does not go through the variable.
 
+### Analytics: the self-hosted Umami at umami.jhemery.xyz
+
+Traffic goes to a self-hosted [Umami](https://umami.is) instance rather than to a third party. It is cookieless and stores only aggregates, so it needs no consent banner and nothing personal leaves the visitor's browser.
+
+The tracker is injected by [frontend/src/lib/analytics.ts](../frontend/src/lib/analytics.ts), not hardcoded in `index.html`, and it is configured by three build-time variables — same mechanism as `VITE_API_URL` above, same caveat about a `.env` on the server being inert:
+
+| Variable | Required | Example |
+| --- | --- | --- |
+| `VITE_UMAMI_SRC` | yes | `https://umami.jhemery.xyz/script.js` |
+| `VITE_UMAMI_WEBSITE_ID` | yes | the UUID from Umami → **Settings** → **Websites** → **Edit** |
+| `VITE_UMAMI_DOMAINS` | no | `jhemery.xyz` — `data-domains`, comma-separated, no scheme |
+
+Set the first two as repository **variables** (Settings → Secrets and variables → Actions → Variables). Variables, not secrets, for the same reason as `VITE_API_URL`: both end up in a public bundle and are visible to anyone who views source.
+
+**With either of the first two unset, no tracker is injected at all.** That is the off switch, and it is why `frontend/.env.development` ships with both commented out — a hot-reloading dev server would otherwise fill the dashboard with pageviews of `localhost`. Unlike `VITE_API_URL`, an unset value does **not** fail the build: a site that is not counted still works, so [frontend-build.yml](../.github/workflows/frontend-build.yml) only prints a `::notice` saying analytics is off.
+
+Two things worth knowing once it is live:
+
+- **Route changes need no wiring.** Umami's script records a pageview on load and one on every `history.pushState`, which is exactly how Vue Router's `createWebHistory` navigates. There is no router hook to maintain.
+- **Content blockers cancel the request.** Self-hosting on your own domain avoids the blocklists that name the hosted service, but `/script.js` is itself a recognised path, so some visitors are never counted. Serving the tracker from a path on `jhemery.xyz` via a reverse proxy avoids that; on this shared host it would need `mod_proxy`, which the [Apache config](#apache-config) deliberately does not depend on. Treat the numbers as a floor, not a census.
+
+To check what a deployed bundle actually contains:
+
+```bash
+curl -s https://jhemery.xyz/$(curl -s https://jhemery.xyz/ | grep -oE '/assets/[^"]+\.js' | head -1) | grep -o 'umami[^"]*'
+```
+
+Beyond pageviews, [frontend/src/App.vue](../frontend/src/App.vue) sends one custom event, `terminal-opened`. The site is a single route, so pageviews alone cannot answer the one question worth asking about it — whether anyone finds the hidden terminal. Add more with `track(name, data)` from the same module; calls made before the script finishes loading are queued and replayed, and calls made while analytics is off are dropped.
+
 ### 5. Set up the backend as a Node.js App
 
 cPanel → **Logiciel** → **Setup Node.js App** → **Create Application**:
@@ -161,6 +190,8 @@ Repo → **Settings** → **Secrets and variables** → **Actions** → **New re
 All seven are required. Check them with `gh secret list` before expecting a deploy to pass — a missing secret expands to an empty string rather than failing the run outright.
 
 `VITE_API_URL` is deliberately **not** in this table — it is a repository *variable*, not a secret, because it ends up inlined in a public bundle. See [Where the frontend's API URL comes from](#where-the-frontends-api-url-comes-from). Without it the frontend build fails outright.
+
+The same goes for `VITE_UMAMI_SRC`, `VITE_UMAMI_WEBSITE_ID` and `VITE_UMAMI_DOMAINS`: variables, not secrets. Unlike `VITE_API_URL` they are optional — without them the site deploys and works, just uncounted. See [Analytics](#analytics-the-self-hosted-umami-at-umamijhemeryxyz).
 
 ### 2. Trigger a run
 

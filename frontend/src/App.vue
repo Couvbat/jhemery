@@ -9,6 +9,7 @@ import { useKonami } from '@/composables/useKonami'
 import { restoreCrt, setCrt } from '@/composables/useCrt'
 import { useMatrix } from '@/composables/useMatrix'
 import { terminalOpen } from '@/composables/useTerminalShell'
+import { track } from '@/lib/analytics'
 import { unlock } from '@/terminal/achievements'
 import AchievementToast from '@/components/AchievementToast.vue'
 // Polls the guestbook on a slow interval, so it stays off the critical path.
@@ -35,7 +36,12 @@ const showThreeBackground = ref(false)
 // its async chunk is fetched exactly once, the first time it's actually needed.
 const terminalEverOpened = ref(false)
 watch(terminalOpen, (isOpen) => {
-  if (isOpen) terminalEverOpened.value = true
+  if (!isOpen) return
+  terminalEverOpened.value = true
+  // The site is a single route, so pageviews alone say nothing about whether
+  // anyone finds the terminal — the one thing here worth measuring. No-op when
+  // analytics is unconfigured.
+  track('terminal-opened')
 })
 
 useKonami(() => {
