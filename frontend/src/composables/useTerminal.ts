@@ -329,6 +329,12 @@ function ownerOf(words: string[]): { command: Command; argStart: number } | unde
   return viaAlias ? { command: viaAlias, argStart: 1 } : undefined
 }
 
+/** What one Tab press produced: the line to show, and where the caret goes in it. */
+export interface Completion {
+  value: string
+  caret: number
+}
+
 /** Candidates for a word past the command name — the command's own to declare. */
 function completeArgument(words: string[], index: number, word: string): string[] {
   const owner = ownerOf(words)
@@ -342,33 +348,47 @@ function completeArgument(words: string[], index: number, word: string): string[
 }
 
 /**
- * Tab completion. Returns the replacement value, printing candidates when
- * ambiguous.
+ * Tab completion. Returns the line to show and where the caret should land,
+ * printing candidates when ambiguous.
  *
  * The command word and its arguments go through the same three steps — filter
  * by prefix, insert the single match or the common prefix, list the rest — so
  * completing an argument feels like completing a command, one word later. Only
  * the source of the candidates differs.
+ *
+ * Only the word the caret sits in is completed, and only the text behind the
+ * caret is read as a prefix — `cat ab|out` completes `ab`, leaving `out` where
+ * it is, the way a real shell does. Whitespace is spliced around rather than
+ * rebuilt, so `cat  ab` keeps the double space the visitor typed.
  */
-export function completeInput(value: string): string {
-  const indent = value.slice(0, value.length - value.trimStart().length)
-  const body = value.slice(indent.length)
-  // A trailing space splits into a final empty word, which is exactly right:
-  // the cursor is on a new argument nobody has typed a prefix for yet.
-  const words = body.split(/\s+/)
-  const index = words.length - 1
-  const word = words[index]!
+export function completeInput(value: string, caret: number = value.length): Completion {
+  const at = Math.max(0, Math.min(caret, value.length))
+  const head = value.slice(0, at)
+  const tail = value.slice(at)
 
-  const candidates =
-    index === 0 ? completeCommand(word) : completeArgument(words, index, word)
-  if (candidates.length === 0) return value
+  // The word under the caret is the run of non-space characters ending at it —
+  // empty when the caret follows a space, which is exactly right: the cursor is
+  // on a new argument nobody has typed a prefix for yet.
+  const word = /\S*$/.exec(head)![0]
+  const start = head.length - word.length
+  const preceding = head.slice(0, start).trim()
+  const priorWords = preceding ? preceding.split(/\s+/) : []
+  const index = priorWords.length
+  const words = [...priorWords, word]
 
-  const head = index === 0 ? indent : `${indent}${words.slice(0, index).join(' ')} `
-  if (candidates.length === 1) return `${head}${candidates[0]!} `
+  const candidates = index === 0 ? completeCommand(word) : completeArgument(words, index, word)
+  if (candidates.length === 0) return { value, caret: at }
+
+  const splice = (insert: string): Completion => ({
+    value: `${head.slice(0, start)}${insert}${tail}`,
+    caret: start + insert.length,
+  })
+
+  if (candidates.length === 1) return splice(`${candidates[0]!} `)
 
   const shared = commonPrefix(candidates)
   append({ text: candidates.join('  '), tone: 'muted', pre: true })
-  return shared.length > word.length ? `${head}${shared}` : value
+  return shared.length > word.length ? splice(shared) : { value, caret: at }
 }
 
 /** Called by `TerminalOverlay` every time it opens — shows the welcome message
