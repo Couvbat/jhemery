@@ -15,8 +15,15 @@ ci:
     # same document with the same bundle, so a second URL would cost a minute of
     # CI to re-measure identical numbers.
     staticDistDir: ./dist
-    # Three runs, median taken below. One run is a coin toss on a shared runner.
-    numberOfRuns: 3
+    # Five, not three, because of what the first CI run actually did: on the
+    # GitHub runner run #1 measured 879 ms of blocking time and a 0.61
+    # performance score, while runs #2 and #3 came in at 14 ms / 0.96 and
+    # 15 ms / 0.96. Locally all three runs were clean, so this is the runner
+    # warming up, not the site. The median below discarded it and the job
+    # passed — but with three samples it only takes two cold starts for the
+    # outlier to become the median and fail a PR that changed nothing. Two
+    # extra runs cost about forty seconds and make that need three.
+    numberOfRuns: 5
     settings:
       # Desktop, deliberately. The mobile preset's 4x CPU throttle turns the
       # runner's own noise into the dominant signal — three consecutive mobile
