@@ -11,74 +11,99 @@ import { allCommands } from '../registry'
  * word-splitting rules rather than any one command's candidate list — a command
  * declaring its own `complete()` is covered by the registry invariants below.
  */
+/** The completed line alone, for the cases where the caret is not the point. */
+const line = (value: string, caret?: number) => completeInput(value, caret).value
+
 describe('completeInput', () => {
   beforeEach(() => {
     clearAliases()
   })
 
   it('still completes the command word', () => {
-    expect(completeInput('whoam')).toBe('whoami ')
+    expect(line('whoam')).toBe('whoami ')
   })
 
   it('leaves an unmatched command word alone', () => {
-    expect(completeInput('zzzz')).toBe('zzzz')
+    expect(line('zzzz')).toBe('zzzz')
   })
 
   it('completes an argument once the line has a space', () => {
-    expect(completeInput('cat ab')).toBe('cat about.txt ')
+    expect(line('cat ab')).toBe('cat about.txt ')
   })
 
   it('offers every file on a bare trailing space', () => {
     // Ambiguous, so the line comes back unchanged — but the listing proves the
     // candidates were found.
-    expect(completeInput('cat ')).toBe('cat ')
+    expect(line('cat ')).toBe('cat ')
   })
 
   it('completes the second operand of diff too', () => {
-    expect(completeInput('diff about.txt sk')).toBe('diff about.txt skills.txt ')
+    expect(line('diff about.txt sk')).toBe('diff about.txt skills.txt ')
   })
 
   it('completes a section for cd', () => {
     const [first] = sectionIds
-    expect(completeInput(`cd ${first!.slice(0, 3)}`)).toBe(`cd ${first} `)
+    expect(line(`cd ${first!.slice(0, 3)}`)).toBe(`cd ${first} `)
   })
 
   it('inserts the common prefix when several candidates share one', () => {
     // `off`/`on` share `o`, which is already typed, so the line stands.
-    expect(completeInput('gravity o')).toBe('gravity o')
-    expect(completeInput('gravity of')).toBe('gravity off ')
+    expect(line('gravity o')).toBe('gravity o')
+    expect(line('gravity of')).toBe('gravity off ')
   })
 
   it('returns the line untouched for a command with no candidates', () => {
-    expect(completeInput('echo hello wor')).toBe('echo hello wor')
+    expect(line('echo hello wor')).toBe('echo hello wor')
   })
 
   it('returns the line untouched after an unknown command', () => {
-    expect(completeInput('zzzz ab')).toBe('zzzz ab')
+    expect(line('zzzz ab')).toBe('zzzz ab')
   })
 
   it('preserves leading whitespace', () => {
-    expect(completeInput('  cat ab')).toBe('  cat about.txt ')
+    expect(line('  cat ab')).toBe('  cat about.txt ')
   })
 
   it('completes the visitor’s own aliases as command words', () => {
     setAlias('zzt', 'cat about.txt')
-    expect(completeInput('zz')).toBe('zzt ')
+    expect(line('zz')).toBe('zzt ')
   })
 
   it('completes arguments through an alias, against the command that will run', () => {
     setAlias('zzt', 'cat')
-    expect(completeInput('zzt ab')).toBe('zzt about.txt ')
+    expect(line('zzt ab')).toBe('zzt about.txt ')
   })
 
   it('completes alias names for unalias', () => {
     setAlias('zzt', 'cat')
-    expect(completeInput('unalias zz')).toBe('unalias zzt ')
+    expect(line('unalias zz')).toBe('unalias zzt ')
   })
 
   it('never leaks a hidden command through help', () => {
     // `help vi<Tab>` would hand out `vim` — the same leak `suggest()` refuses.
-    expect(completeInput('help vi')).toBe('help vi')
+    expect(line('help vi')).toBe('help vi')
+  })
+
+  it('completes the word the caret is in, not the end of the line', () => {
+    // `cat ab|out` — the tail is somebody else's word and stays put.
+    expect(completeInput('cat ab out', 6)).toEqual({ value: 'cat about.txt  out', caret: 14 })
+  })
+
+  it('reads only the text behind the caret as the prefix', () => {
+    // The caret sits after `ab`, so `.txt` behind it plays no part in matching.
+    expect(line('cat abzzz', 6)).toBe('cat about.txt zzz')
+  })
+
+  it('keeps the whitespace the visitor typed', () => {
+    expect(line('cat  ab')).toBe('cat  about.txt ')
+  })
+
+  it('leaves the caret alone when nothing completes', () => {
+    expect(completeInput('zzzz ab', 4)).toEqual({ value: 'zzzz ab', caret: 4 })
+  })
+
+  it('puts the caret after the inserted common prefix', () => {
+    expect(completeInput('gravity of')).toEqual({ value: 'gravity off ', caret: 12 })
   })
 })
 

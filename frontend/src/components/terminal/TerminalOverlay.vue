@@ -129,7 +129,12 @@ function onKeydown(event: KeyboardEvent) {
     input.value = recallHistory(1, input.value)
   } else if (event.key === 'Tab') {
     event.preventDefault()
-    input.value = completeInput(input.value)
+    const el = event.target as HTMLInputElement
+    // The caret goes in and comes back out: completing mid-line has to leave the
+    // cursor after the word it just filled in, not at the end of the line.
+    const completion = completeInput(input.value, el.selectionStart ?? input.value.length)
+    input.value = completion.value
+    void nextTick(() => el.setSelectionRange(completion.caret, completion.caret))
   } else if (event.key === 'l' && event.ctrlKey) {
     event.preventDefault()
     useTerminal().clearBuffer()
