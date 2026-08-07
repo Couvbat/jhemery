@@ -146,9 +146,15 @@ function onKeydown(event: KeyboardEvent) {
 }
 
 /** The red dot and Escape share one exit path, vim-trap nudge included — a
- *  close button that silently does nothing just reads as broken. */
+ *  close button that silently does nothing just reads as broken.
+ *
+ *  It submits `:q!`, not `:q`: a visitor who typed something in insert mode has
+ *  a dirty buffer, and plain `:q` refuses that with E37 — leaving the button
+ *  doing nothing visible but a status line hidden behind the pane. The trap joke
+ *  lives in the *typed* `:q` being refused; the chrome's own close control is
+ *  the way out, so it always works. */
 function requestClose() {
-  if (!closeTerminal()) void submit(':q')
+  if (!closeTerminal()) void submit(':q!')
 }
 
 /** Focus trap: the panel is the only interactive region while open. */
@@ -258,7 +264,12 @@ function onPanelKeydown(event: KeyboardEvent) {
         >
           <TerminalOutput v-for="(entry, i) in buffer" :key="i" :line="entry" />
         </div>
-        <VimPane v-else :buffer="vimBuffer" />
+        <!-- Same click-to-refocus as the scrollback above, and load-bearing here:
+             the pane is a plain div, so a click on the file contents blurs the
+             input, and every keystroke after that lands on <body> — outside the
+             overlay's listeners entirely. `:q!` would then type nowhere and
+             Escape would be dead, which reads exactly like a frozen editor. -->
+        <VimPane v-else :buffer="vimBuffer" @click="inputEl?.focus()" />
 
         <!-- Input -->
         <form

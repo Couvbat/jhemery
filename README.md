@@ -78,8 +78,10 @@ Unknown commands get a Levenshtein "did you mean …?" suggestion. `help` groups
 here" — `help --all` gives up the 18 hidden ones.
 
 **vim.** `vim` (or `vi`, `nvim`, `emacs`) opens a real modal editor pane: normal/insert modes,
-`hjkl` + arrows, `i`/`a`/`A`/`o`, `x`, `dd`, and yes, `:q!` gets you out. `cat` and `vim` read from
-the same fake filesystem, so a file can never show two different contents.
+`hjkl` + arrows, `i`/`a`/`A`/`o`, `x`, `dd`, and yes, `:q!` gets you out. `:q` refuses once you've
+typed something, same as the real thing — the title bar's red dot is the guaranteed way out if you'd
+rather not play along. `cat` and `vim` read from the same fake filesystem, so a file can never show
+two different contents.
 
 ## Commands
 
