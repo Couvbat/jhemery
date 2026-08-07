@@ -31,5 +31,6 @@ This licence covers the source code of this project. It does not cover:
   * `frontend/src/terminal/games/data/words-fr.ts`, which is generated from a
     Mozilla Public License 2.0 source and carries MPL-2.0. See THIRD-PARTY.txt.
 
-Third-party notices for the generated word lists are in
-`frontend/public/THIRD-PARTY.txt`, also served at /THIRD-PARTY.txt.
+Third-party notices are generated at build time by
+`frontend/vite-plugins/third-party.ts` and served at /THIRD-PARTY.txt. They
+cover the word-list data sources and every production dependency.

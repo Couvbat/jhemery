@@ -27,6 +27,7 @@ docs/       design specs and implementation plans
 - [Running it locally](#running-it-locally)
 - [Tests](#tests)
 - [Deployment](#deployment)
+- [Licence](#licence)
 
 ---
 
@@ -216,10 +217,16 @@ terminal pays for a dictionary.
 | [Grammalecte / Dicollecte](https://grammalecte.net/), via [`dictionary-fr`](https://www.npmjs.com/package/dictionary-fr) — © Olivier R. and contributors | **MPL-2.0** | French lemmas |
 | [Tatoeba](https://tatoeba.org/) — © Tatoeba contributors | **CC BY 2.0 FR** | French word frequency |
 
-Full notices are in [`frontend/public/THIRD-PARTY.txt`](frontend/public/THIRD-PARTY.txt), which
-ships with the built site and is served at [`/THIRD-PARTY.txt`](https://jhemery.xyz/THIRD-PARTY.txt)
-— these licences require their notice to travel with the copy that is distributed, and for a website
-that is `dist/`, not this repository.
+Full notices — the verbatim licence text of every data source *and* of all 118 production
+dependencies — ship with the built site at
+[`/THIRD-PARTY.txt`](https://jhemery.xyz/THIRD-PARTY.txt). These licences require their notice to
+travel with the copy that is distributed, and for a website that is `dist/`, not this repository.
+
+That file is generated at build time by
+[`frontend/vite-plugins/third-party.ts`](frontend/vite-plugins/third-party.ts), which copies each
+licence verbatim out of `node_modules` — the same one-source rule as the résumé plugin beside it. It
+was hand-written first and was wrong within the hour (SCOWL misdated, the wrong author credited,
+one copyright missed entirely), which is the whole argument for generating it.
 
 MPL-2.0 is file-level copyleft: `words-fr.ts` carries the notice and inherits the licence; nothing
 else here is affected.

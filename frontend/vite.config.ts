@@ -7,6 +7,7 @@ import vueDevTools from 'vite-plugin-vue-devtools'
 import tailwindcss from '@tailwindcss/vite'
 import { VitePWA } from 'vite-plugin-pwa'
 import { resumePlugin } from './vite-plugins/resume'
+import { thirdPartyPlugin } from './vite-plugins/third-party'
 import { profile } from './src/content/profile'
 
 /** Short commit SHA for the footer. Falls back to `dev` outside a git checkout. */
@@ -27,6 +28,7 @@ export default defineConfig({
     vueDevTools(),
     tailwindcss(),
     resumePlugin(),
+    thirdPartyPlugin(),
     VitePWA({
       registerType: 'autoUpdate',
       // Left off in dev: a service worker sitting in front of the dev server
@@ -88,16 +90,9 @@ export default defineConfig({
           /^\/robots\.txt$/,
           /^\/sitemap\.xml$/,
           /^\/og-image\.(png|svg)$/,
-          // Third-party attribution for the generated word lists. It has to be
-          // reachable in the *deployed* copy, not just the repository: MIT,
-          // MPL-2.0 and CC BY all require the notice to travel with what is
-          // distributed, and for a website that is `dist/`.
-          //
-          // It is a static file in `public/` rather than a bundler banner
-          // because Vite 8 discards `output.banner` and `legalComments` alike —
-          // both were tried. A sidecar in the same distribution is the ordinary
-          // way to do this anyway (it is what LicenseWebpackPlugin emits), and
-          // it cannot be minified away.
+          // Third-party notices, emitted by `vite-plugins/third-party.ts`.
+          // They have to be reachable in the *deployed* copy, not just the
+          // repository, because that is what the licences require.
           /^\/THIRD-PARTY\.txt$/,
         ],
         cleanupOutdatedCaches: true,
