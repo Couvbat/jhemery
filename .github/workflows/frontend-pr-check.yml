@@ -4,13 +4,18 @@ on:
   # `dev` is the integration branch: features branch off it and PR back into it,
   # and only then does `dev` PR into `master`. Both bases need the same checks —
   # a green feature PR is worth nothing if the branch it merges into is unchecked.
+  #
+  # Deliberately *not* path-filtered, unlike frontend-build.yml. These jobs are
+  # required status checks on `master` and `dev`, and GitHub does not read a
+  # workflow that never triggered as "passed" — it reads it as still pending. A
+  # `paths: frontend/**` filter would leave every backend-only PR waiting on a
+  # frontend check that is never going to report, unmergeable until someone
+  # bypasses the rule. Running the suite on PRs that cannot affect it wastes a
+  # couple of runner-minutes; the alternative wedges the merge queue.
   pull_request:
     branches:
       - master
       - dev
-    paths:
-      - 'frontend/**'
-      - '.github/workflows/frontend-*.yml'
   # Re-runs on the merged result. A PR is checked against its own head, so two
   # individually-green branches can still land a broken `dev`; this is the last
   # signal before `dev` is proposed to `master`. `master` is not listed — a push
@@ -18,9 +23,6 @@ on:
   push:
     branches:
       - dev
-    paths:
-      - 'frontend/**'
-      - '.github/workflows/frontend-*.yml'
 
 defaults:
   run:

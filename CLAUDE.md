@@ -159,10 +159,14 @@ git fetch origin && git switch -c feat/my-thing origin/dev
 gh pr create --base dev
 ```
 
-CI is path-filtered per app. `*-pr-check.yml` runs on PRs into either `master` or `dev`, and again
-on pushes to `dev` so the merged result is checked before `dev` is proposed to `master`.
-`*-build.yml` and the deploys stay on `master` only — merging into `dev` never ships anything.
-Deploys go over SSH via the cPanel API, with a manual FTP fallback workflow.
+`*-pr-check.yml` runs on PRs into either `master` or `dev`, and again on pushes to `dev` so the
+merged result is checked before `dev` is proposed to `master`. Both are **unfiltered** — they run
+the frontend *and* backend suites on every PR regardless of what it touches, because they are
+required status checks and GitHub reads a workflow that never triggered as permanently pending
+rather than passed. Don't add a `paths:` filter back; it makes single-app PRs unmergeable.
+
+`*-build.yml` and the deploys are path-filtered per app and stay on `master` only — merging into
+`dev` never ships anything. Deploys go over SSH via the cPanel API, with a manual FTP fallback.
 
 Dependabot has no `target-branch` set, so its PRs open against the default branch (`master`),
 bypassing `dev`. Set `target-branch: dev` in `.github/dependabot.yml` if they should follow the
