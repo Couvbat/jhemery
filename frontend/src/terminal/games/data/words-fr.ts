@@ -1,4 +1,5 @@
-/**
+/*!
+ * @license
  * GENERATED FILE — do not edit by hand.
  * Regenerate with `npm run wordlists` (see `scripts/build-wordlists.mjs`).
  *
@@ -9,12 +10,16 @@
  *
  *   dictionary-fr             MPL-2.0            — lemmas, © Olivier R. et al.
  *   https://grammalecte.net/                       (Grammalecte / Dicollecte)
+ *   MPL-2.0 §3.2: the Source Code Form of this file is available at the
+ *   repository URL below.
  *
  *   Tatoeba sentence export   CC BY 2.0 FR       — word frequency
  *   https://tatoeba.org/                           © Tatoeba contributors
  *
  * MPL-2.0 is file-level copyleft: this generated file inherits it, and must
  * keep this notice. It does not affect the rest of the project.
+ *
+ * Source form of this file: https://github.com/Couvbat/jhemery
  */
 
 /** Words a wordle may pick as the answer, spelled properly.

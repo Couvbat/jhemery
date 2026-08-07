@@ -214,8 +214,13 @@ terminal pays for a dictionary.
 | [Grammalecte / Dicollecte](https://grammalecte.net/), via [`dictionary-fr`](https://www.npmjs.com/package/dictionary-fr) — © Olivier R. and contributors | **MPL-2.0** | French lemmas |
 | [Tatoeba](https://tatoeba.org/) — © Tatoeba contributors | **CC BY 2.0 FR** | French word frequency |
 
+Full notices are in [`frontend/public/THIRD-PARTY.txt`](frontend/public/THIRD-PARTY.txt), which
+ships with the built site and is served at [`/THIRD-PARTY.txt`](https://jhemery.xyz/THIRD-PARTY.txt)
+— these licences require their notice to travel with the copy that is distributed, and for a website
+that is `dist/`, not this repository.
+
 MPL-2.0 is file-level copyleft: `words-fr.ts` carries the notice and inherits the licence; nothing
-else in this repository is affected. Each generated file repeats its own attribution in its header.
+else here is affected.
 
 ## Achievements
 
@@ -352,3 +357,13 @@ GitHub Actions, split per app and path-filtered:
 `docs/superpowers/` holds the design specs and implementation plans behind the bigger pieces — the
 three.js wireframe background, the vim pane, the terminal games, the achievements UI, the SoundCloud
 embed, and a CTF flag chain that is still just a design.
+
+---
+
+## Licence
+
+Source code is [MIT](LICENSE).
+
+Two things it does not cover, both spelled out in `LICENSE`: the personal content (bio, photos,
+project write-ups, résumé text) is mine and not licensed for reuse, and the generated French word
+list is MPL-2.0 — see [Word lists](#word-lists).

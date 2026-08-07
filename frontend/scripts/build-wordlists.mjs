@@ -237,6 +237,8 @@ const HEADERS = {
  *
  *   dictionary-fr             MPL-2.0            — lemmas, © Olivier R. et al.
  *   https://grammalecte.net/                       (Grammalecte / Dicollecte)
+ *   MPL-2.0 §3.2: the Source Code Form of this file is available at the
+ *   repository URL below.
  *
  *   Tatoeba sentence export   CC BY 2.0 FR       — word frequency
  *   https://tatoeba.org/                           © Tatoeba contributors
@@ -245,15 +247,27 @@ const HEADERS = {
  * keep this notice. It does not affect the rest of the project.`,
 }
 
-/** Words are emitted as one space-delimited string rather than an array
- *  literal, which drops two characters of quoting and punctuation per word —
- *  about a third of the file across ~7000 of them. */
+/**
+ * Words are emitted as one space-delimited string rather than an array literal,
+ * which drops two characters of quoting and punctuation per word — about a
+ * third of the file across ~7000 of them.
+ *
+ * The header is a `/*!` bang comment carrying `@license`, which is what marks it
+ * a *legal comment* to esbuild, terser and rolldown alike. A plain `/**` block
+ * is stripped from the production bundle, and these licences all require their
+ * notice to survive into the copy that is actually distributed — which for a
+ * website is `dist/`, not the repository. `THIRD-PARTY.md` covers the same
+ * ground for a reader; this covers it for the artefact.
+ */
 function emit(locale, { answers, accepted, typing }) {
-  return `/**
+  return `/*!
+ * @license
  * GENERATED FILE — do not edit by hand.
  * Regenerate with \`npm run wordlists\` (see \`scripts/build-wordlists.mjs\`).
  *
  * ${HEADERS[locale]}
+ *
+ * Source form of this file: https://github.com/Couvbat/jhemery
  */
 
 /** Words a wordle may pick as the answer, spelled properly.

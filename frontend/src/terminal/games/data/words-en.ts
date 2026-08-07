@@ -1,4 +1,5 @@
-/**
+/*!
+ * @license
  * GENERATED FILE — do not edit by hand.
  * Regenerate with `npm run wordlists` (see `scripts/build-wordlists.mjs`).
  *
@@ -7,6 +8,8 @@
  * under BSD-compatible terms and released under an MIT-like licence.
  *
  *   https://github.com/en-wl/wordlist
+ *
+ * Source form of this file: https://github.com/Couvbat/jhemery
  */
 
 /** Words a wordle may pick as the answer, spelled properly.

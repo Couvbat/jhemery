@@ -27,3 +27,5 @@
 - [Hardware](https://jhemery.xyz/#hardware): PCs, NAS and peripherals
 - [Gaming](https://jhemery.xyz/#gaming): Currently playing and favourite genres
 - [Sitemap](https://jhemery.xyz/sitemap.xml)
+- [Third-party notices](https://jhemery.xyz/THIRD-PARTY.txt): Licences for the generated word lists
+- [Licence](https://github.com/Couvbat/jhemery/blob/master/LICENSE): MIT, for the source code
