@@ -49,12 +49,15 @@ const toneClass: Record<string, string> = {
       :class="segment.tone ? toneClass[segment.tone] : undefined"
     >{{ segment.text }}</span></p>
 
-  <!-- Plain output. `pre` keeps ASCII art and padded columns aligned. -->
+  <!-- Plain output. `pre` keeps ASCII art and padded columns aligned. The
+       empty-line fallback is a non-breaking space written as an escape: a
+       blank line still has to occupy a row, and a literal U+00A0 sitting in
+       the source is indistinguishable from a stray typo. -->
   <p
     v-else
     :class="[
       toneClass[line.tone ?? 'default'],
       line.pre ? 'whitespace-pre' : 'whitespace-pre-wrap break-words',
     ]"
-  >{{ line.text || ' ' }}</p>
+  >{{ line.text || '\u00a0' }}</p>
 </template>

@@ -35,5 +35,8 @@ coverage
 # Vitest
 __screenshots__/
 
+# Lighthouse CI run output and reports
+.lighthouseci
+
 # Vite
 *.timestamp-*-*.mjs

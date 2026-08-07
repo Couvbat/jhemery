@@ -14,7 +14,7 @@ defaults:
 
 jobs:
   check:
-    name: Test, Type-check & Build
+    name: Lint, Test, Type-check & Build
     runs-on: ubuntu-latest
 
     steps:
@@ -29,9 +29,63 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      # `lint`, not `lint:fix` — a check that rewrites the working tree and then
+      # passes tells you nothing about the commit under review.
+      - name: Lint
+        run: npm run lint
+
       - name: Run tests
         run: npm test
 
       # `npm run build` runs type-check and build-only in parallel.
       - name: Build
         run: npm run build
+
+  # A separate job rather than more steps on `check`: it runs Lighthouse three
+  # times and takes a couple of minutes, and there is no reason for a type error
+  # to wait behind that. The two jobs run in parallel and report independently.
+  lighthouse:
+    name: Lighthouse
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      # Built without VITE_API_URL on purpose. The repository variable belongs
+      # to the deploy workflow; here an unset value makes src/lib/api.ts fall
+      # back to a same-origin base, so the live-data calls 404 against LHCI's
+      # static server instead of reaching the real backend. That keeps the run
+      # hermetic — no PR check should depend on api.jhemery.xyz being up — and
+      # it is the same condition the thresholds in lighthouserc.yml were
+      # measured against.
+      - name: Build
+        run: npm run build-only
+
+      # `npm run lighthouse`, not `npx lhci`: npx resolves from the registry
+      # when the local binary is missing, and there is an unrelated package
+      # published under the bare name `lhci`. The script runs node_modules/.bin.
+      #
+      # Chrome comes preinstalled on the GitHub-hosted ubuntu runners and LHCI
+      # finds it without help; if that ever stops being true this step fails
+      # loudly at the healthcheck rather than silently skipping.
+      - name: Lighthouse
+        run: npm run lighthouse
+
+      # Uploaded whether or not the assertions passed — a failed budget is
+      # exactly when the full report is worth reading.
+      - name: Upload Lighthouse reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: lighthouse-reports
+          path: frontend/.lighthouseci/reports
+          retention-days: 14

@@ -75,16 +75,25 @@ function start() {
   step(0)
 }
 
-onMounted(() => {
-  let alreadyBooted = false
+/**
+ * Whether this visitor has already seen the sequence.
+ *
+ * Reading localStorage throws outright in a few configurations — Safari private
+ * browsing, third-party-cookie blocking in an embedded context. Treating the
+ * throw as "already booted" is the safe direction: the sequence is skipped once
+ * rather than replayed on every single navigation.
+ */
+function hasBooted(): boolean {
   try {
-    alreadyBooted = window.localStorage.getItem(STORAGE_KEY) === '1'
+    return window.localStorage.getItem(STORAGE_KEY) === '1'
   } catch {
-    alreadyBooted = true
+    return true
   }
+}
 
+onMounted(() => {
   // First visit only, and never when the visitor asked for less motion.
-  if (alreadyBooted || prefersReducedMotion()) return
+  if (hasBooted() || prefersReducedMotion()) return
 
   start()
 })
