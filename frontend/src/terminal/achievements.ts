@@ -174,6 +174,54 @@ export const achievementList: Achievement[] = [
     description: { en: 'Grew a snake to length 10.', fr: 'Fait grandir un serpent jusqu’à 10.' },
   },
   {
+    id: 'minesweeper',
+    title: { en: 'Clean Sweep', fr: 'Déminage' },
+    hint: {
+      en: 'Somewhere in here, twenty-five things are hiding.',
+      fr: 'Quelque part ici, vingt-cinq choses se cachent.',
+    },
+    description: { en: 'Cleared a minesweeper board.', fr: 'Terrain déminé en entier.' },
+  },
+  {
+    id: 'wordle',
+    title: { en: 'Word Play', fr: 'Jeu de mots' },
+    hint: {
+      en: 'Five letters, and six chances to find them.',
+      fr: 'Cinq lettres, et six chances de les trouver.',
+    },
+    description: { en: 'Solved a wordle.', fr: 'Résolu un wordle.' },
+  },
+  {
+    id: 'hangman',
+    title: { en: 'Last Word', fr: 'Le mot de la fin' },
+    hint: {
+      en: 'Somebody is counting on you to guess quickly.',
+      fr: 'Quelqu’un compte sur vous pour deviner vite.',
+    },
+    description: { en: 'Won a round of hangman.', fr: 'Gagné une partie de pendu.' },
+  },
+  {
+    id: 'wpm',
+    title: { en: 'Touch Typist', fr: 'Dactylo' },
+    hint: {
+      en: 'How fast can you type, and how well?',
+      fr: 'À quelle vitesse tapez-vous, et avec quelle précision ?',
+    },
+    description: {
+      en: 'Hit 60 wpm at 95% accuracy or better.',
+      fr: 'Atteint 60 mots/min avec 95 % de précision ou mieux.',
+    },
+  },
+  {
+    id: 'tetris',
+    title: { en: 'Line Clear', fr: 'Ligne complète' },
+    hint: {
+      en: 'Ten of them, in one sitting.',
+      fr: 'Dix d’entre elles, en une seule partie.',
+    },
+    description: { en: 'Cleared 10 lines in one game.', fr: 'Effacé 10 lignes en une partie.' },
+  },
+  {
     id: 'dotenv',
     title: { en: 'Configuration Leak', fr: 'Fuite de config' },
     hint: {

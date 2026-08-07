@@ -1,7 +1,7 @@
 # jhemery.xyz
 
 Personal portfolio of **Jules Hémery** (*Couvbat*) — a terminal-flavoured single-page site with a
-wireframe three.js background, a real command shell you can type into, two playable games, and 30
+wireframe three.js background, a real command shell you can type into, seven playable games, and 35
 hidden achievements.
 
 Vue 3 + Vite + Tailwind on the front, NestJS on the back, bilingual (EN/FR) throughout.
@@ -139,7 +139,8 @@ the same fake filesystem, so a file can never show two different contents.
 
 ### misc
 
-Playable: `games` / `arcade`, `2048`, `snake`, `play` (starts the music player).
+Playable: `games` / `arcade`, `2048`, `snake`, `minesweeper` (`mines`), `tetris`, `wordle`
+(`motus`), `hangman` (`pendu`), `wpm` (`typing`), `play` (starts the music player).
 
 Background control: `spawn [n]`, `gravity [on|off]`, `constellation [on|off]` (alias `stars`) and
 `scene [reset]`.
@@ -154,22 +155,37 @@ fake as they look. `ls -a` lists both; `cat` and `vim` both read them.
 
 ## Games
 
-Both run inside the terminal buffer, take over the keyboard while they're live, and are cancellable
-with `Ctrl+C`. High scores are kept per game in `localStorage` and shown by `games`.
+All seven run inside the terminal buffer and take over the keyboard while they're live. **`Esc` or
+`Ctrl+C` quits any of them** — that's the universal exit, because three of them read letters and so
+can't spare `q` for it. Scores are kept per game in `localStorage` and shown by `games`.
 
 - **`2048`** — slide tiles and merge them. Arrows or `wasd`, `r` restarts, `q` quits.
 - **`snake`** — eat, grow, mind the walls. Same keys; reduced-motion players get one step per
   keypress instead of a ticking clock.
+- **`minesweeper`** (`mines`) — 16×10 with 25 mines. Arrows or `wasd` move the cursor, `space`
+  reveals, `f` flags, `q` quits. The first reveal is never a mine. Scored on time, so this is the
+  one game where a *lower* number is the better one.
+- **`tetris`** — 10×18 well. Arrows or `wasd` to move and rotate, `space` hard-drops, `q` quits.
+  No speed curve. Under reduced motion there's no clock: each keypress drops the piece one row, so
+  it falls exactly as fast as you play.
+- **`wordle`** (`motus`) — five letters, six tries. Type, `Backspace` deletes, `Enter` submits,
+  `r` starts a new word. The word list follows the site's language, and accents are folded, so
+  `EPEE` is a fine way to type `ÉPÉE`. Scored on solve streak.
+- **`hangman`** (`pendu`) — six wrong guesses. Same bilingual word list. Repeating a letter you've
+  already tried doesn't cost you one. Scored on win streak.
+- **`wpm`** (`typing`) — type a line pulled from this site's own content and get words-per-minute
+  and accuracy. `Backspace` corrects, but a character you got wrong once stays wrong in the
+  accuracy figure.
 
 ## Achievements
 
-30 in total, tracked in `localStorage` (`couvbat:achievements`, plus `couvbat:achievements:sections`
+35 in total, tracked in `localStorage` (`couvbat:achievements`, plus `couvbat:achievements:sections`
 for the exploration one). Unlocking one fires a floating toast and prints a line in the terminal;
-the trophy button in the navbar opens a modal listing all 30. Locked ones show `???` and an oblique
+the trophy button in the navbar opens a modal listing all 35. Locked ones show `???` and an oblique
 hint; unlocking one reveals its title and how it was done. `achievements` (alias `trophies`) prints
 the same progress in the terminal.
 
-The last one cascades: unlock the other twenty-nine and **100%** unlocks itself — and the three.js
+The last one cascades: unlock the other thirty-four and **100%** unlocks itself — and the three.js
 background changes palette to prove it.
 
 | Achievement | How to get it |
@@ -194,6 +210,11 @@ background changes palette to prove it.
 | Cheat Code | Enter the Konami code (↑↑↓↓←→←→BA) anywhere on the page — no terminal needed |
 | Tile Merchant | Reach a 256 tile in `2048` |
 | Nokia Nostalgia | Grow a snake to length 10 in `snake` |
+| Clean Sweep | Clear a board in `minesweeper` |
+| Word Play | Solve a `wordle` |
+| Last Word | Win a round of `hangman` |
+| Touch Typist | Hit 60 wpm at 95%+ accuracy in `wpm` |
+| Line Clear | Clear 10 lines in one game of `tetris` |
 | Configuration Leak | `cat .env` (or open it in `vim`) |
 | Deja Vu | Replay the boot sequence with `reboot` |
 | Knock Knock | `ssh couvbat@jhemery.xyz` |
