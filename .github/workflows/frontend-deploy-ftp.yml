@@ -26,7 +26,7 @@ jobs:
     needs: build
     steps:
       - name: Download Build Artifact
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: frontend-build
           path: build
@@ -45,7 +45,7 @@ jobs:
           echo "dir=./$dir" >> "$GITHUB_OUTPUT"
 
       - name: Sync build over FTPS
-        uses: SamKirkland/FTP-Deploy-Action@v4.3.5
+        uses: SamKirkland/FTP-Deploy-Action@v4.4.0
         with:
           server: ${{ secrets.FTP_SERVER }}
           username: ${{ secrets.FTP_FRONTEND_USERNAME }}
@@ -56,7 +56,7 @@ jobs:
           log-level: minimal
 
       - name: Cleaning artifacts
-        uses: geekyeggo/delete-artifact@v5
+        uses: geekyeggo/delete-artifact@v6
         if: always()
         with:
           name: frontend-build

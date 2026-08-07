@@ -28,7 +28,7 @@ jobs:
     needs: build
     steps:
       - name: Download Build Artifact
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: backend-build
           path: build
@@ -76,7 +76,7 @@ jobs:
       # deletions away from `.htaccess`, the `node_modules` symlink, `public/`,
       # `tmp/`, `.env` and `uploads/`, which all live at the app root.
       - name: Sync build over FTPS
-        uses: SamKirkland/FTP-Deploy-Action@v4.3.5
+        uses: SamKirkland/FTP-Deploy-Action@v4.4.0
         with:
           server: ${{ secrets.FTP_SERVER }}
           username: ${{ secrets.FTP_BACKEND_USERNAME }}
@@ -146,7 +146,7 @@ jobs:
           fi
 
       - name: Cleaning artifacts
-        uses: geekyeggo/delete-artifact@v5
+        uses: geekyeggo/delete-artifact@v6
         if: always()
         with:
           name: backend-build
