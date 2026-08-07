@@ -69,6 +69,16 @@ export default defineConfigWithVueTs(
   },
 
   {
+    // Build-time scripts run in Node, not the browser, so `console`, `fetch`
+    // and friends are globals rather than undefined names.
+    name: 'app/scripts',
+    files: ['scripts/**/*.{js,mjs,ts}'],
+    languageOptions: {
+      globals: { console: 'readonly', fetch: 'readonly', process: 'readonly' },
+    },
+  },
+
+  {
     ...pluginVitest.configs.recommended,
     name: 'app/tests',
     files: ['src/**/__tests__/**/*.{ts,tsx}', 'src/**/*.{test,spec}.{ts,tsx}'],

@@ -1,11 +1,11 @@
 import { describe, expect, it } from 'vitest'
 import * as typing from '../games/typing'
 
-const PROMPTS = ['hello world']
+const WORDS = ['hello', 'world']
 
 /** Types a string starting at `t = 0`, one character per `step` milliseconds. */
 function run(target: string, input: string, step = 100): typing.TypingState {
-  let state: typing.TypingState = { ...typing.newGame(PROMPTS, () => 0), target }
+  let state: typing.TypingState = { ...typing.newGame(WORDS, () => 0), target }
   input.split('').forEach((char, i) => {
     state = typing.type(state, char, (i + 1) * step)
   })
@@ -13,18 +13,37 @@ function run(target: string, input: string, step = 100): typing.TypingState {
 }
 
 describe('newGame', () => {
-  it('picks a prompt and starts idle', () => {
-    const state = typing.newGame(PROMPTS, () => 0)
-    expect(state.target).toBe('hello world')
+  it('builds a line of random words and starts idle', () => {
+    const state = typing.newGame(WORDS, () => 0, 3)
+    // `() => 0` always draws the first word.
+    expect(state.target).toBe('hello hello hello')
     expect(state.typed).toBe('')
     expect(state.startedAt).toBeNull()
     expect(state.mistakes.size).toBe(0)
+  })
+
+  it('draws with replacement, so a word may repeat within a line', () => {
+    // De-duplicating would bias the draw towards rare words, and a repeated word
+    // inside one line is normal in both languages.
+    const state = typing.newGame(WORDS, () => 0.99, 4)
+    expect(state.target).toBe('world world world world')
+  })
+
+  it('defaults to a full line', () => {
+    const state = typing.newGame(WORDS, () => 0)
+    expect(state.target.split(' ')).toHaveLength(typing.WORDS_PER_LINE)
+  })
+
+  it('draws across the whole pool', () => {
+    let i = 0
+    const state = typing.newGame(WORDS, () => (i++ % 2) / 2, 4)
+    expect(state.target).toBe('hello world hello world')
   })
 })
 
 describe('type', () => {
   it('starts the clock on the first keystroke, not before', () => {
-    const state = typing.newGame(PROMPTS, () => 0)
+    const state = typing.newGame(WORDS, () => 0)
     expect(state.startedAt).toBeNull()
 
     const typed = typing.type(state, 'h', 5000)
@@ -37,7 +56,7 @@ describe('type', () => {
   })
 
   it('ignores keys that are not a single character', () => {
-    let state = typing.newGame(PROMPTS, () => 0)
+    let state = typing.newGame(WORDS, () => 0)
     for (const key of ['Enter', 'ArrowLeft', 'Shift', 'Backspace']) {
       state = typing.type(state, key, 100)
     }
@@ -86,7 +105,7 @@ describe('backspace', () => {
   })
 
   it('is a no-op on an empty or finished run', () => {
-    const empty = typing.newGame(PROMPTS, () => 0)
+    const empty = typing.newGame(WORDS, () => 0)
     expect(typing.backspace(empty)).toBe(empty)
 
     const done = run('hi', 'hi')
@@ -96,12 +115,12 @@ describe('backspace', () => {
 
 describe('wpm', () => {
   it('is zero before anything is typed', () => {
-    expect(typing.wpm(typing.newGame(PROMPTS, () => 0), 1000)).toBe(0)
+    expect(typing.wpm(typing.newGame(WORDS, () => 0), 1000)).toBe(0)
   })
 
   it('counts a word as five characters', () => {
     // 10 characters typed over 60 s from the first keystroke → 2 "words" a minute.
-    let state: typing.TypingState = { ...typing.newGame(PROMPTS, () => 0), target: 'a'.repeat(10) }
+    let state: typing.TypingState = { ...typing.newGame(WORDS, () => 0), target: 'a'.repeat(10) }
     'a'.repeat(10)
       .split('')
       .forEach((char, i) => {
@@ -120,7 +139,7 @@ describe('wpm', () => {
 
 describe('accuracy', () => {
   it('is 100 before anything is typed', () => {
-    expect(typing.accuracy(typing.newGame(PROMPTS, () => 0))).toBe(100)
+    expect(typing.accuracy(typing.newGame(WORDS, () => 0))).toBe(100)
   })
 
   it('is 100 for a clean run', () => {

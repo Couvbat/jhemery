@@ -2,9 +2,11 @@ import type { Localised } from '@/content/types'
 import { blank, line, segmented } from '../../format'
 import * as hangman from '../../games/hangman'
 import { keyStream } from '../../games/input'
+import { loadWordleWords } from '../../games/words'
 import type { Command, CommandContext, OutputLine, Tone } from '../../types'
 import { bestScore, play } from './shared'
 
+const LOADING: Localised<string> = { en: 'loading words…', fr: 'chargement des mots…' }
 const HINT: Localised<string> = {
   en: 'guess a letter · esc quits',
   fr: 'devinez une lettre · esc pour quitter',
@@ -80,12 +82,16 @@ export const command: Command = {
   run: (ctx: CommandContext) =>
     play(ctx, 'hangman', async (session) => {
       const keys = keyStream(ctx.capture)
+      const draw = ctx.frame()
 
-      let state = hangman.newGame(ctx.locale)
+      // Lazily-fetched chunk, shared with wordle — see `words.ts`.
+      draw([line(ctx.t(LOADING), 'muted')])
+      const { answers } = await loadWordleWords(ctx.locale)
+
+      let state = hangman.newGame(answers)
       let streak = 0
       let best = bestScore('hangman')
 
-      const draw = ctx.frame()
       const paint = (status: string) => draw(render(state, streak, best, status))
       paint(ctx.t(HINT))
 
@@ -99,7 +105,7 @@ export const command: Command = {
 
           if (state.status !== 'playing') {
             if (key !== 'r') continue
-            state = hangman.newGame(ctx.locale)
+            state = hangman.newGame(answers)
             paint(ctx.t(HINT))
             continue
           }

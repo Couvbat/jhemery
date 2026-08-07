@@ -1,10 +1,12 @@
 import { describe, expect, it } from 'vitest'
 import * as hangman from '../games/hangman'
-import { answersFor } from '../games/words'
+
+/** A fixture, not the shipped list — see `game-wordle.spec.ts` for why. */
+const WORDS = ['SNAKE', 'SPEED', 'ÉPÉES']
 
 /** Forces a known answer, so the assertions do not depend on which word came up. */
 function withAnswer(display: string): hangman.HangmanState {
-  return { ...hangman.newGame('en', () => 0), answer: display, display, guessed: [], status: 'playing' }
+  return { ...hangman.newGame(WORDS, () => 0), answer: display, display, guessed: [], status: 'playing' }
 }
 
 function guessAll(state: hangman.HangmanState, letters: string): hangman.HangmanState {
@@ -13,13 +15,13 @@ function guessAll(state: hangman.HangmanState, letters: string): hangman.Hangman
 }
 
 describe('newGame', () => {
-  it('picks a word from the locale’s list', () => {
-    const state = hangman.newGame('fr', () => 0)
-    expect(answersFor('fr')).toContain(state.display)
+  it('picks a word from the list it was given', () => {
+    const state = hangman.newGame(WORDS, () => 0)
+    expect(WORDS).toContain(state.display)
   })
 
   it('starts with a full set of lives and nothing guessed', () => {
-    const state = hangman.newGame('en', () => 0)
+    const state = hangman.newGame(WORDS, () => 0)
     expect(state.guessed).toEqual([])
     expect(hangman.livesLeft(state)).toBe(hangman.LIVES)
     expect(state.status).toBe('playing')

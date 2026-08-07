@@ -1,9 +1,8 @@
-import { profile } from '@/content/profile'
-import { projects } from '@/content/projects'
-import type { Locale, Localised } from '@/content/types'
+import type { Localised } from '@/content/types'
 import { blank, line, segmented, wrapRanges } from '../../format'
 import { keyStream } from '../../games/input'
 import * as typing from '../../games/typing'
+import { loadTypingWords } from '../../games/words'
 import type { Command, CommandContext, OutputLine, OutputSegment, Tone } from '../../types'
 import { bestScore, play } from './shared'
 
@@ -12,6 +11,7 @@ import { bestScore, play } from './shared'
 const WPM_TARGET = 60
 const ACCURACY_TARGET = 95
 
+const LOADING: Localised<string> = { en: 'loading words…', fr: 'chargement des mots…' }
 const HINT: Localised<string> = {
   en: 'just start typing · backspace corrects · esc quits',
   fr: 'commencez à taper · retour corrige · esc pour quitter',
@@ -22,48 +22,10 @@ const AGAIN: Localised<string> = {
 }
 
 /**
- * The lines you type are the site's own copy.
- *
- * This is the whole reason the game is here rather than shipping a canned pangram
- * list: a visitor who plays it reads the résumé by accident. Sourced from §1's
- * content layer, so it cannot drift from what the page says — and it follows the
- * locale, since typing French on an AZERTY keyboard is a different test.
- *
- * Wrapped to one screen width and stripped of the em dashes and curly quotes the
- * prose uses, which are real characters a player cannot reasonably be asked to
- * find on a keyboard.
- */
-function promptsFor(locale: Locale): string[] {
-  const raw = [
-    profile.tagline[locale],
-    ...profile.bio[locale],
-    ...projects.map((project) => project.description[locale]),
-    projects.flatMap((project) => project.stack).join(', '),
-  ]
-
-  return raw
-    .map((text) =>
-      text
-        .replace(/[—–]/g, '-')
-        .replace(/[’‘]/g, "'")
-        .replace(/[“”]/g, '"')
-        .trim(),
-    )
-    // A 300-character paragraph is a slog, and a 20-character one measures noise.
-    .flatMap((text) => (text.length > 160 ? splitSentences(text) : [text]))
-    .filter((text) => text.length >= 40 && text.length <= 160)
-}
-
-/** Breaks a long paragraph on sentence ends, keeping the punctuation. */
-function splitSentences(text: string): string[] {
-  return text.split(/(?<=[.!?])\s+/)
-}
-
-/**
  * Content width of a wrapped prompt line.
  *
  * `segmented()` is always `pre`, because every other thing it draws is a game
- * board that must not reflow. Prose is the exception: an unwrapped 160-character
+ * board that must not reflow. The typing prompt is the exception: an unwrapped
  * line pushed a horizontal scrollbar onto the whole panel. So the wrapping
  * happens here, at a width that matches `wrap()`'s house column minus the
  * two-space indent.
@@ -124,12 +86,15 @@ export const command: Command = {
   run: (ctx: CommandContext) =>
     play(ctx, 'wpm', async (session) => {
       const keys = keyStream(ctx.capture)
-      const prompts = promptsFor(ctx.locale)
+      const draw = ctx.frame()
 
-      let state = typing.newGame(prompts)
+      // Lazily-fetched chunk — see `words.ts`.
+      draw([line(ctx.t(LOADING), 'muted')])
+      const words = await loadTypingWords(ctx.locale)
+
+      let state = typing.newGame(words)
       let best = bestScore('wpm')
 
-      const draw = ctx.frame()
       const paint = (status: string) => draw(render(state, Date.now(), best, status))
       paint(ctx.t(HINT))
 
@@ -141,7 +106,7 @@ export const command: Command = {
 
           if (typing.isDone(state)) {
             if (key !== 'r') continue
-            state = typing.newGame(prompts)
+            state = typing.newGame(words)
             paint(ctx.t(HINT))
             continue
           }

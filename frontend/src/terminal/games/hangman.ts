@@ -2,13 +2,12 @@
  * Hangman, as plain functions over plain objects — no Vue, no OutputLine, no
  * timers. The renderer (and the gallows art) lives in `commands/games/hangman.ts`.
  *
- * Shares `words.ts` with wordle, which is most of why this game is cheap: what is
+ * Shares wordle's answer pool, which is most of why this game is cheap: what is
  * left is a guessed-letter set and a life counter.
  */
 
-import type { Locale } from '@/content/types'
 import type { Random } from './2048'
-import { answersFor, fold } from './words'
+import { fold } from './words'
 
 /** Wrong guesses allowed. Six is the number of body parts in the usual drawing,
  *  and the drawing is the reason anyone plays this rather than wordle. */
@@ -26,8 +25,9 @@ export interface HangmanState {
   status: Status
 }
 
-export function newGame(locale: Locale, random: Random = Math.random): HangmanState {
-  const answers = answersFor(locale)
+/** Takes its words rather than fetching them — see `wordle.newGame`. Shares the
+ *  wordle answer pool, which is most of why this game is cheap. */
+export function newGame(answers: string[], random: Random = Math.random): HangmanState {
   const display = answers[Math.floor(random() * answers.length)]!
 
   return { answer: fold(display), display, guessed: [], status: 'playing' }

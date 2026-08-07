@@ -6,7 +6,7 @@ import { move } from '../games/2048'
 import type { Board, Dir } from '../games/2048'
 import * as minesweeper from '../games/minesweeper'
 import { HEIGHT, WIDTH } from '../games/snake'
-import { answersFor } from '../games/words'
+import { ANSWERS } from '../games/data/words-en'
 import type { Command, CommandContext, OutputLine } from '../types'
 
 // Snake has two loops — a 120 ms tick and a reduced-motion step-per-keypress —
@@ -316,6 +316,17 @@ describe('snake', () => {
  */
 const drain = () => new Promise((resolve) => setTimeout(resolve, 0))
 
+/**
+ * The word games fetch their list through `import()` before the first frame, so
+ * a test has to let that promise settle before pressing anything. In vitest the
+ * chunk resolves from the module graph rather than the network, so a couple of
+ * macrotasks is plenty.
+ */
+const loaded = async () => {
+  await drain()
+  await drain()
+}
+
 /** A deterministic `Math.random`, rebuildable from the same seed so two passes
  *  can consume an identical sequence of draws. */
 function generator(seed: number): () => number {
@@ -421,13 +432,15 @@ describe('minesweeper', () => {
 
 describe('wordle', () => {
   /** `() => 0` picks the first answer, so the test knows what to type. */
-  const ANSWER = answersFor('en')[0]!
+  const WORDS = ANSWERS.split(' ')
+  const ANSWER = WORDS[0]!
 
   it('unlocks `wordle` on a solve', async () => {
     vi.spyOn(Math, 'random').mockImplementation(() => 0)
 
     const game = harness()
     const finished = command('wordle').run(game.ctx) as Promise<OutputLine[]>
+    await loaded()
 
     for (const letter of ANSWER) game.press(letter.toLowerCase())
     game.press('Enter')
@@ -447,8 +460,9 @@ describe('wordle', () => {
 
     const game = harness()
     const finished = command('wordle').run(game.ctx) as Promise<OutputLine[]>
+    await loaded()
 
-    const wrong = answersFor('en').find((word) => word !== ANSWER)!
+    const wrong = WORDS.find((word) => word !== ANSWER)!
     for (let row = 0; row < 6; row++) {
       for (const letter of wrong) game.press(letter.toLowerCase())
       game.press('Enter')
@@ -468,6 +482,7 @@ describe('wordle', () => {
 
     const game = harness()
     const finished = command('wordle').run(game.ctx) as Promise<OutputLine[]>
+    await loaded()
 
     for (const letter of 'zzzzz') game.press(letter)
     game.press('Enter')
@@ -489,13 +504,14 @@ describe('wordle', () => {
 })
 
 describe('hangman', () => {
-  const ANSWER = answersFor('en')[0]!
+  const ANSWER = ANSWERS.split(' ')[0]!
 
   it('unlocks `hangman` on a win', async () => {
     vi.spyOn(Math, 'random').mockImplementation(() => 0)
 
     const game = harness()
     const finished = command('hangman').run(game.ctx) as Promise<OutputLine[]>
+    await loaded()
 
     for (const letter of new Set(ANSWER)) game.press(letter.toLowerCase())
     await drain()
@@ -512,6 +528,7 @@ describe('hangman', () => {
 
     const game = harness()
     const finished = command('hangman').run(game.ctx) as Promise<OutputLine[]>
+    await loaded()
 
     // Six letters that are certainly not in the answer.
     const wrong = 'abcdefghijklmnopqrstuvwxyz'
@@ -546,6 +563,7 @@ describe('wpm', () => {
   it('wraps a long prompt instead of overflowing the panel', async () => {
     const game = harness()
     const finished = command('wpm').run(game.ctx) as Promise<OutputLine[]>
+    await loaded()
 
     const rendered = game.frame().filter((l) => l.segments && l.text.startsWith('  '))
     // `segmented()` is always `pre`, so an over-wide line cannot reflow in CSS —
@@ -565,6 +583,7 @@ describe('wpm', () => {
 
     const game = harness()
     const finished = command('wpm').run(game.ctx) as Promise<OutputLine[]>
+    await loaded()
 
     // The prompt is whatever the renderer put on screen: the target line is the
     // only one built from segments and indented by two spaces.
@@ -585,6 +604,7 @@ describe('wpm', () => {
 
     const game = harness()
     const finished = command('wpm').run(game.ctx) as Promise<OutputLine[]>
+    await loaded()
 
     const target = readTarget(game.frame())
     // Every character wrong: fast, and worth nothing.

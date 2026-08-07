@@ -71,6 +71,12 @@ export default defineConfig({
           // ~51 kB that only social/link-preview crawlers ever fetch, and none of
           // them run a service worker. Precaching it is pure waste on every install.
           '**/og-image.*',
+          // ~60 kB gzipped of wordle/typing dictionaries, split per locale and
+          // fetched only when someone runs a word game — which most visitors
+          // never do, and nobody does in the locale they are not reading. Same
+          // reasoning as three.js above: precaching would undo the code-split.
+          // The runtime rule below still caches them once actually used.
+          '**/words-??-*.js',
         ],
         navigateFallback: '/index.html',
         navigateFallbackDenylist: [
