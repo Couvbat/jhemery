@@ -27,6 +27,59 @@
 </IfModule>
 
 <IfModule mod_headers.c>
+  # ---------------------------------------------------------------------------
+  # Security headers
+  #
+  # `always` rather than the default `onsuccess`: without it none of these reach
+  # a 404 or a 500, and the SPA fallback below means a mistyped path is one of
+  # the likelier ways someone lands on a response from this host.
+  # ---------------------------------------------------------------------------
+
+  # Two years, because a short max-age is only as good as the last visit that
+  # refreshed it. `preload` is deliberately absent: submitting to the browser
+  # preload list is effectively irreversible and would commit every present and
+  # future *.jhemery.xyz subdomain to HTTPS forever, including ones not built yet.
+  Header always set Strict-Transport-Security "max-age=63072000; includeSubDomains"
+
+  # frame-ancestors in the CSP below is the real control; X-Frame-Options is the
+  # fallback for anything that predates it.
+  Header always set X-Frame-Options "DENY"
+
+  # Stops a browser from second-guessing Content-Type — the reason an uploaded
+  # or user-influenced response can't be coaxed into executing as script.
+  Header always set X-Content-Type-Options "nosniff"
+
+  # Same-origin navigations keep the full URL; cross-origin ones leak only the
+  # scheme+host. Notably this is what keeps terminal deep links out of the
+  # Referer sent to SoundCloud when the embed loads.
+  Header always set Referrer-Policy "strict-origin-when-cross-origin"
+
+  # The site asks for none of these. Denying them up front means an injected
+  # script can't either, and it applies to the SoundCloud iframe too.
+  Header always set Permissions-Policy "camera=(), microphone=(), geolocation=(), payment=(), usb=(), interest-cohort=()"
+
+  # Content-Security-Policy. Each source below is here because something real
+  # needs it — adding an origin to this list should mean adding a dependency.
+  #
+  #   script-src   umami.jhemery.xyz serves the analytics tracker, injected at
+  #                runtime by src/lib/analytics.ts. The JSON-LD block in
+  #                index.html is a data block, not an executed script, so it
+  #                needs no allowance.
+  #   style-src    'unsafe-inline' is unavoidable: Vue writes `style` attributes
+  #                for every :style binding, and the terminal and three.js
+  #                background lean on them. Styles are a far weaker injection
+  #                primitive than script, and script-src stays strict.
+  #   img-src      https: rather than a list — Steam avatars and game icons come
+  #                back from the API on rotating *.steamstatic.com CDN hosts that
+  #                cannot be enumerated ahead of time. This still blocks http:.
+  #   connect-src  api.jhemery.xyz is the backend (contact form, guestbook, ask);
+  #                'self' covers same-origin builds and the precached assets.
+  #   frame-src    w.soundcloud.com is the player embed in MusicSection.vue.
+  #   object-src / base-uri / form-action are locked down because nothing here
+  #                uses them, and each is a known way to turn a stray HTML
+  #                injection into something worse.
+  Header always set Content-Security-Policy "default-src 'self'; script-src 'self' https://umami.jhemery.xyz; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self' data:; connect-src 'self' https://api.jhemery.xyz https://umami.jhemery.xyz; frame-src https://w.soundcloud.com; worker-src 'self'; manifest-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'; upgrade-insecure-requests"
+
   # Only files under /assets/ carry a content hash in their name, so they are the
   # only ones safe to freeze. Matching by extension instead would also freeze
   # sw.js and the unhashed icons in the site root — a year-long immutable cache

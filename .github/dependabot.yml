@@ -1,0 +1,69 @@
+# Automated dependency updates.
+#
+# The two npm ecosystems are declared separately because frontend/ and backend/
+# each have their own lockfile — a single root entry would find neither.
+#
+# Updates land as PRs against master, which is what frontend-pr-check.yml and
+# backend-pr-check.yml watch, so every bump arrives already tested and built.
+version: 2
+
+updates:
+  - package-ecosystem: npm
+    directory: /frontend
+    schedule:
+      interval: weekly
+      day: monday
+      time: '06:00'
+      timezone: Europe/Paris
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: 'chore(frontend)'
+    groups:
+      # One PR for the whole patch/minor stream. Ungrouped, a Vite/Vue/Tailwind
+      # stack kept this up to date opens a dozen PRs a week, and a dozen PRs a
+      # week is the same as none: they stop getting read.
+      frontend-minor:
+        update-types:
+          - minor
+          - patch
+    ignore:
+      # three.js publishes a breaking minor roughly monthly and @types/three has
+      # to move in lockstep; that upgrade is a manual read of the changelog, not
+      # something to merge off a green build.
+      - dependency-name: three
+        update-types: ['version-update:semver-minor']
+      - dependency-name: '@types/three'
+        update-types: ['version-update:semver-minor']
+
+  - package-ecosystem: npm
+    directory: /backend
+    schedule:
+      interval: weekly
+      day: monday
+      time: '06:00'
+      timezone: Europe/Paris
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: 'chore(backend)'
+    groups:
+      # The @nestjs/* packages expect to be on the same version as each other,
+      # so bumping them one PR at a time produces avoidable peer-dep churn.
+      nestjs:
+        patterns:
+          - '@nestjs/*'
+      backend-minor:
+        update-types:
+          - minor
+          - patch
+
+  # Pins like actions/checkout@v4 only move when something tells them to.
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: monthly
+    commit-message:
+      prefix: 'chore(ci)'
+    groups:
+      actions:
+        patterns:
+          - '*'
