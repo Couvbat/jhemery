@@ -2,9 +2,11 @@ import type { Localised } from '@/content/types'
 import { blank, line, segmented } from '../../format'
 import { keyStream } from '../../games/input'
 import * as wordle from '../../games/wordle'
+import { loadWordleWords } from '../../games/words'
 import type { Command, CommandContext, OutputLine, OutputSegment, Tone } from '../../types'
 import { bestScore, play } from './shared'
 
+const LOADING: Localised<string> = { en: 'loading words…', fr: 'chargement des mots…' }
 const HINT: Localised<string> = {
   en: 'type a word · enter submits · backspace deletes · esc quits',
   fr: 'tapez un mot · entrée valide · retour efface · esc pour quitter',
@@ -97,12 +99,18 @@ export const command: Command = {
   run: (ctx: CommandContext) =>
     play(ctx, 'wordle', async (session) => {
       const keys = keyStream(ctx.capture)
+      const draw = ctx.frame()
 
-      let state = wordle.newGame(ctx.locale)
+      // The list is a lazily-fetched chunk (see `words.ts`), so say so rather
+      // than leaving a blank frame. On a warm cache this is one paint nobody
+      // sees; on a cold one it is the difference between "loading" and "broken".
+      draw([line(ctx.t(LOADING), 'muted')])
+      const words = await loadWordleWords(ctx.locale)
+
+      let state = wordle.newGame(words, ctx.locale)
       let streak = 0
       let best = bestScore('wordle')
 
-      const draw = ctx.frame()
       const paint = (status: string) => draw(render(state, streak, best, status))
       paint(ctx.t(HINT))
 
@@ -114,7 +122,7 @@ export const command: Command = {
             // Between rounds only `r` does anything; Esc and Ctrl+C are the exit,
             // and there is no `q` because `q` is a letter the next round needs.
             if (key !== 'r') continue
-            state = wordle.nextWord(state, ctx.locale)
+            state = wordle.nextWord(state, words)
             paint(ctx.t(HINT))
             continue
           }

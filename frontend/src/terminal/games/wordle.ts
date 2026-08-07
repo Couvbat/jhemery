@@ -8,9 +8,10 @@
 
 import type { Locale } from '@/content/types'
 import type { Random } from './2048'
-import { acceptedFor, answersFor, fold } from './words'
+import { type WordleWords, fold } from './words'
 
 export { fold }
+export type { WordleWords }
 
 export const LENGTH = 5
 export const ROWS = 6
@@ -67,9 +68,15 @@ export function score(guess: string, answer: string): Mark[] {
   return marks
 }
 
-export function newGame(locale: Locale, random: Random = Math.random): WordleState {
-  const answers = answersFor(locale)
-  const display = answers[Math.floor(random() * answers.length)]!
+/** Takes its words rather than fetching them: the lists are lazily loaded (see
+ *  `words.ts`), and this module stays pure and testable against a handful of
+ *  fixture words instead of several thousand real ones. */
+export function newGame(
+  words: WordleWords,
+  locale: Locale,
+  random: Random = Math.random,
+): WordleState {
+  const display = words.answers[Math.floor(random() * words.answers.length)]!
 
   return {
     answer: fold(display),
@@ -77,7 +84,7 @@ export function newGame(locale: Locale, random: Random = Math.random): WordleSta
     guesses: [],
     current: '',
     status: 'playing',
-    accepted: acceptedFor(locale),
+    accepted: words.accepted,
     locale,
   }
 }
@@ -144,8 +151,11 @@ export function letterMarks(state: WordleState): Map<string, Mark> {
   return best
 }
 
-/** Starts the next word, keeping the accepted set — `r` between rounds should not
- *  pay to rebuild it. */
-export function nextWord(state: WordleState, locale: Locale, random: Random = Math.random): WordleState {
-  return { ...newGame(locale, random), accepted: state.accepted }
+/** Starts the next word, reusing the loaded lists. */
+export function nextWord(
+  state: WordleState,
+  words: WordleWords,
+  random: Random = Math.random,
+): WordleState {
+  return newGame(words, state.locale, random)
 }

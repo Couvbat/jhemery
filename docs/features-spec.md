@@ -255,7 +255,7 @@ drop a visitor into a keyboard-captured surface they did not ask for.
 | `tetris` | 10×18 well, seven pieces, no speed curve | high score |
 | `wordle` (alias `motus`) | 5 letters, 6 rows, word list follows the locale | solve streak |
 | `hangman` (alias `pendu`) | 6 wrong guesses, same word list | win streak |
-| `wpm` (alias `typing`) | Type a line drawn from §1's content layer | words per minute |
+| `wpm` (alias `typing`) | Type a line of random common words | words per minute |
 
 Each game is a **pure state module** (plain functions over plain objects — no Vue, no `OutputLine`,
 no timers, so the interesting logic is unit-tested directly) plus a renderer that turns state into
@@ -277,6 +277,19 @@ the same try/catch — private browsing means they do not persist, which is not 
 surfacing. `minesweeper` is the one game where a *lower* score wins, so the score table carries a
 direction per game rather than assuming `Math.max`. There are no leaderboards: a publicly writable
 score store is the guestbook's spam problem with none of the guestbook's charm.
+
+**Word lists are generated, and lazily loaded.** The three word games share one pool per locale,
+built by `scripts/build-wordlists.mjs` (run by hand, output committed under `terminal/games/data/`)
+from permissively-licensed sources — SCOWL for English, and for French an MIT word array filtered by
+a hunspell lemma set and ranked by Tatoeba frequency, so the answer pool holds headwords rather than
+conjugations. Each generated file carries its own licence header; the French one is MPL-2.0 and the
+attribution is in the README.
+
+They are ~60 kB gzipped, so they are behind `import()` — one chunk per locale, fetched the first
+time someone runs a word game — and excluded from the PWA precache with a runtime rule instead. Same
+treatment as `ThreeBackground`, same reason: a visitor who never opens the terminal should not pay
+for a dictionary. The pure state modules take their words as an argument rather than importing
+them, which keeps the async boundary in the command layer and lets the specs use fixtures.
 
 Full design in [the first games spec](superpowers/specs/2026-08-04-terminal-games-design.md)
 (`2048`, `snake`, and the `capture` primitive) and

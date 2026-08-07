@@ -102,16 +102,9 @@ score(guess: string, answer: string): Mark[]   // two-pass, duplicates handled
   left-to-right. Two tests pin it (`SPEED` vs `ERASE`, `ARRAY` vs `RADAR`).
 - Score is the **streak** — consecutive solves, reset by a loss. `r` starts the next word.
 
-**Word list:** `terminal/games/words.ts`, *not* `src/content/`. It was tempting, since
-`src/content/` is the build-time-pure layer and a dictionary is pure. But that layer is the single
-source of truth for **site copy**, consumed by `vite.config.ts` and the résumé plugin outside the
-app's module graph; putting a game dictionary there means every `resume.txt` build parses 400 words
-it will never emit, and invites the next person to treat `content/` as "anything without a DOM
-dependency". The purity rule is a *consequence* of what lives there, not the definition of it.
-`games/words.ts` is equally pure and is where a reader would look.
-
-Roughly 200 answers + a wider accepted-guess set per locale, hand-checked so nothing embarrassing
-or obscure ships. Both halves are plain `string[]` — facts, not `Localised`, per the i18n rule.
+**Word lists: generated, not written.** See [the word-list addendum](#addendum--real-word-lists)
+below — the first cut of this spec called for a few hundred hand-picked words per locale, and that
+turned out to be the wrong call for reasons worth recording.
 
 ### `minesweeper`
 
@@ -136,9 +129,13 @@ isWon(state): boolean          // every non-mine cell revealed
 
 ### `wpm` — a typing test, which in a terminal is barely a game
 
-The best thematic fit of the five and the cheapest to build. Also the only one whose prompt text
-comes from `src/content/` — you type a line of Jules's own résumé or a project blurb, which makes
-the game double as a way to read the site.
+The best thematic fit of the five and the cheapest to build.
+
+**Prompt text: random common words**, drawn from the same generated lists as wordle (see the
+addendum). An earlier draft typed lines of Jules's own résumé, which was charming and measured the
+wrong thing: prose lets you predict what comes next and coast, so it scores reading as much as
+typing. Twelve words a line, drawn with replacement — de-duplicating would bias the draw towards
+rare words, and a word repeating inside one line is normal in both languages.
 
 - Pure module tracks `{ target, typed, startedAt }` and derives `wpm` (chars/5 ÷ minutes) and
   accuracy. No timer of its own — it reads `Date.now()` on each keystroke, so there is nothing to
@@ -252,3 +249,80 @@ the guestbook's spam problem without the charm), **pause/resume across a termina
   again. Random word, play as many as you like.
 - **Tetris hold, ghost piece and next-piece preview.** Next-piece is arguably free and still not
   shipped: three more render regions around a well that is already the widest thing in the buffer.
+
+
+---
+
+## Addendum — real word lists
+
+*Added after the five games shipped. The lists this spec originally called for were hand-written,
+and they were the weakest part of the release: ~440 answers per locale, no frequency data, and — in
+French — no way to tell a headword from a conjugation, so `ABOYA` and `ABUSÉ` sat in the answer pool
+next to `TABLE`. This replaces them with generated ones.*
+
+### Constraint that shaped every choice
+
+**Permissive licensing only.** That rules out most of the obvious lexical resources, and the ruling
+out is the interesting part:
+
+| Source | Licence | Verdict |
+|---|---|---|
+| [SCOWL](https://github.com/en-wl/wordlist), via `wordlist-english` | MIT | **used** — English, everything |
+| [`an-array-of-french-words`](https://github.com/words/an-array-of-french-words) | MIT | **used** — French word membership |
+| [`dictionary-fr`](https://grammalecte.net/) (Grammalecte/Dicollecte) | MPL-2.0 | **used** — French lemmas |
+| [Tatoeba](https://tatoeba.org/) sentence export | CC BY 2.0 FR | **used** — French frequency |
+| [Lexique383](http://www.lexique.org/) | CC BY-**SA** 4.0 | rejected — share-alike |
+| [`hermitdave/FrequencyWords`](https://github.com/hermitdave/FrequencyWords) | code MIT, **lists CC BY-SA 3.0** | rejected — the trap is that the repo advertises MIT |
+| [Monkeytype](https://github.com/monkeytypegame/monkeytype) word lists | GPLv3 | rejected — copyleft, would reach the frontend |
+| [`google-10000-english`](https://github.com/first20hours/google-10000-english) | LDC, "educational/personal use" | rejected — not permissive |
+| [Leipzig Corpora](https://wortschatz.uni-leipzig.de/) | stated as CC BY 3.0 / 4.0 / BY-SA on different pages | rejected — cannot rely on a licence the source is unclear about |
+
+MPL-2.0 is file-level copyleft: the generated French file inherits it and carries the notice, and
+nothing else in the project is affected. CC BY is attribution-only. Both are recorded in the header
+of the file they apply to and in the README.
+
+### Why English needs one source and French needs three
+
+SCOWL is **size-graded** (10/20/35/…/70), and that grading is precisely the split the games want:
+size ≤35 is "common enough to be a fair answer", ≤70 is "a real word", ≤10 is "worth typing". No
+frequency corpus required.
+
+French has no equivalent, so commonness has to be assembled:
+
+- the MIT array answers *is this a word?* — 6806 five-letter entries, accents intact
+- the hunspell dictionary answers *is this a headword?* — dropping the conjugations that made the
+  hand-written list unfair
+- Tatoeba answers *is it common?* — 722k sentences, tokenised elision-aware so `qu'il` counts as
+  `il` rather than putting the fragment `qu` in the top thirty words
+
+Drop any one and the pool fills with either conjugations or obscurities.
+
+### Shape
+
+```
+              answers   accepted   typing
+english          3497       6500     3527
+french            969       5891     1261
+```
+
+Answers are uppercase with accents intact (they are displayed); accepted guesses are folded (they
+are typed). French answers are **deduplicated by folded form** — `cote` and `côté` are two entries
+but one puzzle, and the more frequent spelling wins the slot.
+
+### Generation and delivery
+
+`scripts/build-wordlists.mjs`, run by hand via `npm run wordlists`, **output committed**. Not a vite
+plugin: the build must stay reproducible offline and CI must not depend on tatoeba.org being up.
+
+The two generated files are ~140 kB of source, ~60 kB gzipped. Bundled into the main chunk that
+would be a third of the page's transfer budget, paid at first paint by the majority of visitors who
+never open the terminal. So they are behind `import()` — one chunk per locale, fetched the first
+time someone runs a word game — and excluded from the PWA precache with a runtime
+StaleWhileRevalidate rule instead. Exactly the treatment `ThreeBackground` already gets, for exactly
+the same reason.
+
+Consequence for the pure modules: `newGame` **takes its words as an argument** rather than importing
+them. That keeps the state modules pure, keeps the async boundary in the command layer where the
+loading line lives, and lets the specs run against five-word fixtures instead of several thousand
+real ones. The generated lists get their own shape checks — length, folding, no duplicates, every
+answer accepted — so a bad regeneration fails in CI rather than in someone's game.

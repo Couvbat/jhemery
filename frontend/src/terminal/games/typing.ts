@@ -27,9 +27,27 @@ export interface TypingState {
   mistakes: Set<number>
 }
 
-export function newGame(prompts: string[], random: Random = Math.random): TypingState {
+/** Words per generated line. Twelve lands around 70 characters in both locales —
+ *  long enough for the speed to mean something, short enough to finish. */
+export const WORDS_PER_LINE = 12
+
+/**
+ * Builds a line from randomly drawn common words.
+ *
+ * Random words rather than prose: a sentence lets you predict what comes next
+ * and coast, which measures reading as much as typing. Drawing with replacement
+ * is deliberate too — a repeated word inside one line is normal English and
+ * normal French, and de-duplicating would bias the draw towards rare words.
+ */
+export function newGame(
+  words: string[],
+  random: Random = Math.random,
+  count: number = WORDS_PER_LINE,
+): TypingState {
+  const line = Array.from({ length: count }, () => words[Math.floor(random() * words.length)]!)
+
   return {
-    target: prompts[Math.floor(random() * prompts.length)]!,
+    target: line.join(' '),
     typed: '',
     startedAt: null,
     endedAt: null,

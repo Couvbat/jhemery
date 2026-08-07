@@ -21,11 +21,13 @@ docs/       design specs and implementation plans
 - [The terminal](#the-terminal)
 - [Commands](#commands)
 - [Games](#games)
+- [Word lists](#word-lists)
 - [Achievements](#achievements)
 - [The API](#the-api)
 - [Running it locally](#running-it-locally)
 - [Tests](#tests)
 - [Deployment](#deployment)
+- [Licence](#licence)
 
 ---
 
@@ -175,9 +177,59 @@ can't spare `q` for it. Scores are kept per game in `localStorage` and shown by 
   `EPEE` is a fine way to type `ÉPÉE`. Scored on solve streak.
 - **`hangman`** (`pendu`) — six wrong guesses. Same bilingual word list. Repeating a letter you've
   already tried doesn't cost you one. Scored on win streak.
-- **`wpm`** (`typing`) — type a line pulled from this site's own content and get words-per-minute
-  and accuracy. `Backspace` corrects, but a character you got wrong once stays wrong in the
-  accuracy figure.
+- **`wpm`** (`typing`) — type a line of random common words and get words-per-minute and accuracy.
+  `Backspace` corrects, but a character you got wrong once stays wrong in the accuracy figure.
+
+The three word games share a generated word list per language — see
+[Word lists](#word-lists) for where it comes from.
+
+## Word lists
+
+`wordle`, `hangman` and `wpm` share one generated word list per language, built by
+`frontend/scripts/build-wordlists.mjs` (`npm run wordlists`) and committed under
+`frontend/src/terminal/games/data/`. The script is run by hand, never at build time — the build
+stays reproducible offline and CI doesn't depend on anyone's server being up.
+
+|  | answers | accepted guesses | typing pool |
+|---|---|---|---|
+| English | 3 497 | 6 500 | 3 527 |
+| French | 969 | 5 891 | 1 261 |
+
+English comes from **SCOWL**, which is size-graded, and that grading is the split the games want:
+common words become answers, the wider set becomes legal guesses. French has no equivalent, so it's
+assembled from three — an MIT word array for membership, a hunspell dictionary for lemmas (so the
+answer pool holds `TABLE`, not `ABOYA`), and Tatoeba sentence frequencies for commonness.
+
+Answers are stored uppercase with accents intact because they're displayed; guesses are folded
+because they're typed, so `EPEES` finds `ÉPÉES`. French answers are deduplicated by folded form —
+`cote` and `côté` are one puzzle, and the more frequent spelling wins.
+
+The lists are ~60 kB gzipped, so they're behind a dynamic `import()` (one chunk per language, loaded
+the first time you run a word game) and kept out of the PWA precache. Nobody who never opens the
+terminal pays for a dictionary.
+
+### Attribution
+
+| Source | Licence | Used for |
+|---|---|---|
+| [SCOWL](https://github.com/en-wl/wordlist), via [`wordlist-english`](https://www.npmjs.com/package/wordlist-english) | MIT | English word lists |
+| [`an-array-of-french-words`](https://github.com/words/an-array-of-french-words) | MIT | French word membership |
+| [Grammalecte / Dicollecte](https://grammalecte.net/), via [`dictionary-fr`](https://www.npmjs.com/package/dictionary-fr) — © Olivier R. and contributors | **MPL-2.0** | French lemmas |
+| [Tatoeba](https://tatoeba.org/) — © Tatoeba contributors | **CC BY 2.0 FR** | French word frequency |
+
+Full notices — the verbatim licence text of every data source *and* of all 118 production
+dependencies — ship with the built site at
+[`/THIRD-PARTY.txt`](https://jhemery.xyz/THIRD-PARTY.txt). These licences require their notice to
+travel with the copy that is distributed, and for a website that is `dist/`, not this repository.
+
+That file is generated at build time by
+[`frontend/vite-plugins/third-party.ts`](frontend/vite-plugins/third-party.ts), which copies each
+licence verbatim out of `node_modules` — the same one-source rule as the résumé plugin beside it. It
+was hand-written first and was wrong within the hour (SCOWL misdated, the wrong author credited,
+one copyright missed entirely), which is the whole argument for generating it.
+
+MPL-2.0 is file-level copyleft: `words-fr.ts` carries the notice and inherits the licence; nothing
+else here is affected.
 
 ## Achievements
 
@@ -314,3 +366,13 @@ GitHub Actions, split per app and path-filtered:
 `docs/superpowers/` holds the design specs and implementation plans behind the bigger pieces — the
 three.js wireframe background, the vim pane, the terminal games, the achievements UI, the SoundCloud
 embed, and a CTF flag chain that is still just a design.
+
+---
+
+## Licence
+
+Source code is [MIT](LICENSE).
+
+Two things it does not cover, both spelled out in `LICENSE`: the personal content (bio, photos,
+project write-ups, résumé text) is mine and not licensed for reuse, and the generated French word
+list is MPL-2.0 — see [Word lists](#word-lists).

@@ -40,3 +40,4 @@ __screenshots__/
 
 # Vite
 *.timestamp-*-*.mjs
+.wordlist-cache

@@ -1,6 +1,24 @@
 import { describe, expect, it } from 'vitest'
 import * as wordle from '../games/wordle'
-import { acceptedFor, answersFor, fold } from '../games/words'
+import { ANSWERS as EN_ANSWERS, ACCEPTED as EN_ACCEPTED } from '../games/data/words-en'
+import { ANSWERS as FR_ANSWERS, ACCEPTED as FR_ACCEPTED } from '../games/data/words-fr'
+import { type WordleWords, fold } from '../games/words'
+
+/**
+ * The rules are tested against a fixture, not the shipped list: a handful of
+ * words makes each assertion readable, and a spec that breaks whenever
+ * `npm run wordlists` reshuffles a few thousand entries is testing the wrong
+ * thing. The real lists get their own shape checks at the bottom.
+ */
+const WORDS: WordleWords = {
+  answers: ['SNAKE', 'CRANE', 'SPEED', 'RADAR', 'ÉPÉES'],
+  accepted: new Set(['SNAKE', 'CRANE', 'SPEED', 'RADAR', 'EPEES', 'ERASE', 'PLUMB', 'SPACE', 'PLANS', 'ABOUT']),
+}
+
+const LISTS = {
+  en: { answers: EN_ANSWERS.split(' '), accepted: new Set(EN_ACCEPTED.split(' ')) },
+  fr: { answers: FR_ANSWERS.split(' '), accepted: new Set(FR_ACCEPTED.split(' ')) },
+}
 
 describe('fold', () => {
   it('strips accents and uppercases', () => {
@@ -54,7 +72,7 @@ describe('score', () => {
 })
 
 describe('typing', () => {
-  const game = () => wordle.newGame('en', () => 0)
+  const game = () => wordle.newGame(WORDS, 'en', () => 0)
 
   it('accepts letters and folds them', () => {
     let state = game()
@@ -87,7 +105,7 @@ describe('typing', () => {
 
 describe('submit', () => {
   function typed(word: string) {
-    let state = wordle.newGame('en', () => 0)
+    let state = wordle.newGame(WORDS, 'en', () => 0)
     for (const letter of word) state = wordle.typeLetter(state, letter)
     return state
   }
@@ -114,15 +132,14 @@ describe('submit', () => {
   })
 
   it('wins when the guess matches', () => {
-    // `() => 0` picks the first answer in the list.
-    const answer = answersFor('en')[0]!
-    const result = wordle.submit(typed(answer))
+    // `() => 0` picks the first answer in the fixture.
+    const result = wordle.submit(typed(WORDS.answers[0]!))
     expect(result.state.status).toBe('won')
   })
 
   it('loses after six wrong guesses', () => {
-    let state = wordle.newGame('en', () => 0)
-    const wrong = answersFor('en').find((word) => word !== state.answer)!
+    let state = wordle.newGame(WORDS, 'en', () => 0)
+    const wrong = WORDS.answers.find((word) => word !== state.answer)!
 
     for (let i = 0; i < wordle.ROWS; i++) {
       for (const letter of wrong) state = wordle.typeLetter(state, letter)
@@ -136,7 +153,7 @@ describe('submit', () => {
   it('accepts an accented French answer typed without accents', () => {
     // The whole point of folding: ÉPÉES has to be reachable from a keyboard
     // nobody wants to hunt for accent keys on.
-    const state = { ...wordle.newGame('fr', () => 0), answer: 'EPEES', display: 'ÉPÉES' }
+    const state = { ...wordle.newGame(WORDS, 'fr', () => 0), answer: 'EPEES', display: 'ÉPÉES' }
     let typing = state
     for (const letter of 'EPEES') typing = wordle.typeLetter(typing, letter)
 
@@ -151,7 +168,7 @@ describe('letterMarks', () => {
     // Learning that a letter is a hit and then playing it in the wrong place
     // must not downgrade the keyboard back to `near`.
     const state: wordle.WordleState = {
-      ...wordle.newGame('en', () => 0),
+      ...wordle.newGame(WORDS, 'en', () => 0),
       answer: 'SNAKE',
       display: 'SNAKE',
       guesses: ['SPACE', 'PLANS'],
@@ -163,7 +180,7 @@ describe('letterMarks', () => {
 
   it('marks letters the answer does not contain as misses', () => {
     const state: wordle.WordleState = {
-      ...wordle.newGame('en', () => 0),
+      ...wordle.newGame(WORDS, 'en', () => 0),
       answer: 'SNAKE',
       display: 'SNAKE',
       guesses: ['PLUMB'],
@@ -172,32 +189,52 @@ describe('letterMarks', () => {
   })
 })
 
-describe('word lists', () => {
+/*
+ * Shape checks on the *generated* lists. These guard the output of
+ * `scripts/build-wordlists.mjs`, so a bad regeneration fails here rather than in
+ * someone's game.
+ */
+describe('generated word lists', () => {
   for (const locale of ['en', 'fr'] as const) {
     describe(`the ${locale} list`, () => {
-      it('holds only five-letter words', () => {
-        const wrong = answersFor(locale).filter((word) => fold(word).length !== wordle.LENGTH)
-        expect(wrong).toEqual([])
+      const { answers, accepted } = LISTS[locale]
+
+      it('holds only five-letter answers', () => {
+        expect(answers.filter((word) => fold(word).length !== wordle.LENGTH)).toEqual([])
+      })
+
+      it('holds only five-letter accepted guesses', () => {
+        expect([...accepted].filter((word) => word.length !== wordle.LENGTH)).toEqual([])
       })
 
       it('has no duplicate answers', () => {
-        const folded = answersFor(locale).map(fold)
+        const folded = answers.map(fold)
         expect(new Set(folded).size).toBe(folded.length)
       })
 
       it('accepts every answer as a guess', () => {
-        const accepted = acceptedFor(locale)
-        const missing = answersFor(locale).filter((word) => !accepted.has(fold(word)))
-        expect(missing).toEqual([])
+        // Otherwise a player can lose to a word the game would have refused them.
+        expect(answers.filter((word) => !accepted.has(fold(word)))).toEqual([])
       })
 
       it('stores the accepted set folded, so guesses never need accents', () => {
-        for (const word of acceptedFor(locale)) expect(word).toBe(fold(word))
+        for (const word of accepted) expect(word).toBe(fold(word))
       })
 
       it('is long enough that the same word does not come up constantly', () => {
-        expect(answersFor(locale).length).toBeGreaterThan(100)
+        expect(answers.length).toBeGreaterThan(500)
+        expect(accepted.size).toBeGreaterThan(answers.length)
+      })
+
+      it('holds no proper nouns or punctuation', () => {
+        for (const word of answers) expect(fold(word)).toMatch(/^[A-Z]{5}$/)
       })
     })
   }
+
+  it('keeps the French answers accented and the guesses folded', () => {
+    // The whole point of the split: correct on display, forgiving on input.
+    expect(LISTS.fr.answers.some((word) => /[À-ÿ]/.test(word))).toBe(true)
+    expect([...LISTS.fr.accepted].some((word) => /[À-ÿ]/.test(word))).toBe(false)
+  })
 })
