@@ -87,6 +87,59 @@ version, for README's achievements table once shipped.
 | [x] | `constellation` | Connect the Dots / Relier les points | toggling constellation mode | constellation |
 | [x] | `zeroG` | Zero-G | running `gravity off` | scene control |
 
+## E. Games, vol. 2
+
+Five more games in the output buffer. Added after the original three categories were complete, so
+this section has its own build order below. Design lives in
+[`superpowers/specs/2026-08-07-terminal-games-vol2-design.md`](superpowers/specs/2026-08-07-terminal-games-vol2-design.md)
+— read it before picking up a row, the interesting decisions are there rather than here.
+
+The premise: `2048` and `snake` paid for the infrastructure (`ctx.capture()`, `keyStream()`, the
+pure-state/renderer split, the `harness()` in `games-command.spec.ts`), so the marginal cost of a
+sixth game is the game. That is why five land at once rather than one per quarter.
+
+**Shared prerequisites**, done once ahead of the games themselves:
+
+| ✔ | Feature | Approach | Files | Effort |
+|---|---|---|---|---|
+| [x] | `Esc`/`Ctrl+C` as the universal quit | Already works — `onPanelKeydown` aborts on `Esc` during a capture and `handleCaptureKeydown` refuses modifiers. What changes is the documentation of it: `q` cannot be universal because three of the new games read letters. `messages.ts`'s `terminal.playing` prompt label names controls that are wrong for four of seven games and becomes control-agnostic; each game prints its own hint. | `i18n/messages.ts` | S |
+| [x] | Score direction | Minesweeper's score is time, where lower wins, and `recordScore` is `Math.max`. The `KEYS` table becomes `{ key, better: 'higher' \| 'lower' }`. Rejected alternative: storing `1000 - seconds` to keep one direction — makes the stored number meaningless and the display a second piece of arithmetic. | `terminal/games/scores.ts` | S |
+| [x] | Count-driven `games` | It hardcodes `two games` / `deux jeux` and prints 2048's control hint as if it were general. One table drives the listing, the count and the `GameId` rows. | `terminal/commands/games.ts` | S |
+
+**The games**, each a pure state module + renderer + one vitest spec + one achievement:
+
+| ✔ | Feature | Approach | Files | Effort |
+|---|---|---|---|---|
+| [x] | `minesweeper` | Turn-based, so no tick and no reduced-motion branch — build first, for the reason 2048 was built first. 16×10/25 mines at two chars per cell. **Mines are laid after the first reveal**, excluding it and its neighbours: losing on move one is a bug that looks like a difficulty. Cursor on arrows/`wasd`, `space` reveals, `f` flags. Flood-fill on the zero region is the only real logic. | `games/minesweeper.ts` (new), `commands/games.ts`, `__tests__/game-minesweeper.spec.ts` | M |
+| [x] | `wordle` | The pick of the five: the only game that gets *better* from the site being bilingual — `ctx.locale` chooses the word list, accents folded on comparison so `EPEE` matches `ÉPÉE`. Turn-based. **Duplicate-letter scoring is the whole difficulty** (count the answer's letters, spend on exact hits first, then near-misses left-to-right) and gets its own tests. Used-letter row under the grid is most of what makes it playable. Word list goes in `games/words.ts`, *not* `content/` — see the spec for why. | `games/wordle.ts`, `games/words.ts` (new), `commands/games.ts`, `__tests__/game-wordle.spec.ts` | M |
+| [x] | `hangman` | Nearly free once wordle lands — shares `games/words.ts`, so the marginal cost is gallows art and a guessed-letters set. Repeating a letter is refused without costing a life. Not worth building alone; obviously worth building second. | `games/hangman.ts` (new), `commands/games.ts`, `__tests__/game-hangman.spec.ts` | S |
+| [x] | `wpm` | The best thematic fit and the cheapest: a typing test in a terminal is barely a game. Prompt text comes from `content/`, so you type a line of the actual résumé. No timer of its own — reads `Date.now()` per keystroke, nothing to tear down. A character typed wrong once stays counted against accuracy, which is the only way accuracy means anything. | `games/typing.ts` (new), `commands/games.ts`, `__tests__/game-typing.spec.ts` | S |
+| [x] | `tetris` | **Reverses the "out of scope" call in the 2026-08-04 spec**, which cited rotation/kicks/gravity and "reads worse in a monospace grid". Gravity is now a copy of snake's tick loop; kicks are not SRS but "try in place, then one left, then one right, then refuse"; and the monospace objection is answered by drawing two characters per cell, which makes the well square. Seven 4×4 bitmask tables, four rotations each, precomputed. No speed curve. Reduced motion gets gravity-per-keypress rather than snake's step-per-keypress, because gravity *is* the game. Build last — it is the only one with a tick. | `games/tetris.ts` (new), `commands/games.ts`, `__tests__/game-tetris.spec.ts` | M–L |
+
+### Follow-up — real word lists
+
+| ✔ | Feature | Approach | Files | Effort |
+|---|---|---|---|---|
+| [x] | Generated word lists | The hand-written lists shipped with §E were its weakest part: ~440 answers per locale, no frequency data, and in French no way to tell a headword from a conjugation, so `ABOYA` sat next to `TABLE`. Replaced by `scripts/build-wordlists.mjs` (run by hand, output committed). **Permissive sources only** — SCOWL/MIT for English, and for French an MIT word array ∩ a hunspell lemma set (MPL-2.0) ranked by Tatoeba frequency (CC BY 2.0 FR). Rejected: Lexique383 and `hermitdave/FrequencyWords` (CC BY-**SA**), Monkeytype (GPLv3), `google-10000-english` (LDC, non-commercial), Leipzig (licence stated inconsistently). Full reasoning in the spec addendum. | `scripts/build-wordlists.mjs` (new), `games/data/*` (generated), `games/words.ts`, README attribution | M |
+| [x] | Lazy word-list chunks | ~60 kB gzipped is a third of the page budget, paid at first paint by the majority who never open the terminal. Behind `import()`, one chunk per locale, excluded from the PWA precache with a runtime rule — the `ThreeBackground` treatment. Knock-on: `newGame` takes its words as an argument, so the state modules stay pure and the specs use fixtures. | `games/words.ts`, `games/{wordle,hangman,typing}.ts`, `commands/games/*`, `vite.config.ts` | S–M |
+| [x] | `wpm` types random words | Was prose from `content/`, which was charming and measured the wrong thing — a sentence lets you predict what comes next and coast, scoring reading as much as typing. Twelve common words a line, drawn with replacement. | `games/typing.ts`, `commands/games/wpm.ts` | S |
+
+### Achievements for E
+
+Same rule as §D: ship each **after** its game, never as a blocker. Takes the list from 30 to 35;
+`completionist` cascades over whatever the total is and every surface already reads
+`achievementList.length`. Thresholds are single successes rather than scores wherever possible —
+the skill-gate trade-off the first games spec flagged still holds, and 100% should stay a matter of
+persistence rather than reflexes.
+
+| ✔ | id | title (en / fr) | unlocks on | needs |
+|---|---|---|---|---|
+| [x] | `minesweeper` | Clean Sweep / Déminage | clearing a board | `minesweeper` |
+| [x] | `wordle` | Word Play / Jeu de mots | solving a wordle | `wordle` |
+| [x] | `hangman` | Last Word / Le mot de la fin | winning a round | `hangman` |
+| [x] | `wpm` | Touch Typist / Dactylo | 60 wpm at ≥95% accuracy | `wpm` |
+| [x] | `tetris` | Line Clear / Ligne complète | clearing 10 lines in one game | `tetris` |
+
 ---
 
 ## Build order
@@ -108,7 +161,13 @@ makes every command already shipped easier to find), `feat/phase-3-weather` (`we
 weather-linked background mood), `feat/phase-3-markets` (`btc`/`stonks`),
 `feat/phase-3-presence` (presence SSE), `feat/phase-3-stats` (command counter).
 
-Every roadmap row is now ticked.
+Every row in §A–D is ticked.
+
+**Phase 4 — games, vol. 2 (§E):** in progress on `claude/game-ideas-ec3dc5` → `dev`.
+The three shared prerequisites first (they touch code all five games read), then `minesweeper`,
+`wordle`, `hangman`, `wpm`, `tetris` in that order — turn-based before word-based before ticked, so
+each game reuses the one before it and `tetris`, the only one with a tick, lands last against a
+suite that already covers everything else.
 
 ## Known issues
 

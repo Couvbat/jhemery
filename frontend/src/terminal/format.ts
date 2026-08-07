@@ -61,6 +61,51 @@ export function wrap(text: string, width = 76): string[] {
   return out
 }
 
+/**
+ * Word-wraps by **index** rather than by returning strings.
+ *
+ * `wrap()` above is enough when the caller just wants lines. It is not enough
+ * when each character carries its own tone — a typing test colours every
+ * character by whether it has been typed correctly, so the renderer needs to
+ * know where each wrapped line sits in the original string. Re-deriving those
+ * offsets from `wrap()`'s output means trusting that it did not alter any
+ * whitespace, which it does.
+ *
+ * The ranges are contiguous and cover the whole string: the space a line breaks
+ * on stays at the end of that line rather than being swallowed, because in a
+ * typing test it is a character the player still has to type.
+ */
+export function wrapRanges(text: string, width: number): { start: number; end: number }[] {
+  const out: { start: number; end: number }[] = []
+  let start = 0
+
+  while (start < text.length) {
+    if (text.length - start <= width) {
+      out.push({ start, end: text.length })
+      break
+    }
+
+    // The break character is kept on this line, so the last position it may sit
+    // at is `width - 1` — searching from `width` would produce a line one
+    // character over.
+    let cut = -1
+    for (let i = start + width - 1; i > start; i--) {
+      if (text[i] === ' ') {
+        cut = i
+        break
+      }
+    }
+
+    // No space to break on: a single word longer than the line. Hard-break it,
+    // which is still better than overflowing the panel.
+    const end = cut === -1 ? start + width : cut + 1
+    out.push({ start, end })
+    start = end
+  }
+
+  return out
+}
+
 export function heading(text: string): OutputLine[] {
   return [
     { text, tone: 'primary' },

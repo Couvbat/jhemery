@@ -97,9 +97,14 @@ export const messages = {
     didYouMean: { en: 'did you mean', fr: 'vouliez-vous dire' },
     // Shown instead of a typo suggestion when the input reads as a sentence.
     askInstead: { en: 'that reads like a question — try', fr: 'on dirait une question — essayez' },
+    // One label for every game, so it can only name controls they all share.
+    // `q` is not one of them: `wordle`, `hangman` and `wpm` read letters, and a
+    // quit key that eats a guess is worse than no quit key. Esc and Ctrl+C both
+    // abort a capture (see `onPanelKeydown`), and each game prints its own hint
+    // line with the controls that are actually its own.
     playing: {
-      en: '-- playing: arrows/wasd · q or ctrl+c to quit --',
-      fr: '-- en jeu : flèches/wasd · q ou ctrl+c pour quitter --',
+      en: '-- playing: esc or ctrl+c to quit --',
+      fr: '-- en jeu : esc ou ctrl+c pour quitter --',
     },
     cancelled: { en: '^C cancelled', fr: '^C annulé' },
   },

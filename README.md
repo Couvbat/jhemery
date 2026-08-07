@@ -1,7 +1,7 @@
 # jhemery.xyz
 
 Personal portfolio of **Jules Hémery** (*Couvbat*) — a terminal-flavoured single-page site with a
-wireframe three.js background, a real command shell you can type into, two playable games, and 30
+wireframe three.js background, a real command shell you can type into, seven playable games, and 35
 hidden achievements.
 
 Vue 3 + Vite + Tailwind on the front, NestJS on the back, bilingual (EN/FR) throughout.
@@ -21,11 +21,13 @@ docs/       design specs and implementation plans
 - [The terminal](#the-terminal)
 - [Commands](#commands)
 - [Games](#games)
+- [Word lists](#word-lists)
 - [Achievements](#achievements)
 - [The API](#the-api)
 - [Running it locally](#running-it-locally)
 - [Tests](#tests)
 - [Deployment](#deployment)
+- [Licence](#licence)
 
 ---
 
@@ -77,8 +79,10 @@ Unknown commands get a Levenshtein "did you mean …?" suggestion. `help` groups
 here" — `help --all` gives up the 18 hidden ones.
 
 **vim.** `vim` (or `vi`, `nvim`, `emacs`) opens a real modal editor pane: normal/insert modes,
-`hjkl` + arrows, `i`/`a`/`A`/`o`, `x`, `dd`, and yes, `:q!` gets you out. `cat` and `vim` read from
-the same fake filesystem, so a file can never show two different contents.
+`hjkl` + arrows, `i`/`a`/`A`/`o`, `x`, `dd`, and yes, `:q!` gets you out. `:q` refuses once you've
+typed something, same as the real thing — the title bar's red dot is the guaranteed way out if you'd
+rather not play along. `cat` and `vim` read from the same fake filesystem, so a file can never show
+two different contents.
 
 ## Commands
 
@@ -139,7 +143,8 @@ the same fake filesystem, so a file can never show two different contents.
 
 ### misc
 
-Playable: `games` / `arcade`, `2048`, `snake`, `play` (starts the music player).
+Playable: `games` / `arcade`, `2048`, `snake`, `minesweeper` (`mines`), `tetris`, `wordle`
+(`motus`), `hangman` (`pendu`), `wpm` (`typing`), `play` (starts the music player).
 
 Background control: `spawn [n]`, `gravity [on|off]`, `constellation [on|off]` (alias `stars`) and
 `scene [reset]`.
@@ -154,22 +159,87 @@ fake as they look. `ls -a` lists both; `cat` and `vim` both read them.
 
 ## Games
 
-Both run inside the terminal buffer, take over the keyboard while they're live, and are cancellable
-with `Ctrl+C`. High scores are kept per game in `localStorage` and shown by `games`.
+All seven run inside the terminal buffer and take over the keyboard while they're live. **`Esc` or
+`Ctrl+C` quits any of them** — that's the universal exit, because three of them read letters and so
+can't spare `q` for it. Scores are kept per game in `localStorage` and shown by `games`.
 
 - **`2048`** — slide tiles and merge them. Arrows or `wasd`, `r` restarts, `q` quits.
 - **`snake`** — eat, grow, mind the walls. Same keys; reduced-motion players get one step per
   keypress instead of a ticking clock.
+- **`minesweeper`** (`mines`) — 16×10 with 25 mines. Arrows or `wasd` move the cursor, `space`
+  reveals, `f` flags, `q` quits. The first reveal is never a mine. Scored on time, so this is the
+  one game where a *lower* number is the better one.
+- **`tetris`** — 10×18 well. Arrows or `wasd` to move and rotate, `space` hard-drops, `q` quits.
+  No speed curve. Under reduced motion there's no clock: each keypress drops the piece one row, so
+  it falls exactly as fast as you play.
+- **`wordle`** (`motus`) — five letters, six tries. Type, `Backspace` deletes, `Enter` submits,
+  `r` starts a new word. The word list follows the site's language, and accents are folded, so
+  `EPEE` is a fine way to type `ÉPÉE`. Scored on solve streak.
+- **`hangman`** (`pendu`) — six wrong guesses. Same bilingual word list. Repeating a letter you've
+  already tried doesn't cost you one. Scored on win streak.
+- **`wpm`** (`typing`) — type a line of random common words and get words-per-minute and accuracy.
+  `Backspace` corrects, but a character you got wrong once stays wrong in the accuracy figure.
+
+The three word games share a generated word list per language — see
+[Word lists](#word-lists) for where it comes from.
+
+## Word lists
+
+`wordle`, `hangman` and `wpm` share one generated word list per language, built by
+`frontend/scripts/build-wordlists.mjs` (`npm run wordlists`) and committed under
+`frontend/src/terminal/games/data/`. The script is run by hand, never at build time — the build
+stays reproducible offline and CI doesn't depend on anyone's server being up.
+
+|  | answers | accepted guesses | typing pool |
+|---|---|---|---|
+| English | 3 497 | 6 500 | 3 527 |
+| French | 969 | 5 891 | 1 261 |
+
+English comes from **SCOWL**, which is size-graded, and that grading is the split the games want:
+common words become answers, the wider set becomes legal guesses. French has no equivalent, so it's
+assembled from three — an MIT word array for membership, a hunspell dictionary for lemmas (so the
+answer pool holds `TABLE`, not `ABOYA`), and Tatoeba sentence frequencies for commonness.
+
+Answers are stored uppercase with accents intact because they're displayed; guesses are folded
+because they're typed, so `EPEES` finds `ÉPÉES`. French answers are deduplicated by folded form —
+`cote` and `côté` are one puzzle, and the more frequent spelling wins.
+
+The lists are ~60 kB gzipped, so they're behind a dynamic `import()` (one chunk per language, loaded
+the first time you run a word game) and kept out of the PWA precache. Nobody who never opens the
+terminal pays for a dictionary.
+
+### Attribution
+
+| Source | Licence | Used for |
+|---|---|---|
+| [SCOWL](https://github.com/en-wl/wordlist), via [`wordlist-english`](https://www.npmjs.com/package/wordlist-english) | MIT | English word lists |
+| [`an-array-of-french-words`](https://github.com/words/an-array-of-french-words) | MIT | French word membership |
+| [Grammalecte / Dicollecte](https://grammalecte.net/), via [`dictionary-fr`](https://www.npmjs.com/package/dictionary-fr) — © Olivier R. and contributors | **MPL-2.0** | French lemmas |
+| [Tatoeba](https://tatoeba.org/) — © Tatoeba contributors | **CC BY 2.0 FR** | French word frequency |
+
+Full notices — the verbatim licence text of every data source *and* of all 118 production
+dependencies — ship with the built site at
+[`/THIRD-PARTY.txt`](https://jhemery.xyz/THIRD-PARTY.txt). These licences require their notice to
+travel with the copy that is distributed, and for a website that is `dist/`, not this repository.
+
+That file is generated at build time by
+[`frontend/vite-plugins/third-party.ts`](frontend/vite-plugins/third-party.ts), which copies each
+licence verbatim out of `node_modules` — the same one-source rule as the résumé plugin beside it. It
+was hand-written first and was wrong within the hour (SCOWL misdated, the wrong author credited,
+one copyright missed entirely), which is the whole argument for generating it.
+
+MPL-2.0 is file-level copyleft: `words-fr.ts` carries the notice and inherits the licence; nothing
+else here is affected.
 
 ## Achievements
 
-30 in total, tracked in `localStorage` (`couvbat:achievements`, plus `couvbat:achievements:sections`
+35 in total, tracked in `localStorage` (`couvbat:achievements`, plus `couvbat:achievements:sections`
 for the exploration one). Unlocking one fires a floating toast and prints a line in the terminal;
-the trophy button in the navbar opens a modal listing all 30. Locked ones show `???` and an oblique
+the trophy button in the navbar opens a modal listing all 35. Locked ones show `???` and an oblique
 hint; unlocking one reveals its title and how it was done. `achievements` (alias `trophies`) prints
 the same progress in the terminal.
 
-The last one cascades: unlock the other twenty-nine and **100%** unlocks itself — and the three.js
+The last one cascades: unlock the other thirty-four and **100%** unlocks itself — and the three.js
 background changes palette to prove it.
 
 | Achievement | How to get it |
@@ -194,6 +264,11 @@ background changes palette to prove it.
 | Cheat Code | Enter the Konami code (↑↑↓↓←→←→BA) anywhere on the page — no terminal needed |
 | Tile Merchant | Reach a 256 tile in `2048` |
 | Nokia Nostalgia | Grow a snake to length 10 in `snake` |
+| Clean Sweep | Clear a board in `minesweeper` |
+| Word Play | Solve a `wordle` |
+| Last Word | Win a round of `hangman` |
+| Touch Typist | Hit 60 wpm at 95%+ accuracy in `wpm` |
+| Line Clear | Clear 10 lines in one game of `tetris` |
 | Configuration Leak | `cat .env` (or open it in `vim`) |
 | Deja Vu | Replay the boot sequence with `reboot` |
 | Knock Knock | `ssh couvbat@jhemery.xyz` |
@@ -291,3 +366,13 @@ GitHub Actions, split per app and path-filtered:
 `docs/superpowers/` holds the design specs and implementation plans behind the bigger pieces — the
 three.js wireframe background, the vim pane, the terminal games, the achievements UI, the SoundCloud
 embed, and a CTF flag chain that is still just a design.
+
+---
+
+## Licence
+
+Source code is [MIT](LICENSE).
+
+Two things it does not cover, both spelled out in `LICENSE`: the personal content (bio, photos,
+project write-ups, résumé text) is mine and not licensed for reuse, and the generated French word
+list is MPL-2.0 — see [Word lists](#word-lists).

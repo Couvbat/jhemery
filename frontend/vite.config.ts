@@ -7,6 +7,7 @@ import vueDevTools from 'vite-plugin-vue-devtools'
 import tailwindcss from '@tailwindcss/vite'
 import { VitePWA } from 'vite-plugin-pwa'
 import { resumePlugin } from './vite-plugins/resume'
+import { thirdPartyPlugin } from './vite-plugins/third-party'
 import { profile } from './src/content/profile'
 
 /** Short commit SHA for the footer. Falls back to `dev` outside a git checkout. */
@@ -27,6 +28,7 @@ export default defineConfig({
     vueDevTools(),
     tailwindcss(),
     resumePlugin(),
+    thirdPartyPlugin(),
     VitePWA({
       registerType: 'autoUpdate',
       // Left off in dev: a service worker sitting in front of the dev server
@@ -71,6 +73,12 @@ export default defineConfig({
           // ~51 kB that only social/link-preview crawlers ever fetch, and none of
           // them run a service worker. Precaching it is pure waste on every install.
           '**/og-image.*',
+          // ~60 kB gzipped of wordle/typing dictionaries, split per locale and
+          // fetched only when someone runs a word game — which most visitors
+          // never do, and nobody does in the locale they are not reading. Same
+          // reasoning as three.js above: precaching would undo the code-split.
+          // The runtime rule below still caches them once actually used.
+          '**/words-??-*.js',
         ],
         navigateFallback: '/index.html',
         navigateFallbackDenylist: [
@@ -82,6 +90,10 @@ export default defineConfig({
           /^\/robots\.txt$/,
           /^\/sitemap\.xml$/,
           /^\/og-image\.(png|svg)$/,
+          // Third-party notices, emitted by `vite-plugins/third-party.ts`.
+          // They have to be reachable in the *deployed* copy, not just the
+          // repository, because that is what the licences require.
+          /^\/THIRD-PARTY\.txt$/,
         ],
         cleanupOutdatedCaches: true,
         clientsClaim: true,
