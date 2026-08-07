@@ -1,7 +1,7 @@
 import { profile } from '@/content/profile'
 import { projects } from '@/content/projects'
 import type { Locale, Localised } from '@/content/types'
-import { blank, line, segmented } from '../../format'
+import { blank, line, segmented, wrapRanges } from '../../format'
 import { keyStream } from '../../games/input'
 import * as typing from '../../games/typing'
 import type { Command, CommandContext, OutputLine, OutputSegment, Tone } from '../../types'
@@ -59,25 +59,41 @@ function splitSentences(text: string): string[] {
   return text.split(/(?<=[.!?])\s+/)
 }
 
-function targetLine(state: typing.TypingState): OutputLine {
-  const parts: OutputSegment[] = [{ text: '  ', tone: 'muted' }]
+/**
+ * Content width of a wrapped prompt line.
+ *
+ * `segmented()` is always `pre`, because every other thing it draws is a game
+ * board that must not reflow. Prose is the exception: an unwrapped 160-character
+ * line pushed a horizontal scrollbar onto the whole panel. So the wrapping
+ * happens here, at a width that matches `wrap()`'s house column minus the
+ * two-space indent.
+ */
+const WRAP_WIDTH = 74
 
-  for (let i = 0; i < state.target.length; i++) {
-    const expected = state.target[i]!
-    const typed = state.typed[i]
+function targetLines(state: typing.TypingState): OutputLine[] {
+  return wrapRanges(state.target, WRAP_WIDTH).map(({ start, end }) => {
+    const parts: OutputSegment[] = [{ text: '  ', tone: 'muted' }]
 
-    let tone: Tone = 'muted'
-    if (typed !== undefined) tone = typed === expected ? 'success' : 'error'
-    else if (i === state.typed.length) tone = 'accent'
+    for (let i = start; i < end; i++) {
+      const expected = state.target[i]!
+      const typed = state.typed[i]
 
-    // Always the *expected* character, never the typed one: a line that mutates
-    // into your typos is unreadable exactly when you need to read it. Wrong
-    // characters are shown by colour, and a wrong space by an underscore, since
-    // a red space is invisible.
-    parts.push({ text: typed !== undefined && typed !== expected && expected === ' ' ? '_' : expected, tone })
-  }
+      let tone: Tone = 'muted'
+      if (typed !== undefined) tone = typed === expected ? 'success' : 'error'
+      else if (i === state.typed.length) tone = 'accent'
 
-  return segmented(parts)
+      // Always the *expected* character, never the typed one: a line that mutates
+      // into your typos is unreadable exactly when you need to read it. Wrong
+      // characters are shown by colour, and a wrong space by an underscore, since
+      // a red space is invisible.
+      parts.push({
+        text: typed !== undefined && typed !== expected && expected === ' ' ? '_' : expected,
+        tone,
+      })
+    }
+
+    return segmented(parts)
+  })
 }
 
 function render(state: typing.TypingState, now: number, best: number, status: string): OutputLine[] {
@@ -94,7 +110,7 @@ function render(state: typing.TypingState, now: number, best: number, status: st
       { text: best === 0 ? '—' : String(best), tone: 'accent' },
     ]),
     blank,
-    targetLine(state),
+    ...targetLines(state),
     blank,
     line(status, 'muted'),
   ]

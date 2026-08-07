@@ -1,5 +1,17 @@
 import { describe, expect, it } from 'vitest'
-import { art, blank, heading, keyValues, line, lines, link, pre, tags, wrap } from '../format'
+import {
+  art,
+  blank,
+  heading,
+  keyValues,
+  line,
+  lines,
+  link,
+  pre,
+  tags,
+  wrap,
+  wrapRanges,
+} from '../format'
 
 describe('line helpers', () => {
   it('defaults to the default tone', () => {
@@ -112,5 +124,48 @@ describe('tags', () => {
   it('wraps a long list across lines', () => {
     const many = Array.from({ length: 40 }, (_, i) => `tag${i}`)
     expect(tags(many).length).toBeGreaterThan(1)
+  })
+})
+
+describe('wrapRanges', () => {
+  const slice = (text: string, width: number) =>
+    wrapRanges(text, width).map(({ start, end }) => text.slice(start, end))
+
+  it('returns one range for text that already fits', () => {
+    expect(wrapRanges('short', 20)).toEqual([{ start: 0, end: 5 }])
+  })
+
+  it('breaks on spaces', () => {
+    expect(slice('one two three four', 8)).toEqual(['one two ', 'three ', 'four'])
+  })
+
+  /*
+   * The property the typing test depends on: every character of the original
+   * appears exactly once, in order. A renderer toning characters by index cannot
+   * survive a wrapper that drops or duplicates the space it broke on.
+   */
+  it('covers the whole string with contiguous ranges', () => {
+    const text = 'Quand je ne livre pas de features, je produis de la musique et je joue.'
+
+    for (const width of [10, 24, 40, 74]) {
+      const ranges = wrapRanges(text, width)
+      expect(ranges[0]!.start).toBe(0)
+      expect(ranges[ranges.length - 1]!.end).toBe(text.length)
+      for (let i = 1; i < ranges.length; i++) expect(ranges[i]!.start).toBe(ranges[i - 1]!.end)
+      expect(slice(text, width).join('')).toBe(text)
+    }
+  })
+
+  it('keeps every line within the width', () => {
+    const text = 'the quick brown fox jumps over the lazy dog and keeps on running'
+    for (const line of slice(text, 16)) expect(line.length).toBeLessThanOrEqual(16)
+  })
+
+  it('hard-breaks a word longer than the line rather than overflowing', () => {
+    expect(slice('supercalifragilistic', 6)).toEqual(['superc', 'alifra', 'gilist', 'ic'])
+  })
+
+  it('handles an empty string', () => {
+    expect(wrapRanges('', 10)).toEqual([])
   })
 })

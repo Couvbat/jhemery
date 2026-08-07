@@ -531,6 +531,32 @@ describe('hangman', () => {
 })
 
 describe('wpm', () => {
+  /**
+   * The prompt as the player sees it. Long lines wrap, so the target is every
+   * indented segmented line joined back together — the space a line breaks on
+   * stays at the end of that line, so this reconstructs the original exactly.
+   */
+  function readTarget(frame: OutputLine[]): string {
+    return frame
+      .filter((l) => l.segments && l.text.startsWith('  '))
+      .map((l) => l.text.slice(2))
+      .join('')
+  }
+
+  it('wraps a long prompt instead of overflowing the panel', async () => {
+    const game = harness()
+    const finished = command('wpm').run(game.ctx) as Promise<OutputLine[]>
+
+    const rendered = game.frame().filter((l) => l.segments && l.text.startsWith('  '))
+    // `segmented()` is always `pre`, so an over-wide line cannot reflow in CSS —
+    // it puts a horizontal scrollbar on the whole panel instead.
+    expect(rendered.length).toBeGreaterThan(0)
+    for (const row of rendered) expect(row.text.length).toBeLessThanOrEqual(76)
+
+    game.abort()
+    await expect(finished).rejects.toThrow()
+  })
+
   it('unlocks `wpm` on a fast, accurate run', async () => {
     // 20 ms a character is about 600 wpm, comfortably past the threshold, and
     // every character is correct so accuracy is 100.
@@ -542,7 +568,7 @@ describe('wpm', () => {
 
     // The prompt is whatever the renderer put on screen: the target line is the
     // only one built from segments and indented by two spaces.
-    const target = game.frame().find((l) => l.text.startsWith('  ') && l.segments)!.text.slice(2)
+    const target = readTarget(game.frame())
     for (const char of target) game.press(char)
     await drain()
 
@@ -560,7 +586,7 @@ describe('wpm', () => {
     const game = harness()
     const finished = command('wpm').run(game.ctx) as Promise<OutputLine[]>
 
-    const target = game.frame().find((l) => l.text.startsWith('  ') && l.segments)!.text.slice(2)
+    const target = readTarget(game.frame())
     // Every character wrong: fast, and worth nothing.
     for (let i = 0; i < target.length; i++) game.press('~')
     await drain()
