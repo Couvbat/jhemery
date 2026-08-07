@@ -239,6 +239,49 @@ muted disclaimer, and the whole feature is off unless `ASK_ENABLED` is set — s
 [its own spec](superpowers/specs/2026-08-04-ask-command-design.md) for the limits, which are the
 interesting part.
 
+### games
+
+**Where:** `frontend/src/terminal/games/*` (pure state), `commands/games.ts` (renderers + commands)
+
+Seven playable games in the output buffer. `games` (alias `arcade`) lists them with the local best
+for each; it is the only one flagged `palette: true`, because launching a game from `Ctrl+K` would
+drop a visitor into a keyboard-captured surface they did not ask for.
+
+| Command | Game | Score kept |
+|---|---|---|
+| `2048` | Slide and merge tiles on a 4×4 board | high score |
+| `snake` | 24×12 grid, walls kill | high score |
+| `minesweeper` (alias `mines`) | 16×10, 25 mines, first reveal is never a mine | fastest clear, in seconds |
+| `tetris` | 10×18 well, seven pieces, no speed curve | high score |
+| `wordle` (alias `motus`) | 5 letters, 6 rows, word list follows the locale | solve streak |
+| `hangman` (alias `pendu`) | 6 wrong guesses, same word list | win streak |
+| `wpm` (alias `typing`) | Type a line drawn from §1's content layer | words per minute |
+
+Each game is a **pure state module** (plain functions over plain objects — no Vue, no `OutputLine`,
+no timers, so the interesting logic is unit-tested directly) plus a renderer that turns state into
+`OutputLine[]` for `ctx.frame()`. The one shared primitive is `ctx.capture()`, which routes raw keys
+to the running command; `execute()`'s `finally` releases it unconditionally, so a game that throws
+cannot wedge the keyboard.
+
+**`Esc` and `Ctrl+C` quit every game.** They have to: `wordle`, `hangman` and `wpm` read letters, so
+`q` is a letter and cannot also mean quit — the four grid games keep it as a convenience only. This
+is why the prompt-row label shown during a capture names no controls; each game prints its own hint
+line instead.
+
+**Motion:** `2048`, `minesweeper`, `wordle` and `hangman` are turn-based and unaffected. `snake`
+drops its 120 ms tick and steps once per keypress under reduced motion; `tetris` advances gravity
+one row per keypress, which is a different and more deliberate game rather than a refusal to run.
+
+High scores live in `localStorage` (`couvbat:games:*`) alongside the achievement keys, wrapped in
+the same try/catch — private browsing means they do not persist, which is not an error worth
+surfacing. `minesweeper` is the one game where a *lower* score wins, so the score table carries a
+direction per game rather than assuming `Math.max`. There are no leaderboards: a publicly writable
+score store is the guestbook's spam problem with none of the guestbook's charm.
+
+Full design in [the first games spec](superpowers/specs/2026-08-04-terminal-games-design.md)
+(`2048`, `snake`, and the `capture` primitive) and
+[vol. 2](superpowers/specs/2026-08-07-terminal-games-vol2-design.md) (the other five).
+
 ---
 
 ## 4. Command palette
@@ -616,7 +659,10 @@ Retrofitting these is painful, so they are part of the definition of done:
 - Terminal overlay: `role="dialog"`, `aria-modal="true"`, focus trapped inside, focus restored to
   the launcher on close, `Esc` closes (except during the vim trap).
 - Output buffer: `aria-live="polite"` with `aria-atomic="false"` so screen readers announce new
-  lines rather than re-reading the whole buffer.
+  lines rather than re-reading the whole buffer. **The one exception is a running game** (§3
+  `games`): while a command holds the keyboard the region drops to `aria-live="off"`, because a
+  grid redrawn eight times a second through a polite live region is actively hostile. These are
+  visual games and a screen reader cannot play them; announcing the redraws would not change that.
 - Command palette: `role="listbox"`, arrow-key navigation, `aria-activedescendant`.
 - Achievements modal: same hand-rolled pattern as the terminal overlay — `role="dialog"`,
   `aria-modal="true"`, `Tab`/`Shift+Tab` cycled inside the panel, focus moved to the close button

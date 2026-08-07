@@ -4,7 +4,9 @@ import { isUnlocked, unlocked } from '../achievements'
 import { gameCommands } from '../commands/games'
 import { move } from '../games/2048'
 import type { Board, Dir } from '../games/2048'
+import * as minesweeper from '../games/minesweeper'
 import { HEIGHT, WIDTH } from '../games/snake'
+import { answersFor } from '../games/words'
 import type { Command, CommandContext, OutputLine } from '../types'
 
 // Snake has two loops — a 120 ms tick and a reduced-motion step-per-keypress —
@@ -299,5 +301,380 @@ describe('snake', () => {
     await finished
 
     expect(isUnlocked('snake')).toBe(false)
+  })
+})
+
+/*
+ * The five games added in vol. 2. Same idea as the two above: the pure modules
+ * prove the rules, and these prove the wiring between state, renderer, capture
+ * and achievement — the part no unit test reaches.
+ *
+ * `keyStream` buffers, so a whole sequence can be pressed synchronously and then
+ * drained by awaiting one macrotask: every `keys.next()` resolves from that
+ * buffer through an already-settled promise, and microtasks run to completion
+ * before a timer fires.
+ */
+const drain = () => new Promise((resolve) => setTimeout(resolve, 0))
+
+/** A deterministic `Math.random`, rebuildable from the same seed so two passes
+ *  can consume an identical sequence of draws. */
+function generator(seed: number): () => number {
+  let value = seed
+  return () => {
+    value = (value * 1664525 + 1013904223) >>> 0
+    return value / 0x100000000
+  }
+}
+
+describe('minesweeper', () => {
+  const SEED = 0x31337
+
+  /** Arrow presses that walk the cursor from one cell to another. */
+  function walk(from: { x: number; y: number }, to: { x: number; y: number }): string[] {
+    return [
+      ...Array.from({ length: Math.abs(to.x - from.x) }, () =>
+        to.x > from.x ? 'ArrowRight' : 'ArrowLeft',
+      ),
+      ...Array.from({ length: Math.abs(to.y - from.y) }, () =>
+        to.y > from.y ? 'ArrowDown' : 'ArrowUp',
+      ),
+    ]
+  }
+
+  it('unlocks `minesweeper` when every safe cell is revealed', async () => {
+    // Two passes over the same seed: the first works out where the mines will
+    // land, the second drives the command into an identical layout. The cursor
+    // starts at the centre, which is therefore also the first reveal.
+    const start = minesweeper.newGame().cursor
+    const layout = minesweeper.reveal(minesweeper.newGame(), start.x, start.y, generator(SEED))
+    vi.spyOn(Math, 'random').mockImplementation(generator(SEED))
+
+    const game = harness()
+    const finished = command('minesweeper').run(game.ctx) as Promise<OutputLine[]>
+
+    let at = start
+    game.press(' ')
+
+    for (let y = 0; y < minesweeper.HEIGHT; y++) {
+      for (let x = 0; x < minesweeper.WIDTH; x++) {
+        if (layout.cells[y * minesweeper.WIDTH + x]!.mine) continue
+        for (const key of walk(at, { x, y })) game.press(key)
+        game.press(' ')
+        at = { x, y }
+      }
+    }
+
+    await drain()
+    const lines = await finished
+
+    expect(isUnlocked('minesweeper')).toBe(true)
+    expect(lines.some((l) => l.text.includes('Clean Sweep'))).toBe(true)
+  })
+
+  it('does not unlock when a mine is hit', async () => {
+    const start = minesweeper.newGame().cursor
+    const layout = minesweeper.reveal(minesweeper.newGame(), start.x, start.y, generator(SEED))
+    vi.spyOn(Math, 'random').mockImplementation(generator(SEED))
+
+    const game = harness()
+    const finished = command('minesweeper').run(game.ctx) as Promise<OutputLine[]>
+
+    const mine = layout.cells.findIndex((cell) => cell.mine)
+    const target = { x: mine % minesweeper.WIDTH, y: Math.floor(mine / minesweeper.WIDTH) }
+
+    game.press(' ')
+    for (const key of walk(start, target)) game.press(key)
+    game.press(' ')
+
+    await drain()
+    await finished
+
+    expect(isUnlocked('minesweeper')).toBe(false)
+  })
+
+  it('will not reveal a flagged cell, so a flag cannot lose the game', async () => {
+    const start = minesweeper.newGame().cursor
+    const layout = minesweeper.reveal(minesweeper.newGame(), start.x, start.y, generator(SEED))
+    vi.spyOn(Math, 'random').mockImplementation(generator(SEED))
+
+    const game = harness()
+    const finished = command('minesweeper').run(game.ctx) as Promise<OutputLine[]>
+
+    const mine = layout.cells.findIndex((cell) => cell.mine)
+    const target = { x: mine % minesweeper.WIDTH, y: Math.floor(mine / minesweeper.WIDTH) }
+
+    game.press(' ')
+    for (const key of walk(start, target)) game.press(key)
+    game.press('f')
+    game.press(' ')
+    await drain()
+
+    // Still alive: the board is on screen and the status line is the hint, not
+    // the loss message.
+    expect(game.frame().some((l) => l.text.includes('boom'))).toBe(false)
+
+    game.press('q')
+    await drain()
+    await finished
+  })
+})
+
+describe('wordle', () => {
+  /** `() => 0` picks the first answer, so the test knows what to type. */
+  const ANSWER = answersFor('en')[0]!
+
+  it('unlocks `wordle` on a solve', async () => {
+    vi.spyOn(Math, 'random').mockImplementation(() => 0)
+
+    const game = harness()
+    const finished = command('wordle').run(game.ctx) as Promise<OutputLine[]>
+
+    for (const letter of ANSWER) game.press(letter.toLowerCase())
+    game.press('Enter')
+    await drain()
+
+    expect(isUnlocked('wordle')).toBe(true)
+
+    // There is no `q` to quit on — every letter is a guess — so Esc is the exit,
+    // and the achievement line has to survive that path.
+    game.abort()
+    await expect(finished).rejects.toThrow()
+    expect(game.printed().some((l) => l.text.includes('Word Play'))).toBe(true)
+  })
+
+  it('does not unlock on a loss', async () => {
+    vi.spyOn(Math, 'random').mockImplementation(() => 0)
+
+    const game = harness()
+    const finished = command('wordle').run(game.ctx) as Promise<OutputLine[]>
+
+    const wrong = answersFor('en').find((word) => word !== ANSWER)!
+    for (let row = 0; row < 6; row++) {
+      for (const letter of wrong) game.press(letter.toLowerCase())
+      game.press('Enter')
+    }
+    await drain()
+
+    expect(isUnlocked('wordle')).toBe(false)
+    // The answer is printed once the round is lost.
+    expect(game.frame().some((l) => l.text === ANSWER)).toBe(true)
+
+    game.abort()
+    await expect(finished).rejects.toThrow()
+  })
+
+  it('refuses a word that is not in the list without spending a row', async () => {
+    vi.spyOn(Math, 'random').mockImplementation(() => 0)
+
+    const game = harness()
+    const finished = command('wordle').run(game.ctx) as Promise<OutputLine[]>
+
+    for (const letter of 'zzzzz') game.press(letter)
+    game.press('Enter')
+    await drain()
+
+    expect(game.frame().some((l) => l.text.includes('not in the word list'))).toBe(true)
+
+    // The row survived the refusal, so the same letters can be corrected.
+    for (let i = 0; i < 5; i++) game.press('Backspace')
+    for (const letter of ANSWER) game.press(letter.toLowerCase())
+    game.press('Enter')
+    await drain()
+
+    expect(isUnlocked('wordle')).toBe(true)
+
+    game.abort()
+    await expect(finished).rejects.toThrow()
+  })
+})
+
+describe('hangman', () => {
+  const ANSWER = answersFor('en')[0]!
+
+  it('unlocks `hangman` on a win', async () => {
+    vi.spyOn(Math, 'random').mockImplementation(() => 0)
+
+    const game = harness()
+    const finished = command('hangman').run(game.ctx) as Promise<OutputLine[]>
+
+    for (const letter of new Set(ANSWER)) game.press(letter.toLowerCase())
+    await drain()
+
+    expect(isUnlocked('hangman')).toBe(true)
+
+    game.abort()
+    await expect(finished).rejects.toThrow()
+    expect(game.printed().some((l) => l.text.includes('Last Word'))).toBe(true)
+  })
+
+  it('does not unlock when the drawing finishes first', async () => {
+    vi.spyOn(Math, 'random').mockImplementation(() => 0)
+
+    const game = harness()
+    const finished = command('hangman').run(game.ctx) as Promise<OutputLine[]>
+
+    // Six letters that are certainly not in the answer.
+    const wrong = 'abcdefghijklmnopqrstuvwxyz'
+      .toUpperCase()
+      .split('')
+      .filter((letter) => !ANSWER.includes(letter))
+      .slice(0, 6)
+
+    for (const letter of wrong) game.press(letter.toLowerCase())
+    await drain()
+
+    expect(isUnlocked('hangman')).toBe(false)
+
+    game.abort()
+    await expect(finished).rejects.toThrow()
+  })
+})
+
+describe('wpm', () => {
+  it('unlocks `wpm` on a fast, accurate run', async () => {
+    // 20 ms a character is about 600 wpm, comfortably past the threshold, and
+    // every character is correct so accuracy is 100.
+    let now = 0
+    vi.spyOn(Date, 'now').mockImplementation(() => (now += 20))
+
+    const game = harness()
+    const finished = command('wpm').run(game.ctx) as Promise<OutputLine[]>
+
+    // The prompt is whatever the renderer put on screen: the target line is the
+    // only one built from segments and indented by two spaces.
+    const target = game.frame().find((l) => l.text.startsWith('  ') && l.segments)!.text.slice(2)
+    for (const char of target) game.press(char)
+    await drain()
+
+    expect(isUnlocked('wpm')).toBe(true)
+
+    game.abort()
+    await expect(finished).rejects.toThrow()
+    expect(game.printed().some((l) => l.text.includes('Touch Typist'))).toBe(true)
+  })
+
+  it('does not unlock a sloppy run, however fast', async () => {
+    let now = 0
+    vi.spyOn(Date, 'now').mockImplementation(() => (now += 20))
+
+    const game = harness()
+    const finished = command('wpm').run(game.ctx) as Promise<OutputLine[]>
+
+    const target = game.frame().find((l) => l.text.startsWith('  ') && l.segments)!.text.slice(2)
+    // Every character wrong: fast, and worth nothing.
+    for (let i = 0; i < target.length; i++) game.press('~')
+    await drain()
+
+    expect(isUnlocked('wpm')).toBe(false)
+
+    game.abort()
+    await expect(finished).rejects.toThrow()
+  })
+})
+
+describe('tetris', () => {
+  /**
+   * Five O pieces side by side fill two rows of a ten-wide well, so five bands
+   * of five pieces clear ten lines. `always('O')` keeps the piece predictable;
+   * the offsets walk the spawn column to each pair of columns in turn.
+   */
+  const OFFSETS = [-4, -2, 0, 2, 4]
+
+  function clearTenLines(press: (key: string) => void) {
+    for (let band = 0; band < 5; band++) {
+      for (const offset of OFFSETS) {
+        for (let i = 0; i < Math.abs(offset); i++) {
+          press(offset < 0 ? 'ArrowLeft' : 'ArrowRight')
+        }
+        press(' ')
+      }
+    }
+  }
+
+  /** Always the O piece: `PIECE_IDS.indexOf('O')` is 1 of 7. */
+  const onlyO = () => 1 / 7
+
+  it('unlocks `tetris` at ten lines, one gravity step per keypress', async () => {
+    vi.spyOn(Math, 'random').mockImplementation(onlyO)
+
+    const game = harness()
+    const finished = command('tetris').run(game.ctx) as Promise<OutputLine[]>
+
+    clearTenLines(game.press)
+    await drain()
+
+    expect(isUnlocked('tetris')).toBe(true)
+
+    game.press('q')
+    await drain()
+    const lines = await finished
+    expect(lines.some((l) => l.text.includes('Line Clear'))).toBe(true)
+  })
+
+  it('unlocks `tetris` on the 500 ms tick too', async () => {
+    // The loop a visitor without reduced motion plays: the handler only records
+    // the keys, and the tick is what applies them.
+    motion.reduced = false
+    vi.spyOn(Math, 'random').mockImplementation(onlyO)
+    vi.useFakeTimers()
+
+    const game = harness()
+    const finished = command('tetris').run(game.ctx) as Promise<OutputLine[]>
+
+    for (let band = 0; band < 5; band++) {
+      for (const offset of OFFSETS) {
+        for (let i = 0; i < Math.abs(offset); i++) {
+          game.press(offset < 0 ? 'ArrowLeft' : 'ArrowRight')
+        }
+        game.press(' ')
+        // One tick applies everything pressed during it, in order.
+        await vi.advanceTimersByTimeAsync(500)
+      }
+    }
+
+    expect(isUnlocked('tetris')).toBe(true)
+
+    game.press('q')
+    await vi.advanceTimersByTimeAsync(500)
+    await finished
+  })
+
+  it('does not unlock on a short game', async () => {
+    vi.spyOn(Math, 'random').mockImplementation(onlyO)
+
+    const game = harness()
+    const finished = command('tetris').run(game.ctx) as Promise<OutputLine[]>
+
+    game.press(' ')
+    await drain()
+    game.press('q')
+    await drain()
+    await finished
+
+    expect(isUnlocked('tetris')).toBe(false)
+  })
+})
+
+describe('the games listing', () => {
+  it('counts the games rather than hardcoding a number', () => {
+    const listed = command('games').run(harness().ctx) as OutputLine[]
+    // Every game command except the listing itself.
+    const playable = gameCommands.length - 1
+    expect(listed[0]!.text).toContain(String(playable))
+  })
+
+  it('names every playable game', () => {
+    const listed = command('games').run(harness().ctx) as OutputLine[]
+    const text = listed.map((l) => l.text).join('\n')
+
+    for (const game of gameCommands.filter((c) => c.name !== 'games')) {
+      expect(text).toContain(game.name)
+    }
+  })
+
+  it('shows minesweeper’s best in seconds, since a lower one is better', () => {
+    window.localStorage.setItem('couvbat:games:minesweeper', '42')
+    const listed = command('games').run(harness().ctx) as OutputLine[]
+    expect(listed.some((l) => l.text.includes('best: 42s'))).toBe(true)
   })
 })
