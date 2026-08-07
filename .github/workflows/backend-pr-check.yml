@@ -1,9 +1,23 @@
 name: Backend PR Check
 
 on:
+  # `dev` is the integration branch: features branch off it and PR back into it,
+  # and only then does `dev` PR into `master`. Both bases need the same checks —
+  # a green feature PR is worth nothing if the branch it merges into is unchecked.
   pull_request:
     branches:
       - master
+      - dev
+    paths:
+      - 'backend/**'
+      - '.github/workflows/backend-*.yml'
+  # Re-runs on the merged result. A PR is checked against its own head, so two
+  # individually-green branches can still land a broken `dev`; this is the last
+  # signal before `dev` is proposed to `master`. `master` is not listed — a push
+  # there already triggers backend-build.yml.
+  push:
+    branches:
+      - dev
     paths:
       - 'backend/**'
       - '.github/workflows/backend-*.yml'
