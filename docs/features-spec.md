@@ -400,6 +400,17 @@ Three surfaces, one source of truth:
   `AchievementToast` drains one at a time. Centralising it in `unlock()` rather than at each call
   site is what makes the Konami code (handled in `App.vue`, far from any terminal) announce
   itself at all.
+- **Confetti** — the toast also fires a burst from its own bounding box, via `fireConfetti()` and
+  the globally-mounted `ConfettiBurst`. The particles are monospace glyphs in the neon palette
+  rather than paper shapes: round confetti reads as a different product bolted onto a wireframe
+  terminal. A 360° spread with an upward kick and gravity turns it into a fountain, so it works
+  wherever the toast happens to sit. `completionist` gets 2.5× the particles.
+
+  The canvas is mounted only while particles are alive and the loop stops itself when the last one
+  dies — no idle `requestAnimationFrame`, no full-viewport backing store sitting around for the
+  visitor who never unlocks anything. Phones get half the particles. `fireConfetti()` is a no-op
+  under `prefers-reduced-motion`, which is also why nothing accumulates in the queue when there is
+  no renderer to drain it.
 
 `unlocked` is exported as a `Ref<Set<string>>` so Vue components read live state directly — the
 same pattern `history.ts` already uses — while the terminal command keeps using the plain

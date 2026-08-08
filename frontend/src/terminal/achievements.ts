@@ -10,7 +10,7 @@ export interface Achievement {
   description: Localised<string>
 }
 
-const COMPLETIONIST = 'completionist'
+export const COMPLETIONIST = 'completionist'
 
 /** Every achievement, in the order `achievements` prints them. */
 export const achievementList: Achievement[] = [
