@@ -257,6 +257,7 @@ function onPanelKeydown(event: KeyboardEvent) {
         <div
           v-if="!vimBuffer"
           ref="scrollEl"
+          data-testid="terminal-output"
           class="flex-1 overflow-y-auto p-4 font-mono text-xs sm:text-sm space-y-0.5"
           :aria-live="capturing ? 'off' : 'polite'"
           aria-atomic="false"

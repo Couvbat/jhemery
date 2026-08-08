@@ -24,6 +24,7 @@ Run from `frontend/` or `backend/` — there is no root `package.json`.
 ```bash
 cd frontend && npm run dev          # http://localhost:5173
 cd frontend && npm test             # vitest run
+cd frontend && npm run test:e2e     # playwright (builds + serves dist itself)
 cd frontend && npm run type-check   # vue-tsc --build
 cd frontend && npm run build        # type-check + build, in parallel
 cd frontend && npm run lint         # eslint . (CI runs this; lint:fix rewrites)
@@ -41,8 +42,24 @@ Single test:
 
 ```bash
 cd frontend && npx vitest run src/terminal/__tests__/registry.spec.ts -t 'suggests'
+cd frontend && npx playwright test --project=chromium -g 'graceful'
 cd backend && npx jest src/ask/ask.service.spec.ts -t 'rate limit'
 ```
+
+### Two test suites, with a line between them
+
+`src/**/__tests__/` (vitest, jsdom) owns behaviour: the command registry, every
+command, the games, i18n, content purity. It is where a new assertion belongs by
+default — it runs in seconds.
+
+`frontend/e2e/` (Playwright) owns only what jsdom structurally cannot reach: that the
+async chunks load, that live-data failures degrade instead of throwing, that a
+section anchor scrolls a real viewport, that `/resume.txt` and friends survive the
+SPA fallback. It builds `dist/` and serves it itself (`webServer` in
+`playwright.config.ts`), and **never touches a real backend** — every API call is
+stubbed by the `api` fixture against an unreachable origin, so a forgotten stub fails
+loudly rather than reaching api.jhemery.xyz. Re-testing command behaviour through a
+browser is the thing to avoid: it is a hundred times slower and covered already.
 
 Preview servers are declared in `.claude/launch.json` (`frontend-dev`, `frontend-preview`,
 `backend-dev`) — start them with the preview tools, not Bash.
