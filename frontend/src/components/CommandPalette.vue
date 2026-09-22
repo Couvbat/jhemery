@@ -1,9 +1,9 @@
 <script setup lang="ts">
 import { computed, nextTick, onMounted, onUnmounted, ref, shallowRef, watch } from 'vue'
-import { sections } from '@/content'
+import { sections, views } from '@/content'
 import { useLocale } from '@/i18n'
 import { openTerminal } from '@/composables/useTerminalShell'
-import { scrollToSection } from '@/composables/useActiveSection'
+import { goTo } from '@/composables/useViewSwing'
 import type { Command } from '@/terminal/types'
 
 const { t, m } = useLocale()
@@ -38,15 +38,24 @@ function loadRegistryCommands() {
 
 /**
  * Sections come first — jumping around the page is what most visitors actually want
- * from Ctrl+K. Registry commands follow, so the palette never needs its own list.
+ * from Ctrl+K — then the other views, then the registry commands, so the palette
+ * never needs a list of its own. `goTo` handles being on the wrong page for a section.
  */
 const entries = computed<Entry[]>(() => [
   ...sections.map((s) => ({
     id: `go:${s.id}`,
     label: `cd ${t(s.label)}`,
     hint: t(s.heading),
-    run: () => scrollToSection(s.id),
+    run: () => goTo(s.id),
   })),
+  ...views
+    .filter((v) => v.id !== 'home')
+    .map((v) => ({
+      id: `go:${v.id}`,
+      label: `cd ${t(v.label)}`,
+      hint: t(v.heading),
+      run: () => goTo(v.id),
+    })),
   ...registryCommands.value.map((c) => ({
     id: `cmd:${c.name}`,
     label: c.name,

@@ -1,11 +1,12 @@
-import { findSection, profile, sectionIds, sections, socials } from '@/content'
-import { currentSection } from '@/composables/useActiveSection'
+import { profile, sectionIds, sections, socials, viewIds, views } from '@/content'
+import { currentPath, resolvePath } from '@/composables/useViewSwing'
 import { prefersReducedMotion } from '@/composables/useCrt'
+import { tools } from '@/tools/registry'
 import { announce, toast, visitSection } from '../achievements'
 import { diffLines, hasChanges } from '../diff'
 import { sleep } from '../timing'
 import type { Command, OutputLine } from '../types'
-import { blank, line, pre } from '../format'
+import { blank, line, pre, segmented } from '../format'
 import { FILES, FILE_ACHIEVEMENTS, HIDDEN_FILES, listFiles, resolveFileLines } from './files'
 
 const PING_COUNT = 4
@@ -23,21 +24,54 @@ function latency(): number {
   return 0.02 + Math.random() * 0.08
 }
 
+/** Everything `cd`, `ls` and `ping` complete to: sections, the other views, and each
+ *  tool as `tools/<id>` — one list, so Tab and the resolver can never disagree. */
+function destinations(): string[] {
+  return [
+    ...sectionIds,
+    ...viewIds.filter((id) => id !== 'home'),
+    ...tools.map((tool) => `tools/${tool.id}`),
+  ]
+}
+
 export const navigateCommands: Command[] = [
   {
     name: 'ls',
-    usage: 'ls [-a]',
-    description: { en: 'List sections and files', fr: 'Lister sections et fichiers' },
+    usage: 'ls [-a] [path]',
+    description: { en: 'List sections, pages and files', fr: 'Lister sections, pages et fichiers' },
     group: 'navigate',
-    complete: ({ index }) => (index === 0 ? ['-a'] : []),
+    complete: ({ index, args }) =>
+      index === 0 && !args[0]?.startsWith('-')
+        ? ['-a', ...destinations()]
+        : index <= 1
+          ? destinations()
+          : [],
     run({ args, t }) {
       const showHidden = args.some((a) => a === '-a' || a === '-la' || a === '-al')
+      const target = args.find((a) => !a.startsWith('-'))
 
-      const dirs = sections.map((s) => ({
-        text: `${t(s.label)}/`.padEnd(14),
-        tone: 'primary' as const,
-        pre: true,
-      }))
+      if (target) {
+        const resolved = resolvePath(target)
+        if (!resolved) {
+          return [line(`ls: cannot access '${target}': No such file or directory`, 'error')]
+        }
+        if (resolved.kind === 'view' && resolved.view.id === 'tools') {
+          const listed = resolved.tool ? [resolved.tool] : tools
+          return listed.map((tool) =>
+            segmented([
+              { text: tool.id.padEnd(10), tone: 'primary' },
+              { text: t(tool.description), tone: 'muted' },
+            ]),
+          )
+        }
+        // A section is an empty directory; `ls /` and `ls ~` fall through to the root.
+        if (resolved.kind === 'section' || resolved.view.id !== 'home') return undefined
+      }
+
+      const dirs = [
+        ...sections.map((s) => t(s.label)),
+        ...views.filter((v) => v.id !== 'home').map((v) => t(v.label)),
+      ].map((name) => ({ text: `${name}/`.padEnd(14), tone: 'primary' as const, pre: true }))
       const files = FILES.map((f) => ({ text: f, tone: 'default' as const, pre: true }))
       const hidden = showHidden
         ? HIDDEN_FILES.map((f) => ({ text: f, tone: 'muted' as const, pre: true }))
@@ -48,31 +82,37 @@ export const navigateCommands: Command[] = [
   },
   {
     name: 'cd',
-    usage: 'cd <section>',
-    description: { en: 'Jump to a section', fr: 'Aller à une section' },
+    usage: 'cd <section|tools[/<tool>]>',
+    description: { en: 'Jump to a section or a page', fr: 'Aller à une section ou une page' },
     group: 'navigate',
-    complete: ({ index }) => (index === 0 ? [...sectionIds] : []),
+    complete: ({ index }) => (index === 0 ? destinations() : []),
     run({ args, navigate, t }) {
-      const [target] = args
-      const bare = !target || target === '~' || target === '/'
-      const section = bare ? sections[0] : findSection(target)
-
-      if (!section) {
+      const [target = ''] = args
+      const resolved = resolvePath(target)
+      if (!resolved || !navigate(target)) {
         return [line(`cd: ${target}: No such file or directory`, 'error')]
       }
 
-      navigate(section.id)
-      const unlocks = toast(visitSection(section.id, sectionIds), t)
-      if (bare) return unlocks.length ? unlocks : undefined
-      return [line(`~/${t(section.label)}`, 'muted'), ...unlocks]
+      if (resolved.kind === 'section') {
+        const unlocks = toast(visitSection(resolved.section.id, sectionIds), t)
+        return [line(`~/${t(resolved.section.label)}`, 'muted'), ...unlocks]
+      }
+
+      const { view, tool } = resolved
+      if (view.id === 'home') {
+        // `cd`, `cd ~`, `cd /`: the top of the page counts as visiting the first section.
+        const unlocks = toast(visitSection(sections[0]!.id, sectionIds), t)
+        return unlocks.length ? unlocks : undefined
+      }
+      return [line(`~/${t(view.label)}${tool ? `/${tool.id}` : ''}`, 'muted')]
     },
   },
   {
     name: 'pwd',
-    description: { en: 'Print the current section', fr: 'Afficher la section courante' },
+    description: { en: 'Print where you are', fr: 'Afficher où vous êtes' },
     group: 'navigate',
     run() {
-      return [line(`/home/${profile.handle}/${currentSection()}`, 'muted')]
+      return [line(`/home/${profile.handle}/${currentPath()}`, 'muted')]
     },
   },
   {
@@ -136,22 +176,31 @@ export const navigateCommands: Command[] = [
   },
   {
     name: 'ping',
-    usage: 'ping <section>',
-    description: { en: 'Ping a section, then go there', fr: 'Pinguer une section, puis y aller' },
+    usage: 'ping <section|page>',
+    description: {
+      en: 'Ping a section or a page, then go there',
+      fr: 'Pinguer une section ou une page, puis y aller',
+    },
     group: 'navigate',
-    complete: ({ index }) => (index === 0 ? [...sectionIds] : []),
+    complete: ({ index }) => (index === 0 ? destinations() : []),
     async run(ctx) {
       const [target] = ctx.args
       if (!target) {
         return [line('ping: usage error: Destination address required', 'error')]
       }
 
-      const section = findSection(target)
-      if (!section) {
+      const resolved = resolvePath(target)
+      if (!resolved) {
         return [line(`ping: ${target}: Name or service not known`, 'error')]
       }
 
-      const host = `${section.id}.${profile.domain}`
+      const name =
+        resolved.kind === 'section'
+          ? resolved.section.id
+          : resolved.tool
+            ? `${resolved.tool.id}.${resolved.view.id}`
+            : resolved.view.id
+      const host = `${name}.${profile.domain}`
       const times: number[] = []
       const replies: OutputLine[] = []
 
@@ -185,9 +234,10 @@ export const navigateCommands: Command[] = [
         blank,
       ])
 
-      // The payoff: a reachable section is one you can go to.
-      ctx.navigate(section.id)
-      return toast(visitSection(section.id, sectionIds), ctx.t)
+      // The payoff: a reachable host is one you can go to.
+      ctx.navigate(target)
+      if (resolved.kind !== 'section') return undefined
+      return toast(visitSection(resolved.section.id, sectionIds), ctx.t)
     },
   },
   {

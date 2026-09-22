@@ -1,5 +1,6 @@
 import { expect, test } from './fixtures'
 import { profile } from '@/content/profile'
+import { views } from '@/content/views'
 
 /**
  * The files the SPA fallback must not swallow.
@@ -71,6 +72,15 @@ test.describe('discoverability', () => {
 
     expect(sitemap).toContain(profile.domain)
     expect(robots.toLowerCase()).toContain('sitemap')
+  })
+
+  test('the sitemap lists every view', async ({ request }) => {
+    // `sitemap.xml` is a hand-maintained static file; `views.ts` is the list of routes.
+    // A view that is not in the sitemap exists for visitors and not for crawlers.
+    const sitemap = await (await request.get('/sitemap.xml')).text()
+    for (const view of views) {
+      expect(sitemap, view.id).toContain(`<loc>https://${profile.domain}${view.path}</loc>`)
+    }
   })
 
   test('the PWA manifest describes this app', async ({ request }) => {

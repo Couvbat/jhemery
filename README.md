@@ -22,6 +22,7 @@ docs/       design specs and implementation plans
 - [Commands](#commands)
 - [Games](#games)
 - [Word lists](#word-lists)
+- [Tools](#tools)
 - [Achievements](#achievements)
 - [The API](#the-api)
 - [Running it locally](#running-it-locally)
@@ -45,12 +46,16 @@ docs/       design specs and implementation plans
 | — constellation | Lines drawn between shapes closer than 5.5 world units, recomputed each frame into a pre-allocated buffer. |
 | — weather mood | The real sky nudges it: a storm spins the wireframes up, fog dims them, snow slows them, night dims a little further. Small multipliers on top of the section palette, never a replacement for it. |
 | — performance | The whole component is `defineAsyncComponent`'d and only loaded on `requestIdleCallback`, so ~520 kB of three.js never competes with first paint. It is excluded from the PWA precache for the same reason. |
+| — view swing | Moving between pages turns the wireframe field about the slab's centre (a `THREE.Group`, not the camera — an orbit would put the camera inside the field) while the camera dollies back, every shape drifts to a fresh home, and the rotation is baked away at the end so the gravity well's maths stays honest. Driven by the same eased clock as the page transition below. |
 | — accessibility | `prefers-reduced-motion` skips loading it entirely; WebGL failures are caught and the canvas is simply left blank. Geometries, materials and the renderer are disposed on unmount. |
 | **CRT overdrive** | `crt` in the terminal (or the Konami code anywhere on the page) toggles scanlines, flicker and a speed multiplier that the three.js loop reads live to spin the wireframes up. Persisted in `localStorage`. |
 | **Boot sequence** | A fake `couvsh 1.0` kernel log plays on first visit, then remembers it booted. `reboot` replays it on demand, and `ssh` ends by triggering it. Skipped for reduced-motion. |
 | **Status ticker** | The footer carries the same uptime `neofetch` reports (days since the first commit) plus how long ago this build shipped, re-read on a slow tick so a long-open tab stays honest. |
 | **Live presence** | The same line says how many people are here right now, over SSE, moving as visitors arrive and leave. An aggregate count and nothing else — see the API table below. |
 | **Sections** | about · projects · music · gaming · hardware · contact — defined once in `src/content/sections.ts` and consumed by the navbar, the terminal's `ls`/`cd`/`pwd`, the command palette and every section header. |
+| **Views** | home · tools — the routes, defined once in `src/content/views.ts` one level above the sections, in the order they sit on the prism. `cd tools`, the navbar's `./tools` and Ctrl+K all go through one `goTo()`, which knows to route home first when you ask for a section from another page. |
+| **Prism swing** | Changing view turns the page like a face of a prism whose axis runs through the centre of the three.js scene: the leaving page rotates out, the new one rotates in from the same side, both in 3D CSS on a stage that is fixed and clipped for the 650 ms it takes, while the navbar and launcher stay put. Back turns it the other way. Under `prefers-reduced-motion` the pages simply swap. Works with no three.js loaded. |
+| **Tools page** | `/tools` — small utilities that run entirely in the browser, one lazy chunk each, listed from `src/tools/registry.ts`. See [Tools](#tools). |
 | **Live cards** | Steam "currently playing", GitHub recent commits, latest CI runs, contribution heatmap and pinned repos, SoundCloud player, guestbook. |
 | **Guestbook ticker** | A 20s poll (not SSE — see [the spec](docs/features-spec.md#8-backend-additions)) surfaces anyone who signs while you're on the page, as a floating notice that opens `guestbook` when clicked. Skipped while the tab is hidden, and it gives up if the guestbook is off. |
 | **Command palette** | `Ctrl/⌘+K` — fuzzy list of sections and palette-flagged commands, arrow-key navigable with the selection kept in view. |
@@ -105,12 +110,13 @@ two different contents.
 
 | Command | Usage |
 |---|---|
-| `ls` | `ls [-a]` — list sections and files (`-a` shows more than you were meant to see) |
-| `cd` | `cd <section>` — scrolls the page there; accepts English ids and French labels |
-| `pwd` | Print the current section |
+| `ls` | `ls [-a] [path]` — list sections, pages and files (`-a` shows more than you were meant to see); `ls tools` lists the tools |
+| `cd` | `cd <section>` scrolls the page there (from another page it routes home first); `cd tools` and `cd tools/<tool>` open the tools page or one tool; `cd`, `cd ~`, `cd /` go home |
+| `pwd` | Print where you are — `/home/couvbat/projects` on the page, `/home/couvbat/tools/image` with a tool open |
+| `tools` | `tools [<tool>]` — list the tools with their descriptions, or open one |
 | `cat` | `cat <file>` — `about.txt`, `skills.txt`, `contact.txt`, guestbook entries, … |
 | `diff` | `diff <file> <file>` — unified line diff of any two files in the fake filesystem |
-| `ping` | `ping <section>` — four fake round trips, then it actually goes there |
+| `ping` | `ping <section|page>` — four fake round trips, then it actually goes there |
 | `open` | `open <github|linkedin|soundcloud|steam|email>` |
 
 ### content
@@ -230,6 +236,31 @@ one copyright missed entirely), which is the whole argument for generating it.
 
 MPL-2.0 is file-level copyleft: `words-fr.ts` carries the notice and inherits the licence; nothing
 else here is affected.
+
+## Tools
+
+`/tools` is a second page — reached from the navbar, `cd tools`, `tools`, or Ctrl+K — of small
+utilities that run **entirely in the browser**: nothing dropped on the page is uploaded anywhere,
+because there is no server on the other end. Each tool is one lazy chunk, opened at
+`/tools/<name>` (or `cd tools/<name>`), and each one's maths lives in a plain `.ts` beside its
+panel with its own tests.
+
+- **`image`** — convert between PNG, JPEG and WebP, resize to a maximum width, pick a quality.
+  Re-encoding through a canvas drops EXIF, GPS and colour-profile blocks by construction. Where a
+  browser cannot write the format asked for (Safari and WebP), the tool says so and names the
+  file after what it actually produced.
+- **`hash`** — SHA-1, SHA-256 and SHA-512 of a text or a dropped file, as hex or base64, over
+  Web Crypto.
+- **`encode`** — base64 (UTF-8 safe, url-safe alphabet and missing padding accepted), URL
+  encoding and hex, both ways, with malformed input reported rather than guessed at.
+- **`json`** — pretty-print with 2, 4 or tab indentation, or minify. When the input is not JSON
+  the tool points at the line and column, with a caret under the offending character — a scanner
+  of its own, because `JSON.parse`'s messages no longer carry a position.
+
+The list, the page and the terminal all read `src/tools/registry.ts`; adding a tool means adding
+one object there plus its folder. The rest of the plan — more client-side tools, an
+`ffmpeg.wasm` converter, watch-party and radio rooms, an admin-only downloader — is in
+[the design spec](docs/superpowers/specs/2026-09-22-tools-and-views-design.md).
 
 ## Achievements
 
@@ -366,7 +397,7 @@ GitHub Actions, split per app and path-filtered:
 
 `docs/superpowers/` holds the design specs and implementation plans behind the bigger pieces — the
 three.js wireframe background, the vim pane, the terminal games, the achievements UI, the SoundCloud
-embed, and a CTF flag chain that is still just a design.
+embed, the views/prism-swing/tools page, and a CTF flag chain that is still just a design.
 
 ---
 
