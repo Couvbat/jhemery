@@ -1,6 +1,7 @@
 import type { Command } from '../types'
 import { coreCommands } from './core'
 import { navigateCommands } from './navigate'
+import { toolCommands } from './tools'
 import { contentCommands } from './content'
 import { liveCommands } from './live'
 import { askCommands } from './ask'
@@ -11,6 +12,7 @@ import { systemCommands } from './system'
 export const commands: Command[] = [
   ...coreCommands,
   ...navigateCommands,
+  ...toolCommands,
   ...contentCommands,
   ...liveCommands,
   ...askCommands,

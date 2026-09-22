@@ -108,6 +108,69 @@
   .crt-glitch body { filter: none; }
 }
 
+/*
+ * The prism swing between views — superpowers/specs/2026-09-22-tools-and-views-design.md §3.
+ *
+ * Nothing here animates on its own. `--swing` (eased, 0→1), `--swing-dir` (±1) and
+ * `--leave-scroll` are written inline by App.vue from `useViewSwing`, the same clock the
+ * three.js field reads, so the page and the wireframes can never disagree on the curve.
+ * The stage only becomes a fixed, clipped, perspective box for the 650 ms it is turning;
+ * the rest of the time it is an unstyled wrapper and the pages sit in normal flow.
+ *
+ * Two elements because `overflow: hidden` forces `transform-style: flat` on whatever it
+ * is set on, and the faces need `preserve-3d` to sort by depth rather than DOM order.
+ */
+.view-stage {
+  /* Half the viewport, so two adjacent faces meet at a right angle behind the screen. */
+  --prism-r: 50vw;
+}
+.view-stage.is-swinging {
+  position: fixed;
+  inset: 0;
+  overflow: hidden;
+  z-index: 0;
+}
+.view-stage.is-swinging .view-prism {
+  position: absolute;
+  inset: 0;
+  perspective: 1200px;
+  transform-style: preserve-3d;
+}
+/* Scoped to the swinging stage on purpose: `is-swinging` is the one switch. Vue's
+ * <Transition> removes its classes on its own clock (a requestAnimationFrame, then a
+ * timer), which a hidden tab throttles to nothing, while the composable's deadline
+ * still unfixes the stage — after which a leftover face class must mean nothing, or
+ * the page would sit absolute and unclickable until the tab comes back. */
+.view-stage.is-swinging .view-enter-active,
+.view-stage.is-swinging .view-leave-active {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 0;
+  will-change: transform;
+  pointer-events: none;
+  backface-visibility: hidden;
+}
+/* The leaving page keeps showing what the visitor was looking at while the window
+ * scrolls to the new page's top. */
+.view-stage.is-swinging .view-leave-active {
+  top: var(--leave-scroll, 0px);
+  transform: translateZ(calc(-1 * var(--prism-r)))
+    rotateY(calc(var(--swing-dir, 1) * -90deg * var(--swing, 1)))
+    translateZ(var(--prism-r));
+}
+.view-stage.is-swinging .view-enter-active {
+  transform: translateZ(calc(-1 * var(--prism-r)))
+    rotateY(calc(var(--swing-dir, 1) * 90deg * (1 - var(--swing, 1))))
+    translateZ(var(--prism-r));
+}
+@media (prefers-reduced-motion: reduce) {
+  .view-stage.is-swinging .view-enter-active,
+  .view-stage.is-swinging .view-leave-active {
+    transform: none;
+  }
+}
+
 #app {
   min-height: 100vh;
 }

@@ -142,6 +142,23 @@ persistence rather than reflexes.
 
 ---
 
+## F. Views and tools
+
+A second page, the transition between pages, and the utilities on it. Design in
+[`superpowers/specs/2026-09-22-tools-and-views-design.md`](superpowers/specs/2026-09-22-tools-and-views-design.md),
+slices in [`superpowers/plans/2026-09-22-tools-and-views.md`](superpowers/plans/2026-09-22-tools-and-views.md).
+
+| ✔ | Feature | Approach | Files | Effort |
+|---|---|---|---|---|
+| [x] | `views.ts` + `goTo` | The route list as content, one level above sections; one navigation function the navbar, palette and terminal all use; `cd`/`ls`/`pwd`/`ping` learn paths. | `content/views.ts`, `useViewSwing.ts`, `navigate.ts`, `NavBar.vue`, `CommandPalette.vue` | M |
+| [x] | Prism swing | Pages as faces of a prism (CSS 3D on a fixed, clipped stage), the wireframe *field* yawed in a `THREE.Group` by the same eased clock, re-homed on the first frame and baked on the last. Reduced motion: instant swap. | `useViewSwing.ts`, `App.vue`, `main.css`, `ThreeBackground.vue` | M |
+| [x] | `/tools` + registry | `tools/registry.ts` drives the page, the `tools` command, `ls tools`, `cd tools/<id>` and Tab. One lazy chunk per panel. | `views/ToolsView.vue`, `tools/*` | M |
+| [x] | Client tools, vol. 1 | `image` (canvas re-encode, strips EXIF), `hash` (Web Crypto), `encode` (base64/url/hex), `json` (format/minify with a scanner that points at the error). | `tools/{image,hash,encode,json}/` | M |
+| [ ] | Client tools, vol. 2 | `colour`, `time`, `password` (diceware from the games' word lists), `text`. Pure additions to the registry. | `tools/*` | S each |
+| [ ] | `ffmpeg.wasm` tier | The accepted dependency exception. Explicit "download N MB" step, excluded from the PWA precache like three.js, COOP/COEP for `/tools/*` only if the single-thread core is too slow. | `tools/media/`, `vite.config.ts`, `.htaccess` | M |
+| [ ] | Rooms (`watch`, `radio`) | SSE + POST, in-memory with TTL, `ROOMS_ENABLED` off by default; YouTube IFrame API and the SoundCloud iframe; third and fourth faces of the prism. | `backend/src/rooms/*`, `views/{Watch,Radio}View.vue` | L |
+| [ ] | Downloader (admin) | Only after `which python3 ffmpeg` on the o2switch shell. A **job** API (start / poll / fetch-once), never a long request; runner on the box or relayed to one the owner controls; `DOWNLOADER_ENABLED`. | `backend/src/jobs/*`, `tools/download/` | L |
+
 ## Build order
 
 **Phase 1 — quick wins, no backend (S):** ✅ shipped on `feat/phase-1` → `dev`.
@@ -162,6 +179,9 @@ weather-linked background mood), `feat/phase-3-markets` (`btc`/`stonks`),
 `feat/phase-3-presence` (presence SSE), `feat/phase-3-stats` (command counter).
 
 Every row in §A–D is ticked.
+
+**Phase 5 — views and tools (§F):** slice 1 on `feat/tools-and-views` → `dev`; the remaining
+rows one branch each, in the table's order.
 
 **Phase 4 — games, vol. 2 (§E):** in progress on `claude/game-ideas-ec3dc5` → `dev`.
 The three shared prerequisites first (they touch code all five games read), then `minesweeper`,

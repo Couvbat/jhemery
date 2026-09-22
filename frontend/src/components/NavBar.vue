@@ -1,8 +1,9 @@
 <script setup lang="ts">
 import { ref, onMounted, onUnmounted } from 'vue'
-import { sections, profile } from '@/content'
+import { sections, profile, views } from '@/content'
 import { useLocale } from '@/i18n'
-import { activeSection, scrollToSection } from '@/composables/useActiveSection'
+import { activeSection } from '@/composables/useActiveSection'
+import { activeView, goTo } from '@/composables/useViewSwing'
 import AchievementsModal from '@/components/AchievementsModal.vue'
 
 const { t, m, locale, toggleLocale } = useLocale()
@@ -10,12 +11,20 @@ const { t, m, locale, toggleLocale } = useLocale()
 const menuOpen = ref(false)
 const achievementsOpen = ref(false)
 
-function go(id: string) {
-  scrollToSection(id)
+/** The other faces of the prism; `home` is the section links themselves. */
+const pages = views.filter((v) => v.id !== 'home')
+
+/** `goTo` knows whether a section is on the page showing — from `/tools` a section
+ *  link routes home first, then scrolls once the swing has settled. */
+function go(target: string) {
+  goTo(target)
   menuOpen.value = false
 }
 
 function onScroll() {
+  // Only the home page has sections to track. Elsewhere the loop would find nothing
+  // and leave `activeSection` alone anyway; this just says so.
+  if (activeView.value !== 'home') return
   for (const s of [...sections].reverse()) {
     const el = document.getElementById(s.id)
     if (el && window.scrollY >= el.offsetTop - 120) {
@@ -36,7 +45,7 @@ onUnmounted(() => window.removeEventListener('scroll', onScroll))
     <nav class="max-w-5xl mx-auto px-4 h-14 flex items-center justify-between">
       <!-- Logo / Name -->
       <button
-        @click="go('about')"
+        @click="go('')"
         class="text-primary font-bold glow-green tracking-wider hover:opacity-80 transition-opacity"
       >
         <span class="text-muted-foreground">~/</span>{{ profile.alias }}
@@ -49,13 +58,30 @@ onUnmounted(() => window.removeEventListener('scroll', onScroll))
             @click="go(s.id)"
             :class="[
               'px-3 py-1 text-sm rounded transition-colors',
-              activeSection === s.id
+              activeView === 'home' && activeSection === s.id
                 ? 'text-primary glow-green'
                 : 'text-muted-foreground hover:text-foreground',
             ]"
           >
             <span class="text-muted-foreground">./</span>{{ t(s.label) }}
           </button>
+        </li>
+        <!-- Real hrefs, so a crawler can reach the page; the click still goes through
+             the router (and the prism) rather than a full load. -->
+        <li v-for="v in pages" :key="v.id">
+          <a
+            :href="v.path"
+            :aria-current="activeView === v.id ? 'page' : undefined"
+            :class="[
+              'inline-block px-3 py-1 text-sm rounded transition-colors',
+              activeView === v.id
+                ? 'text-accent glow-cyan'
+                : 'text-muted-foreground hover:text-foreground',
+            ]"
+            @click.prevent="go(v.id)"
+          >
+            <span class="text-muted-foreground">./</span>{{ t(v.label) }}
+          </a>
         </li>
         <li>
           <button
@@ -145,6 +171,15 @@ onUnmounted(() => window.removeEventListener('scroll', onScroll))
           >
             <span>$ cd ./{{ t(s.label) }}</span>
           </button>
+        </li>
+        <li v-for="v in pages" :key="v.id">
+          <a
+            :href="v.path"
+            class="block w-full text-left py-2 text-sm text-muted-foreground hover:text-primary transition-colors"
+            @click.prevent="go(v.id)"
+          >
+            <span>$ cd ./{{ t(v.label) }}</span>
+          </a>
         </li>
       </ul>
     </div>

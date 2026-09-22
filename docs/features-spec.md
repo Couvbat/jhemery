@@ -705,3 +705,30 @@ Retrofitting these is painful, so they are part of the definition of done:
 - **Blog** — infrastructure without content is worse than no infrastructure.
 - **Command chaining / pipes** — `ls | grep` is a lot of parser for a joke nobody will run twice.
 - **Terminal on mobile** — see §9.
+
+## 11. Views, the prism swing and the tools page
+
+**Where:** `content/views.ts`, `composables/useViewSwing.ts`, `views/ToolsView.vue`,
+`tools/registry.ts`, `App.vue`, `ThreeBackground.vue`. Full design in
+[`superpowers/specs/2026-09-22-tools-and-views-design.md`](superpowers/specs/2026-09-22-tools-and-views-design.md);
+this section only fixes the rules the code cites.
+
+- **`views.ts` is the list of routes** the way `sections.ts` is the list of sections, and its order
+  is the order of the prism. Sections stay anchors inside `home`. `activeView` (set by the router)
+  and `activeSection` (set by scrolling) compose into `pwd`.
+- **One navigation function.** `goTo(target)` takes anything `cd` accepts and is what the navbar,
+  the palette and `CommandContext.navigate` all call. A section on another view routes home with a
+  hash and is scrolled to once the swing settles. `resolvePath` is the shared resolver, so `cd`
+  can say "No such file or directory" for the same inputs `goTo` refuses.
+- **The swing is one clock with three readers.** `useViewSwing` eases 0→1 once; `App.vue` binds it
+  as CSS custom properties on the stage that rotates the two pages as faces of a prism, and
+  `ThreeBackground` yaws the wireframe *field* (not the camera — see the spec for why), re-homes
+  every shape on the first frame and bakes the rotation away on the last. Under reduced motion
+  nothing moves and the pages swap. The transition is complete with no three.js present.
+- **Nothing inside a view may be `position: fixed`** — the stage is a transformed ancestor for the
+  duration of a swing. Fixed chrome lives in `App.vue`, beside `RouterView`.
+- **The tool registry is the API** (`tools/registry.ts`), exactly as §2 says of commands: the page,
+  `ls tools`, `cd tools/<id>`, the `tools` command and Tab derive from one array. Metas are plain
+  data in both locales; each tool's maths lives in a pure `.ts` beside its panel and is tested in
+  jsdom. Client-side tools never send a file anywhere; the page says so once.
+

@@ -6,6 +6,7 @@ import { activeSection } from '@/composables/useActiveSection'
 import { terminalOpen } from '@/composables/useTerminalShell'
 import { BASE_SHAPE_COUNT, MAX_SHAPE_COUNT, useSceneControl } from '@/composables/useSceneControl'
 import { fetchWeather, weatherMood } from '@/composables/useWeather'
+import { useViewSwing } from '@/composables/useViewSwing'
 import { unlock, unlocked } from '@/terminal/achievements'
 
 // CRT overdrive spins the wireframes up; reading the ref inside the loop keeps the
@@ -13,6 +14,9 @@ import { unlock, unlocked } from '@/terminal/achievements'
 // screen-tear on `sudo rm -rf /`, so the shapes shake for exactly that window.
 const { speedMultiplier, glitching } = useCrt()
 const { shapeCount, gravityOn, constellationOn } = useSceneControl()
+// The prism swing between views (features-spec §11). The router drives one eased
+// clock; the DOM turns the pages by it and this component turns the field by it.
+const { swing, swingDirection, swinging, activeView } = useViewSwing()
 
 const canvasRef = ref<HTMLCanvasElement | null>(null)
 /** What `click-to-inspect` is currently showing, if anything. */
@@ -21,6 +25,9 @@ let inspectTimer: ReturnType<typeof setTimeout> | undefined
 
 let renderer: THREE.WebGLRenderer | null = null
 let scene: THREE.Scene | null = null
+/** Every shape and the constellation lines live in here, not in the scene directly,
+ *  so a view swing can turn the whole field about the slab's centre. */
+let field: THREE.Group | null = null
 let camera: THREE.PerspectiveCamera | null = null
 let animationFrameId: number | null = null
 
@@ -75,6 +82,20 @@ const LINK_DISTANCE = 5.5
 /** How long the camera keeps looking at an inspected shape. */
 const FOCUS_MS = 2200
 
+/**
+ * The view swing, in three numbers. The field of homes is a slab roughly 20 × 14 × 12
+ * units centred this far behind the z=0 plane, with the camera at z=10 — so a literal
+ * 90° camera orbit would put the camera on the slab's edge. Instead the *field* yaws
+ * about its own centre (the same image as a camera yaw, with the camera left where
+ * every invariant assumes it is), by a modest angle: the pages do a true 90° because
+ * "next face" means 90° for a prism, but the cloud only has to agree in direction and
+ * timing, and 90° of a 20-wide slab flies shapes through the lens. The dolly pulls the
+ * camera back over the swing so nothing clips the near plane on the way round.
+ */
+const FIELD_DEPTH = -4
+const FIELD_YAW = (40 * Math.PI) / 180
+const DOLLY = 6
+
 let mouseX = 0
 let mouseY = 0
 let pointerActive = false
@@ -101,6 +122,12 @@ const SECTION_PALETTES: Record<string, Palette> = {
   contact: { base: 'cyan', accent: 'pink', speed: 1 },
 }
 
+/** The other views get a mood of their own, the way each section does. Anything not
+ *  listed here (the 404, say) falls back to the section palette below. */
+const VIEW_PALETTES: Record<string, Palette> = {
+  tools: { base: 'cyan', accent: 'purple', speed: 1.1 },
+}
+
 /** The reward for finding everything: a palette no section can produce. */
 const COMPLETIONIST_PALETTE: Palette = { base: 'pink', accent: 'cyan', speed: 1.35 }
 
@@ -121,6 +148,10 @@ const lookTarget = new THREE.Vector3()
 const pointerNdc = new THREE.Vector2()
 const raycaster = new THREE.Raycaster()
 const ORIGIN = new THREE.Vector3(0, 0, 0)
+const Y_AXIS = new THREE.Vector3(0, 1, 0)
+const worldPosition = new THREE.Vector3()
+/** Set on a swing's first frame, cleared by the bake on its last. */
+let swingArmed = false
 
 function handleMouseMove(event: MouseEvent) {
   mouseX = (event.clientX / window.innerWidth) * 2 - 1
@@ -146,6 +177,8 @@ function halfExtents(aspect: number): { x: number; y: number } {
 
 function currentPalette(): Palette {
   if (unlocked.value.has('completionist')) return COMPLETIONIST_PALETTE
+  const view = activeView.value
+  if (view !== 'home' && VIEW_PALETTES[view]) return VIEW_PALETTES[view]
   return SECTION_PALETTES[activeSection.value] ?? SECTION_PALETTES.about!
 }
 
@@ -173,8 +206,16 @@ function applyPalette() {
   if (animationFrameId === null && renderer && scene && camera) renderer.render(scene, camera)
 }
 
+/** A fresh position from the spawn distribution, in the field's own axes — the same
+ *  distribution `addShape` uses and the swing re-homes to, so the scene never drifts
+ *  toward a composition the opening one could not have produced. */
+function sampleHome(out: THREE.Vector3): THREE.Vector3 {
+  const spread = camera ? halfExtents(camera.aspect).x * 2 : 20
+  return out.set((Math.random() - 0.5) * spread, (Math.random() - 0.5) * 14, (Math.random() - 0.5) * 12)
+}
+
 function addShape(accent: boolean) {
-  if (!scene || !camera) return
+  if (!field || !camera) return
 
   const kind = KINDS[Math.floor(Math.random() * KINDS.length)]!
   const palette = currentPalette()
@@ -187,16 +228,11 @@ function addShape(accent: boolean) {
   })
   const mesh = new THREE.Mesh(kind.make(), material)
 
-  const spread = halfExtents(camera.aspect).x * 2
-  const home = new THREE.Vector3(
-    (Math.random() - 0.5) * spread,
-    (Math.random() - 0.5) * 14,
-    (Math.random() - 0.5) * 12 - 4,
-  )
+  const home = sampleHome(new THREE.Vector3())
   mesh.position.copy(home)
   mesh.rotation.set(Math.random() * Math.PI, Math.random() * Math.PI, Math.random() * Math.PI)
 
-  scene.add(mesh)
+  field.add(mesh)
   shapes.push({
     mesh,
     home,
@@ -219,7 +255,7 @@ function removeShape() {
   if (!shape) return
 
   if (focused === shape) focused = null
-  scene?.remove(shape.mesh)
+  field?.remove(shape.mesh)
   shape.mesh.geometry.dispose()
   ;(shape.mesh.material as THREE.Material).dispose()
 }
@@ -254,7 +290,7 @@ function createInitialShapes() {
  *  keeping the loop allocation-free, and sizing it to the *current* shape count
  *  would silently truncate the lines the moment someone spawns more. */
 function ensureLinks() {
-  if (links || !scene) return
+  if (links || !field) return
 
   const maxPairs = (MAX_SHAPE_COUNT * (MAX_SHAPE_COUNT - 1)) / 2
   linkPositions = new Float32Array(maxPairs * 6)
@@ -268,13 +304,15 @@ function ensureLinks() {
       opacity: 0.12,
     }),
   )
-  scene.add(links)
+  // In the field, not the scene: the positions it is fed are the shapes' field-local
+  // ones, and it has to turn with them.
+  field.add(links)
   applyPalette()
 }
 
 function disposeLinks() {
   if (!links) return
-  scene?.remove(links)
+  field?.remove(links)
   links.geometry.dispose()
   ;(links.material as THREE.Material).dispose()
   links = null
@@ -357,12 +395,62 @@ function handleResize() {
   }
 }
 
+/**
+ * The first frame of a swing. Every shape draws a new home so the field lands in a
+ * fresh composition — but the mesh must not jump, so the offset absorbs the difference
+ * and the existing `offset.lerp(target)` drifts it there over the swing (§5.3: "let go
+ * is just a zero target, not a special case"). The new home is expressed in the frame
+ * the bake will leave behind: rotated by the *inverse* of the swing's final yaw, so
+ * that once the bake rotates everything forward again it sits exactly where the
+ * distribution put it.
+ */
+function rehome() {
+  const finalYaw = -swingDirection.value * FIELD_YAW
+  for (const shape of shapes) {
+    sampleHome(worldPosition).applyAxisAngle(Y_AXIS, -finalYaw)
+    shape.offset.add(shape.home).sub(worldPosition)
+    shape.home.copy(worldPosition)
+  }
+}
+
+/**
+ * The last frame of a swing. Rotating home and offset by the field's rotation and
+ * zeroing the rotation is a visual no-op — and it restores the invariant that
+ * `halfExtents`, the pointer projection and the gravity well all assume: camera on
+ * +z, field facing it, positions in world axes. Without it every route change would
+ * leave the well a little more wrong.
+ */
+function bake() {
+  if (!field) return
+  const yaw = field.rotation.y
+  for (const shape of shapes) {
+    shape.home.applyAxisAngle(Y_AXIS, yaw)
+    shape.offset.applyAxisAngle(Y_AXIS, yaw)
+  }
+  field.rotation.y = 0
+}
+
 function animate() {
   animationFrameId = requestAnimationFrame(animate)
 
   const boost = speedMultiplier.value * sectionSpeed * weatherMood.value.speed
   const shaking = glitching.value
-  const pulling = pointerActive && gravityOn.value
+  const turning = swinging.value
+  // The well's z=0-plane maths is wrong in a rotated frame; off for the 650 ms.
+  const pulling = pointerActive && gravityOn.value && !turning
+
+  if (field) {
+    if (turning) {
+      if (!swingArmed) {
+        rehome()
+        swingArmed = true
+      }
+      field.rotation.y = -swingDirection.value * FIELD_YAW * swing.value
+    } else if (swingArmed) {
+      bake()
+      swingArmed = false
+    }
+  }
 
   if (camera && pulling) {
     const half = halfExtents(camera.aspect)
@@ -407,12 +495,13 @@ function animate() {
     const targetY = -mouseY * 0.4
     camera.position.x += (targetX - camera.position.x) * 0.03
     camera.position.y += (targetY - camera.position.y) * 0.03
-    camera.position.z = cameraBaseZ
+    camera.position.z = cameraBaseZ + (turning ? DOLLY * Math.sin(Math.PI * swing.value) : 0)
 
     // An inspected shape draws the camera's gaze for a couple of seconds, then
-    // the origin takes it back — easing both ways, so nothing ever snaps.
+    // the origin takes it back — easing both ways, so nothing ever snaps. World
+    // position, because a mesh's own position is field-local while the field turns.
     if (focused && performance.now() > focusUntil) focused = null
-    lookTarget.lerp(focused ? focused.mesh.position : ORIGIN, 0.04)
+    lookTarget.lerp(focused ? focused.mesh.getWorldPosition(worldPosition) : ORIGIN, 0.04)
     camera.lookAt(lookTarget)
   }
 
@@ -425,7 +514,7 @@ function animate() {
 // watcher covers them because `currentPalette()` already knows which wins.
 // The weather rides along on the same watcher: it only ever scales what the
 // palette already decided, so there is nothing for it to apply separately.
-watch([activeSection, unlocked, weatherMood], applyPalette)
+watch([activeSection, activeView, unlocked, weatherMood], applyPalette)
 watch(shapeCount, syncShapeCount)
 watch(constellationOn, (on) => (on ? ensureLinks() : disposeLinks()))
 
@@ -434,6 +523,9 @@ onMounted(() => {
 
   try {
     scene = new THREE.Scene()
+    field = new THREE.Group()
+    field.position.z = FIELD_DEPTH
+    scene.add(field)
     camera = new THREE.PerspectiveCamera(FOV, window.innerWidth / window.innerHeight, 0.1, 100)
     camera.position.z = cameraBaseZ
 
@@ -485,7 +577,9 @@ onUnmounted(() => {
   renderer?.dispose()
   renderer = null
   scene = null
+  field = null
   camera = null
+  swingArmed = false
 })
 </script>
 

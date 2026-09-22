@@ -55,6 +55,22 @@ export interface SectionMeta {
   heading: Localised
 }
 
+/**
+ * A top-level destination — a face of the prism (see
+ * superpowers/specs/2026-09-22-tools-and-views-design.md). Sections are anchors inside
+ * `home`; a view is a route of its own.
+ */
+export interface ViewMeta {
+  id: string
+  /** The route path: `/`, `/tools`. */
+  path: string
+  /** What the navbar and `ls` print, as a directory name. */
+  label: Localised
+  /** The fake shell command shown above the view's heading. */
+  prompt: string
+  heading: Localised
+}
+
 export interface GameEntry {
   name: string
   status: Localised

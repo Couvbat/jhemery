@@ -16,6 +16,13 @@ const router = createRouter({
       component: HomeView,
     },
     {
+      // One view for the page and every tool on it: `/tools/image` is the image tool
+      // open, and moving between the two never turns the prism (same view).
+      path: '/tools/:tool?',
+      name: 'tools',
+      component: () => import('../views/ToolsView.vue'),
+    },
+    {
       // Needs the .htaccess rewrite in public/ to survive a hard refresh on Apache.
       path: '/:pathMatch(.*)*',
       name: 'not-found',
