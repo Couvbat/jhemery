@@ -317,6 +317,61 @@ Reproduce with the two `curl` commands in [Known gaps](#known-gaps). If they sti
 
 Note `curl -X POST` does **not** reproduce a browser here: it sends the POST directly, while a browser preflights it first because of the JSON content type. Testing only the POST leaves the half that actually fails untested.
 
+## What the shell can run — facts for the downloader
+
+Measured on the o2switch shell (`cronos`) on 22 September 2026, for the admin-only yt-dlp
+downloader in [the tools design spec](superpowers/specs/2026-09-22-tools-and-views-design.md) §5.
+That spec said "check before designing the runner"; this is the check. Nothing here is installed
+by the deploy — it was set up by hand, under `$HOME`, and survives deploys because nothing under
+`~/bin` or `~/ytdlp` is touched by them.
+
+**Verdict: the box can run the downloader itself.** YouTube and SoundCloud both extract from the
+host's IP, with the caveats below. The relay-to-another-machine design stays the fallback, and the
+job API is the same either way, but it is not needed today.
+
+| Question | Answer |
+|---|---|
+| System `python3` | 3.6.8 — too old for yt-dlp, which needs 3.9+. Ignore it. |
+| Alternative interpreters | `/opt/alt/python36` … `/opt/alt/python312` (CloudLinux `alt-python`). |
+| yt-dlp | venv at `~/ytdlp` from `/opt/alt/python312/bin/python3.12`; `pip install "yt-dlp[default,curl-cffi]"`; 2026.08.19 at the time of writing. |
+| `ffmpeg` | Absent from the system. Static 7.0.2 (johnvansickle.com build) in `~/bin/ffmpeg` and `~/bin/ffprobe`; yt-dlp needs `--ffmpeg-location ~/bin`. |
+| `xz` | Absent — `tar xJ` fails. The static ffmpeg tarball was unpacked with `~/ytdlp/bin/python -m tarfile -e`, which has `lzma` built in. |
+| Node | 20, at `/opt/alt/alt-nodejs20/root/usr/bin/node` (the Passenger app's runtime). |
+| `/tmp` | Mounted `noexec`. |
+| CPU time | `ulimit -t` is unlimited, but that is the shell's view; CloudLinux LVE limits still apply and were not measured. |
+
+Three of those rows have teeth:
+
+- **`/tmp` is `noexec`.** yt-dlp's standalone `yt-dlp_linux` binary is a PyInstaller bundle that
+  unpacks its libraries into `/tmp` and dies with `libz.so.1: failed to map segment from shared
+  object`. That is not a libz problem, it is the mount. Anything that has to *execute* must live
+  under `$HOME`, and anything that unpacks executables at run time needs `TMPDIR` pointed under
+  `$HOME` too. The venv sidesteps it entirely, which is why the venv is the install and the
+  binary is not. The static ffmpeg has no shared libraries, so it is unaffected.
+- **YouTube wants a JavaScript runtime.** Without one, yt-dlp warns that extraction "has been
+  deprecated, and some formats may be missing". Only deno is enabled by default; the host has
+  node, so the runner passes `--js-runtimes node:/opt/alt/alt-nodejs20/root/usr/bin/node`. With
+  that, a single video extracts from the host's IP with no bot challenge — which was the open
+  question, since YouTube challenges datacentre ranges aggressively and a shared host is one.
+- **SoundCloud rate-limits the IP, hard and for about an hour.** A probe that used a *profile*
+  URL made yt-dlp walk the whole "All" playlist — roughly three hundred metadata requests in a
+  minute — and from item 72 on everything answered `HTTP 403`, including `soundcloud.com` itself.
+  Single tracks extracted fine before the burst and again after the block lifted. So the runner
+  accepts **one track URL per job, never a profile or a set**, keeps a pause between requests,
+  and ships with the `curl-cffi` extra, which yt-dlp's SoundCloud extractor asks for to
+  impersonate a browser.
+
+The full check, for whoever has to repeat it:
+
+```bash
+which python3 ffmpeg xz; python3 --version; ls /opt/alt | grep -i python; ulimit -t
+~/ytdlp/bin/yt-dlp --version && ~/bin/ffmpeg -version | head -1
+~/ytdlp/bin/yt-dlp --simulate --js-runtimes node:/opt/alt/alt-nodejs20/root/usr/bin/node "https://www.youtube.com/watch?v=dQw4w9WgXcQ" 2>&1 | tail -3
+~/ytdlp/bin/yt-dlp --simulate --ffmpeg-location ~/bin -x --audio-format mp3 "https://soundcloud.com/couvbat/abysses" 2>&1 | tail -3
+```
+
+Use a single track for the SoundCloud line. Using a profile is how the block above was earned.
+
 ## Known gaps
 
 - ~~**The automated backend deploy has never completed a run.**~~ **Fixed 4 August 2026.** Ten runs died before the transfer; the last of them never reached SSH at all, because the whitelist was full of leaked runner addresses, `add` was refused, and an unchecked `curl` let the run walk into a two-minute SSH timeout. Both were fixed in [backend-deploy.yml](../.github/workflows/backend-deploy.yml) and the deploy has completed cleanly on every run since — see [Verified in production](#verified-in-production).
