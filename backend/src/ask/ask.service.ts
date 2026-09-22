@@ -125,9 +125,8 @@ export class AskService {
     this.inFlight = true;
 
     const startedAt = Date.now();
-    let delivered = 0;
     try {
-      delivered = await this.stream(dto, onDelta, signal);
+      const delivered = await this.stream(dto, onDelta, signal);
       // Latency and outcome only — never the question, the answer or the IP.
       // There is no value in a transcript of what strangers asked, and keeping
       // one turns a toy into a privacy obligation.
