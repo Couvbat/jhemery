@@ -3,13 +3,18 @@
 # The two npm ecosystems are declared separately because frontend/ and backend/
 # each have their own lockfile — a single root entry would find neither.
 #
-# Updates land as PRs against master, which is what frontend-pr-check.yml and
-# backend-pr-check.yml watch, so every bump arrives already tested and built.
+# Every entry sets `target-branch: dev`. Without it Dependabot opens against the
+# default branch (master), and a push to master with frontend/** or backend/**
+# paths *deploys* — so each bump would ship itself to production, skipping the
+# integration branch that everything else in this repo goes through. The
+# pr-check workflows run on both bases, so a bump still arrives tested and
+# built; it just waits for dev to be promoted like any other change.
 version: 2
 
 updates:
   - package-ecosystem: npm
     directory: /frontend
+    target-branch: dev
     schedule:
       interval: weekly
       day: monday
@@ -37,6 +42,7 @@ updates:
 
   - package-ecosystem: npm
     directory: /backend
+    target-branch: dev
     schedule:
       interval: weekly
       day: monday
@@ -59,6 +65,7 @@ updates:
   # Pins like actions/checkout@v4 only move when something tells them to.
   - package-ecosystem: github-actions
     directory: /
+    target-branch: dev
     schedule:
       interval: monthly
     commit-message:
