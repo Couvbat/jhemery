@@ -180,8 +180,8 @@ weather-linked background mood), `feat/phase-3-markets` (`btc`/`stonks`),
 
 Every row in §A–D is ticked.
 
-**Phase 5 — views and tools (§F):** slice 1 on `feat/tools-and-views` → `dev`; the remaining
-rows one branch each, in the table's order.
+**Phase 5 — views and tools (§F):** ✅ slice 1 on `feat/tools-and-views` → `dev` (#78), slice 2 on
+`feat/tools-client-vol2` → `dev`; the remaining rows one branch each, in the table's order.
 
 **Phase 4 — games, vol. 2 (§E):** in progress on `claude/game-ideas-ec3dc5` → `dev`.
 The three shared prerequisites first (they touch code all five games read), then `minesweeper`,

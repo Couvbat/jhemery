@@ -256,6 +256,18 @@ panel with its own tests.
 - **`json`** — pretty-print with 2, 4 or tab indentation, or minify. When the input is not JSON
   the tool points at the line and column, with a caret under the offending character — a scanner
   of its own, because `JSON.parse`'s messages no longer carry a position.
+- **`colour`** — hex, `rgb()`, `hsl()` and `oklch()` in, all four out, plus the WCAG contrast
+  ratio and level against a second colour and against every token of the site's own palette,
+  read live from the stylesheet so the presets cannot drift from the theme.
+- **`time`** — an epoch in seconds or milliseconds, an ISO 8601 date or `now`, converted to all
+  of those, your own zone spelled out, a relative phrase (*in 3 days*), the ISO week and day of
+  the year, and the same instant in nine zones with their offsets.
+- **`password`** — random passwords with a length slider and character classes (look-alikes
+  optional), or diceware passphrases drawn from the same common-word lists the typing game uses,
+  with the entropy in bits and a grade. `crypto.getRandomValues`, generated locally, never stored.
+- **`text`** — word, character, line, sentence and paragraph counts, UTF-8 bytes, reading and
+  speaking time, every case conversion (title, sentence, camel, pascal, snake, kebab, constant,
+  slug with accents folded) and the most frequent words.
 
 The list, the page and the terminal all read `src/tools/registry.ts`; adding a tool means adding
 one object there plus its folder. The rest of the plan — more client-side tools, an
