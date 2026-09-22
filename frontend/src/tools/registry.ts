@@ -68,6 +68,50 @@ export const tools: ToolMeta[] = [
     tier: 'client',
     load: () => import('./json/JsonTool.vue'),
   },
+  {
+    id: 'colour',
+    name: { en: 'Colour converter', fr: 'Convertisseur de couleurs' },
+    description: {
+      en: 'hex, rgb, hsl and oklch, plus WCAG contrast against the site palette',
+      fr: 'hex, rgb, hsl et oklch, plus le contraste WCAG contre la palette du site',
+    },
+    keywords: ['color', 'hex', 'rgb', 'hsl', 'oklch', 'contrast', 'wcag'],
+    tier: 'client',
+    load: () => import('./colour/ColourTool.vue'),
+  },
+  {
+    id: 'time',
+    name: { en: 'Time converter', fr: 'Convertisseur de dates' },
+    description: {
+      en: 'Epoch, ISO 8601, your zone and eight others, relative time, ISO week',
+      fr: 'Epoch, ISO 8601, votre fuseau et huit autres, temps relatif, semaine ISO',
+    },
+    keywords: ['epoch', 'unix', 'timestamp', 'iso', 'timezone', 'utc', 'date'],
+    tier: 'client',
+    load: () => import('./time/TimeTool.vue'),
+  },
+  {
+    id: 'password',
+    name: { en: 'Password generator', fr: 'Générateur de mots de passe' },
+    description: {
+      en: 'Random passwords, or passphrases from the word games’ lists, with the entropy shown',
+      fr: 'Mots de passe aléatoires, ou phrases secrètes tirées des listes des jeux, entropie affichée',
+    },
+    keywords: ['password', 'passphrase', 'diceware', 'random', 'entropy'],
+    tier: 'client',
+    load: () => import('./password/PasswordTool.vue'),
+  },
+  {
+    id: 'text',
+    name: { en: 'Text tools', fr: 'Outils texte' },
+    description: {
+      en: 'Word, character and line counts, reading time, and every case conversion',
+      fr: 'Comptage de mots, caractères et lignes, temps de lecture, et toutes les casses',
+    },
+    keywords: ['count', 'words', 'characters', 'case', 'camel', 'snake', 'slug', 'reading time'],
+    tier: 'client',
+    load: () => import('./text/TextTool.vue'),
+  },
 ]
 
 export function findTool(id: string): ToolMeta | undefined {
