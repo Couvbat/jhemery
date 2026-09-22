@@ -234,7 +234,8 @@ else here is affected.
 ## Achievements
 
 35 in total, tracked in `localStorage` (`couvbat:achievements`, plus `couvbat:achievements:sections`
-for the exploration one). Unlocking one fires a floating toast and prints a line in the terminal;
+for the exploration one). Unlocking one fires a floating toast — with a burst of monospace-glyph
+confetti out of the toast itself, skipped under `prefers-reduced-motion` — and prints a line in the terminal;
 the trophy button in the navbar opens a modal listing all 35. Locked ones show `???` and an oblique
 hint; unlocking one reveals its title and how it was done. `achievements` (alias `trophies`) prints
 the same progress in the terminal.

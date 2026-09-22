@@ -57,6 +57,64 @@ jobs:
       - name: Build
         run: npm run build
 
+  # Same reasoning as the Lighthouse job below: its own runner, in parallel, because
+  # it builds the app and drives three browser engines and there is no reason for a
+  # lint error to wait behind that.
+  e2e:
+    name: Playwright
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      # Cached on the Playwright version rather than the lockfile hash: the browsers
+      # are ~400 MB and only change when that package does. A miss just means the
+      # download below runs, so a stale key costs a minute, never correctness.
+      - name: Cache Playwright browsers
+        id: playwright-cache
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ hashFiles('frontend/package-lock.json') }}
+
+      # Chromium only: both shipped projects (`chromium` and the Pixel 5 `mobile`
+      # emulation) run on it, and pulling Firefox and WebKit for jobs that never launch
+      # them costs ~400 MB per cache miss. `E2E_ALL_ENGINES` — see the long note in
+      # playwright.config.ts — needs `npx playwright install` without the argument.
+      #
+      # `--with-deps` only on a cache miss: the apt half is what the cache cannot
+      # cover, and the runner image already carries those libraries.
+      - name: Install Playwright browsers
+        run: npx playwright install chromium ${{ steps.playwright-cache.outputs.cache-hit == 'true' && '' || '--with-deps' }}
+
+      # The suite builds the app itself, via `webServer` in playwright.config.ts —
+      # deliberately, so the tests always run against the same artefact `preview`
+      # serves rather than whatever happens to be in `dist/`. `VITE_API_URL` is set
+      # there too, to an unreachable origin: every backend call is stubbed with
+      # `page.route`, and an origin that cannot accidentally succeed means a missing
+      # stub fails the test instead of quietly reaching the real api.jhemery.xyz.
+      - name: Run Playwright tests
+        run: npm run test:e2e
+
+      # Uploaded whether or not the run passed: a failed assertion is exactly when the
+      # trace, the screenshot and the video are worth having.
+      - name: Upload Playwright report
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: playwright-report
+          path: frontend/playwright-report
+          retention-days: 14
+
   # A separate job rather than more steps on `check`: it runs Lighthouse three
   # times and takes a couple of minutes, and there is no reason for a type error
   # to wait behind that. The two jobs run in parallel and report independently.

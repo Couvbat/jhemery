@@ -1,0 +1,28 @@
+// TSConfig for the Playwright suite. Node-side like tsconfig.node.json, but it also
+// imports from `src/content/` — the specs drive themselves from the same section and
+// profile data the app renders, so adding a section fails the test until it is wired
+// up rather than silently going uncovered. Those modules are guaranteed dependency-free
+// (see `src/content/__tests__/purity.spec.ts`), which is what makes importing them from
+// a Node context safe.
+{
+  "extends": "@tsconfig/node24/tsconfig.json",
+  // `env.d.ts` comes along for `ImportMetaEnv`: the specs import types from
+  // `src/lib/api.ts`, which reads `import.meta.env` at module scope, and without the
+  // ambient declaration the whole file fails to check here while checking fine in the
+  // app project.
+  "include": ["e2e/**/*", "env.d.ts"],
+  "compilerOptions": {
+    "module": "preserve",
+    "moduleResolution": "bundler",
+    "types": ["node"],
+    // DOM on top of the Node lib, for the callbacks handed to `page.addInitScript`
+    // and `page.evaluate`. Those bodies are serialised and run *in the browser*, so
+    // they legitimately use `window` even though the file around them runs in Node.
+    "lib": ["ES2024", "DOM"],
+    "noEmit": true,
+    "paths": {
+      "@/*": ["./src/*"]
+    },
+    "tsBuildInfoFile": "./node_modules/.tmp/tsconfig.playwright.tsbuildinfo"
+  }
+}

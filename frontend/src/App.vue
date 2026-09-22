@@ -12,6 +12,9 @@ import { terminalOpen } from '@/composables/useTerminalShell'
 import { track } from '@/lib/analytics'
 import { unlock } from '@/terminal/achievements'
 import AchievementToast from '@/components/AchievementToast.vue'
+// Imported eagerly, unlike MatrixRain: a couple of KB, and a chunk fetched on the
+// first unlock would land after the toast that triggered it had already gone.
+import ConfettiBurst from '@/components/effects/ConfettiBurst.vue'
 // Polls the guestbook on a slow interval, so it stays off the critical path.
 const GuestbookTicker = defineAsyncComponent(() => import('@/components/GuestbookTicker.vue'))
 
@@ -74,6 +77,7 @@ onMounted(() => {
   <TerminalOverlay v-if="terminalEverOpened" />
   <CommandPalette />
   <AchievementToast />
+  <ConfettiBurst />
   <GuestbookTicker />
 
   <MatrixRain v-if="matrixActive" />

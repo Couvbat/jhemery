@@ -3,6 +3,7 @@ import js from '@eslint/js'
 import { defineConfigWithVueTs, vueTsConfigs } from '@vue/eslint-config-typescript'
 import pluginVue from 'eslint-plugin-vue'
 import pluginVitest from '@vitest/eslint-plugin'
+import pluginPlaywright from 'eslint-plugin-playwright'
 
 /**
  * Correctness, not formatting.
@@ -18,7 +19,14 @@ import pluginVitest from '@vitest/eslint-plugin'
  * reason. If the frontend ever adopts it, that should be its own commit.
  */
 export default defineConfigWithVueTs(
-  globalIgnores(['dist/**', 'dev-dist/**', 'coverage/**', '.lighthouseci/**']),
+  globalIgnores([
+    'dist/**',
+    'dev-dist/**',
+    'coverage/**',
+    '.lighthouseci/**',
+    'playwright-report/**',
+    'test-results/**',
+  ]),
 
   {
     name: 'app/files-to-lint',
@@ -91,6 +99,37 @@ export default defineConfigWithVueTs(
       // Aimed at try/catch assertions that silently never run. The two uses here
       // are data-dependent guards inside a loop, and both are commented as such.
       'vitest/no-conditional-expect': 'off',
+    },
+  },
+
+  {
+    // The Playwright suite. Its own plugin rather than the vitest one above: the
+    // mistakes worth catching are different — a `.only` left in, an assertion
+    // written without `await` (which passes unconditionally), a hand-rolled
+    // `waitForTimeout` where a web-first assertion belongs.
+    ...pluginPlaywright.configs['flat/recommended'],
+    name: 'app/e2e',
+    files: ['e2e/**/*.ts'],
+    rules: {
+      ...pluginPlaywright.configs['flat/recommended'].rules,
+      // Not a warning here but an error: a sleep is how this suite would start
+      // going intermittently red on CI, and every wait it needs is expressible
+      // as an assertion on state.
+      'playwright/no-wait-for-timeout': 'error',
+
+      // The rule counts literal `expect` calls in the test body. Assertions that
+      // live in the fixtures (`terminal.open()` waits on the panel and the focus,
+      // `expectOutput` on the scrollback) are the point of having fixtures, so it
+      // is told about them rather than being switched off.
+      'playwright/expect-expect': [
+        'warn',
+        { assertFunctionNames: ['expectOutput', 'expectVisible'] },
+      ],
+
+      // `test.skip(condition, reason)` is not a disabled test — it is how a spec
+      // says "this surface does not exist on a phone". The unconditional form is
+      // still flagged.
+      'playwright/no-skipped-test': ['warn', { allowConditional: true }],
     },
   },
 )

@@ -14,6 +14,8 @@
     "lighthouse": "lhci autorun",
     "test": "vitest run",
     "test:watch": "vitest",
+    "test:e2e": "playwright test",
+    "test:e2e:ui": "playwright test --ui",
     "assets": "./scripts/gen-assets.sh",
     "wordlists": "node scripts/build-wordlists.mjs"
   },
@@ -33,6 +35,7 @@
   "devDependencies": {
     "@eslint/js": "^10.0.1",
     "@lhci/cli": "^0.15.1",
+    "@playwright/test": "^1.62.1",
     "@tsconfig/node24": "^24.0.4",
     "@types/node": "^24.12.2",
     "@types/three": "^0.185.1",
@@ -43,6 +46,7 @@
     "an-array-of-french-words": "^2.0.0",
     "dictionary-fr": "^3.0.0",
     "eslint": "^10.8.0",
+    "eslint-plugin-playwright": "^2.11.0",
     "eslint-plugin-vue": "^10.10.0",
     "jsdom": "^29.1.1",
     "npm-run-all2": "^8.0.4",
