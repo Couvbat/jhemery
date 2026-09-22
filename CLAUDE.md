@@ -185,9 +185,10 @@ rather than passed. Don't add a `paths:` filter back; it makes single-app PRs un
 `*-build.yml` and the deploys are path-filtered per app and stay on `master` only — merging into
 `dev` never ships anything. Deploys go over SSH via the cPanel API, with a manual FTP fallback.
 
-Dependabot has no `target-branch` set, so its PRs open against the default branch (`master`),
-bypassing `dev`. Set `target-branch: dev` in `.github/dependabot.yml` if they should follow the
-same route.
+Dependabot sets `target-branch: dev` on every entry, so its PRs follow the same route as
+everything else. Note that Dependabot reads `.github/dependabot.yml` from the **default branch**
+(`master`) — changing that file only takes effect once the change reaches `master`, not when it
+merges into `dev`.
 
 <!-- rtk-instructions v2 -->
 # RTK (Rust Token Killer) - Token-Optimized Commands
