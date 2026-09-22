@@ -79,6 +79,14 @@ export default defineConfig({
           // reasoning as three.js above: precaching would undo the code-split.
           // The runtime rule below still caches them once actually used.
           '**/words-??-*.js',
+          // The ffmpeg.wasm loader (~110 kB) and its worker. Only a visitor who
+          // opens the ffmpeg tool *and* accepts its 32 MB download ever needs them,
+          // and they are useless without the .wasm beside them, which the glob
+          // above never matched. Same reasoning as three.js; the runtime rule
+          // caches them once used. The .wasm itself relies on the immutable
+          // `/assets/` header in public/.htaccess, not on the service worker.
+          '**/ffmpeg-core-*.js',
+          '**/ffmpeg.worker-*.js',
         ],
         navigateFallback: '/index.html',
         navigateFallbackDenylist: [
@@ -119,6 +127,14 @@ export default defineConfig({
   define: {
     __BUILD_SHA__: JSON.stringify(commitSha()),
     __BUILD_TIME__: JSON.stringify(new Date().toISOString()),
+  },
+  optimizeDeps: {
+    // Vite's dependency optimiser only meets `@ffmpeg/ffmpeg` when the ffmpeg tool's
+    // chunk is first opened; it then pre-bundles it and reloads the page, throwing
+    // away the 32 MB download the visitor has just started. Excluded, the package's
+    // own ESM files are served as they are — there are six, and they are small. This
+    // is dev-only: Rollup never pre-bundles, so production is unaffected.
+    exclude: ['@ffmpeg/ffmpeg'],
   },
   resolve: {
     alias: {

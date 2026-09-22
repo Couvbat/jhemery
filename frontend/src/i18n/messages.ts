@@ -284,6 +284,62 @@ export const messages = {
     seconds: { en: '{n} s', fr: '{n} s' },
     minutes: { en: '{n} min', fr: '{n} min' },
   },
+  toolFfmpeg: {
+    intro: {
+      en: 'This is ffmpeg compiled to WebAssembly, running in your browser: the file never leaves this machine. It first needs the ffmpeg core, a one-off download the browser keeps in its cache — and nothing is fetched until you press the button.',
+      fr: "C'est ffmpeg compilé en WebAssembly, exécuté dans votre navigateur : le fichier ne quitte jamais cette machine. Il faut d'abord le cœur ffmpeg, un téléchargement unique que le navigateur garde en cache — et rien n'est récupéré avant d'appuyer sur le bouton.",
+    },
+    download: { en: 'download ffmpeg', fr: 'télécharger ffmpeg' },
+    downloading: { en: 'downloading', fr: 'téléchargement' },
+    starting: { en: 'starting ffmpeg…', fr: 'démarrage de ffmpeg…' },
+    ready: { en: 'ffmpeg ready', fr: 'ffmpeg prêt' },
+    loadFailed: {
+      en: 'The core could not be downloaded or started. Reload the page and try again; a browser that blocks WebAssembly cannot run this tool.',
+      fr: "Le cœur n'a pas pu être téléchargé ou démarré. Rechargez la page et réessayez ; un navigateur qui bloque WebAssembly ne peut pas exécuter cet outil.",
+    },
+    probing: { en: 'reading the file…', fr: 'lecture du fichier…' },
+    notMedia: {
+      en: 'ffprobe does not recognise this file as audio or video.',
+      fr: "ffprobe ne reconnaît pas ce fichier comme de l'audio ou de la vidéo.",
+    },
+    format: { en: 'format', fr: 'format' },
+    trim: { en: 'trim', fr: 'découpe' },
+    start: { en: 'start', fr: 'début' },
+    end: { en: 'end', fr: 'fin' },
+    trimHint: {
+      en: 'hh:mm:ss or seconds; empty means the whole file.',
+      fr: 'hh:mm:ss ou secondes ; vide pour tout le fichier.',
+    },
+    badStart: {
+      en: 'The start is not a timecode, or is past the end of the file.',
+      fr: "Le début n'est pas un timecode, ou dépasse la fin du fichier.",
+    },
+    badEnd: { en: 'The end is not a timecode.', fr: "La fin n'est pas un timecode." },
+    badOrder: { en: 'The end has to come after the start.', fr: 'La fin doit venir après le début.' },
+    noAudio: { en: 'This file has no audio stream.', fr: "Ce fichier n'a pas de piste audio." },
+    noVideo: {
+      en: 'This file has no video stream; pick an audio format.',
+      fr: "Ce fichier n'a pas de piste vidéo ; choisissez un format audio.",
+    },
+    copyUnknown: {
+      en: 'No plain container for this audio codec here; pick a format that re-encodes.',
+      fr: 'Pas de conteneur simple pour ce codec audio ici ; choisissez un format qui ré-encode.',
+    },
+    convert: { en: 'convert', fr: 'convertir' },
+    cancel: { en: 'cancel', fr: 'annuler' },
+    cancelled: { en: 'cancelled — restarting ffmpeg', fr: 'annulé — redémarrage de ffmpeg' },
+    crashed: {
+      en: 'ffmpeg crashed on this file and has been restarted; try another format.',
+      fr: 'ffmpeg a planté sur ce fichier et a été redémarré ; essayez un autre format.',
+    },
+    failed: { en: 'ffmpeg exited with code', fr: 'ffmpeg a quitté avec le code' },
+    result: { en: 'result', fr: 'résultat' },
+    elapsed: { en: 'in', fr: 'en' },
+    slow: {
+      en: 'Video re-encoding is single-threaded WebAssembly: expect a few times the clip’s length on a laptop, more on a phone. Audio, and the copy preset, are quick.',
+      fr: "Le ré-encodage vidéo est du WebAssembly mono-thread : comptez quelques fois la durée du clip sur un portable, plus sur un téléphone. L'audio, et le préréglage copy, sont rapides.",
+    },
+  },
   footer: {
     built: { en: 'built', fr: 'build' },
     source: { en: 'source', fr: 'source' },

@@ -731,4 +731,14 @@ this section only fixes the rules the code cites.
   `ls tools`, `cd tools/<id>`, the `tools` command and Tab derive from one array. Metas are plain
   data in both locales; each tool's maths lives in a pure `.ts` beside its panel and is tested in
   jsdom. Client-side tools never send a file anywhere; the page says so once.
+- **Tier `wasm` downloads only on a click** (`tools/ffmpeg/`). The 32 MB core is served from our own
+  `/assets/`, so the CSP keeps `'self'` for scripts and connections; `'wasm-unsafe-eval'` is the one
+  addition, and it reaches the worker because the worker's own script response carries the header.
+  Nothing is fetched until the visitor presses the button, whose label states the size
+  (`CORE_BYTES`, checked against the installed file by a test). The loader and worker chunks are
+  kept out of the precache like three.js; the `.wasm` itself relies on the immutable `/assets/`
+  cache header, not the service worker. The single-thread core is a decision, not a fallback: the
+  multi-thread one needs COOP/COEP on the document, which would break the SoundCloud embed sharing
+  it. Inputs are read in place over WORKERFS; stream facts come from `ffprobe` as JSON; `-ss` goes
+  before `-i` and the length is `-t`.
 

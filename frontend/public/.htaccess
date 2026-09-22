@@ -24,6 +24,17 @@
   AddDefaultCharset UTF-8
   AddCharset UTF-8 .txt
   AddType application/manifest+json .webmanifest
+  # Apache's own mime.types has known .wasm for years, but a wrong or missing
+  # type here downgrades WebAssembly.instantiateStreaming to a full buffer
+  # first — the ffmpeg core is 32 MB, so the streaming compile is worth keeping.
+  AddType application/wasm .wasm
+</IfModule>
+
+<IfModule mod_deflate.c>
+  # The ffmpeg tool's WebAssembly core is 32 MB on disk and 10 MB deflated.
+  # cPanel's "Optimize Website" switch compresses text types only, so a binary
+  # type has to be named; everything else worth compressing here already is.
+  AddOutputFilterByType DEFLATE application/wasm
 </IfModule>
 
 <IfModule mod_headers.c>
@@ -64,7 +75,12 @@
   #   script-src   umami.jhemery.xyz serves the analytics tracker, injected at
   #                runtime by src/lib/analytics.ts. The JSON-LD block in
   #                index.html is a data block, not an executed script, so it
-  #                needs no allowance.
+  #                needs no allowance. 'wasm-unsafe-eval' is for the ffmpeg
+  #                tool: Chrome and Firefox refuse WebAssembly.instantiate()
+  #                under any script-src that lacks it, 'self' included. It
+  #                allows nothing else — no eval(), no Function() — and it
+  #                reaches the module worker that runs the core because the
+  #                worker's own script response carries this same header.
   #   style-src    'unsafe-inline' is unavoidable: Vue writes `style` attributes
   #                for every :style binding, and the terminal and three.js
   #                background lean on them. Styles are a far weaker injection
@@ -78,7 +94,7 @@
   #   object-src / base-uri / form-action are locked down because nothing here
   #                uses them, and each is a known way to turn a stray HTML
   #                injection into something worse.
-  Header always set Content-Security-Policy "default-src 'self'; script-src 'self' https://umami.jhemery.xyz; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self' data:; connect-src 'self' https://api.jhemery.xyz https://umami.jhemery.xyz; frame-src https://w.soundcloud.com; worker-src 'self'; manifest-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'; upgrade-insecure-requests"
+  Header always set Content-Security-Policy "default-src 'self'; script-src 'self' 'wasm-unsafe-eval' https://umami.jhemery.xyz; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self' data:; connect-src 'self' https://api.jhemery.xyz https://umami.jhemery.xyz; frame-src https://w.soundcloud.com; worker-src 'self'; manifest-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'; upgrade-insecure-requests"
 
   # Only files under /assets/ carry a content hash in their name, so they are the
   # only ones safe to freeze. Matching by extension instead would also freeze

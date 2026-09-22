@@ -85,6 +85,36 @@ MPL-2.0 is file-level copyleft. No other part of this project is affected —
 the rest of the source is MIT (see LICENSE).
 `
 
+/**
+ * GPL obliges whoever distributes the binary to say where its source is, and
+ * `@ffmpeg/core` ships from npm with no licence file at all — its manifest's
+ * `license` field is the only notice it carries. So this one, like the MPL
+ * notice above, is written out. The version is read from the installed package
+ * so the pointer follows every bump.
+ */
+function gplSourceNotice(): string {
+  const core = readPackage('@ffmpeg/core')
+  const version = core?.version ?? 'the installed version'
+  return `${rule('=')}
+GNU GENERAL PUBLIC LICENSE — SOURCE OFFER FOR @ffmpeg/core
+${rule('=')}
+
+The audio/video converter at /tools/ffmpeg runs FFmpeg compiled to WebAssembly,
+shipped here as \`assets/ffmpeg-core-*.wasm\` and \`assets/ffmpeg-core-*.js\`. That
+binary is the unmodified \`@ffmpeg/core\` npm package, version ${version}, licensed
+GPL-2.0-or-later because it links libx264 (GPL) into FFmpeg (LGPL).
+
+Its complete corresponding source — FFmpeg, every library built into it and the
+scripts that produce the binary — is published by the ffmpeg.wasm project:
+
+  https://github.com/ffmpegwasm/ffmpeg.wasm   (tag matching v${version})
+
+The site's own code does not link against it. It talks to the core through the
+MIT-licensed \`@ffmpeg/ffmpeg\` wrapper, in a separate Web Worker the browser
+fetches on demand, and remains MIT (see LICENSE).
+`
+}
+
 interface Package {
   name: string
   version: string
@@ -217,6 +247,8 @@ export function buildNotices(): string {
     TATOEBA,
     '',
     MPL_SOURCE_NOTICE,
+    '',
+    gplSourceNotice(),
     '',
     rule('='),
     `PART 2 — RUNTIME DEPENDENCIES (${runtime.length} packages)`,
