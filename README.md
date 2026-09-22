@@ -268,10 +268,16 @@ panel with its own tests.
 - **`text`** — word, character, line, sentence and paragraph counts, UTF-8 bytes, reading and
   speaking time, every case conversion (title, sentence, camel, pascal, snake, kebab, constant,
   slug with accents folded) and the most frequent words.
+- **`ffmpeg`** — the one tool with a dependency: ffmpeg compiled to WebAssembly. Convert to mp3,
+  m4a, ogg, wav or flac, extract the audio stream without re-encoding, re-encode video to H.264
+  mp4 or make a palette-optimised GIF, and trim any of it. The 32 MB core is fetched only when
+  you press the button, from this site's own `/assets/`, and stays in the browser cache; the
+  input is read in place from disk, so a multi-gigabyte file is fine. Single-threaded, so video
+  is slow — audio is not.
 
 The list, the page and the terminal all read `src/tools/registry.ts`; adding a tool means adding
-one object there plus its folder. The rest of the plan — more client-side tools, an
-`ffmpeg.wasm` converter, watch-party and radio rooms, an admin-only downloader — is in
+one object there plus its folder. The rest of the plan — watch-party and radio rooms, an
+admin-only downloader — is in
 [the design spec](docs/superpowers/specs/2026-09-22-tools-and-views-design.md).
 
 ## Achievements

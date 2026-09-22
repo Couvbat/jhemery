@@ -112,6 +112,17 @@ export const tools: ToolMeta[] = [
     tier: 'client',
     load: () => import('./text/TextTool.vue'),
   },
+  {
+    id: 'ffmpeg',
+    name: { en: 'Audio & video converter', fr: 'Convertisseur audio & vidéo' },
+    description: {
+      en: 'mp3, m4a, ogg, wav, flac, mp4 or gif; trim; extract audio without re-encoding. ffmpeg in WebAssembly, 32 MB on first use',
+      fr: "mp3, m4a, ogg, wav, flac, mp4 ou gif ; découper ; extraire l'audio sans ré-encoder. ffmpeg en WebAssembly, 32 Mo au premier usage",
+    },
+    keywords: ['convert', 'mp3', 'mp4', 'audio', 'video', 'trim', 'cut', 'gif', 'wav', 'extract'],
+    tier: 'wasm',
+    load: () => import('./ffmpeg/FfmpegTool.vue'),
+  },
 ]
 
 export function findTool(id: string): ToolMeta | undefined {

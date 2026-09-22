@@ -257,6 +257,15 @@ and never starts on its own — a 30 MB core is not something a page pulls on a 
 which `public/.htaccess` can set for `/tools/*` only; the single-thread core is the fallback where
 they cannot be set. Not in the first slice.
 
+*As built (slice 3):* single-thread core, by decision rather than fallback — COOP/COEP applies to
+the document, and this is one document, so it would break the SoundCloud embed on the home face.
+The core is served from our own `/assets/` so the CSP keeps `'self'`, with `'wasm-unsafe-eval'` as
+the one addition; the loader and worker chunks are precache-excluded, the `.wasm` relies on the
+immutable `/assets/` header. Inputs are read in place over WORKERFS. Two quirks of the 0.12.10
+core shaped the code: its `ffprobe` returns -1 on success, so the JSON is written to a file; and
+its `libopus` traps with `memory access out of bounds`, poisoning the instance, so the free audio
+preset is Vorbis and any trap restarts the engine.
+
 **Tier `admin` — the downloader.** `yt-dlp` for YouTube / SoundCloud audio, visible only after
 the existing `ADMIN_PASSWORD` unlock (the mechanism the guestbook moderation uses). Gating fixes
 the legal exposure, not the hosting one, so it is designed as a **job, not a request**:
