@@ -40,6 +40,17 @@ unconfigured rather than failing.
 | `GET /guestbook` | `guestbook` | Newest 25 entries. |
 | `POST /guestbook` | `guestbook` | Sign. 1/min per IP. |
 | `DELETE /guestbook/:id` | `guestbook` | Moderation; requires the `x-admin-password` header. |
+| `GET /rooms` | `rooms` | `{ enabled }` — the feature flag, so the pages can say so. |
+| `POST /rooms` | `rooms` | Create a `watch` or `radio` room; returns the code and the host token. 10/hour per IP. |
+| `GET /rooms/:code` | `rooms` | Snapshot: state, queue, member count. |
+| `GET /rooms/:code/events` | `rooms` | SSE of the same snapshot on every change, plus a 25 s heartbeat. Subscribing *is* membership. |
+| `POST /rooms/:code/state` | `rooms` | Host only (`x-room-token`): media, position, playing, queue. 120/min per IP. |
+| `DELETE /rooms/:code` | `rooms` | Host only: ends the room for everyone. |
+| `GET /jobs` | `jobs` | Admin only (`x-admin-password`): `{ configured, jobs }`. Doubles as the frontend's password check. |
+| `POST /jobs` | `jobs` | Admin only: start a yt-dlp job for one video or one track. 202 with the job. 20/hour per IP. |
+| `GET /jobs/:id` | `jobs` | Admin only: poll. |
+| `GET /jobs/:id/file` | `jobs` | Admin only: the mp3, streamed once and then deleted. |
+| `DELETE /jobs/:id` | `jobs` | Admin only: cancel a running job, or dismiss a finished one. |
 
 Every optional integration degrades instead of erroring: no Steam key hides live activity, no
 GitHub token drops the heatmap and pinned repos, an unreachable model makes the terminal say the
@@ -96,6 +107,44 @@ Disabled unless `GUESTBOOK_ENABLED=true` — it is a publicly writable field.
 - Writes are serialised through a queue and written via rename, so two concurrent signings can't
   clobber each other.
 - `DELETE /guestbook/:id` refuses outright unless `ADMIN_PASSWORD` is set.
+
+## `rooms`
+
+Disabled unless `ROOMS_ENABLED=true` — a public endpoint that holds a connection per guest and
+relays what a host loads to everyone in the room.
+
+- In memory: a `Map` of rooms and an RxJS `Subject` each. 200 rooms at most, each gone two hours
+  after its last host action or arrival/departure; a restart empties them all, by design.
+- What a host may load is an allowlist per kind, checked in the service, not a sanitiser: eleven
+  characters from YouTube's id alphabet for `watch`, an https URL on `soundcloud.com` for `radio`.
+  The string ends up as an iframe `src` on every member's page, which is why the host's own page
+  is not trusted to have checked it.
+- A room knows nothing about its members but how many there are — the `/presence` rule. The host
+  token is random, compared in constant time, returned once at creation and never again.
+- Playback state carries the server clock (`at`); a bare `{ playing: false }` pauses where the item
+  actually is, because the position is recomputed to now rather than copied.
+
+## `jobs`
+
+Disabled unless `DOWNLOADER_ENABLED=true` — it spawns a process on a shared host and writes to
+disk. Every route is behind `AdminGuard` (`x-admin-password` against `ADMIN_PASSWORD`, constant
+time, unset means locked).
+
+- A download is a **job, not a request**: `POST` returns at once with an id, the page polls, the
+  file is streamed exactly once and deleted. A request that waited for yt-dlp would die at
+  Passenger's timeout and come back from Cloudflare as a 524 — the wall `ask` already hit.
+- The runner is what the shell check in `docs/deploy.md` found, as defaults: `~/ytdlp/bin/yt-dlp`
+  (the venv; the PyInstaller binary cannot run because `/tmp` is `noexec`), `~/bin` for the static
+  ffmpeg, and the app's own `process.execPath` as yt-dlp's JS runtime (YouTube wants one). Each
+  is an env var when the box differs. `TMPDIR` is moved under `DATA_DIR` for the same `noexec`
+  reason.
+- What it will fetch is an allowlist of URL shapes (`jobs.urls.ts`): one YouTube video, one
+  SoundCloud track. Never a set or a profile — yt-dlp walks those, hundreds of requests in a
+  minute, and that earned the host's IP an hour-long 403 during the check.
+- One job runs at a time, three may be pending, ten minutes each, 200 MB at most, files gone
+  30 minutes after they are produced if never fetched, the whole `DATA_DIR/jobs` emptied on boot.
+- Progress is read from yt-dlp's own `[download] 42.7%` lines; a failure keeps its last `ERROR`
+  line, never the whole log.
 
 ## Tests
 

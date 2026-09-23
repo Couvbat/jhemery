@@ -142,6 +142,23 @@ persistence rather than reflexes.
 
 ---
 
+## F. Views and tools
+
+A second page, the transition between pages, and the utilities on it. Design in
+[`superpowers/specs/2026-09-22-tools-and-views-design.md`](superpowers/specs/2026-09-22-tools-and-views-design.md),
+slices in [`superpowers/plans/2026-09-22-tools-and-views.md`](superpowers/plans/2026-09-22-tools-and-views.md).
+
+| ✔ | Feature | Approach | Files | Effort |
+|---|---|---|---|---|
+| [x] | `views.ts` + `goTo` | The route list as content, one level above sections; one navigation function the navbar, palette and terminal all use; `cd`/`ls`/`pwd`/`ping` learn paths. | `content/views.ts`, `useViewSwing.ts`, `navigate.ts`, `NavBar.vue`, `CommandPalette.vue` | M |
+| [x] | Prism swing | Pages as faces of a prism (CSS 3D on a fixed, clipped stage), the wireframe *field* yawed in a `THREE.Group` by the same eased clock, re-homed on the first frame and baked on the last. Reduced motion: instant swap. | `useViewSwing.ts`, `App.vue`, `main.css`, `ThreeBackground.vue` | M |
+| [x] | `/tools` + registry | `tools/registry.ts` drives the page, the `tools` command, `ls tools`, `cd tools/<id>` and Tab. One lazy chunk per panel. | `views/ToolsView.vue`, `tools/*` | M |
+| [x] | Client tools, vol. 1 | `image` (canvas re-encode, strips EXIF), `hash` (Web Crypto), `encode` (base64/url/hex), `json` (format/minify with a scanner that points at the error). | `tools/{image,hash,encode,json}/` | M |
+| [x] | Client tools, vol. 2 | `colour`, `time`, `password` (diceware from the games' word lists), `text`. Pure additions to the registry. | `tools/*` | S each |
+| [x] | `ffmpeg.wasm` tier | The accepted dependency exception. Single-thread core served from our own `/assets/` (CSP stays `'self'`, plus `'wasm-unsafe-eval'`), fetched only on an explicit "download 32 MB" button, loader and worker kept out of the precache like three.js, input read in place over WORKERFS, ffprobe for the stream facts. COOP/COEP for the multi-thread core deliberately not done: it would break the SoundCloud embed on the same document. | `tools/ffmpeg/`, `vite.config.ts`, `.htaccess`, `third-party.ts` | M |
+| [x] | Rooms (`watch`, `radio`) | SSE + POST, in-memory with a two-hour idle TTL and a cap of 200, `ROOMS_ENABLED` off by default, media allowlisted server-side. Both embeds driven over `postMessage` — no YouTube or SoundCloud script on the page, one `frame-src` added. Third and fourth faces of the prism; `cd watch/<code>` joins. | `backend/src/rooms/*`, `frontend/src/rooms/*`, `views/{Watch,Radio}View.vue` | L |
+| [x] | Downloader (admin) | The shell check said the box can run it, so it does: a **job** API (start / poll / fetch-once), yt-dlp spawned with the check's findings as defaults, URLs allowlisted to one video or one track, `AdminGuard` on every route, `DOWNLOADER_ENABLED` off by default. Unlocked by `sudo -i`; hidden from every listing until then. | `backend/src/jobs/*`, `backend/src/common/admin.guard.ts`, `frontend/src/lib/admin.ts`, `tools/download/` | L |
+
 ## Build order
 
 **Phase 1 — quick wins, no backend (S):** ✅ shipped on `feat/phase-1` → `dev`.
@@ -162,6 +179,10 @@ weather-linked background mood), `feat/phase-3-markets` (`btc`/`stonks`),
 `feat/phase-3-presence` (presence SSE), `feat/phase-3-stats` (command counter).
 
 Every row in §A–D is ticked.
+
+**Phase 5 — views and tools (§F):** ✅ slice 1 on `feat/tools-and-views` → `dev` (#78), ✅ slice 2 on
+`feat/tools-client-vol2` → `dev` (#80), ✅ slice 3 on `feat/tools-ffmpeg` → `dev` (#81), ✅ slice 4 on
+`feat/rooms` → `dev` (#82), slice 5 on `feat/downloader` → `dev` — the last of the plan.
 
 **Phase 4 — games, vol. 2 (§E):** in progress on `claude/game-ideas-ec3dc5` → `dev`.
 The three shared prerequisites first (they touch code all five games read), then `minesweeper`,

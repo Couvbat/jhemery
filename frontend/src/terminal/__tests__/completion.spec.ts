@@ -46,6 +46,14 @@ describe('completeInput', () => {
     expect(line(`cd ${first!.slice(0, 3)}`)).toBe(`cd ${first} `)
   })
 
+  it('completes a view, and a tool inside it, for cd', () => {
+    // `tools` and every `tools/<id>` share the prefix, so the first Tab stops at the
+    // directory name without a trailing space — the shell's usual ambiguity rule.
+    expect(line('cd too')).toBe('cd tools')
+    expect(line('cd tools/im')).toBe('cd tools/image ')
+    expect(line('ls tools/js')).toBe('ls tools/json ')
+  })
+
   it('inserts the common prefix when several candidates share one', () => {
     // `off`/`on` share `o`, which is already typed, so the line stands.
     expect(line('gravity o')).toBe('gravity o')

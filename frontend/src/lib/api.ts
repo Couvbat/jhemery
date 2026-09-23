@@ -190,6 +190,65 @@ export interface GuestbookList {
   entries?: GuestbookEntry[]
 }
 
+export type RoomKind = 'watch' | 'radio'
+
+/** The host's playback, anchored to the server clock — see `rooms/sync.ts` for the maths. */
+export interface PlaybackState {
+  /** A YouTube video id (`watch`) or a soundcloud.com URL (`radio`); null when nothing is loaded. */
+  media: string | null
+  /** Seconds into the item as of `at`. */
+  position: number
+  playing: boolean
+  /** Server time in ms when the state was set. */
+  at: number
+}
+
+/** One frame of a room's event stream. `members` is a count, as in `/presence`. */
+export interface RoomSnapshot {
+  code: string
+  kind: RoomKind
+  state: PlaybackState
+  queue: string[]
+  members: number
+}
+
+export interface RoomCreated extends RoomSnapshot {
+  /** Proves the host on the state route. Kept in the host's tab, never in a URL. */
+  hostToken: string
+}
+
+export interface RoomsInfo {
+  enabled: boolean
+}
+
+export interface RoomPatch {
+  media?: string | null
+  position?: number
+  playing?: boolean
+  queue?: string[]
+}
+
+export type JobStatus = 'queued' | 'running' | 'done' | 'failed'
+
+/** One download on the server. No path: the file is only ever reached through `fetchJobFile`. */
+export interface DownloadJob {
+  id: string
+  url: string
+  status: JobStatus
+  /** 0–1 while running; null before yt-dlp's first progress line. */
+  progress: number | null
+  filename: string | null
+  size: number | null
+  error: string | null
+  createdAt: number
+  finishedAt: number | null
+}
+
+export interface JobsInfo {
+  configured: boolean
+  jobs: DownloadJob[]
+}
+
 export class ApiError extends Error {
   constructor(
     message: string,
@@ -312,4 +371,51 @@ export const api = {
       body: JSON.stringify(payload),
     }),
   askStream,
+  rooms: () => request<RoomsInfo>('/rooms'),
+  createRoom: (kind: RoomKind) =>
+    request<RoomCreated>('/rooms', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ kind }),
+    }),
+  room: (code: string) => request<RoomSnapshot>(`/rooms/${code}`),
+  updateRoom: (code: string, token: string, patch: RoomPatch) =>
+    request<RoomSnapshot>(`/rooms/${code}/state`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'x-room-token': token },
+      body: JSON.stringify(patch),
+    }),
+  endRoom: (code: string, token: string) =>
+    request<void>(`/rooms/${code}`, { method: 'DELETE', headers: { 'x-room-token': token } }),
+  jobs: (password: string) => request<JobsInfo>('/jobs', { headers: adminHeaders(password) }),
+  startJob: (password: string, url: string) =>
+    request<DownloadJob>('/jobs', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', ...adminHeaders(password) },
+      body: JSON.stringify({ url }),
+    }),
+  job: (password: string, id: string) =>
+    request<DownloadJob>(`/jobs/${id}`, { headers: adminHeaders(password) }),
+  cancelJob: (password: string, id: string) =>
+    request<void>(`/jobs/${id}`, { method: 'DELETE', headers: adminHeaders(password) }),
+}
+
+/**
+ * `GET /jobs/:id/file`, fetch-once: the server deletes the file as soon as this
+ * response is fully read. A `<a download>` cannot carry the admin header, so the
+ * bytes come through `fetch` and leave through an object URL.
+ */
+export async function fetchJobFile(password: string, id: string): Promise<Blob> {
+  const res = await fetch(`${apiUrl}/jobs/${id}/file`, { headers: adminHeaders(password) })
+  if (!res.ok) throw await errorFrom(res)
+  return res.blob()
+}
+
+function adminHeaders(password: string): Record<string, string> {
+  return { 'x-admin-password': password }
+}
+
+/** The SSE endpoint a room's members hold open; `EventSource` wants a URL, not a fetch. */
+export function roomEventsUrl(code: string): string {
+  return `${apiUrl}/rooms/${code}/events`
 }

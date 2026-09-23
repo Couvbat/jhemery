@@ -674,6 +674,41 @@ When enabled:
 
 Output is rendered as text in the terminal (never `v-html`), so a stored payload cannot execute.
 
+### `rooms` — `/rooms`, `/rooms/:code/events`, `/rooms/:code/state`
+
+The watch-party and radio pages (§11). SSE + POST, as `/presence` proved on this host; WebSockets
+stay rejected. Rules the code cites:
+
+- **Off by default** (`ROOMS_ENABLED`). `GET /rooms` reports the flag so the pages can say
+  "rooms are off here" rather than fail to create one.
+- **A room is a code, a state, a queue and a count.** No member list, no ids, nothing on disk;
+  in memory with a two-hour idle TTL and a cap of 200. The host token is the only secret: random,
+  returned once, compared in constant time, carried in `x-room-token`.
+- **Media is allowlisted per kind, server-side.** A YouTube id (eleven characters from its
+  alphabet) or an https URL on `soundcloud.com`. It becomes an iframe `src` on every guest's page,
+  so the host's page is not trusted to have checked it; the service 400s anything else, queue
+  items included.
+- **State is anchored to the server clock.** `{ media, position, playing, at }`; guests compute
+  `position + (now − at)` and seek when more than two seconds out. A patch without a position
+  recomputes it to now, so a bare pause lands where the item actually is.
+
+### `jobs` — the downloader, `/jobs`, `/jobs/:id`, `/jobs/:id/file`
+
+The admin tier of the tools page (§11). Rules the code cites:
+
+- **Admin end to end.** `AdminGuard` on every route: `x-admin-password` against `ADMIN_PASSWORD`,
+  constant time, unset means locked. `GET /jobs` is also how the frontend learns whether a
+  password is right — one surface, one check.
+- **A job, not a request.** `POST` returns 202 with an id; the page polls; the file is streamed
+  once and deleted. Nothing waits on yt-dlp inside a request.
+- **The runner is the shell check made executable.** Defaults from `deploy.md`: the venv binary,
+  `~/bin` for ffmpeg, `process.execPath` as the JS runtime, `TMPDIR` under `DATA_DIR`, a pause
+  between requests, `--no-playlist`, `--restrict-filenames`.
+- **One video or one track.** The URL is an allowlist of shapes, canonicalised; sets and
+  profiles are refused because yt-dlp walks them, and the host's IP paid for that once.
+- **Bounded everywhere.** One running, three pending, ten minutes, 200 MB, 30-minute TTL, the
+  job directory emptied on boot. A failure keeps its last `ERROR` line only.
+
 ---
 
 ## 9. Accessibility
@@ -705,3 +740,57 @@ Retrofitting these is painful, so they are part of the definition of done:
 - **Blog** — infrastructure without content is worse than no infrastructure.
 - **Command chaining / pipes** — `ls | grep` is a lot of parser for a joke nobody will run twice.
 - **Terminal on mobile** — see §9.
+
+## 11. Views, the prism swing and the tools page
+
+**Where:** `content/views.ts`, `composables/useViewSwing.ts`, `views/ToolsView.vue`,
+`tools/registry.ts`, `App.vue`, `ThreeBackground.vue`. Full design in
+[`superpowers/specs/2026-09-22-tools-and-views-design.md`](superpowers/specs/2026-09-22-tools-and-views-design.md);
+this section only fixes the rules the code cites.
+
+- **`views.ts` is the list of routes** the way `sections.ts` is the list of sections, and its order
+  is the order of the prism. Sections stay anchors inside `home`. `activeView` (set by the router)
+  and `activeSection` (set by scrolling) compose into `pwd`.
+- **One navigation function.** `goTo(target)` takes anything `cd` accepts and is what the navbar,
+  the palette and `CommandContext.navigate` all call. A section on another view routes home with a
+  hash and is scrolled to once the swing settles. `resolvePath` is the shared resolver, so `cd`
+  can say "No such file or directory" for the same inputs `goTo` refuses.
+- **The swing is one clock with three readers.** `useViewSwing` eases 0→1 once; `App.vue` binds it
+  as CSS custom properties on the stage that rotates the two pages as faces of a prism, and
+  `ThreeBackground` yaws the wireframe *field* (not the camera — see the spec for why), re-homes
+  every shape on the first frame and bakes the rotation away on the last. Under reduced motion
+  nothing moves and the pages swap. The transition is complete with no three.js present.
+- **Nothing inside a view may be `position: fixed`** — the stage is a transformed ancestor for the
+  duration of a swing. Fixed chrome lives in `App.vue`, beside `RouterView`.
+- **The tool registry is the API** (`tools/registry.ts`), exactly as §2 says of commands: the page,
+  `ls tools`, `cd tools/<id>`, the `tools` command and Tab derive from one array. Metas are plain
+  data in both locales; each tool's maths lives in a pure `.ts` beside its panel and is tested in
+  jsdom. Client-side tools never send a file anywhere; the page says so once.
+- **Tier `wasm` downloads only on a click** (`tools/ffmpeg/`). The 32 MB core is served from our own
+  `/assets/`, so the CSP keeps `'self'` for scripts and connections; `'wasm-unsafe-eval'` is the one
+  addition, and it reaches the worker because the worker's own script response carries the header.
+  Nothing is fetched until the visitor presses the button, whose label states the size
+  (`CORE_BYTES`, checked against the installed file by a test). The loader and worker chunks are
+  kept out of the precache like three.js; the `.wasm` itself relies on the immutable `/assets/`
+  cache header, not the service worker. The single-thread core is a decision, not a fallback: the
+  multi-thread one needs COOP/COEP on the document, which would break the SoundCloud embed sharing
+  it. Inputs are read in place over WORKERFS; stream facts come from `ffprobe` as JSON; `-ss` goes
+  before `-i` and the length is `-t`.
+- **Rooms are the third and fourth faces** (`watch`, `radio`; `rooms/*`). One page component for
+  both, one composable for the network, one pure module for the maths; the kind picks the player
+  and the words. **No third-party script**: both embeds are driven over `postMessage` — the wire
+  protocol the YouTube IFrame API and the SoundCloud Widget API scripts would speak on the page's
+  behalf — so the CSP gains one `frame-src` and no `script-src`, exactly as `MusicSection` decided
+  for the SoundCloud widget. The players share one interface (`PlayerHandle`, `PlayerReading`);
+  the sync loop never knows which it drives. **Host and guest are one token apart**: the token
+  lives in `sessionStorage` keyed by code (a reload keeps hosting, a URL never carries it), and a
+  refused token demotes the tab to guest rather than retrying. Guests seek at most once per 1.5 s,
+  hosts coalesce changes for 250 ms and re-anchor every 15 s while playing. `cd watch/<code>` joins.
+- **The admin tier is hidden, not secret** (`download`, `lib/admin.ts`). `visibleTools()` leaves
+  it out of the page, `tools`, `ls tools` and Tab until the owner unlocks — `sudo -i` in the
+  terminal, or the panel's own field — but `findTool` still resolves it, so `cd tools/download`
+  opens the panel and the panel asks. The password is checked against `GET /jobs` and kept in
+  `sessionStorage` for the tab; a 403 on any later call locks again rather than retrying. The
+  panel is a thin client: start, poll while something moves, save once through a blob URL
+  (a plain link cannot carry the header).
+

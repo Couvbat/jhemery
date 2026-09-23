@@ -1,6 +1,7 @@
 <script setup lang="ts">
-import { defineAsyncComponent, onMounted, ref, watch } from 'vue'
-import { RouterView } from 'vue-router'
+import { computed, defineAsyncComponent, onMounted, ref, watch } from 'vue'
+import { RouterView, useRouter } from 'vue-router'
+import { useMediaQuery } from '@vueuse/core'
 import NavBar from '@/components/NavBar.vue'
 import BootSequence from '@/components/BootSequence.vue'
 import CommandPalette from '@/components/CommandPalette.vue'
@@ -9,6 +10,7 @@ import { useKonami } from '@/composables/useKonami'
 import { restoreCrt, setCrt } from '@/composables/useCrt'
 import { useMatrix } from '@/composables/useMatrix'
 import { terminalOpen } from '@/composables/useTerminalShell'
+import { SWING_MS, installViewSwing, useViewSwing } from '@/composables/useViewSwing'
 import { track } from '@/lib/analytics'
 import { unlock } from '@/terminal/achievements'
 import AchievementToast from '@/components/AchievementToast.vue'
@@ -34,6 +36,20 @@ const { matrixActive } = useMatrix()
 // doesn't compete with hero content for bandwidth/CPU during first paint.
 const showThreeBackground = ref(false)
 
+// The prism swing between views (features-spec §11). The router drives the clock;
+// the stage below only binds its values as CSS custom properties, and
+// `ThreeBackground` reads the same clock for the wireframes. Under reduced motion
+// the `<Transition>` is told there is no CSS to wait for, which in Vue means the
+// pages swap instantly — the composable never starts a tween in that case either.
+installViewSwing(useRouter())
+const { swing, swingDirection, swinging, leaveScroll } = useViewSwing()
+const reducedMotion = useMediaQuery('(prefers-reduced-motion: reduce)')
+const stageStyle = computed(() => ({
+  '--swing': String(swing.value),
+  '--swing-dir': String(swingDirection.value),
+  '--leave-scroll': `${-leaveScroll.value}px`,
+}))
+
 // Once true, stays true — TerminalOverlay is mounted for the rest of the session
 // (its own internal `open`/Transition handles every close/reopen after that) so
 // its async chunk is fetched exactly once, the first time it's actually needed.
@@ -41,9 +57,8 @@ const terminalEverOpened = ref(false)
 watch(terminalOpen, (isOpen) => {
   if (!isOpen) return
   terminalEverOpened.value = true
-  // The site is a single route, so pageviews alone say nothing about whether
-  // anyone finds the terminal — the one thing here worth measuring. No-op when
-  // analytics is unconfigured.
+  // Pageviews alone say nothing about whether anyone finds the terminal — the one
+  // thing here worth measuring. No-op when analytics is unconfigured.
   track('terminal-opened')
 })
 
@@ -71,7 +86,21 @@ onMounted(() => {
 <template>
   <ThreeBackground v-if="showThreeBackground" />
   <NavBar />
-  <RouterView />
+
+  <!--
+    The fixed chrome (navbar, launcher, toasts) sits outside the stage on purpose:
+    the visitor does not turn, the world does. Nothing inside a view may be
+    `position: fixed` — a transformed ancestor becomes its containing block.
+  -->
+  <div class="view-stage" :class="{ 'is-swinging': swinging }" :style="stageStyle">
+    <div class="view-prism">
+      <RouterView v-slot="{ Component }">
+        <Transition name="view" :css="!reducedMotion" :duration="SWING_MS">
+          <component :is="Component" />
+        </Transition>
+      </RouterView>
+    </div>
+  </div>
 
   <TerminalLauncher />
   <TerminalOverlay v-if="terminalEverOpened" />

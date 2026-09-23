@@ -19,7 +19,7 @@ import {
   terminalOpen as open,
   terminalTrapped as trapped,
 } from './useTerminalShell'
-import { scrollToSection } from './useActiveSection'
+import { goTo } from './useViewSwing'
 import { setCrt, glitch } from './useCrt'
 import { showMatrix } from './useMatrix'
 import { triggerBoot } from './useBoot'
@@ -105,7 +105,7 @@ const effects: TerminalEffects = {
   glitch,
   playMusic: () => {
     requestPlayback()
-    scrollToSection('music')
+    goTo('music')
   },
 }
 
@@ -146,8 +146,8 @@ function buildContext(args: string[], raw: string, signal: AbortSignal): Command
     close: () => {
       open.value = false
     },
-    navigate: (sectionId: string) => {
-      const ok = scrollToSection(sectionId)
+    navigate: (target: string) => {
+      const ok = goTo(target)
       if (ok) open.value = false
       return ok
     },

@@ -59,8 +59,11 @@ export interface CommandContext {
   clear: () => void
   /** Closes the overlay. */
   close: () => void
-  /** Scrolls to a section and closes the overlay. Returns false if the id is unknown. */
-  navigate: (sectionId: string) => boolean
+  /**
+   * Goes wherever `target` names — a section, a view or a tool, anything `cd`
+   * accepts — and closes the overlay on success. Returns false for an unknown target.
+   */
+  navigate: (target: string) => boolean
   /** Ask the user for a line of input. Rejects if they hit Ctrl+C. */
   prompt: (question: string, options?: { mask?: boolean }) => Promise<string>
   /**

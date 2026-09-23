@@ -144,6 +144,11 @@ export class ApiStub {
     this.get('/stats', payloads.statsConfigured)
     this.post('/stats/session', payloads.statsConfigured)
 
+    // Rooms: the flag follows the preset. A room itself is per test — `room()` —
+    // because a default that held an SSE stream open would cost every test a
+    // connection it never asked for.
+    this.get('/rooms', { enabled: configured })
+
     // Presence is a held SSE connection. Aborting it is the quiet default: the
     // composable gives up after three failures (`MAX_FAILURES`) and the counter
     // simply never appears, whereas a stream that closes cleanly makes EventSource
@@ -197,6 +202,65 @@ export class ApiStub {
       respond: (route) =>
         route.fulfill({ status: 200, contentType: 'text/event-stream', body }),
     })
+    return this
+  }
+
+  /**
+   * One room, as the pages see it: `GET /rooms/:code` answers the snapshot, the
+   * event stream sends it once and ends (EventSource reconnects and replays, which is
+   * fine for asserting what renders), `POST /rooms` creates "it" for a host, and the
+   * state route echoes it back. `members` and the state are whatever the test says.
+   */
+  room(snapshot: {
+    code: string
+    kind: 'watch' | 'radio'
+    state: { media: string | null; position: number; playing: boolean; at: number }
+    queue: string[]
+    members: number
+  }): this {
+    this.get(`/rooms/${snapshot.code}`, snapshot)
+    this.post('/rooms', { ...snapshot, hostToken: 'e2e-host-token' }, 201)
+    this.post(`/rooms/${snapshot.code}/state`, snapshot)
+    this.handlers.push({
+      method: 'GET',
+      pattern: toPattern(`/rooms/${snapshot.code}/events`),
+      respond: (route) =>
+        route.fulfill({
+          status: 200,
+          contentType: 'text/event-stream',
+          body: `data: ${JSON.stringify(snapshot)}\n\n`,
+        }),
+    })
+    return this
+  }
+
+  /**
+   * The downloader, unlocked: `GET /jobs` answers for the right password and 403s
+   * every other, which is exactly what `lib/admin.ts` uses as its check. `jobs`
+   * is what the listing returns; a test drives the rest with `get`/`post`.
+   */
+  downloader(password: string, jobs: unknown[] = [], configured = true): this {
+    const gate = (respond: (route: Route) => Promise<void>) => async (route: Route) => {
+      if (route.request().headers()['x-admin-password'] !== password) {
+        await route.fulfill({ status: 403, contentType: 'application/json', body: '{"message":"Not the admin"}' })
+        return
+      }
+      await respond(route)
+    }
+    for (const method of ['GET', 'POST', 'DELETE']) {
+      this.handlers.push({
+        method,
+        pattern: /^\/jobs(\/.*)?$/,
+        respond: gate(async (route) => {
+          const path = new URL(route.request().url()).pathname.slice(API_PREFIX.length)
+          if (path === '/jobs' && method === 'GET') {
+            await json({ configured, jobs })(route)
+          } else {
+            await route.fulfill({ status: 501, contentType: 'application/json', body: '{"message":"no stub"}' })
+          }
+        }),
+      })
+    }
     return this
   }
 

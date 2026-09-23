@@ -22,6 +22,7 @@ docs/       design specs and implementation plans
 - [Commands](#commands)
 - [Games](#games)
 - [Word lists](#word-lists)
+- [Tools](#tools)
 - [Achievements](#achievements)
 - [The API](#the-api)
 - [Running it locally](#running-it-locally)
@@ -45,12 +46,18 @@ docs/       design specs and implementation plans
 | — constellation | Lines drawn between shapes closer than 5.5 world units, recomputed each frame into a pre-allocated buffer. |
 | — weather mood | The real sky nudges it: a storm spins the wireframes up, fog dims them, snow slows them, night dims a little further. Small multipliers on top of the section palette, never a replacement for it. |
 | — performance | The whole component is `defineAsyncComponent`'d and only loaded on `requestIdleCallback`, so ~520 kB of three.js never competes with first paint. It is excluded from the PWA precache for the same reason. |
+| — view swing | Moving between pages turns the wireframe field about the slab's centre (a `THREE.Group`, not the camera — an orbit would put the camera inside the field) while the camera dollies back, every shape drifts to a fresh home, and the rotation is baked away at the end so the gravity well's maths stays honest. Driven by the same eased clock as the page transition below. |
 | — accessibility | `prefers-reduced-motion` skips loading it entirely; WebGL failures are caught and the canvas is simply left blank. Geometries, materials and the renderer are disposed on unmount. |
 | **CRT overdrive** | `crt` in the terminal (or the Konami code anywhere on the page) toggles scanlines, flicker and a speed multiplier that the three.js loop reads live to spin the wireframes up. Persisted in `localStorage`. |
 | **Boot sequence** | A fake `couvsh 1.0` kernel log plays on first visit, then remembers it booted. `reboot` replays it on demand, and `ssh` ends by triggering it. Skipped for reduced-motion. |
 | **Status ticker** | The footer carries the same uptime `neofetch` reports (days since the first commit) plus how long ago this build shipped, re-read on a slow tick so a long-open tab stays honest. |
 | **Live presence** | The same line says how many people are here right now, over SSE, moving as visitors arrive and leave. An aggregate count and nothing else — see the API table below. |
 | **Sections** | about · projects · music · gaming · hardware · contact — defined once in `src/content/sections.ts` and consumed by the navbar, the terminal's `ls`/`cd`/`pwd`, the command palette and every section header. |
+| **Views** | home · tools · watch · radio — the routes, defined once in `src/content/views.ts` one level above the sections, in the order they sit on the prism. `cd tools`, the navbar's `./tools` and Ctrl+K all go through one `goTo()`, which knows to route home first when you ask for a section from another page. |
+| **Prism swing** | Changing view turns the page like a face of a prism whose axis runs through the centre of the three.js scene: the leaving page rotates out, the new one rotates in from the same side, both in 3D CSS on a stage that is fixed and clipped for the 650 ms it takes, while the navbar and launcher stay put. Back turns it the other way. Under `prefers-reduced-motion` the pages simply swap. Works with no three.js loaded. |
+| **Tools page** | `/tools` — small utilities that run entirely in the browser, one lazy chunk each, listed from `src/tools/registry.ts`. See [Tools](#tools). |
+| **Watch party** | `/watch` — a room is a five-character code. The host pastes a YouTube link; every guest's player follows the host's play, pause and seeks to within two seconds, correcting drift against the server's clock. The embed is driven over `postMessage`, so no YouTube script runs on the page; the CSP gains one `frame-src`. Off unless the API sets `ROOMS_ENABLED`. |
+| **Radio** | `/radio` — the same room with the SoundCloud widget and a queue: the host lines up tracks or sets, the queue advances when one ends, and everyone hears the same second. Same `postMessage` approach as the site's music player. |
 | **Live cards** | Steam "currently playing", GitHub recent commits, latest CI runs, contribution heatmap and pinned repos, SoundCloud player, guestbook. |
 | **Guestbook ticker** | A 20s poll (not SSE — see [the spec](docs/features-spec.md#8-backend-additions)) surfaces anyone who signs while you're on the page, as a floating notice that opens `guestbook` when clicked. Skipped while the tab is hidden, and it gives up if the guestbook is off. |
 | **Command palette** | `Ctrl/⌘+K` — fuzzy list of sections and palette-flagged commands, arrow-key navigable with the selection kept in view. |
@@ -105,12 +112,13 @@ two different contents.
 
 | Command | Usage |
 |---|---|
-| `ls` | `ls [-a]` — list sections and files (`-a` shows more than you were meant to see) |
-| `cd` | `cd <section>` — scrolls the page there; accepts English ids and French labels |
-| `pwd` | Print the current section |
+| `ls` | `ls [-a] [path]` — list sections, pages and files (`-a` shows more than you were meant to see); `ls tools` lists the tools |
+| `cd` | `cd <section>` scrolls the page there (from another page it routes home first); `cd tools` and `cd tools/<tool>` open the tools page or one tool; `cd watch/<code>` and `cd radio/<code>` join a room; `cd`, `cd ~`, `cd /` go home |
+| `pwd` | Print where you are — `/home/couvbat/projects` on the page, `/home/couvbat/tools/image` with a tool open, `/home/couvbat/watch/AB3DE` in a room |
+| `tools` | `tools [<tool>]` — list the tools with their descriptions, or open one |
 | `cat` | `cat <file>` — `about.txt`, `skills.txt`, `contact.txt`, guestbook entries, … |
 | `diff` | `diff <file> <file>` — unified line diff of any two files in the fake filesystem |
-| `ping` | `ping <section>` — four fake round trips, then it actually goes there |
+| `ping` | `ping <section|page>` — four fake round trips, then it actually goes there |
 | `open` | `open <github|linkedin|soundcloud|steam|email>` |
 
 ### content
@@ -231,6 +239,54 @@ one copyright missed entirely), which is the whole argument for generating it.
 MPL-2.0 is file-level copyleft: `words-fr.ts` carries the notice and inherits the licence; nothing
 else here is affected.
 
+## Tools
+
+`/tools` is a second page — reached from the navbar, `cd tools`, `tools`, or Ctrl+K — of small
+utilities that run **entirely in the browser**: nothing dropped on the page is uploaded anywhere,
+because there is no server on the other end. Each tool is one lazy chunk, opened at
+`/tools/<name>` (or `cd tools/<name>`), and each one's maths lives in a plain `.ts` beside its
+panel with its own tests.
+
+- **`image`** — convert between PNG, JPEG and WebP, resize to a maximum width, pick a quality.
+  Re-encoding through a canvas drops EXIF, GPS and colour-profile blocks by construction. Where a
+  browser cannot write the format asked for (Safari and WebP), the tool says so and names the
+  file after what it actually produced.
+- **`hash`** — SHA-1, SHA-256 and SHA-512 of a text or a dropped file, as hex or base64, over
+  Web Crypto.
+- **`encode`** — base64 (UTF-8 safe, url-safe alphabet and missing padding accepted), URL
+  encoding and hex, both ways, with malformed input reported rather than guessed at.
+- **`json`** — pretty-print with 2, 4 or tab indentation, or minify. When the input is not JSON
+  the tool points at the line and column, with a caret under the offending character — a scanner
+  of its own, because `JSON.parse`'s messages no longer carry a position.
+- **`colour`** — hex, `rgb()`, `hsl()` and `oklch()` in, all four out, plus the WCAG contrast
+  ratio and level against a second colour and against every token of the site's own palette,
+  read live from the stylesheet so the presets cannot drift from the theme.
+- **`time`** — an epoch in seconds or milliseconds, an ISO 8601 date or `now`, converted to all
+  of those, your own zone spelled out, a relative phrase (*in 3 days*), the ISO week and day of
+  the year, and the same instant in nine zones with their offsets.
+- **`password`** — random passwords with a length slider and character classes (look-alikes
+  optional), or diceware passphrases drawn from the same common-word lists the typing game uses,
+  with the entropy in bits and a grade. `crypto.getRandomValues`, generated locally, never stored.
+- **`text`** — word, character, line, sentence and paragraph counts, UTF-8 bytes, reading and
+  speaking time, every case conversion (title, sentence, camel, pascal, snake, kebab, constant,
+  slug with accents folded) and the most frequent words.
+- **`ffmpeg`** — the one tool with a dependency: ffmpeg compiled to WebAssembly. Convert to mp3,
+  m4a, ogg, wav or flac, extract the audio stream without re-encoding, re-encode video to H.264
+  mp4 or make a palette-optimised GIF, and trim any of it. The 32 MB core is fetched only when
+  you press the button, from this site's own `/assets/`, and stays in the browser cache; the
+  input is read in place from disk, so a multi-gigabyte file is fine. Single-threaded, so video
+  is slow — audio is not.
+- **`download`** — the owner's tool, and the only one with a server behind it. yt-dlp on the box
+  turns one YouTube video or one SoundCloud track into an mp3, as a *job* the page polls, then
+  hands it over exactly once and deletes it. Hidden from the page until `sudo -i` in the terminal
+  (or the panel's own field) unlocks it with the admin password. Never a set or a profile: walking
+  one is what got the host's IP blocked for an hour — see [deploy.md](docs/deploy.md).
+
+The list, the page and the terminal all read `src/tools/registry.ts`; adding a tool means adding
+one object there plus its folder. The rest of the plan — watch-party and radio rooms, an
+admin-only downloader — is in
+[the design spec](docs/superpowers/specs/2026-09-22-tools-and-views-design.md).
+
 ## Achievements
 
 35 in total, tracked in `localStorage` (`couvbat:achievements`, plus `couvbat:achievements:sections`
@@ -303,10 +359,16 @@ limiter sees real clients behind Apache.
 | `GET /stats` · `POST /stats/session` | A single running total of terminal sessions opened. Counted once when you open the shell, never per command — the server never learns which commands anyone runs. 5/hour per IP. |
 | `GET /guestbook` · `POST /guestbook` | Read and sign. Sanitised, link-filtered, 1/min per IP, capped at 500 entries. Stored in a JSON file under `DATA_DIR`, or in MongoDB if `MONGODB_URI` is set. Disabled by default. |
 | `DELETE /guestbook/:id` | Moderation; requires the `x-admin-password` header. |
+| `GET /rooms` · `POST /rooms` | Whether rooms are on, and a new watch or radio room: a five-character code plus a host token that never travels again. 10 rooms/hour per IP, 200 rooms at most, all in memory. Disabled by default. |
+| `GET /rooms/:code` · `GET /rooms/:code/events` | A room's snapshot, and the SSE stream every member holds: the host's playback state anchored to the server clock, the queue, and a head count — an integer, as for `/presence`, never who. |
+| `POST /rooms/:code/state` · `DELETE /rooms/:code` | The host's verb and the host's exit, both behind the `x-room-token` header. What a host may load is allowlisted server-side: an eleven-character YouTube id or an https soundcloud.com URL, nothing else reaches a guest's iframe. 120 state changes/min per IP. |
+| `GET /jobs` · `POST /jobs` | Owner only (`x-admin-password`, every route): the downloader's state, and a new job for one YouTube video or one SoundCloud track — an allowlist of URL shapes, a set or a profile is refused. yt-dlp runs on the box as a background process and the request returns at once with an id. 20/hour per IP, three pending at most, one running, ten minutes per job. Disabled by default. |
+| `GET /jobs/:id` · `GET /jobs/:id/file` · `DELETE /jobs/:id` | Poll; fetch once — the file is deleted as the response completes, or 30 minutes after it was produced; cancel or dismiss. |
 
 Everything optional degrades gracefully: no Steam key hides live activity, no GitHub token drops the
 heatmap, no `GITHUB_REPO` drops the build-status card, an unreachable model makes the terminal say
-it's asleep and point at `mail`.
+it's asleep and point at `mail`, rooms left off make the watch and radio pages say so, a downloader
+left off makes its panel say so once unlocked.
 
 See `backend/.env.example` — it documents every variable, including why the risky ones are off by
 default.
@@ -366,7 +428,7 @@ GitHub Actions, split per app and path-filtered:
 
 `docs/superpowers/` holds the design specs and implementation plans behind the bigger pieces — the
 three.js wireframe background, the vim pane, the terminal games, the achievements UI, the SoundCloud
-embed, and a CTF flag chain that is still just a design.
+embed, the views/prism-swing/tools page, and a CTF flag chain that is still just a design.
 
 ---
 

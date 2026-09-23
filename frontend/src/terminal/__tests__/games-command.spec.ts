@@ -178,6 +178,15 @@ describe('2048', () => {
 })
 
 describe('snake', () => {
+  /** Food placement is snake's only randomness, and `chaseFood` is greedy with no
+   *  lookahead — so on an unlucky spawn sequence it walls itself in a cell or two
+   *  short of ten (about 1 seed in 200: 107 of 20 000 sampled). Seeded for the same
+   *  reason 2048 is; any seed that reaches ten will do, and this one does. */
+  const SEED = 0x5a4e
+  beforeEach(() => {
+    vi.spyOn(Math, 'random').mockImplementation(generator(SEED))
+  })
+
   interface Point {
     x: number
     y: number
