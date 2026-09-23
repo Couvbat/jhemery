@@ -3,7 +3,7 @@ import { computed, defineAsyncComponent, onUnmounted, watchEffect, type Componen
 import { RouterLink, useRoute } from 'vue-router'
 import { findView, profile } from '@/content'
 import { useLocale } from '@/i18n'
-import { findTool, tools, type ToolMeta, type ToolTier } from '@/tools/registry'
+import { findTool, visibleTools, type ToolMeta, type ToolTier } from '@/tools/registry'
 
 const route = useRoute()
 const { t, m } = useLocale()
@@ -28,6 +28,7 @@ function panelFor(meta: ToolMeta): Component {
   return created
 }
 const panel = computed(() => (tool.value ? panelFor(tool.value) : null))
+const listed = computed(() => visibleTools())
 
 const TIER_LABEL: Record<ToolTier, keyof typeof m.tools> = {
   client: 'tierClient',
@@ -74,7 +75,7 @@ onUnmounted(() => {
       </p>
 
       <ul class="grid gap-4 sm:grid-cols-2" :aria-label="t(m.tools.list)">
-        <li v-for="entry in tools" :key="entry.id">
+        <li v-for="entry in listed" :key="entry.id">
           <RouterLink
             :to="`/tools/${entry.id}`"
             class="group block h-full rounded border bg-card overflow-hidden transition-colors"

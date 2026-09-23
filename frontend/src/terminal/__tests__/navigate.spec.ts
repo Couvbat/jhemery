@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it } from 'vitest'
 import type { Localised } from '@/content/types'
 import { activeView } from '@/composables/useViewSwing'
-import { tools } from '@/tools/registry'
+import { tools, visibleTools } from '@/tools/registry'
 import { navigateCommands } from '../commands/navigate'
 import { toolCommands } from '../commands/tools'
 import type { Command, CommandContext, OutputLine } from '../types'
@@ -103,10 +103,15 @@ describe('ls', () => {
     expect(text.some((t) => t.startsWith('projects/'))).toBe(true)
   })
 
-  it('lists every tool for ls tools, and one for ls tools/<id>', async () => {
+  it('lists every visible tool for ls tools, and one for ls tools/<id>', async () => {
     const { text } = await run('ls', 'tools')
-    expect(text).toHaveLength(tools.length)
-    for (const tool of tools) expect(text.some((t) => t.startsWith(tool.id))).toBe(true)
+    // The admin tier is not in the listing until the owner unlocks it — but it does
+    // exist, so `ls tools/download` still finds it.
+    expect(text).toHaveLength(visibleTools().length)
+    expect(visibleTools().length).toBe(tools.length - 1)
+    for (const tool of visibleTools()) expect(text.some((t) => t.startsWith(tool.id))).toBe(true)
+    expect(text.some((t) => t.startsWith('download'))).toBe(false)
+    expect((await run('ls', 'tools/download')).text).toHaveLength(1)
 
     expect((await run('ls', 'tools/json')).text).toHaveLength(1)
   })
@@ -132,9 +137,10 @@ describe('pwd', () => {
 })
 
 describe('tools', () => {
-  it('lists every tool with its description', async () => {
+  it('lists every visible tool with its description', async () => {
     const { text } = await run('tools')
-    for (const tool of tools) {
+    expect(text.some((t) => t.startsWith('download'))).toBe(false)
+    for (const tool of visibleTools()) {
       expect(text.some((t) => t.startsWith(tool.id) && t.includes(tool.description.en))).toBe(true)
     }
   })
@@ -153,7 +159,7 @@ describe('tools', () => {
 
   it('completes tool ids', () => {
     expect(command('tools').complete!({ args: [''], index: 0, word: '' })).toEqual(
-      tools.map((t) => t.id),
+      visibleTools().map((t) => t.id),
     )
   })
 

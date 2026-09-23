@@ -340,6 +340,45 @@ export const messages = {
       fr: "Le ré-encodage vidéo est du WebAssembly mono-thread : comptez quelques fois la durée du clip sur un portable, plus sur un téléphone. L'audio, et le préréglage copy, sont rapides.",
     },
   },
+  toolDownload: {
+    locked: {
+      en: 'This tool is the owner’s. Unlock it with the admin password — or `sudo -i` in the terminal.',
+      fr: "Cet outil est celui du propriétaire. Déverrouillez-le avec le mot de passe admin — ou `sudo -i` dans le terminal.",
+    },
+    password: { en: 'admin password', fr: 'mot de passe admin' },
+    unlock: { en: 'unlock', fr: 'déverrouiller' },
+    lock: { en: 'lock', fr: 'verrouiller' },
+    wrong: { en: 'Sorry, try again.', fr: 'Désolé, réessayez.' },
+    unreachable: {
+      en: 'The API cannot be reached to check that.',
+      fr: "Impossible de joindre l'API pour vérifier.",
+    },
+    off: {
+      en: 'The downloader is off on this deployment — DOWNLOADER_ENABLED, and yt-dlp on the box.',
+      fr: 'Le téléchargeur est désactivé sur ce déploiement — DOWNLOADER_ENABLED, et yt-dlp sur la machine.',
+    },
+    intro: {
+      en: 'One YouTube video or one SoundCloud track per job — never a set or a profile, which is how this host earned an hour-long block. The server fetches it as mp3, hands it over once, and deletes it.',
+      fr: "Une vidéo YouTube ou un morceau SoundCloud par tâche — jamais une playlist ni un profil, c'est ainsi que cet hébergeur s'est fait bloquer une heure. Le serveur le récupère en mp3, le remet une fois, puis l'efface.",
+    },
+    url: { en: 'YouTube or SoundCloud link', fr: 'lien YouTube ou SoundCloud' },
+    start: { en: 'download', fr: 'télécharger' },
+    starting: { en: 'starting…', fr: 'démarrage…' },
+    jobs: { en: 'Downloads', fr: 'Téléchargements' },
+    queued: { en: 'queued', fr: 'en attente' },
+    running: { en: 'downloading', fr: 'téléchargement' },
+    done: { en: 'ready', fr: 'prêt' },
+    failed: { en: 'failed', fr: 'échec' },
+    fetch: { en: 'save', fr: 'enregistrer' },
+    fetching: { en: 'fetching…', fr: 'récupération…' },
+    cancel: { en: 'cancel', fr: 'annuler' },
+    remove: { en: 'dismiss', fr: 'fermer' },
+    empty: { en: 'No downloads yet.', fr: 'Aucun téléchargement.' },
+    ttl: {
+      en: 'A file waits on the server for 30 minutes at most, and is gone the moment it is saved.',
+      fr: "Un fichier attend au plus 30 minutes sur le serveur, et disparaît dès qu'il est enregistré.",
+    },
+  },
   rooms: {
     introWatch: {
       en: 'A watch party: one code, one YouTube video, everyone at the same second. The host presses play; every other player follows.',

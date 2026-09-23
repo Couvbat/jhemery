@@ -46,6 +46,11 @@ unconfigured rather than failing.
 | `GET /rooms/:code/events` | `rooms` | SSE of the same snapshot on every change, plus a 25 s heartbeat. Subscribing *is* membership. |
 | `POST /rooms/:code/state` | `rooms` | Host only (`x-room-token`): media, position, playing, queue. 120/min per IP. |
 | `DELETE /rooms/:code` | `rooms` | Host only: ends the room for everyone. |
+| `GET /jobs` | `jobs` | Admin only (`x-admin-password`): `{ configured, jobs }`. Doubles as the frontend's password check. |
+| `POST /jobs` | `jobs` | Admin only: start a yt-dlp job for one video or one track. 202 with the job. 20/hour per IP. |
+| `GET /jobs/:id` | `jobs` | Admin only: poll. |
+| `GET /jobs/:id/file` | `jobs` | Admin only: the mp3, streamed once and then deleted. |
+| `DELETE /jobs/:id` | `jobs` | Admin only: cancel a running job, or dismiss a finished one. |
 
 Every optional integration degrades instead of erroring: no Steam key hides live activity, no
 GitHub token drops the heatmap and pinned repos, an unreachable model makes the terminal say the
@@ -118,6 +123,28 @@ relays what a host loads to everyone in the room.
   token is random, compared in constant time, returned once at creation and never again.
 - Playback state carries the server clock (`at`); a bare `{ playing: false }` pauses where the item
   actually is, because the position is recomputed to now rather than copied.
+
+## `jobs`
+
+Disabled unless `DOWNLOADER_ENABLED=true` — it spawns a process on a shared host and writes to
+disk. Every route is behind `AdminGuard` (`x-admin-password` against `ADMIN_PASSWORD`, constant
+time, unset means locked).
+
+- A download is a **job, not a request**: `POST` returns at once with an id, the page polls, the
+  file is streamed exactly once and deleted. A request that waited for yt-dlp would die at
+  Passenger's timeout and come back from Cloudflare as a 524 — the wall `ask` already hit.
+- The runner is what the shell check in `docs/deploy.md` found, as defaults: `~/ytdlp/bin/yt-dlp`
+  (the venv; the PyInstaller binary cannot run because `/tmp` is `noexec`), `~/bin` for the static
+  ffmpeg, and the app's own `process.execPath` as yt-dlp's JS runtime (YouTube wants one). Each
+  is an env var when the box differs. `TMPDIR` is moved under `DATA_DIR` for the same `noexec`
+  reason.
+- What it will fetch is an allowlist of URL shapes (`jobs.urls.ts`): one YouTube video, one
+  SoundCloud track. Never a set or a profile — yt-dlp walks those, hundreds of requests in a
+  minute, and that earned the host's IP an hour-long 403 during the check.
+- One job runs at a time, three may be pending, ten minutes each, 200 MB at most, files gone
+  30 minutes after they are produced if never fetched, the whole `DATA_DIR/jobs` emptied on boot.
+- Progress is read from yt-dlp's own `[download] 42.7%` lines; a failure keeps its last `ERROR`
+  line, never the whole log.
 
 ## Tests
 

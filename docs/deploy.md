@@ -372,6 +372,16 @@ which python3 ffmpeg xz; python3 --version; ls /opt/alt | grep -i python; ulimit
 
 Use a single track for the SoundCloud line. Using a profile is how the block above was earned.
 
+### Turning the downloader on
+
+In the server's `.env`: `DOWNLOADER_ENABLED=true`, and `ADMIN_PASSWORD` set — the tool is behind
+it end to end. The defaults match this section (`~/ytdlp/bin/yt-dlp`, `~/bin` for ffmpeg, the
+app's own node as yt-dlp's JS runtime), so `YTDLP_BIN`, `FFMPEG_LOCATION` and `JS_RUNTIME` only
+need setting if those move. Files land under `DATA_DIR/jobs`, which the deploy never touches;
+they are deleted once fetched or 30 minutes after they were produced, and the directory is
+emptied on every app start. `~/ytdlp/bin/pip install -U "yt-dlp[default,curl-cffi]"` is the
+upgrade, and the thing to try first when YouTube starts refusing.
+
 ## Known gaps
 
 - ~~**The automated backend deploy has never completed a run.**~~ **Fixed 4 August 2026.** Ten runs died before the transfer; the last of them never reached SSH at all, because the whitelist was full of leaked runner addresses, `add` was refused, and an unchecked `curl` let the run walk into a two-minute SSH timeout. Both were fixed in [backend-deploy.yml](../.github/workflows/backend-deploy.yml) and the deploy has completed cleanly on every run since — see [Verified in production](#verified-in-production).

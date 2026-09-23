@@ -1,7 +1,7 @@
 import { profile, sectionIds, sections, socials, viewIds, views } from '@/content'
 import { currentPath, resolvePath } from '@/composables/useViewSwing'
 import { prefersReducedMotion } from '@/composables/useCrt'
-import { tools } from '@/tools/registry'
+import { visibleTools } from '@/tools/registry'
 import { announce, toast, visitSection } from '../achievements'
 import { diffLines, hasChanges } from '../diff'
 import { sleep } from '../timing'
@@ -30,7 +30,7 @@ function destinations(): string[] {
   return [
     ...sectionIds,
     ...viewIds.filter((id) => id !== 'home'),
-    ...tools.map((tool) => `tools/${tool.id}`),
+    ...visibleTools().map((tool) => `tools/${tool.id}`),
   ]
 }
 
@@ -56,7 +56,7 @@ export const navigateCommands: Command[] = [
           return [line(`ls: cannot access '${target}': No such file or directory`, 'error')]
         }
         if (resolved.kind === 'view' && resolved.view.id === 'tools') {
-          const listed = resolved.tool ? [resolved.tool] : tools
+          const listed = resolved.tool ? [resolved.tool] : visibleTools()
           return listed.map((tool) =>
             segmented([
               { text: tool.id.padEnd(10), tone: 'primary' },

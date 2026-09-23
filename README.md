@@ -276,6 +276,11 @@ panel with its own tests.
   you press the button, from this site's own `/assets/`, and stays in the browser cache; the
   input is read in place from disk, so a multi-gigabyte file is fine. Single-threaded, so video
   is slow — audio is not.
+- **`download`** — the owner's tool, and the only one with a server behind it. yt-dlp on the box
+  turns one YouTube video or one SoundCloud track into an mp3, as a *job* the page polls, then
+  hands it over exactly once and deletes it. Hidden from the page until `sudo -i` in the terminal
+  (or the panel's own field) unlocks it with the admin password. Never a set or a profile: walking
+  one is what got the host's IP blocked for an hour — see [deploy.md](docs/deploy.md).
 
 The list, the page and the terminal all read `src/tools/registry.ts`; adding a tool means adding
 one object there plus its folder. The rest of the plan — watch-party and radio rooms, an
@@ -357,10 +362,13 @@ limiter sees real clients behind Apache.
 | `GET /rooms` · `POST /rooms` | Whether rooms are on, and a new watch or radio room: a five-character code plus a host token that never travels again. 10 rooms/hour per IP, 200 rooms at most, all in memory. Disabled by default. |
 | `GET /rooms/:code` · `GET /rooms/:code/events` | A room's snapshot, and the SSE stream every member holds: the host's playback state anchored to the server clock, the queue, and a head count — an integer, as for `/presence`, never who. |
 | `POST /rooms/:code/state` · `DELETE /rooms/:code` | The host's verb and the host's exit, both behind the `x-room-token` header. What a host may load is allowlisted server-side: an eleven-character YouTube id or an https soundcloud.com URL, nothing else reaches a guest's iframe. 120 state changes/min per IP. |
+| `GET /jobs` · `POST /jobs` | Owner only (`x-admin-password`, every route): the downloader's state, and a new job for one YouTube video or one SoundCloud track — an allowlist of URL shapes, a set or a profile is refused. yt-dlp runs on the box as a background process and the request returns at once with an id. 20/hour per IP, three pending at most, one running, ten minutes per job. Disabled by default. |
+| `GET /jobs/:id` · `GET /jobs/:id/file` · `DELETE /jobs/:id` | Poll; fetch once — the file is deleted as the response completes, or 30 minutes after it was produced; cancel or dismiss. |
 
 Everything optional degrades gracefully: no Steam key hides live activity, no GitHub token drops the
 heatmap, no `GITHUB_REPO` drops the build-status card, an unreachable model makes the terminal say
-it's asleep and point at `mail`, rooms left off make the watch and radio pages say so.
+it's asleep and point at `mail`, rooms left off make the watch and radio pages say so, a downloader
+left off makes its panel say so once unlocked.
 
 See `backend/.env.example` — it documents every variable, including why the risky ones are off by
 default.

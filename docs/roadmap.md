@@ -157,7 +157,7 @@ slices in [`superpowers/plans/2026-09-22-tools-and-views.md`](superpowers/plans/
 | [x] | Client tools, vol. 2 | `colour`, `time`, `password` (diceware from the games' word lists), `text`. Pure additions to the registry. | `tools/*` | S each |
 | [x] | `ffmpeg.wasm` tier | The accepted dependency exception. Single-thread core served from our own `/assets/` (CSP stays `'self'`, plus `'wasm-unsafe-eval'`), fetched only on an explicit "download 32 MB" button, loader and worker kept out of the precache like three.js, input read in place over WORKERFS, ffprobe for the stream facts. COOP/COEP for the multi-thread core deliberately not done: it would break the SoundCloud embed on the same document. | `tools/ffmpeg/`, `vite.config.ts`, `.htaccess`, `third-party.ts` | M |
 | [x] | Rooms (`watch`, `radio`) | SSE + POST, in-memory with a two-hour idle TTL and a cap of 200, `ROOMS_ENABLED` off by default, media allowlisted server-side. Both embeds driven over `postMessage` — no YouTube or SoundCloud script on the page, one `frame-src` added. Third and fourth faces of the prism; `cd watch/<code>` joins. | `backend/src/rooms/*`, `frontend/src/rooms/*`, `views/{Watch,Radio}View.vue` | L |
-| [ ] | Downloader (admin) | Only after `which python3 ffmpeg` on the o2switch shell. A **job** API (start / poll / fetch-once), never a long request; runner on the box or relayed to one the owner controls; `DOWNLOADER_ENABLED`. | `backend/src/jobs/*`, `tools/download/` | L |
+| [x] | Downloader (admin) | The shell check said the box can run it, so it does: a **job** API (start / poll / fetch-once), yt-dlp spawned with the check's findings as defaults, URLs allowlisted to one video or one track, `AdminGuard` on every route, `DOWNLOADER_ENABLED` off by default. Unlocked by `sudo -i`; hidden from every listing until then. | `backend/src/jobs/*`, `backend/src/common/admin.guard.ts`, `frontend/src/lib/admin.ts`, `tools/download/` | L |
 
 ## Build order
 
@@ -181,8 +181,8 @@ weather-linked background mood), `feat/phase-3-markets` (`btc`/`stonks`),
 Every row in §A–D is ticked.
 
 **Phase 5 — views and tools (§F):** ✅ slice 1 on `feat/tools-and-views` → `dev` (#78), ✅ slice 2 on
-`feat/tools-client-vol2` → `dev` (#80), ✅ slice 3 on `feat/tools-ffmpeg` → `dev` (#81), slice 4 on
-`feat/rooms` → `dev`; the downloader remains, on its own branch.
+`feat/tools-client-vol2` → `dev` (#80), ✅ slice 3 on `feat/tools-ffmpeg` → `dev` (#81), ✅ slice 4 on
+`feat/rooms` → `dev` (#82), slice 5 on `feat/downloader` → `dev` — the last of the plan.
 
 **Phase 4 — games, vol. 2 (§E):** in progress on `claude/game-ideas-ec3dc5` → `dev`.
 The three shared prerequisites first (they touch code all five games read), then `minesweeper`,

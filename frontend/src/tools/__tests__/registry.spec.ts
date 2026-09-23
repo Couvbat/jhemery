@@ -1,5 +1,10 @@
-import { describe, expect, it } from 'vitest'
-import { findTool, tools } from '../registry'
+import { describe, expect, it, vi } from 'vitest'
+import { findTool, tools, visibleTools } from '../registry'
+
+const admin = vi.hoisted(() => ({ unlocked: false }))
+vi.mock('@/lib/admin', () => ({
+  isAdmin: { get value() { return admin.unlocked } },
+}))
 
 /**
  * The same invariants `registry.spec.ts` holds the commands to: the page, `ls tools`,
@@ -24,6 +29,18 @@ describe('tool registry', () => {
       expect(tool.description.en, tool.id).toBeTruthy()
       expect(tool.description.fr, tool.id).toBeTruthy()
     }
+  })
+
+  it('hides the admin tier until the owner unlocks it, and never hides it from findTool', () => {
+    admin.unlocked = false
+    expect(visibleTools().map((t) => t.id)).not.toContain('download')
+    expect(visibleTools().every((t) => t.tier !== 'admin')).toBe(true)
+    expect(findTool('download')?.tier).toBe('admin')
+
+    admin.unlocked = true
+    expect(visibleTools().map((t) => t.id)).toContain('download')
+    expect(visibleTools()).toHaveLength(tools.length)
+    admin.unlocked = false
   })
 
   it('finds a tool by id, forgiving a trailing slash and case', () => {
