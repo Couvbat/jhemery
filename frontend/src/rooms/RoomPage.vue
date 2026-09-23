@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onUnmounted, ref, watch, watchEffect } from 'vue'
+import { computed, onUnmounted, ref, watch } from 'vue'
 import { RouterLink, useRoute, useRouter } from 'vue-router'
 import { findView, profile } from '@/content'
 import { useLocale } from '@/i18n'
@@ -202,14 +202,6 @@ const link = computed(() => `${window.location.origin}${view.path}/${code.value 
 const intro = computed(() => t(props.kind === 'watch' ? m.rooms.introWatch : m.rooms.introRadio))
 const inputLabel = computed(() => t(props.kind === 'watch' ? m.rooms.inputWatch : m.rooms.inputRadio))
 const badLink = computed(() => t(props.kind === 'watch' ? m.rooms.badLinkWatch : m.rooms.badLinkRadio))
-
-const originalTitle = document.title
-watchEffect(() => {
-  document.title = `${t(view.heading)}${code.value ? ` · ${code.value}` : ''} — ${profile.name}`
-})
-onUnmounted(() => {
-  document.title = originalTitle
-})
 </script>
 
 <template>

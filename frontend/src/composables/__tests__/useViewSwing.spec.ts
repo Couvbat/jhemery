@@ -20,6 +20,7 @@ import {
   goTo,
   installViewSwing,
   resolvePath,
+  untilSettled,
   useViewSwing,
   type SwingRouter,
 } from '../useViewSwing'
@@ -66,22 +67,23 @@ function fakeRouter(initial = '/') {
 }
 
 /** A hand-cranked requestAnimationFrame: nothing runs until `advance()` is called. */
-let frames: FrameRequestCallback[] = []
+let frames = new Map<number, FrameRequestCallback>()
+let lastFrame = 0
 function advance(time: number) {
-  const due = frames
-  frames = []
+  const due = [...frames.values()]
+  frames = new Map()
   for (const callback of due) callback(time)
 }
 
 beforeEach(() => {
   motion.reduced = false
-  frames = []
+  frames = new Map()
   scrolled.mockClear()
   vi.stubGlobal('requestAnimationFrame', (callback: FrameRequestCallback) => {
-    frames.push(callback)
-    return frames.length
+    frames.set(++lastFrame, callback)
+    return lastFrame
   })
-  vi.stubGlobal('cancelAnimationFrame', () => {})
+  vi.stubGlobal('cancelAnimationFrame', (id: number) => frames.delete(id))
 })
 
 describe('resolvePath', () => {
@@ -137,7 +139,7 @@ describe('installViewSwing', () => {
 
     expect(activeView.value).toBe('tools')
     expect(useViewSwing().swinging.value).toBe(false)
-    expect(frames).toHaveLength(0)
+    expect(frames.size).toBe(0)
   })
 
   it('swings forward to a later face and reaches exactly one', () => {
@@ -199,7 +201,7 @@ describe('installViewSwing', () => {
     const { swing, swinging } = useViewSwing()
     expect(swinging.value).toBe(false)
     expect(swing.value).toBe(1)
-    expect(frames).toHaveLength(0)
+    expect(frames.size).toBe(0)
   })
 
   it('settles on a timer if the frames never come — a hidden tab must not stay fixed', () => {
@@ -219,6 +221,63 @@ describe('installViewSwing', () => {
     } finally {
       vi.useRealTimers()
     }
+  })
+
+  it('holds the page transition until the stage unfixes, then lets go in the same tick', () => {
+    const { router, push } = fakeRouter('/')
+    installViewSwing(router)
+    const { swinging } = useViewSwing()
+    void push('/tools')
+
+    // What App.vue's <Transition> hands over for the leaving and the arriving page.
+    // Let go a frame late, the leaving page sat in normal flow above the new one.
+    const face = document.createElement('main')
+    const leave = vi.fn()
+    const enter = vi.fn()
+    untilSettled(face, leave)
+    untilSettled(face, enter)
+
+    advance(0)
+    advance(SWING_MS - 1)
+    expect(swinging.value).toBe(true)
+    expect(leave).not.toHaveBeenCalled()
+
+    advance(SWING_MS)
+    expect(swinging.value).toBe(false)
+    expect(leave).toHaveBeenCalledOnce()
+    expect(enter).toHaveBeenCalledOnce()
+  })
+
+  it('lets the page transition go at once when nothing is turning', () => {
+    motion.reduced = true
+    const { router, push } = fakeRouter('/')
+    installViewSwing(router)
+    void push('/tools')
+
+    const done = vi.fn()
+    untilSettled(document.createElement('main'), done)
+    expect(done).toHaveBeenCalledOnce()
+  })
+
+  it('keeps a page from an interrupted swing until the swing that replaced it settles', () => {
+    const { router, push } = fakeRouter('/')
+    installViewSwing(router)
+    void push('/tools')
+    const first = vi.fn()
+    untilSettled(document.createElement('main'), first)
+    advance(0)
+    advance(SWING_MS / 2)
+
+    void push('/watch')
+    const second = vi.fn()
+    untilSettled(document.createElement('main'), second)
+    advance(SWING_MS)
+    advance(SWING_MS * 2 - 1)
+    expect(first).not.toHaveBeenCalled()
+
+    advance(SWING_MS * 2)
+    expect(first).toHaveBeenCalledOnce()
+    expect(second).toHaveBeenCalledOnce()
   })
 
   it('scrolls to the hash once the swing has settled and the stage has unfixed', async () => {
