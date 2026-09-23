@@ -51,13 +51,23 @@ onUnmounted(() => window.removeEventListener('scroll', onScroll))
         <span class="text-muted-foreground">~/</span>{{ profile.alias }}
       </button>
 
-      <!-- Desktop links -->
-      <ul class="hidden md:flex gap-1 items-center">
+      <!-- Desktop links.
+           `lg`, not `md`: six sections plus three pages plus the two buttons need
+           about 940px of bar, and the container is capped at `max-w-5xl` — 992px
+           inside its padding. At `md` the bar was 40px short of its own contents,
+           which pushed the language and achievement buttons off the right edge on a
+           1024-wide window, and split every link between its `./` and its label on
+           fonts a little wider than this one. Below `lg` the same destinations are
+           all in the menu below, `pages` included.
+           `gap-0.5` rather than `gap-1` for the same reason: it buys 20px, which
+           takes the slack from 3% of the bar to 5%, and this broke on a machine
+           whose monospace renders a little wider than the one measured on. -->
+      <ul class="hidden lg:flex gap-0.5 items-center">
         <li v-for="s in sections" :key="s.id">
           <button
             @click="go(s.id)"
             :class="[
-              'px-3 py-1 text-sm rounded transition-colors',
+              'px-2 py-1 text-sm rounded whitespace-nowrap transition-colors',
               activeView === 'home' && activeSection === s.id
                 ? 'text-primary glow-green'
                 : 'text-muted-foreground hover:text-foreground',
@@ -73,7 +83,7 @@ onUnmounted(() => window.removeEventListener('scroll', onScroll))
             :href="v.path"
             :aria-current="activeView === v.id ? 'page' : undefined"
             :class="[
-              'inline-block px-3 py-1 text-sm rounded transition-colors',
+              'inline-block px-2 py-1 text-sm rounded whitespace-nowrap transition-colors',
               activeView === v.id
                 ? 'text-accent glow-cyan'
                 : 'text-muted-foreground hover:text-foreground',
@@ -106,7 +116,7 @@ onUnmounted(() => window.removeEventListener('scroll', onScroll))
       </ul>
 
       <!-- Mobile controls -->
-      <div class="flex items-center gap-2 md:hidden">
+      <div class="flex items-center gap-2 lg:hidden">
         <button
           @click="achievementsOpen = true"
           :aria-label="t(m.achievements.open)"
@@ -162,7 +172,7 @@ onUnmounted(() => window.removeEventListener('scroll', onScroll))
     </nav>
 
     <!-- Mobile menu -->
-    <div v-if="menuOpen" class="md:hidden border-t border-border bg-background">
+    <div v-if="menuOpen" class="lg:hidden border-t border-border bg-background">
       <ul class="flex flex-col px-4 py-2">
         <li v-for="s in sections" :key="s.id">
           <button
