@@ -1,9 +1,14 @@
 # Plan — views, the prism swing, and the tools page
 
+**Status: complete.** Slice 1 in PR #78, slice 2 in #80, slice 3 in #81, slice 4 in #82, slice 5 in
+#83. Two departures from the text below: the ffmpeg core turned out to be 32 MB, not 30, and the
+single-thread core was kept on purpose — COOP/COEP would break the SoundCloud embed — so no headers
+were added for `/tools/*`.
+
 Implements [the design spec](../specs/2026-09-22-tools-and-views-design.md). One branch per slice,
 each a PR into `dev`; the order is chosen so every slice leaves the site whole.
 
-## Slice 1 — `feat/tools-and-views` (this branch)
+## Slice 1 — `feat/tools-and-views`
 
 The page, the prism, and four client-side tools. Nothing here needs the backend.
 
