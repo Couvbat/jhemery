@@ -674,6 +674,24 @@ When enabled:
 
 Output is rendered as text in the terminal (never `v-html`), so a stored payload cannot execute.
 
+### `rooms` — `/rooms`, `/rooms/:code/events`, `/rooms/:code/state`
+
+The watch-party and radio pages (§11). SSE + POST, as `/presence` proved on this host; WebSockets
+stay rejected. Rules the code cites:
+
+- **Off by default** (`ROOMS_ENABLED`). `GET /rooms` reports the flag so the pages can say
+  "rooms are off here" rather than fail to create one.
+- **A room is a code, a state, a queue and a count.** No member list, no ids, nothing on disk;
+  in memory with a two-hour idle TTL and a cap of 200. The host token is the only secret: random,
+  returned once, compared in constant time, carried in `x-room-token`.
+- **Media is allowlisted per kind, server-side.** A YouTube id (eleven characters from its
+  alphabet) or an https URL on `soundcloud.com`. It becomes an iframe `src` on every guest's page,
+  so the host's page is not trusted to have checked it; the service 400s anything else, queue
+  items included.
+- **State is anchored to the server clock.** `{ media, position, playing, at }`; guests compute
+  `position + (now − at)` and seek when more than two seconds out. A patch without a position
+  recomputes it to now, so a bare pause lands where the item actually is.
+
 ---
 
 ## 9. Accessibility
@@ -741,4 +759,14 @@ this section only fixes the rules the code cites.
   multi-thread one needs COOP/COEP on the document, which would break the SoundCloud embed sharing
   it. Inputs are read in place over WORKERFS; stream facts come from `ffprobe` as JSON; `-ss` goes
   before `-i` and the length is `-t`.
+- **Rooms are the third and fourth faces** (`watch`, `radio`; `rooms/*`). One page component for
+  both, one composable for the network, one pure module for the maths; the kind picks the player
+  and the words. **No third-party script**: both embeds are driven over `postMessage` — the wire
+  protocol the YouTube IFrame API and the SoundCloud Widget API scripts would speak on the page's
+  behalf — so the CSP gains one `frame-src` and no `script-src`, exactly as `MusicSection` decided
+  for the SoundCloud widget. The players share one interface (`PlayerHandle`, `PlayerReading`);
+  the sync loop never knows which it drives. **Host and guest are one token apart**: the token
+  lives in `sessionStorage` keyed by code (a reload keeps hosting, a URL never carries it), and a
+  refused token demotes the tab to guest rather than retrying. Guests seek at most once per 1.5 s,
+  hosts coalesce changes for 250 ms and re-anchor every 15 s while playing. `cd watch/<code>` joins.
 

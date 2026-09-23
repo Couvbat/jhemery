@@ -65,6 +65,12 @@ describe('cd', () => {
     expect(text[0]).toBe('~/tools/image')
   })
 
+  it('joins a room by code, echoing it upper-case', async () => {
+    const { ctx, text } = await run('cd', 'watch/ab3de')
+    expect(ctx.navigated).toEqual(['watch/ab3de'])
+    expect(text[0]).toBe('~/watch/AB3DE')
+  })
+
   it('goes home on nothing, ~ or /, printing nothing', async () => {
     for (const args of [[], ['~'], ['/']]) {
       const { ctx, out } = await run('cd', ...args)
@@ -75,7 +81,7 @@ describe('cd', () => {
   })
 
   it('refuses what does not exist, without navigating', async () => {
-    for (const target of ['nope', 'tools/nope', 'projects/deeper']) {
+    for (const target of ['nope', 'tools/nope', 'projects/deeper', 'watch/abcd']) {
       const { ctx, out } = await run('cd', target)
       expect(ctx.navigated).toEqual([])
       expect(out[0]).toMatchObject({ tone: 'error', text: `cd: ${target}: No such file or directory` })

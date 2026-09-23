@@ -23,6 +23,18 @@ const router = createRouter({
       component: () => import('../views/ToolsView.vue'),
     },
     {
+      // A room code in the path is the same view with a room open, as a tool is for
+      // `/tools/:tool` — joining never turns the prism.
+      path: '/watch/:code?',
+      name: 'watch',
+      component: () => import('../views/WatchView.vue'),
+    },
+    {
+      path: '/radio/:code?',
+      name: 'radio',
+      component: () => import('../views/RadioView.vue'),
+    },
+    {
       // Needs the .htaccess rewrite in public/ to survive a hard refresh on Apache.
       path: '/:pathMatch(.*)*',
       name: 'not-found',

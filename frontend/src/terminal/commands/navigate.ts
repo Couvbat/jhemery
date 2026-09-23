@@ -82,7 +82,7 @@ export const navigateCommands: Command[] = [
   },
   {
     name: 'cd',
-    usage: 'cd <section|tools[/<tool>]>',
+    usage: 'cd <section|tools[/<tool>]|watch|radio[/<code>]>',
     description: { en: 'Jump to a section or a page', fr: 'Aller à une section ou une page' },
     group: 'navigate',
     complete: ({ index }) => (index === 0 ? destinations() : []),
@@ -98,13 +98,14 @@ export const navigateCommands: Command[] = [
         return [line(`~/${t(resolved.section.label)}`, 'muted'), ...unlocks]
       }
 
-      const { view, tool } = resolved
+      const { view, tool, code } = resolved
       if (view.id === 'home') {
         // `cd`, `cd ~`, `cd /`: the top of the page counts as visiting the first section.
         const unlocks = toast(visitSection(sections[0]!.id, sectionIds), t)
         return unlocks.length ? unlocks : undefined
       }
-      return [line(`~/${t(view.label)}${tool ? `/${tool.id}` : ''}`, 'muted')]
+      const child = tool?.id ?? code
+      return [line(`~/${t(view.label)}${child ? `/${child}` : ''}`, 'muted')]
     },
   },
   {
@@ -199,7 +200,9 @@ export const navigateCommands: Command[] = [
           ? resolved.section.id
           : resolved.tool
             ? `${resolved.tool.id}.${resolved.view.id}`
-            : resolved.view.id
+            : resolved.code
+              ? `${resolved.code.toLowerCase()}.${resolved.view.id}`
+              : resolved.view.id
       const host = `${name}.${profile.domain}`
       const times: number[] = []
       const replies: OutputLine[] = []

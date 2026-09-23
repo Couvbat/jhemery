@@ -44,7 +44,8 @@ async function bootstrap() {
     methods: ['GET', 'POST', 'DELETE'],
     // x-admin-password is what GuestbookController reads; the preflight for
     // DELETE /guestbook/:id fails in the browser if it is not listed here.
-    allowedHeaders: ['Content-Type', 'x-admin-password'],
+    // x-room-token is the same story for the rooms' host routes.
+    allowedHeaders: ['Content-Type', 'x-admin-password', 'x-room-token'],
   });
   // Apache fronts this app, so req.ip must come from X-Forwarded-For for the
   // per-IP rate limiter to see real clients rather than the proxy.

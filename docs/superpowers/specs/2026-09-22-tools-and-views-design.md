@@ -299,6 +299,16 @@ playback; guests receive state. Given SSE is proven on this host and WebSockets 
 - Behind `ROOMS_ENABLED`, off by default. These are the `watch` and `radio` views, the third and
   fourth faces of the prism.
 
+*As built (slice 4):* no IFrame API script after all. Both embeds answer the `postMessage`
+protocol their official scripts wrap — verified before building: YouTube reports `onReady`,
+`infoDelivery` (`currentTime`, `playerState`) and obeys `playVideo`/`seekTo`; the SoundCloud
+widget reports `ready`, `playProgress`, `seek`, `finish` and obeys `play`/`seekTo`. Driving them
+directly keeps every third-party script off this origin, as `MusicSection` already chose, and the
+CSP grows by one `frame-src` (`www.youtube-nocookie.com`) and nothing in `script-src`. The queue
+therefore advances on the widget's `finish` event, not a timer. State is one shape for both kinds
+(`media`, `position`, `playing`, `at`, plus a `queue`), media is allowlisted server-side per kind,
+and a room is a code, a state and a head count — no member list.
+
 ### 7. Everything a new route touches
 
 Found and small, listed so the checklist does not have to be rediscovered: a router entry

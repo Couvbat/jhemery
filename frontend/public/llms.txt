@@ -25,6 +25,8 @@
 ## Optional
 
 - [Tools](https://jhemery.xyz/tools): Small utilities that run in the browser — image conversion, hashes, encoders, a JSON formatter
+- [Watch party](https://jhemery.xyz/watch): Watch a YouTube video in sync with friends — one room code, the host drives, everyone follows
+- [Radio](https://jhemery.xyz/radio): A shared SoundCloud queue, one track at a time, everyone hearing the same second
 - [Hardware](https://jhemery.xyz/#hardware): PCs, NAS and peripherals
 - [Gaming](https://jhemery.xyz/#gaming): Currently playing and favourite genres
 - [Sitemap](https://jhemery.xyz/sitemap.xml)

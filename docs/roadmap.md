@@ -156,7 +156,7 @@ slices in [`superpowers/plans/2026-09-22-tools-and-views.md`](superpowers/plans/
 | [x] | Client tools, vol. 1 | `image` (canvas re-encode, strips EXIF), `hash` (Web Crypto), `encode` (base64/url/hex), `json` (format/minify with a scanner that points at the error). | `tools/{image,hash,encode,json}/` | M |
 | [x] | Client tools, vol. 2 | `colour`, `time`, `password` (diceware from the games' word lists), `text`. Pure additions to the registry. | `tools/*` | S each |
 | [x] | `ffmpeg.wasm` tier | The accepted dependency exception. Single-thread core served from our own `/assets/` (CSP stays `'self'`, plus `'wasm-unsafe-eval'`), fetched only on an explicit "download 32 MB" button, loader and worker kept out of the precache like three.js, input read in place over WORKERFS, ffprobe for the stream facts. COOP/COEP for the multi-thread core deliberately not done: it would break the SoundCloud embed on the same document. | `tools/ffmpeg/`, `vite.config.ts`, `.htaccess`, `third-party.ts` | M |
-| [ ] | Rooms (`watch`, `radio`) | SSE + POST, in-memory with TTL, `ROOMS_ENABLED` off by default; YouTube IFrame API and the SoundCloud iframe; third and fourth faces of the prism. | `backend/src/rooms/*`, `views/{Watch,Radio}View.vue` | L |
+| [x] | Rooms (`watch`, `radio`) | SSE + POST, in-memory with a two-hour idle TTL and a cap of 200, `ROOMS_ENABLED` off by default, media allowlisted server-side. Both embeds driven over `postMessage` — no YouTube or SoundCloud script on the page, one `frame-src` added. Third and fourth faces of the prism; `cd watch/<code>` joins. | `backend/src/rooms/*`, `frontend/src/rooms/*`, `views/{Watch,Radio}View.vue` | L |
 | [ ] | Downloader (admin) | Only after `which python3 ffmpeg` on the o2switch shell. A **job** API (start / poll / fetch-once), never a long request; runner on the box or relayed to one the owner controls; `DOWNLOADER_ENABLED`. | `backend/src/jobs/*`, `tools/download/` | L |
 
 ## Build order
@@ -181,8 +181,8 @@ weather-linked background mood), `feat/phase-3-markets` (`btc`/`stonks`),
 Every row in §A–D is ticked.
 
 **Phase 5 — views and tools (§F):** ✅ slice 1 on `feat/tools-and-views` → `dev` (#78), ✅ slice 2 on
-`feat/tools-client-vol2` → `dev` (#80), slice 3 on `feat/tools-ffmpeg` → `dev`; the remaining rows one
-branch each, in the table's order.
+`feat/tools-client-vol2` → `dev` (#80), ✅ slice 3 on `feat/tools-ffmpeg` → `dev` (#81), slice 4 on
+`feat/rooms` → `dev`; the downloader remains, on its own branch.
 
 **Phase 4 — games, vol. 2 (§E):** in progress on `claude/game-ideas-ec3dc5` → `dev`.
 The three shared prerequisites first (they touch code all five games read), then `minesweeper`,

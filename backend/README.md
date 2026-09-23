@@ -40,6 +40,12 @@ unconfigured rather than failing.
 | `GET /guestbook` | `guestbook` | Newest 25 entries. |
 | `POST /guestbook` | `guestbook` | Sign. 1/min per IP. |
 | `DELETE /guestbook/:id` | `guestbook` | Moderation; requires the `x-admin-password` header. |
+| `GET /rooms` | `rooms` | `{ enabled }` — the feature flag, so the pages can say so. |
+| `POST /rooms` | `rooms` | Create a `watch` or `radio` room; returns the code and the host token. 10/hour per IP. |
+| `GET /rooms/:code` | `rooms` | Snapshot: state, queue, member count. |
+| `GET /rooms/:code/events` | `rooms` | SSE of the same snapshot on every change, plus a 25 s heartbeat. Subscribing *is* membership. |
+| `POST /rooms/:code/state` | `rooms` | Host only (`x-room-token`): media, position, playing, queue. 120/min per IP. |
+| `DELETE /rooms/:code` | `rooms` | Host only: ends the room for everyone. |
 
 Every optional integration degrades instead of erroring: no Steam key hides live activity, no
 GitHub token drops the heatmap and pinned repos, an unreachable model makes the terminal say the
@@ -96,6 +102,22 @@ Disabled unless `GUESTBOOK_ENABLED=true` — it is a publicly writable field.
 - Writes are serialised through a queue and written via rename, so two concurrent signings can't
   clobber each other.
 - `DELETE /guestbook/:id` refuses outright unless `ADMIN_PASSWORD` is set.
+
+## `rooms`
+
+Disabled unless `ROOMS_ENABLED=true` — a public endpoint that holds a connection per guest and
+relays what a host loads to everyone in the room.
+
+- In memory: a `Map` of rooms and an RxJS `Subject` each. 200 rooms at most, each gone two hours
+  after its last host action or arrival/departure; a restart empties them all, by design.
+- What a host may load is an allowlist per kind, checked in the service, not a sanitiser: eleven
+  characters from YouTube's id alphabet for `watch`, an https URL on `soundcloud.com` for `radio`.
+  The string ends up as an iframe `src` on every member's page, which is why the host's own page
+  is not trusted to have checked it.
+- A room knows nothing about its members but how many there are — the `/presence` rule. The host
+  token is random, compared in constant time, returned once at creation and never again.
+- Playback state carries the server clock (`at`); a bare `{ playing: false }` pauses where the item
+  actually is, because the position is recomputed to now rather than copied.
 
 ## Tests
 

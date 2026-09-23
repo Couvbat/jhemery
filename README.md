@@ -53,9 +53,11 @@ docs/       design specs and implementation plans
 | **Status ticker** | The footer carries the same uptime `neofetch` reports (days since the first commit) plus how long ago this build shipped, re-read on a slow tick so a long-open tab stays honest. |
 | **Live presence** | The same line says how many people are here right now, over SSE, moving as visitors arrive and leave. An aggregate count and nothing else — see the API table below. |
 | **Sections** | about · projects · music · gaming · hardware · contact — defined once in `src/content/sections.ts` and consumed by the navbar, the terminal's `ls`/`cd`/`pwd`, the command palette and every section header. |
-| **Views** | home · tools — the routes, defined once in `src/content/views.ts` one level above the sections, in the order they sit on the prism. `cd tools`, the navbar's `./tools` and Ctrl+K all go through one `goTo()`, which knows to route home first when you ask for a section from another page. |
+| **Views** | home · tools · watch · radio — the routes, defined once in `src/content/views.ts` one level above the sections, in the order they sit on the prism. `cd tools`, the navbar's `./tools` and Ctrl+K all go through one `goTo()`, which knows to route home first when you ask for a section from another page. |
 | **Prism swing** | Changing view turns the page like a face of a prism whose axis runs through the centre of the three.js scene: the leaving page rotates out, the new one rotates in from the same side, both in 3D CSS on a stage that is fixed and clipped for the 650 ms it takes, while the navbar and launcher stay put. Back turns it the other way. Under `prefers-reduced-motion` the pages simply swap. Works with no three.js loaded. |
 | **Tools page** | `/tools` — small utilities that run entirely in the browser, one lazy chunk each, listed from `src/tools/registry.ts`. See [Tools](#tools). |
+| **Watch party** | `/watch` — a room is a five-character code. The host pastes a YouTube link; every guest's player follows the host's play, pause and seeks to within two seconds, correcting drift against the server's clock. The embed is driven over `postMessage`, so no YouTube script runs on the page; the CSP gains one `frame-src`. Off unless the API sets `ROOMS_ENABLED`. |
+| **Radio** | `/radio` — the same room with the SoundCloud widget and a queue: the host lines up tracks or sets, the queue advances when one ends, and everyone hears the same second. Same `postMessage` approach as the site's music player. |
 | **Live cards** | Steam "currently playing", GitHub recent commits, latest CI runs, contribution heatmap and pinned repos, SoundCloud player, guestbook. |
 | **Guestbook ticker** | A 20s poll (not SSE — see [the spec](docs/features-spec.md#8-backend-additions)) surfaces anyone who signs while you're on the page, as a floating notice that opens `guestbook` when clicked. Skipped while the tab is hidden, and it gives up if the guestbook is off. |
 | **Command palette** | `Ctrl/⌘+K` — fuzzy list of sections and palette-flagged commands, arrow-key navigable with the selection kept in view. |
@@ -111,8 +113,8 @@ two different contents.
 | Command | Usage |
 |---|---|
 | `ls` | `ls [-a] [path]` — list sections, pages and files (`-a` shows more than you were meant to see); `ls tools` lists the tools |
-| `cd` | `cd <section>` scrolls the page there (from another page it routes home first); `cd tools` and `cd tools/<tool>` open the tools page or one tool; `cd`, `cd ~`, `cd /` go home |
-| `pwd` | Print where you are — `/home/couvbat/projects` on the page, `/home/couvbat/tools/image` with a tool open |
+| `cd` | `cd <section>` scrolls the page there (from another page it routes home first); `cd tools` and `cd tools/<tool>` open the tools page or one tool; `cd watch/<code>` and `cd radio/<code>` join a room; `cd`, `cd ~`, `cd /` go home |
+| `pwd` | Print where you are — `/home/couvbat/projects` on the page, `/home/couvbat/tools/image` with a tool open, `/home/couvbat/watch/AB3DE` in a room |
 | `tools` | `tools [<tool>]` — list the tools with their descriptions, or open one |
 | `cat` | `cat <file>` — `about.txt`, `skills.txt`, `contact.txt`, guestbook entries, … |
 | `diff` | `diff <file> <file>` — unified line diff of any two files in the fake filesystem |
@@ -352,10 +354,13 @@ limiter sees real clients behind Apache.
 | `GET /stats` · `POST /stats/session` | A single running total of terminal sessions opened. Counted once when you open the shell, never per command — the server never learns which commands anyone runs. 5/hour per IP. |
 | `GET /guestbook` · `POST /guestbook` | Read and sign. Sanitised, link-filtered, 1/min per IP, capped at 500 entries. Stored in a JSON file under `DATA_DIR`, or in MongoDB if `MONGODB_URI` is set. Disabled by default. |
 | `DELETE /guestbook/:id` | Moderation; requires the `x-admin-password` header. |
+| `GET /rooms` · `POST /rooms` | Whether rooms are on, and a new watch or radio room: a five-character code plus a host token that never travels again. 10 rooms/hour per IP, 200 rooms at most, all in memory. Disabled by default. |
+| `GET /rooms/:code` · `GET /rooms/:code/events` | A room's snapshot, and the SSE stream every member holds: the host's playback state anchored to the server clock, the queue, and a head count — an integer, as for `/presence`, never who. |
+| `POST /rooms/:code/state` · `DELETE /rooms/:code` | The host's verb and the host's exit, both behind the `x-room-token` header. What a host may load is allowlisted server-side: an eleven-character YouTube id or an https soundcloud.com URL, nothing else reaches a guest's iframe. 120 state changes/min per IP. |
 
 Everything optional degrades gracefully: no Steam key hides live activity, no GitHub token drops the
 heatmap, no `GITHUB_REPO` drops the build-status card, an unreachable model makes the terminal say
-it's asleep and point at `mail`.
+it's asleep and point at `mail`, rooms left off make the watch and radio pages say so.
 
 See `backend/.env.example` — it documents every variable, including why the risky ones are off by
 default.

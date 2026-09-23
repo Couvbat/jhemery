@@ -90,11 +90,15 @@
   #                cannot be enumerated ahead of time. This still blocks http:.
   #   connect-src  api.jhemery.xyz is the backend (contact form, guestbook, ask);
   #                'self' covers same-origin builds and the precached assets.
-  #   frame-src    w.soundcloud.com is the player embed in MusicSection.vue.
+  #   frame-src    w.soundcloud.com is the player embed in MusicSection.vue and
+  #                the radio rooms; www.youtube-nocookie.com is the watch-party
+  #                player. Both are driven over postMessage (src/rooms/*), so
+  #                neither needs a script-src entry — no third-party script runs
+  #                on this origin for them.
   #   object-src / base-uri / form-action are locked down because nothing here
   #                uses them, and each is a known way to turn a stray HTML
   #                injection into something worse.
-  Header always set Content-Security-Policy "default-src 'self'; script-src 'self' 'wasm-unsafe-eval' https://umami.jhemery.xyz; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self' data:; connect-src 'self' https://api.jhemery.xyz https://umami.jhemery.xyz; frame-src https://w.soundcloud.com; worker-src 'self'; manifest-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'; upgrade-insecure-requests"
+  Header always set Content-Security-Policy "default-src 'self'; script-src 'self' 'wasm-unsafe-eval' https://umami.jhemery.xyz; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self' data:; connect-src 'self' https://api.jhemery.xyz https://umami.jhemery.xyz; frame-src https://w.soundcloud.com https://www.youtube-nocookie.com; worker-src 'self'; manifest-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'; upgrade-insecure-requests"
 
   # Only files under /assets/ carry a content hash in their name, so they are the
   # only ones safe to freeze. Matching by extension instead would also freeze
