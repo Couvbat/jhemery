@@ -12,17 +12,18 @@ import { prefersReducedMotion } from './useCrt'
  *
  * One clock, three readers. The router starts a swing; `App.vue` binds `swing`,
  * `swingDirection` and `leaveScroll` as CSS custom properties on the stage that turns
- * the two pages; `ThreeBackground` reads the same `swing` to yaw the wireframe field
- * and dolly the camera. Because the easing is applied *here*, once, the page and the
- * background can never disagree on the curve. Same flag-and-watch shape as
- * `useSceneControl`: the router sets, the components only read.
+ * the two pages, and ends its `<Transition>` on `untilSettled`; `ThreeBackground` reads
+ * the same `swing` to yaw the wireframe field and dolly the camera. Because the easing
+ * is applied *here*, once, the page and the background can never disagree on the
+ * curve. Same flag-and-watch shape as `useSceneControl`: the router sets, the
+ * components only read.
  *
  * This module also owns `goTo()` — the one function the navbar, the palette and the
  * terminal's `navigate` all call — because it is the only place that knows both the
  * router and whether a section is on the page currently showing.
  */
 
-/** How long the prism takes to turn one face. `App.vue`'s `<Transition>` uses the same number. */
+/** How long the prism takes to turn one face. */
 export const SWING_MS = 650
 
 /** Which face is showing: a view id, or the raw path for anything the router sent to
@@ -46,6 +47,8 @@ export type SwingRouter = Pick<Router, 'afterEach' | 'currentRoute' | 'push'>
 
 let router: SwingRouter | null = null
 let frame: number | null = null
+/** The `<Transition>`'s own callbacks, held until the stage unfixes — see `untilSettled`. */
+let held: Array<() => void> = []
 
 function easeInOut(t: number): number {
   return t < 0.5 ? 2 * t * t : 1 - (-2 * t + 2) ** 2 / 2
@@ -63,7 +66,7 @@ export function startSwing(dir: 1 | -1): void {
   cancelFrame()
   if (prefersReducedMotion()) {
     swing.value = 1
-    swinging.value = false
+    rest()
     return
   }
 
@@ -95,10 +98,31 @@ export function startSwing(dir: 1 | -1): void {
  *  `scrollIntoView` would scroll *it* (a scroll offset that vanishes with the class)
  *  instead of the window. */
 function settle() {
-  swinging.value = false
+  rest()
   const hash = router?.currentRoute.value.hash
   if (!hash) return
   void nextTick().then(() => scrollToSection(hash.slice(1)))
+}
+
+/** Unfixes the stage and lets go of the faces in the same tick, so no frame is ever
+ *  painted with one and not the other. */
+function rest() {
+  swinging.value = false
+  const release = held
+  held = []
+  for (const done of release) done()
+}
+
+/**
+ * The `<Transition>`'s `enter` and `leave` hook. Taking `done` tells Vue to wait for
+ * it instead of running its own clock — two frames, then a timer — which ended a frame
+ * or so after `settle()` had already unfixed the stage: for that frame both pages sat
+ * in normal flow, and the one leaving flashed back, flat, above the one arriving.
+ * Released at once when nothing is turning (reduced motion swaps the pages instantly).
+ */
+export function untilSettled(_el: Element, done: () => void): void {
+  if (swinging.value) held.push(done)
+  else done()
 }
 
 function viewIdFor(path: string): string {
@@ -111,7 +135,7 @@ export function installViewSwing(instance: SwingRouter): void {
   // A fresh router means a fresh clock — nothing can be mid-turn.
   cancelFrame()
   swing.value = 1
-  swinging.value = false
+  rest()
   activeView.value = viewIdFor(instance.currentRoute.value.path)
 
   instance.afterEach((to, from, failure) => {

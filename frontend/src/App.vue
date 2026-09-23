@@ -9,8 +9,9 @@ import TerminalLauncher from '@/components/terminal/TerminalLauncher.vue'
 import { useKonami } from '@/composables/useKonami'
 import { restoreCrt, setCrt } from '@/composables/useCrt'
 import { useMatrix } from '@/composables/useMatrix'
+import { useTabTitle } from '@/composables/useTabTitle'
 import { terminalOpen } from '@/composables/useTerminalShell'
-import { SWING_MS, installViewSwing, useViewSwing } from '@/composables/useViewSwing'
+import { installViewSwing, untilSettled, useViewSwing } from '@/composables/useViewSwing'
 import { track } from '@/lib/analytics'
 import { unlock } from '@/terminal/achievements'
 import AchievementToast from '@/components/AchievementToast.vue'
@@ -37,10 +38,10 @@ const { matrixActive } = useMatrix()
 const showThreeBackground = ref(false)
 
 // The prism swing between views (features-spec §11). The router drives the clock;
-// the stage below only binds its values as CSS custom properties, and
-// `ThreeBackground` reads the same clock for the wireframes. Under reduced motion
-// the `<Transition>` is told there is no CSS to wait for, which in Vue means the
-// pages swap instantly — the composable never starts a tween in that case either.
+// the stage below only binds its values as CSS custom properties, its `<Transition>`
+// ends when that clock does (`untilSettled`), and `ThreeBackground` reads the same
+// clock for the wireframes. Under reduced motion the `<Transition>` puts no classes
+// on and the composable never starts a tween, so the pages swap instantly.
 installViewSwing(useRouter())
 const { swing, swingDirection, swinging, leaveScroll } = useViewSwing()
 const reducedMotion = useMediaQuery('(prefers-reduced-motion: reduce)')
@@ -49,6 +50,8 @@ const stageStyle = computed(() => ({
   '--swing-dir': String(swingDirection.value),
   '--leave-scroll': `${-leaveScroll.value}px`,
 }))
+
+useTabTitle()
 
 // Once true, stays true — TerminalOverlay is mounted for the rest of the session
 // (its own internal `open`/Transition handles every close/reopen after that) so
@@ -95,7 +98,7 @@ onMounted(() => {
   <div class="view-stage" :class="{ 'is-swinging': swinging }" :style="stageStyle">
     <div class="view-prism">
       <RouterView v-slot="{ Component }">
-        <Transition name="view" :css="!reducedMotion" :duration="SWING_MS">
+        <Transition name="view" :css="!reducedMotion" @enter="untilSettled" @leave="untilSettled">
           <component :is="Component" />
         </Transition>
       </RouterView>

@@ -136,11 +136,10 @@
   perspective: 1200px;
   transform-style: preserve-3d;
 }
-/* Scoped to the swinging stage on purpose: `is-swinging` is the one switch. Vue's
- * <Transition> removes its classes on its own clock (a requestAnimationFrame, then a
- * timer), which a hidden tab throttles to nothing, while the composable's deadline
- * still unfixes the stage — after which a leftover face class must mean nothing, or
- * the page would sit absolute and unclickable until the tab comes back. */
+/* Scoped to the swinging stage on purpose: `is-swinging` is the one switch. The
+ * <Transition> is held until the same tick the stage unfixes (`untilSettled`), so a
+ * face class should never outlive it — but if one ever did, it must mean nothing, or
+ * the page would sit absolute and unclickable. */
 .view-stage.is-swinging .view-enter-active,
 .view-stage.is-swinging .view-leave-active {
   position: absolute;

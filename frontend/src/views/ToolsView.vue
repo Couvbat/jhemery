@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, defineAsyncComponent, onUnmounted, watchEffect, type Component } from 'vue'
+import { computed, defineAsyncComponent, type Component } from 'vue'
 import { RouterLink, useRoute } from 'vue-router'
 import { findView, profile } from '@/content'
 import { useLocale } from '@/i18n'
@@ -35,16 +35,6 @@ const TIER_LABEL: Record<ToolTier, keyof typeof m.tools> = {
   wasm: 'tierWasm',
   admin: 'tierAdmin',
 }
-
-// The tab title follows the view; index.html's title is put back on the way out so
-// the home page keeps the one the crawlers and the OG tags describe.
-const originalTitle = document.title
-watchEffect(() => {
-  document.title = `${tool.value ? t(tool.value.name) : t(view.heading)} — ${profile.name}`
-})
-onUnmounted(() => {
-  document.title = originalTitle
-})
 </script>
 
 <template>
