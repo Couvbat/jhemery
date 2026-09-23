@@ -1,5 +1,6 @@
 import { expect, test } from './fixtures'
 import { sections } from '@/content/sections'
+import { views } from '@/content/views'
 import { messages } from '@/i18n/messages'
 
 /**
@@ -34,7 +35,7 @@ test.describe('sections', () => {
   }
 
   test('a navbar link scrolls to its section', async ({ page }) => {
-    // Desktop links are `hidden md:flex`; on the mobile project the same ids are
+    // Desktop links are `hidden lg:flex`; on the mobile project the same ids are
     // reached through the burger menu, covered below.
     test.skip(test.info().project.name === 'mobile', 'Covered by the burger-menu test.')
 
@@ -44,8 +45,46 @@ test.describe('sections', () => {
     await expect(page.locator('#contact')).toBeInViewport()
   })
 
+  test('the navbar fits its own bar, on one line', async ({ page }) => {
+    test.skip(test.info().project.name === 'mobile', 'The burger bar is one line by construction.')
+
+    // What this is really watching for: the bar grows a link for every section and
+    // every view, and its container is capped at `max-w-5xl` — so the room never
+    // exceeds 992px however wide the screen is. Once the links stop fitting, each one
+    // breaks between its `./` and its label and the bar silently becomes two rows, or
+    // the language and trophy buttons slide out past the edge. Nine destinations did
+    // exactly that at the old `md` breakpoint.
+    //
+    // The measurement is against the nav's *own* content box, not the viewport: at a
+    // desktop width the overflow spills into the centring margin and stays on screen,
+    // so a viewport check passes while the bar is visibly broken.
+    await page.goto('/')
+
+    const fit = await page.evaluate(() => {
+      const nav = document.querySelector('header nav')!
+      const ul = nav.querySelector('ul')!
+      const logo = nav.firstElementChild as HTMLElement
+      const style = getComputedStyle(nav)
+      const links = [...ul.querySelectorAll('li > a, li > button')] as HTMLElement[]
+      return {
+        room: nav.clientWidth - parseFloat(style.paddingLeft) - parseFloat(style.paddingRight),
+        needed: Math.round(logo.getBoundingClientRect().width + ul.scrollWidth),
+        tallestLink: Math.max(...links.map((l) => l.getBoundingClientRect().height)),
+        links: links.length,
+        headerHeight: document.querySelector('header')!.getBoundingClientRect().height,
+      }
+    })
+
+    expect(fit.needed).toBeLessThanOrEqual(fit.room)
+    // One line of 14px text sits well under this; two lines do not.
+    expect(fit.tallestLink).toBeLessThan(32)
+    expect(fit.headerHeight).toBeLessThan(72)
+    // Every section, every view but home, plus the language and trophy buttons.
+    expect(fit.links).toBe(sections.length + views.length - 1 + 2)
+  })
+
   test('the burger menu reaches every section on a phone', async ({ page }) => {
-    test.skip(test.info().project.name !== 'mobile', 'The burger is `md:hidden`.')
+    test.skip(test.info().project.name !== 'mobile', 'The burger is `lg:hidden`.')
 
     await page.getByRole('button', { name: messages.nav.toggleMenu.en }).click()
 
