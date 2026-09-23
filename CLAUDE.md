@@ -9,7 +9,8 @@ background. Two independent npm projects, no workspace/monorepo tooling:
 
 ```
 frontend/   Vue 3 + Vite + Tailwind 4 SPA (sections, terminal, games, achievements, PWA)
-backend/    NestJS API (ask, contact, steam, github, weather, markets, presence, stats, guestbook)
+backend/    NestJS API (ask, contact, steam, github, weather, markets, presence, stats, guestbook,
+            rooms, jobs)
 docs/       features-spec.md, roadmap.md, deploy.md; superpowers/{specs,plans} for the bigger pieces
 ```
 
@@ -109,8 +110,8 @@ user-supplied data (guestbook entries), so there is deliberately no markup escap
 
 ### Achievements
 
-30 entries in `terminal/achievements.ts`, persisted under `couvbat:achievements` in
-`localStorage`. `completionist` cascades off the other 29 and repaints the three.js palette.
+35 entries in `terminal/achievements.ts`, persisted under `couvbat:achievements` in
+`localStorage`. `completionist` cascades off the other 34 and repaints the three.js palette.
 Adding one means adding it to `achievementList` *and* the README's spoiler table.
 
 ### Backend: NestJS, one module per capability

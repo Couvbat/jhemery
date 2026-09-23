@@ -1,7 +1,11 @@
 # Roadmap — brainstormed features
 
-Status tracker for the three-category feature brainstorm (three.js background, terminal commands,
-live information). Built feature by feature, across sessions.
+Status tracker for the feature brainstorm: first three categories (three.js background, terminal
+commands, live information), then games vol. 2 (§E) and views and tools (§F). Built feature by
+feature, across sessions.
+
+**Current state: every row below is shipped.** What is still open is under
+[Open](#open) — one known issue and one design that was never built.
 
 **How to use:** tick a box when the feature ships, and append the PR number. Design detail for
 each row is the "approach" column — enough to act on without re-deriving. Anything that grows into
@@ -69,7 +73,7 @@ Passive data cards — no achievements (see §D).
 Ship each **after** its parent feature lands — a follow-up, never a blocker. Mechanically each one
 is `unlock('id')` + `announce('id', t)` inside the command's `run()` (see `matrix`/`vim` in
 `eggs.ts`), plus one entry appended to `achievementList` in `terminal/achievements.ts`. Progress
-counters already read `achievementList.length`, so the `n/21` display updates itself.
+counters already read `achievementList.length`, so the `n/total` display updates itself.
 `completionist` stays last in the array and cascades over whatever the new total is.
 
 Hints stay oblique in the modal — nudge, never name the command. The table below is the spoiler
@@ -180,15 +184,22 @@ weather-linked background mood), `feat/phase-3-markets` (`btc`/`stonks`),
 
 Every row in §A–D is ticked.
 
-**Phase 5 — views and tools (§F):** ✅ slice 1 on `feat/tools-and-views` → `dev` (#78), ✅ slice 2 on
-`feat/tools-client-vol2` → `dev` (#80), ✅ slice 3 on `feat/tools-ffmpeg` → `dev` (#81), ✅ slice 4 on
-`feat/rooms` → `dev` (#82), slice 5 on `feat/downloader` → `dev` — the last of the plan.
-
-**Phase 4 — games, vol. 2 (§E):** in progress on `claude/game-ideas-ec3dc5` → `dev`.
+**Phase 4 — games, vol. 2 (§E):** ✅ shipped on `claude/game-ideas-ec3dc5` → `dev` (#59, #60).
 The three shared prerequisites first (they touch code all five games read), then `minesweeper`,
 `wordle`, `hangman`, `wpm`, `tetris` in that order — turn-based before word-based before ticked, so
-each game reuses the one before it and `tetris`, the only one with a tick, lands last against a
-suite that already covers everything else.
+each game reused the one before it and `tetris`, the only one with a tick, landed last against a
+suite that already covered everything else.
+
+**Phase 5 — views and tools (§F):** ✅ all five slices shipped, one branch each → `dev`:
+`feat/tools-and-views` (#78), `feat/tools-client-vol2` (#80), `feat/tools-ffmpeg` (#81),
+`feat/rooms` (#82), `feat/downloader` (#83). Follow-up fixes: navbar overflow with nine
+destinations (#87), the swing's end-of-transition twitch (#89).
+
+## Open
+
+- **CTF flag chain** — designed in
+  [`superpowers/specs/2026-08-04-ctf-flag-chain-design.md`](superpowers/specs/2026-08-04-ctf-flag-chain-design.md),
+  never built. The only proposed spec left.
 
 ## Known issues
 
@@ -207,7 +218,9 @@ suite that already covers everything else.
 
 ## Appendix — `reboot` and fake `.env`
 
-The two Phase-1 items that are fully specified and ready to implement first.
+The two Phase-1 items as they were specified before implementation. Both shipped in Phase 1;
+kept as a record — the code has since moved on in small ways (e.g. `reboot` gained the `restart`
+alias, `env` reads the same module as `.env`).
 
 ### `reboot`
 

@@ -23,7 +23,7 @@ Repo → **Settings** → **Secrets and variables** → **Actions** → **Variab
 
 A `.env` placed on the server does nothing for a static bundle; the file is read by Vite during `npm run build`, never by the browser. `VITE_UMAMI_SRC` and `VITE_UMAMI_WEBSITE_ID` work the same way but are optional — see [Analytics](#analytics-the-self-hosted-umami-at-umamijhemeryxyz).
 
-Getting this wrong is quiet rather than loud: `src/lib/api.ts` falls back to `http://localhost:3000`, so the site deploys and renders perfectly while every API call goes nowhere. [frontend-build.yml](../.github/workflows/frontend-build.yml) therefore fails the build outright when the variable is unset rather than letting the fallback through. To check what a deployed bundle actually contains:
+Getting this wrong is quiet rather than loud: `src/lib/api.ts` falls back to an empty base in a production build (the `localhost:3000` fallback is dev-only), so the site deploys and renders perfectly while every API call lands on the SPA fallback and comes back as `index.html`. [frontend-build.yml](../.github/workflows/frontend-build.yml) therefore fails the build outright when the variable is unset rather than letting the fallback through. To check what a deployed bundle actually contains:
 
 ```bash
 curl -s https://jhemery.xyz/$(curl -s https://jhemery.xyz/ | grep -oE '/assets/[^"]+\.js' | head -1) | grep -o 'https://api[^"]*'
@@ -264,12 +264,14 @@ Setup, if you want this path ready before you need it:
 
 ## Apache config
 
-[frontend/public/.htaccess](../frontend/public/.htaccess) is copied into `dist/` by the build and deployed with everything else — but only because [frontend-build.yml](../.github/workflows/frontend-build.yml) sets `include-hidden-files: true` on the artifact upload. `actions/upload-artifact@v4` drops dotfiles by default, and with `.htaccess` missing from the artifact the deploy's `rsync --delete` removes the copy on the server too. The symptom is easy to misread: the site builds, deploys and renders fine, but deep links 404 and `curl jhemery.xyz` returns HTML instead of the résumé. It needs `mod_rewrite` only — no `mod_proxy` — so it works on o2switch shared hosting. It does four things:
+[frontend/public/.htaccess](../frontend/public/.htaccess) is copied into `dist/` by the build and deployed with everything else — but only because [frontend-build.yml](../.github/workflows/frontend-build.yml) sets `include-hidden-files: true` on the artifact upload. `actions/upload-artifact@v4` drops dotfiles by default, and with `.htaccess` missing from the artifact the deploy's `rsync --delete` removes the copy on the server too. The symptom is easy to misread: the site builds, deploys and renders fine, but deep links 404 and `curl jhemery.xyz` returns HTML instead of the résumé. It needs `mod_rewrite` only — no `mod_proxy` — so it works on o2switch shared hosting. It does six things:
 
 - **SPA fallback.** Vue Router uses `createWebHistory`, so every non-file request is handed to `index.html`. Without this, a hard refresh on any path other than `/` 404s before Vue Router ever sees the URL.
 - **`curl jhemery.xyz` → the ANSI résumé.** Matches on `User-Agent` at the site root and serves `resume.txt`, generated at build time by [vite-plugins/resume.ts](../frontend/vite-plugins/resume.ts). The same rule covers LLM crawlers, which would otherwise fetch an empty `<div id="app">`.
 - **Charset.** `UTF-8` by default, and explicitly for `.txt` so the résumé's box-drawing characters survive.
 - **Caching.** Hashed assets are `immutable` for a year; `index.html` and `resume.txt` are `no-cache`, so a deploy takes effect immediately.
+- **WebAssembly.** An explicit `application/wasm` type (so the 32 MB ffmpeg core compiles while streaming) and deflate for it, since cPanel's compression switch only covers text types.
+- **Security headers.** HSTS (no `preload`, deliberately), `X-Frame-Options`, `nosniff`, `Referrer-Policy`, a deny-all `Permissions-Policy` and the Content-Security-Policy. Each CSP source is commented with the feature that needs it — the Umami origin, `'wasm-unsafe-eval'` for the ffmpeg tool, the YouTube and SoundCloud `frame-src` for the rooms and the music player. Adding an origin there should mean adding a dependency.
 
 If `mod_headers` or `mod_mime` is unavailable the `<IfModule>` guards make those blocks no-ops — the site still works, just without the cache and charset hints.
 

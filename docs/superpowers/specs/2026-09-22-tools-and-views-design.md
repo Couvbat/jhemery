@@ -1,6 +1,7 @@
 # Design spec — views, the prism swing, and the tools page
 
-Status: proposed. Follows [the three.js background spec](2026-07-27-threejs-wireframe-background-design.md)
+Status: implemented in five slices (PRs #78, #80, #81, #82, #83), then two fixes (#87, #89).
+features-spec §11 records the rules the code cites. Follows [the three.js background spec](2026-07-27-threejs-wireframe-background-design.md)
 and features-spec §5.3, which it extends; the terminal side follows features-spec §2 ("the registry
 is the API"). Four decisions were taken before this was written and are treated as fixed:
 **page-first** (the `/tools` page is the product, terminal commands derive from it),

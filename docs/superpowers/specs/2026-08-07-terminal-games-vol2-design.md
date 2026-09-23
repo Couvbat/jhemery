@@ -1,6 +1,7 @@
 # Design spec — terminal games, vol. 2 (wordle, minesweeper, wpm, tetris, hangman)
 
-Status: proposed. Follows [the 2048/snake spec](2026-08-04-terminal-games-design.md), which shipped
+Status: implemented (PRs #59 and #60), including the generated word lists of the addendum.
+Follows [the 2048/snake spec](2026-08-04-terminal-games-design.md), which shipped
 `ctx.capture()` and the pure-state-module / renderer split. This spec adds five games on top of that
 machinery and introduces **no new `CommandContext` primitive** — if one turns out to be needed,
 that is a signal the design is wrong.
