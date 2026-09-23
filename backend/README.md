@@ -1,7 +1,8 @@
 # backend
 
 The `api.jhemery.xyz` service — NestJS 11, TypeScript. It backs the portfolio's live features:
-the terminal's `ask`, the contact form, Steam and GitHub activity, and the guestbook.
+the terminal's `ask`, the contact form, Steam and GitHub activity, weather, crypto quotes, live
+presence, the session counter, the guestbook, the watch/radio rooms and the owner-only downloader.
 
 For the site itself, see the [root README](../README.md).
 
@@ -37,6 +38,12 @@ unconfigured rather than failing.
 | `GET /github/activity` | `github` | Recent public commits, 5-minute cache. |
 | `GET /github/contributions` | `github` | Contribution heatmap — GraphQL, needs a token. |
 | `GET /github/pinned-repos` | `github` | Pinned repos — GraphQL, needs a token. |
+| `GET /github/workflow-status` | `github` | Four latest Actions runs for `GITHUB_REPO`; public REST, token optional. 60 s cache. |
+| `GET /weather` | `weather` | Open-Meteo for the coordinates in config (never the caller's). 10-minute cache. |
+| `GET /markets` | `markets` | CoinGecko quotes + 7-day series for `MARKETS_COINS`. 5-minute cache. |
+| `GET /presence` | `presence` | SSE: one integer, the number of open connections. 25 s heartbeat. |
+| `GET /stats` | `stats` | `{ sessions }` — terminal sessions ever opened. |
+| `POST /stats/session` | `stats` | Count one session. 5/hour per IP. |
 | `GET /guestbook` | `guestbook` | Newest 25 entries. |
 | `POST /guestbook` | `guestbook` | Sign. 1/min per IP. |
 | `DELETE /guestbook/:id` | `guestbook` | Moderation; requires the `x-admin-password` header. |
@@ -52,11 +59,19 @@ unconfigured rather than failing.
 | `GET /jobs/:id/file` | `jobs` | Admin only: the mp3, streamed once and then deleted. |
 | `DELETE /jobs/:id` | `jobs` | Admin only: cancel a running job, or dismiss a finished one. |
 
-Every optional integration degrades instead of erroring: no Steam key hides live activity, no
-GitHub token drops the heatmap and pinned repos, an unreachable model makes the terminal say the
-model is asleep and point at `mail`.
+Every optional integration degrades instead of erroring — endpoints report `configured: false` (or
+`enabled: false`) and the frontend renders that state: no Steam key hides live activity, no GitHub
+token drops the heatmap and pinned repos, no weather coordinates hide `weather`, an unreachable
+model makes the terminal say the model is asleep and point at `mail`. `ask`, `guestbook`, `rooms`
+and `jobs` are **off by default**.
+
+Privacy is a constraint on every module, not a policy on top: `/presence` pushes one integer with
+no visitor id, `/stats` counts sessions rather than commands, `/weather` uses server-side
+coordinates so everyone gets the same answer, and `ask` never logs questions or answers.
 
 ## Cross-cutting bits
+
+**Helmet** sets a `default-src 'none'` CSP — this is a JSON API, never a document.
 
 **CORS** is limited to `localhost:5173` plus `FRONTEND_URL`, methods `GET`/`POST`/`DELETE`, and
 allows the `x-admin-password` header — without which the guestbook DELETE preflight fails in the
@@ -149,10 +164,12 @@ time, unset means locked).
 ## Tests
 
 ```bash
-npm test          # guestbook service + controller, ask service + controller,
-                  # contact service, rate-limit guard
-npm run test:e2e
+npm test          # jest — a *.spec.ts beside each service, controller and guard
+npm run test:e2e  # test/jest-e2e.json
+npx jest src/ask/ask.service.spec.ts -t 'rate limit'   # one file, one test
 ```
+
+CI (`backend-pr-check.yml`) runs `lint`, `test` and `build` on every PR into `dev` or `master`.
 
 ## Deployment
 

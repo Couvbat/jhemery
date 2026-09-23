@@ -26,26 +26,37 @@ API down — the live cards say so instead of breaking.
 | `npm run preview` | Serve the built `dist/` |
 | `npm test` | `vitest run` |
 | `npm run test:watch` | `vitest` |
+| `npm run test:e2e` | Playwright — builds and serves `dist/` itself (`test:e2e:ui` for the UI mode) |
+| `npm run lint` | `eslint .` — what CI runs (`lint:fix` rewrites) |
+| `npm run lighthouse` | `lhci autorun` against the budgets in `lighthouserc.yml` |
 | `npm run assets` | Regenerate PNG icons / og-image from their SVG sources |
+| `npm run wordlists` | Regenerate the word-game lists (by hand, output committed — see the root README) |
 
 ## Layout
 
 ```
 src/
   content/       plain-TS data: profile, projects, skills, music, gaming, hardware,
-                 contact, sections. No Vue, no `@` alias, no side effects.
+                 contact, sections, views. No Vue, no `@` alias, no side effects.
   terminal/      the shell: command registry, commands/, games/, vim editor,
-                 achievements, output formatting, history
-  components/    sections/, terminal/, effects/, ui/ (shadcn-vue via reka-ui)
-  composables/   useTerminal, useTerminalShell, useCrt, useMatrix, useKonami,
-                 useSteam, useGithub, useMusicPlayer, useActiveSection, …
+                 achievements, output formatting, history, aliases
+  tools/         the /tools page: registry.ts + one folder per tool (panel + pure .ts)
+  rooms/         watch/radio: RoomPage, the two postMessage players, sync maths, useRoom
+  components/    sections/, terminal/, effects/, ui/ (shadcn-vue via reka-ui), navbar,
+                 palette, footer, toasts, ThreeBackground
+  composables/   useTerminal, useTerminalShell, useViewSwing, useCrt, useMatrix, useBoot,
+                 useSceneControl, useWeather, usePresence, useSteam, useGithub, …
   i18n/          locale ref + the message catalogue
-  lib/           api client (`apiUrl`, typed fetchers), `cn()` helper
-  views/         HomeView (all sections), NotFoundView
+  lib/           api client (`apiUrl`, typed fetchers), analytics, admin unlock, `cn()`
+  router/        home, /tools/:tool?, /watch/:code?, /radio/:code?, 404
+  views/         HomeView (all sections), ToolsView, WatchView, RadioView, NotFoundView
+e2e/             Playwright specs + the `api` stub fixture
 vite-plugins/
   resume.ts      emits the ANSI-coloured /resume.txt at build time
+  third-party.ts emits /THIRD-PARTY.txt from the licences in node_modules
 scripts/
-  gen-assets.sh  SVG → PNG, run manually and committed
+  gen-assets.sh        SVG → PNG, run manually and committed
+  build-wordlists.mjs  word-game lists, run manually and committed
 ```
 
 `@` is aliased to `src/`.
@@ -70,9 +81,9 @@ it up.
 terminal/
   types.ts        Command, CommandContext, OutputLine, vim types
   registry.ts     name/alias lookup, tab completion, "did you mean" suggestions
-  commands/       core · navigate · content · live · ask · eggs · games · system
-  games/          2048, snake, key stream, local high scores
-  achievements.ts the 21 achievements, the localStorage store, toasts
+  commands/       core · navigate · content · live · ask · eggs · system · tools · games/
+  games/          pure state for the seven games, word lists, key stream, local high scores
+  achievements.ts the 35 achievements, the localStorage store, toasts
   vimEditor.ts    pure state machine for the vim pane
   format.ts       line/blank/wrap/art helpers
 ```
@@ -106,8 +117,8 @@ Append to one of the arrays in `src/terminal/commands/` — `commands/index.ts` 
 | `capture(handler)` | Hold the raw keyboard for longer than one line (the games). Auto-released when the command settles; modifier combos still reach `Ctrl+C` / `Ctrl+L` |
 | `prompt(question, { mask })` | Ask for a line of input; rejects on `Ctrl+C` |
 | `run(input)` | Run another command as if typed |
-| `navigate(id)` / `close()` / `clear()` | Drive the overlay |
-| `effects` | `matrix`, `crt`, `vim`, `glitch`, `playMusic` |
+| `navigate(target)` / `close()` / `clear()` | Drive the overlay; `navigate` takes anything `cd` does and goes through `goTo()` |
+| `effects` | `matrix`, `reboot`, `crt`, `vim`, `glitch`, `playMusic` |
 | `signal` | `AbortSignal` — long-running commands must honour it |
 
 Output is a list of `OutputLine`s of **plain text, never HTML** — commands render visitor-supplied
@@ -116,9 +127,17 @@ per-run colouring, `pre` to preserve whitespace, `href` for links.
 
 ### Files, achievements
 
-`commands/files.ts` is the fake filesystem shared by `cat` and `vim`, so a file cannot show two
-different contents. `achievements.ts` exports `unlock(id)` and `announce(id, t)` — the latter
+`commands/files.ts` is the fake filesystem shared by `ls`, `cat`, `vim` and `diff`, so a file
+cannot show two different contents. `achievements.ts` exports `unlock(id)` and `announce(id, t)` — the latter
 returns the toast lines to splice into your output. The `completionist` cascade is handled there.
+A new achievement also needs a row in the root README's spoiler table.
+
+### Adding a tool
+
+One entry in `src/tools/registry.ts` (id, localised name and description, lazy panel) plus a
+folder under `src/tools/<id>/` with the panel and a pure `.ts` holding the logic, tested in
+`src/tools/__tests__/`. The page, `tools`, `ls tools`, `cd tools/<id>` and Tab all derive from the registry.
+Nothing inside a view may be `position: fixed` — the prism swing transforms its ancestor.
 
 ## Performance notes worth preserving
 
@@ -127,17 +146,30 @@ returns the toast lines to splice into your output. The `completionist` cascade 
 - `TerminalOverlay` — and behind it the whole command registry, guestbook client and vim editor —
   is only fetched the first time someone opens the terminal, then stays mounted.
 - `MatrixRain` loads only when someone types `matrix`.
+- The word lists are one `import()` chunk per locale, loaded by the first word game, and kept out
+  of the precache.
+- Each tool panel is its own chunk; the ffmpeg core (32 MB) is fetched only on an explicit click
+  and its loader and worker are kept out of the precache.
+- Lighthouse budgets in `lighthouserc.yml` are enforced on every PR (median of five runs).
 - `og-image.*` is excluded from precaching; only crawlers fetch it and none run a service worker.
 - The service worker is disabled in dev, where it would fight HMR.
 
 ## Tests
 
 ```bash
-npm test
+npm test             # vitest + jsdom
+npm run test:e2e     # playwright
 ```
 
-Vitest + jsdom, covering the command registry, the games, `ask` streaming, history, output
-formatting, i18n, and the content-purity rule.
+**Vitest** (`src/**/__tests__/`) owns behaviour: the command registry, every command, the games,
+the tools' logic, i18n and the content-purity rule. A new assertion belongs here by default — it
+runs in seconds.
+
+**Playwright** (`e2e/`) owns only what jsdom structurally cannot reach: async chunks loading,
+live-data failures degrading instead of throwing, section anchors scrolling a real viewport, and
+`/resume.txt` and friends surviving the SPA fallback. It **never touches a real backend**: the
+`api` fixture stubs every call against an unreachable origin, so a forgotten stub fails loudly.
+Re-testing command behaviour through a browser is the thing to avoid.
 
 ## Building
 

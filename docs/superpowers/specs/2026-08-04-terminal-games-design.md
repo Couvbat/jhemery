@@ -1,6 +1,7 @@
 # Design spec — terminal games (2048, snake)
 
-Status: proposed. Not implemented. Introduces one addition to `CommandContext` (`capture`) that
+Status: implemented (PR #21, then #26 for the achievements). Five more games followed in
+[vol. 2](2026-08-07-terminal-games-vol2-design.md). Introduces one addition to `CommandContext` (`capture`) that
 [the `ask` command spec](2026-08-04-ask-command-design.md) does not need but
 [the CTF chain](2026-08-04-ctf-flag-chain-design.md) may later reuse; this spec owns it.
 

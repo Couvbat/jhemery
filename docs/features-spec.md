@@ -11,10 +11,10 @@ Apache config are in [deploy.md](deploy.md).
 
 ## Context
 
-The site is a single-page Vue 3 portfolio with a cyberpunk terminal aesthetic. Six sections
-(`about`, `projects`, `music`, `gaming`, `hardware`, `contact`) render on one route, backed by a
-NestJS API exposing `/contact`, `/steam/activity`, `/github/activity`,
-`/github/contributions`, `/github/pinned-repos` and `/guestbook`.
+The site is a Vue 3 portfolio with a cyberpunk terminal aesthetic. Six sections (`about`,
+`projects`, `music`, `gaming`, `hardware`, `contact`) render on the `home` view; three more views
+(`tools`, `watch`, `radio` — §11) sit beside it as faces of a prism. It is backed by a NestJS API
+whose routes are described in §8 and listed in the README.
 
 The hero already renders a *fake* terminal — `whoami`, `cat about.txt`, `ls skills/`. The features
 below add a *real* one. The distinction matters: if the interactive terminal only reprinted the
@@ -31,7 +31,8 @@ things the static page cannot — query live APIs, send mail, mutate the page.
    backend is unreachable or unconfigured. The site works with the API entirely down.
 4. **Motion is opt-out-able.** Everything animated checks `prefers-reduced-motion`.
 5. **No new runtime dependencies.** i18n, the terminal and the effects are all hand-rolled against
-   what is already installed (Vue, Tailwind, Three.js).
+   what is already installed (Vue, Tailwind, Three.js). The one accepted exception is
+   `ffmpeg.wasm` for the `ffmpeg` tool (§11), fetched only on an explicit click.
 
 ---
 
@@ -55,6 +56,7 @@ src/content/
   hardware.ts    machines[] + peripherals[]
   contact.ts     socials, availability line
   sections.ts    section ids, nav labels, per-section shell prompt lines
+  views.ts       the routes (home, tools, watch, radio) in prism order — §11
   index.ts       re-exports
 ```
 
@@ -101,16 +103,21 @@ interface Command {
 
 `CommandContext` carries the parsed `args`, the `raw` input, the current `locale`, the `t()`
 resolver, and the side-effect handles a command may use: `print()`, `clear()`, `close()`,
-`navigate(sectionId)`, `prompt(question)` (resolves to the next line the user types, rejects on
-`Ctrl+C`), `run(input)` (runs another command as if typed — how `git log` delegates to `gitlog`),
-a `signal: AbortSignal` so animated commands stop cleanly when cancelled, and `effects`:
-`matrix`, `crt`, `vim`/`vimIsDirty`/`vimMessage` (§5.1), `glitch` and `playMusic`.
+`frame()` (a redrawable output region — animations and game boards), `navigate(target)` (anything
+`cd` accepts, through `goTo()` — §11), `prompt(question, { mask })` (resolves to the next line the
+user types, rejects on `Ctrl+C`), `capture(handler)` (holds the raw keyboard for the games — §3 —
+and is released unconditionally when the command settles), `run(input)` (runs another command as
+if typed — how `git log` delegates to `gitlog`), a `signal: AbortSignal` so animated commands stop
+cleanly when cancelled, and `effects`: `matrix`, `reboot`, `crt`, `vim`/`vimIsDirty`/`vimMessage`
+(§5.1), `glitch` and `playMusic`. `terminal/types.ts` documents each; read it before adding a
+primitive.
 
-`OutputLine` is
-`{ text: string; tone?: Tone; href?: string; pre?: boolean; prompt?: boolean }`, where `Tone` is
-`default|muted|primary|accent|secondary|error|success|warning`. `pre` preserves runs of spaces for
-ASCII art and tables; `prompt` marks an echoed prompt line rather than output. Deliberately *not*
-HTML — output is rendered as text nodes, so a guestbook entry cannot inject markup.
+`OutputLine` is `{ text; tone?; segments?; href?; pre?; prompt? }`, where `Tone` is
+`default|muted|primary|accent|secondary|error|success|warning`. `segments` splits a line into
+differently-toned runs (a game board needs a colour per cell) while `text` stays their plain
+concatenation; `pre` preserves runs of spaces for ASCII art and tables; `prompt` marks an echoed
+prompt line rather than output. Deliberately *not* HTML — output is rendered as text nodes, so a
+guestbook entry cannot inject markup.
 
 ### Registry
 
@@ -152,7 +159,8 @@ join it as soon as `guestbook` has cached them.
 
 An alias in the first position is expanded before the owning command is resolved, so `zz ab`
 completes against whatever `zz` will actually run.
-- `run(input)` handles `&&`-free single commands only — chaining is out of scope.
+
+`run(input)` handles `&&`-free single commands only — chaining is out of scope (§10).
 
 ### Chrome
 
@@ -196,12 +204,13 @@ refused: it survives a reload, so `alias ls=rickroll` would be a lockout rather 
 ### navigate
 | Command | Behaviour |
 |---|---|
-| `ls [-a]` | Lists sections as directories. `-a` also reveals `.secret` and `.env` (§5) |
-| `cd <section>` | Scrolls to the section and closes the overlay |
-| `pwd` | Current section, derived from scroll position |
+| `ls [-a] [path]` | Lists sections and views as directories; `ls tools` lists the tools. `-a` also reveals `.secret` and `.env` (§5) |
+| `cd <path>` | A section scrolls there and closes the overlay, routing home first from another view; `tools`, `tools/<id>`, `watch/<code>` and `radio/<code>` go through `goTo()` (§11) |
+| `pwd` | The view plus the current section — `/home/couvbat/projects`, `/home/couvbat/tools/image` |
+| `tools [<id>]` | Lists the tools from `tools/registry.ts`, or opens one |
 | `cat <file>` | `about.txt`, `skills.txt`, `contact.txt`, `.secret`, `.env` |
 | `diff <a> <b>` | Line diff of any two files the fake filesystem resolves |
-| `ping <section>` | Four paced fake replies and an rtt summary, then `cd`s there |
+| `ping <section\|view>` | Four paced fake replies and an rtt summary, then `cd`s there |
 | `open <target>` | `github`, `linkedin`, `soundcloud`, `steam`, `email` — opens in a new tab |
 
 `diff` runs both operands through the same `resolveFileLines()` `cat` uses, then through a pure
@@ -301,9 +310,10 @@ Full design in [the first games spec](superpowers/specs/2026-08-04-terminal-game
 
 **Where:** `frontend/src/components/CommandPalette.vue`
 
-`Ctrl+K` / `Cmd+K` opens a filtered list of commands flagged `palette: true` — navigation, the
-content commands, and language switching. Selecting a navigation command scrolls directly;
-selecting an output command opens the terminal with that command already run.
+`Ctrl+K` / `Cmd+K` opens a filtered list of the views, the sections and every command flagged
+`palette: true` — the content and live-data commands, `tools`, `games`, `achievements`, `lang`.
+Selecting a view or a section navigates through `goTo()` directly; selecting an output command
+opens the terminal with that command already run.
 
 This exists so the ~90% of visitors who will never type into a terminal still get the fast path.
 It shares the registry, so it needs no separate maintenance.
@@ -319,6 +329,7 @@ It shares the registry, so it needs no separate maintenance.
 | Trigger | Effect |
 |---|---|
 | `sudo <anything>` | `couvbat is not in the sudoers file. This incident has been reported.` |
+| `sudo -i` / `sudo -k` | The owner's real use: a masked prompt for the admin password, checked against the API, unlocks the downloader tool for the tab (§11); `-k` locks again. `sudo rm <entry>` removes a guestbook entry the same way |
 | `sudo rm -rf /` | Fake cascading deletion, page desaturates, then restores with a wink |
 | `matrix` | Full-screen canvas digital rain; any key or click exits |
 | Konami code (anywhere) | CRT overdrive — scanlines intensify, chromatic aberration, background wireframes speed up. Toggles off on repeat |
