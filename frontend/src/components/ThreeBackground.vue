@@ -126,6 +126,8 @@ const SECTION_PALETTES: Record<string, Palette> = {
  *  listed here (the 404, say) falls back to the section palette below. */
 const VIEW_PALETTES: Record<string, Palette> = {
   tools: { base: 'cyan', accent: 'purple', speed: 1.1 },
+  watch: { base: 'pink', accent: 'cyan', speed: 0.9 },
+  radio: { base: 'purple', accent: 'green', speed: 1.2 },
 }
 
 /** The reward for finding everything: a palette no section can produce. */

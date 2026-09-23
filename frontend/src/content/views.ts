@@ -24,6 +24,20 @@ export const views: ViewMeta[] = [
     prompt: 'ls ~/tools',
     heading: { en: 'Tools & utilities', fr: 'Outils & utilitaires' },
   },
+  {
+    id: 'watch',
+    path: '/watch',
+    label: { en: 'watch', fr: 'watch' },
+    prompt: 'open ~/watch',
+    heading: { en: 'Watch party', fr: 'Soirée vidéo' },
+  },
+  {
+    id: 'radio',
+    path: '/radio',
+    label: { en: 'radio', fr: 'radio' },
+    prompt: 'play ~/radio',
+    heading: { en: 'Radio', fr: 'Radio' },
+  },
 ]
 
 export const viewIds = views.map((v) => v.id)

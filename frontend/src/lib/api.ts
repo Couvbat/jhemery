@@ -190,6 +190,44 @@ export interface GuestbookList {
   entries?: GuestbookEntry[]
 }
 
+export type RoomKind = 'watch' | 'radio'
+
+/** The host's playback, anchored to the server clock — see `rooms/sync.ts` for the maths. */
+export interface PlaybackState {
+  /** A YouTube video id (`watch`) or a soundcloud.com URL (`radio`); null when nothing is loaded. */
+  media: string | null
+  /** Seconds into the item as of `at`. */
+  position: number
+  playing: boolean
+  /** Server time in ms when the state was set. */
+  at: number
+}
+
+/** One frame of a room's event stream. `members` is a count, as in `/presence`. */
+export interface RoomSnapshot {
+  code: string
+  kind: RoomKind
+  state: PlaybackState
+  queue: string[]
+  members: number
+}
+
+export interface RoomCreated extends RoomSnapshot {
+  /** Proves the host on the state route. Kept in the host's tab, never in a URL. */
+  hostToken: string
+}
+
+export interface RoomsInfo {
+  enabled: boolean
+}
+
+export interface RoomPatch {
+  media?: string | null
+  position?: number
+  playing?: boolean
+  queue?: string[]
+}
+
 export class ApiError extends Error {
   constructor(
     message: string,
@@ -312,4 +350,25 @@ export const api = {
       body: JSON.stringify(payload),
     }),
   askStream,
+  rooms: () => request<RoomsInfo>('/rooms'),
+  createRoom: (kind: RoomKind) =>
+    request<RoomCreated>('/rooms', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ kind }),
+    }),
+  room: (code: string) => request<RoomSnapshot>(`/rooms/${code}`),
+  updateRoom: (code: string, token: string, patch: RoomPatch) =>
+    request<RoomSnapshot>(`/rooms/${code}/state`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'x-room-token': token },
+      body: JSON.stringify(patch),
+    }),
+  endRoom: (code: string, token: string) =>
+    request<void>(`/rooms/${code}`, { method: 'DELETE', headers: { 'x-room-token': token } }),
+}
+
+/** The SSE endpoint a room's members hold open; `EventSource` wants a URL, not a fetch. */
+export function roomEventsUrl(code: string): string {
+  return `${apiUrl}/rooms/${code}/events`
 }

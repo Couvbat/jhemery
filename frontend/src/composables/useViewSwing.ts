@@ -3,6 +3,7 @@ import type { RouteLocationRaw, Router } from 'vue-router'
 import type { SectionMeta, ViewMeta } from '@/content'
 import { findSection, findView, sections, viewFor, viewIndex, views } from '@/content'
 import { findTool, type ToolMeta } from '@/tools/registry'
+import { normaliseCode } from '@/rooms/sync'
 import { currentSection, scrollToSection } from './useActiveSection'
 import { prefersReducedMotion } from './useCrt'
 
@@ -132,7 +133,7 @@ export function installViewSwing(instance: SwingRouter): void {
 
 export type ResolvedPath =
   | { kind: 'section'; section: SectionMeta }
-  | { kind: 'view'; view: ViewMeta; tool?: ToolMeta }
+  | { kind: 'view'; view: ViewMeta; tool?: ToolMeta; code?: string }
 
 /**
  * What a `cd`-style path names, or `undefined` for "No such file or directory".
@@ -152,10 +153,18 @@ export function resolvePath(target: string): ResolvedPath | undefined {
   const view = findView(head)
   if (!view) return undefined
   if (!rest.length) return { kind: 'view', view }
-  if (view.id !== 'tools' || rest.length > 1) return undefined
+  if (rest.length > 1) return undefined
 
-  const tool = findTool(rest[0]!)
-  return tool ? { kind: 'view', view, tool } : undefined
+  if (view.id === 'tools') {
+    const tool = findTool(rest[0]!)
+    return tool ? { kind: 'view', view, tool } : undefined
+  }
+  // `cd watch/AB3DE` joins a room, the way `cd tools/json` opens a tool.
+  if (view.id === 'watch' || view.id === 'radio') {
+    const code = normaliseCode(rest[0]!)
+    return code ? { kind: 'view', view, code } : undefined
+  }
+  return undefined
 }
 
 /** What `pwd` prints after `/home/<handle>/`: the section on the home page, the
@@ -186,12 +195,13 @@ export function goTo(target: string): boolean {
     return push({ path: '/', hash: `#${resolved.section.id}` })
   }
 
-  const { view, tool } = resolved
+  const { view, tool, code } = resolved
   if (view.id === 'home') {
     if (activeView.value === 'home') return scrollToSection(sections[0]!.id)
     return push('/')
   }
-  return push(tool ? `${view.path}/${tool.id}` : view.path)
+  const child = tool?.id ?? code
+  return push(child ? `${view.path}/${child}` : view.path)
 }
 
 export function useViewSwing() {

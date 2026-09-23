@@ -105,6 +105,13 @@ describe('resolvePath', () => {
     })
   })
 
+  it('resolves a room code under watch or radio, in any case', () => {
+    expect(resolvePath('watch/ab3de')).toMatchObject({ kind: 'view', view: { id: 'watch' }, code: 'AB3DE' })
+    expect(resolvePath('/radio/AB3DE/')).toMatchObject({ kind: 'view', view: { id: 'radio' }, code: 'AB3DE' })
+    expect(resolvePath('watch/abcd')).toBeUndefined()
+    expect(resolvePath('watch/ab3de/x')).toBeUndefined()
+  })
+
   it('refuses what does not exist, including sub-paths of things that have none', () => {
     expect(resolvePath('nope')).toBeUndefined()
     expect(resolvePath('tools/nope')).toBeUndefined()
@@ -268,11 +275,19 @@ describe('goTo', () => {
     expect(home.push).not.toHaveBeenCalled()
   })
 
+  it('joins a room by code', () => {
+    const { router, push } = fakeRouter('/')
+    installViewSwing(router)
+    expect(goTo('radio/ab3de')).toBe(true)
+    expect(push).toHaveBeenCalledWith('/radio/AB3DE')
+  })
+
   it('returns false for an unknown target and goes nowhere', () => {
     const { router, push } = fakeRouter('/')
     installViewSwing(router)
     expect(goTo('nope')).toBe(false)
     expect(goTo('tools/nope')).toBe(false)
+    expect(goTo('watch/abcd')).toBe(false)
     expect(push).not.toHaveBeenCalled()
     expect(scrolled).not.toHaveBeenCalled()
   })
