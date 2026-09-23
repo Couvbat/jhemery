@@ -9,6 +9,7 @@ import TerminalLauncher from '@/components/terminal/TerminalLauncher.vue'
 import { useKonami } from '@/composables/useKonami'
 import { restoreCrt, setCrt } from '@/composables/useCrt'
 import { useMatrix } from '@/composables/useMatrix'
+import { useTabTitle } from '@/composables/useTabTitle'
 import { terminalOpen } from '@/composables/useTerminalShell'
 import { installViewSwing, untilSettled, useViewSwing } from '@/composables/useViewSwing'
 import { track } from '@/lib/analytics'
@@ -49,6 +50,8 @@ const stageStyle = computed(() => ({
   '--swing-dir': String(swingDirection.value),
   '--leave-scroll': `${-leaveScroll.value}px`,
 }))
+
+useTabTitle()
 
 // Once true, stays true — TerminalOverlay is mounted for the rest of the session
 // (its own internal `open`/Transition handles every close/reopen after that) so
