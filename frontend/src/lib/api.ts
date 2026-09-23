@@ -228,6 +228,27 @@ export interface RoomPatch {
   queue?: string[]
 }
 
+export type JobStatus = 'queued' | 'running' | 'done' | 'failed'
+
+/** One download on the server. No path: the file is only ever reached through `fetchJobFile`. */
+export interface DownloadJob {
+  id: string
+  url: string
+  status: JobStatus
+  /** 0–1 while running; null before yt-dlp's first progress line. */
+  progress: number | null
+  filename: string | null
+  size: number | null
+  error: string | null
+  createdAt: number
+  finishedAt: number | null
+}
+
+export interface JobsInfo {
+  configured: boolean
+  jobs: DownloadJob[]
+}
+
 export class ApiError extends Error {
   constructor(
     message: string,
@@ -366,6 +387,32 @@ export const api = {
     }),
   endRoom: (code: string, token: string) =>
     request<void>(`/rooms/${code}`, { method: 'DELETE', headers: { 'x-room-token': token } }),
+  jobs: (password: string) => request<JobsInfo>('/jobs', { headers: adminHeaders(password) }),
+  startJob: (password: string, url: string) =>
+    request<DownloadJob>('/jobs', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', ...adminHeaders(password) },
+      body: JSON.stringify({ url }),
+    }),
+  job: (password: string, id: string) =>
+    request<DownloadJob>(`/jobs/${id}`, { headers: adminHeaders(password) }),
+  cancelJob: (password: string, id: string) =>
+    request<void>(`/jobs/${id}`, { method: 'DELETE', headers: adminHeaders(password) }),
+}
+
+/**
+ * `GET /jobs/:id/file`, fetch-once: the server deletes the file as soon as this
+ * response is fully read. A `<a download>` cannot carry the admin header, so the
+ * bytes come through `fetch` and leave through an object URL.
+ */
+export async function fetchJobFile(password: string, id: string): Promise<Blob> {
+  const res = await fetch(`${apiUrl}/jobs/${id}/file`, { headers: adminHeaders(password) })
+  if (!res.ok) throw await errorFrom(res)
+  return res.blob()
+}
+
+function adminHeaders(password: string): Record<string, string> {
+  return { 'x-admin-password': password }
 }
 
 /** The SSE endpoint a room's members hold open; `EventSource` wants a URL, not a fetch. */

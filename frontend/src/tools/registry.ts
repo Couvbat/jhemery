@@ -1,5 +1,6 @@
 import type { AsyncComponentLoader } from 'vue'
 import type { Localised } from '@/content/types'
+import { isAdmin } from '@/lib/admin'
 
 /** Which tier of the design spec a tool sits in (§5). `wasm` tools announce their
  *  download before starting it; `admin` tools only exist after the owner unlocks them. */
@@ -123,7 +124,28 @@ export const tools: ToolMeta[] = [
     tier: 'wasm',
     load: () => import('./ffmpeg/FfmpegTool.vue'),
   },
+  {
+    id: 'download',
+    name: { en: 'Downloader', fr: 'Téléchargeur' },
+    description: {
+      en: 'One YouTube video or SoundCloud track as mp3, fetched by the server and handed over once. Owner only',
+      fr: 'Une vidéo YouTube ou un morceau SoundCloud en mp3, récupéré par le serveur et remis une fois. Propriétaire uniquement',
+    },
+    keywords: ['yt-dlp', 'youtube', 'soundcloud', 'mp3', 'download', 'admin'],
+    tier: 'admin',
+    load: () => import('./download/DownloadTool.vue'),
+  },
 ]
+
+/**
+ * What a visitor is shown: everything but the admin tier, until the owner unlocks it
+ * (`sudo -i` in the terminal, or the tool's own password field). `findTool` still
+ * resolves a hidden tool by id — the gate is the password, not the listing — so
+ * `cd tools/download` opens the panel, which asks for it.
+ */
+export function visibleTools(): ToolMeta[] {
+  return tools.filter((tool) => tool.tier !== 'admin' || isAdmin.value)
+}
 
 export function findTool(id: string): ToolMeta | undefined {
   const needle = id.toLowerCase().replace(/\/+$/, '')

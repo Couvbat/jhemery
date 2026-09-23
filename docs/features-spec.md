@@ -692,6 +692,23 @@ stay rejected. Rules the code cites:
   `position + (now − at)` and seek when more than two seconds out. A patch without a position
   recomputes it to now, so a bare pause lands where the item actually is.
 
+### `jobs` — the downloader, `/jobs`, `/jobs/:id`, `/jobs/:id/file`
+
+The admin tier of the tools page (§11). Rules the code cites:
+
+- **Admin end to end.** `AdminGuard` on every route: `x-admin-password` against `ADMIN_PASSWORD`,
+  constant time, unset means locked. `GET /jobs` is also how the frontend learns whether a
+  password is right — one surface, one check.
+- **A job, not a request.** `POST` returns 202 with an id; the page polls; the file is streamed
+  once and deleted. Nothing waits on yt-dlp inside a request.
+- **The runner is the shell check made executable.** Defaults from `deploy.md`: the venv binary,
+  `~/bin` for ffmpeg, `process.execPath` as the JS runtime, `TMPDIR` under `DATA_DIR`, a pause
+  between requests, `--no-playlist`, `--restrict-filenames`.
+- **One video or one track.** The URL is an allowlist of shapes, canonicalised; sets and
+  profiles are refused because yt-dlp walks them, and the host's IP paid for that once.
+- **Bounded everywhere.** One running, three pending, ten minutes, 200 MB, 30-minute TTL, the
+  job directory emptied on boot. A failure keeps its last `ERROR` line only.
+
 ---
 
 ## 9. Accessibility
@@ -769,4 +786,11 @@ this section only fixes the rules the code cites.
   lives in `sessionStorage` keyed by code (a reload keeps hosting, a URL never carries it), and a
   refused token demotes the tab to guest rather than retrying. Guests seek at most once per 1.5 s,
   hosts coalesce changes for 250 ms and re-anchor every 15 s while playing. `cd watch/<code>` joins.
+- **The admin tier is hidden, not secret** (`download`, `lib/admin.ts`). `visibleTools()` leaves
+  it out of the page, `tools`, `ls tools` and Tab until the owner unlocks — `sudo -i` in the
+  terminal, or the panel's own field — but `findTool` still resolves it, so `cd tools/download`
+  opens the panel and the panel asks. The password is checked against `GET /jobs` and kept in
+  `sessionStorage` for the tab; a 403 on any later call locks again rather than retrying. The
+  panel is a thin client: start, poll while something moves, save once through a blob URL
+  (a plain link cannot carry the header).
 

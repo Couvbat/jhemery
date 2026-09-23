@@ -281,6 +281,14 @@ the legal exposure, not the hosting one, so it is designed as a **job, not a req
 - Off by default (`DOWNLOADER_ENABLED=false`), `configured: false` when off, like `ask` and
   `guestbook`.
 
+*As built (slice 5):* the shell check (deploy.md) said the box can run it, so the runner is on
+the box and the relay was never built. `POST /jobs` is admin-only like every other job route, so
+the frontend's unlock — `sudo -i`, kept in `sessionStorage` for the tab — is checked against
+`GET /jobs` rather than against the guestbook. What yt-dlp is handed is an allowlist of URL
+shapes, one video or one track, because a set or a profile is the request burst that got the
+host's IP blocked during the check. Bounds: one running, three pending, ten minutes, 200 MB,
+files deleted once fetched or after 30 minutes, the job directory emptied on boot.
+
 ### 6. Watchparty and radio — after the client-side tools
 
 Both are the same feature with a different player. A **room** is a short code; the host controls

@@ -1,4 +1,4 @@
-import { findTool, tools } from '@/tools/registry'
+import { findTool, visibleTools } from '@/tools/registry'
 import { blank, line, segmented } from '../format'
 import type { Command } from '../types'
 
@@ -17,13 +17,13 @@ export const toolCommands: Command[] = [
     },
     group: 'navigate',
     palette: true,
-    complete: ({ index }) => (index === 0 ? tools.map((tool) => tool.id) : []),
+    complete: ({ index }) => (index === 0 ? visibleTools().map((tool) => tool.id) : []),
     run({ args, navigate, t }) {
       const [id] = args
       if (!id) {
         return [
           line('~/tools', 'muted'),
-          ...tools.map((tool) =>
+          ...visibleTools().map((tool) =>
             segmented([
               { text: tool.id.padEnd(10), tone: 'primary' },
               { text: t(tool.description), tone: 'muted' },

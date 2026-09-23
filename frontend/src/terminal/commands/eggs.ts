@@ -8,6 +8,7 @@ import {
   spawnShapes,
   useSceneControl,
 } from '@/composables/useSceneControl'
+import { isAdmin, lockAdmin, unlockAdmin } from '@/lib/admin'
 import { api, ApiError } from '@/lib/api'
 import { announce, unlock } from '../achievements'
 import { COW, TRAIN } from '../ascii'
@@ -89,7 +90,36 @@ async function paced(ctx: CommandContext, output: OutputLine[], stepMs: number) 
   }
 }
 
-/** The only real thing `sudo` can do — remove a guestbook entry, given the admin password. */
+/**
+ * `sudo -i`: the owner's unlock. The password is checked against the API and kept
+ * for the tab (`lib/admin.ts`), which is what makes the admin tier of the tools page
+ * appear. The prompt is masked, as for `sudo rm`.
+ */
+async function elevate(ctx: CommandContext): Promise<OutputLine[]> {
+  if (isAdmin.value) {
+    return [line(`root@${profile.host}:~# already root — sudo -k drops it`, 'muted')]
+  }
+  const password = await ctx.prompt('[sudo] password for visitor:', { mask: true })
+  if (!password) return [line('sudo: no password entered', 'error')]
+
+  const result = await unlockAdmin(password)
+  if (result === 'wrong') return [line('Sorry, try again.', 'error')]
+  if (result === 'unreachable') {
+    return [line('sudo: unable to reach the API to check that', 'error')]
+  }
+  return [
+    line(`root@${profile.host}:~#`, 'success'),
+    line(
+      ctx.t({
+        en: 'the admin tools are on the tools page now — `tools`, or `cd tools/download`. `sudo -k` locks again.',
+        fr: 'les outils admin sont sur la page outils — `tools`, ou `cd tools/download`. `sudo -k` verrouille.',
+      }),
+      'muted',
+    ),
+  ]
+}
+
+/** One of two real things `sudo` can do — remove a guestbook entry, given the admin password. */
 async function removeGuestbookEntry(
   ctx: CommandContext,
   target: string,
@@ -144,6 +174,14 @@ export const eggCommands: Command[] = [
           line('(you should still not run that on a real machine)', 'muted'),
           ...announce('sudo', ctx.t),
         ]
+      }
+
+      if (rest === '-i' || rest === '-s' || rest === 'su' || rest === 'su -') {
+        return elevate(ctx)
+      }
+      if (rest === '-k' || rest === '-K') {
+        lockAdmin()
+        return [line('sudo: credentials cleared', 'muted')]
       }
 
       const rmMatch = /^rm\s+(?:-\w+\s+)?(\S+)$/.exec(rest)

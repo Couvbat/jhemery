@@ -235,6 +235,36 @@ export class ApiStub {
   }
 
   /**
+   * The downloader, unlocked: `GET /jobs` answers for the right password and 403s
+   * every other, which is exactly what `lib/admin.ts` uses as its check. `jobs`
+   * is what the listing returns; a test drives the rest with `get`/`post`.
+   */
+  downloader(password: string, jobs: unknown[] = [], configured = true): this {
+    const gate = (respond: (route: Route) => Promise<void>) => async (route: Route) => {
+      if (route.request().headers()['x-admin-password'] !== password) {
+        await route.fulfill({ status: 403, contentType: 'application/json', body: '{"message":"Not the admin"}' })
+        return
+      }
+      await respond(route)
+    }
+    for (const method of ['GET', 'POST', 'DELETE']) {
+      this.handlers.push({
+        method,
+        pattern: /^\/jobs(\/.*)?$/,
+        respond: gate(async (route) => {
+          const path = new URL(route.request().url()).pathname.slice(API_PREFIX.length)
+          if (path === '/jobs' && method === 'GET') {
+            await json({ configured, jobs })(route)
+          } else {
+            await route.fulfill({ status: 501, contentType: 'application/json', body: '{"message":"no stub"}' })
+          }
+        }),
+      })
+    }
+    return this
+  }
+
+  /**
    * `POST /ask`, as the SSE frame sequence `askStream` parses: one `data:` line per
    * delta, terminated by `[DONE]`. Pass `{ error }` for the mid-stream failure case
    * that cannot be a status code — the one `askStream` turns back into an ApiError.
