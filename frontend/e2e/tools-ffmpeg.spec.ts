@@ -1,18 +1,15 @@
-import { readFileSync } from 'node:fs'
-import { API_PREFIX, BASE_URL } from './constants'
 import { expect, test } from './fixtures'
 
 /**
  * What jsdom cannot see: that a 32 MB WebAssembly core loads from our own `/assets/`
- * into a module worker and produces bytes — and that it does so under the *production*
- * Content-Security-Policy. That header lives in public/.htaccess, which no local
- * server applies, so this test reads it out of the file and stamps it onto every
- * same-origin response, the worker script included. A `script-src` that lost
- * `'wasm-unsafe-eval'` fails here rather than on jhemery.xyz.
+ * into a module worker and produces bytes that play — and that it does so under the
+ * *production* Content-Security-Policy (the `cspViolations` fixture, which stamps the
+ * header from public/.htaccess onto every same-origin response, the worker script
+ * included). A `script-src` that lost `'wasm-unsafe-eval'`, or a `media-src` that
+ * refused the `blob:` preview, fails here rather than on jhemery.xyz.
  */
-const CSP = /Content-Security-Policy "([^"]+)"/.exec(
-  readFileSync(new URL('../public/.htaccess', import.meta.url), 'utf8'),
-)?.[1]
+
+test.use({ serviceWorkers: 'block' })
 
 /** One second of a 440 Hz sine, 8 kHz mono 16-bit: a real WAV, made here rather than
  *  committed as a binary. */
@@ -41,26 +38,10 @@ function wav(seconds: number): Buffer {
 }
 
 test.describe('the ffmpeg tool', () => {
-  test.beforeEach(async ({ page }) => {
-    expect(CSP, 'public/.htaccess should still carry a Content-Security-Policy').toBeTruthy()
-    const origin = new URL(BASE_URL).origin
-    await page.route(
-      (url) => url.origin === origin && !url.pathname.endsWith('.wasm'),
-      async (route) => {
-        // The stubbed backend lives under this origin too; leave it to the api fixture.
-        if (new URL(route.request().url()).pathname.startsWith(API_PREFIX)) return route.fallback()
-        const response = await route.fetch()
-        await route.fulfill({
-          response,
-          headers: { ...response.headers(), 'content-security-policy': CSP! },
-        })
-      },
-    )
-  })
-
   test('fetches nothing until asked, then turns a wav into an mp3 under the production CSP', async ({
     page,
     pageErrors,
+    cspViolations,
   }) => {
     test.slow()
     const wasmRequests: string[] = []
@@ -86,6 +67,18 @@ test.describe('the ffmpeg tool', () => {
 
     await region.getByRole('button', { name: /^convert$/i }).click()
     await expect(region.getByRole('link', { name: /download tone\.mp3/i })).toBeVisible({ timeout: 60_000 })
+
+    // The preview is an object URL too. A refused one sits there with a play button
+    // that does nothing: no metadata ever arrives, and `error` says why.
+    const preview = () =>
+      region
+        .locator('audio')
+        .evaluate((audio: HTMLAudioElement) =>
+          audio.error ? `error ${audio.error.code}` : audio.readyState > 0 ? 'metadata' : 'pending',
+        )
+    await expect.poll(preview).not.toBe('pending')
+    expect(await preview(), `refused: ${cspViolations.join('; ') || 'nothing'}`).toBe('metadata')
+    expect(cspViolations).toEqual([])
     expect(pageErrors).toEqual([])
   })
 })
