@@ -4,9 +4,10 @@ import { cleanToken, decodeJwt, timeClaims, validity } from '../jwt/jwt'
 const b64url = (value: object) =>
   btoa(JSON.stringify(value)).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '')
 
-// The jwt.io example token (HS256, `your-256-bit-secret`): a real token from the wild.
+// The jwt.io example token (HS256, `your-256-bit-secret`): a real token from the wild, and a
+// public one, so the secret scanner is told to let it be.
 const EXAMPLE =
-  'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4gRG9lIiwiaWF0IjoxNTE2MjM5MDIyfQ.SflKxwRJSMeKKF2QT4fwpMeJf36POk6yJV_adQssw5c'
+  'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4gRG9lIiwiaWF0IjoxNTE2MjM5MDIyfQ.SflKxwRJSMeKKF2QT4fwpMeJf36POk6yJV_adQssw5c' // ggignore
 
 describe('decodeJwt', () => {
   it('decodes the header and payload of a real token', () => {
