@@ -60,4 +60,22 @@ test.describe('the tools under the production CSP', () => {
     expect(widths, `refused: ${cspViolations.join('; ') || 'nothing'}`).toEqual([64, 64])
     expect(cspViolations).toEqual([])
   })
+
+  test('the regex tool runs its matcher in a worker', async ({ page, cspViolations }) => {
+    // Opening the panel is not enough: the worker is only created when a pattern runs,
+    // and a refused one reads as the one-second timeout, not as an error.
+    await page.goto('/tools/regex')
+    const region = page.getByRole('region', { name: /regex tester/i })
+    await expect(region.getByTestId('regex-highlight').locator('mark')).toHaveCount(2)
+    expect(cspViolations).toEqual([])
+  })
+
+  test('the qr tool previews its code', async ({ page, cspViolations }) => {
+    await page.goto('/tools/qr')
+    const preview = page.getByRole('region', { name: /qr code/i }).getByTestId('qr-preview')
+    await expect.poll(() => preview.evaluate((img) => (img as HTMLImageElement).complete)).toBe(true)
+    const width = await preview.evaluate((img) => (img as HTMLImageElement).naturalWidth)
+    expect(width, `refused: ${cspViolations.join('; ') || 'nothing'}`).toBeGreaterThan(0)
+    expect(cspViolations).toEqual([])
+  })
 })

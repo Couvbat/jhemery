@@ -244,8 +244,9 @@ the rest of §F.
   the SDK's sessions and streams would be used for. Five tools, six resources.
 - **Two-player games:** connect four, not battleship — battleship has hidden state the server
   would have to hold to keep a player honest.
-- Found while building `qr`: the CSP's `img-src` has no `blob:`, so the image tool's previews are
-  most likely blocked in production. Filed separately rather than fixed here.
+- Found while building `qr`: the CSP's `img-src` had no `blob:`, so the image tool's previews
+  were blocked in production. Fixed separately in #97, whose production-CSP e2e spec now covers
+  the `regex` worker and the `qr` preview as well.
 
 ## Build order
 

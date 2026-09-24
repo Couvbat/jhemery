@@ -33,9 +33,9 @@ const result = computed<{ qr: QrCode } | { error: string } | null>(() => {
 const qr = computed(() => (result.value && 'qr' in result.value ? result.value.qr : null))
 const svg = computed(() => (qr.value ? toSvg(qr.value) : ''))
 
-// A data: URL, not an object URL: the CSP's img-src allows `data:` and not `blob:`,
-// and the markup is a few kilobytes at most. The preview and the download link
-// share it, and nothing is ever uploaded.
+// A data: URL, not an object URL: the markup is a few kilobytes at most, so there is
+// nothing to revoke when the input changes. The preview and the download link share
+// it, and nothing is ever uploaded.
 const svgUrl = computed(() => (svg.value ? `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg.value)}` : ''))
 
 const info = computed(() =>
