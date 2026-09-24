@@ -1,6 +1,6 @@
 # Design spec — the September 2026 batch (roadmap §G)
 
-Status: implemented on `claude/roadmap-features-impl-c80870`. The roadmap's approach column is
+Status: implemented on `claude/roadmap-features-impl-c80870`, shipped in #98. The roadmap's approach column is
 the brief for each row; this file records only the decisions that column left open, and the places
 where building it changed the plan. The CTF chain has its own spec
 ([2026-08-04-ctf-flag-chain-design.md](2026-08-04-ctf-flag-chain-design.md)) and is covered here
@@ -38,8 +38,9 @@ removed with `router.replace` once read. The command is resolved **without the v
 aliases** — a link's author must not be able to reach whatever the reader named `ls` — and runs
 only if the resolved command is `linkable`. A refused link prints why instead of running.
 Invariants in `registry.spec.ts`: nothing that writes (`mail`, `sign`, `sudo`, `alias`, `unalias`,
-`theme`, `lang`, `flag`) is linkable, and nothing hidden is — a link must not hand out an easter
-egg. Games are linkable: they write nothing until the reader plays.
+`theme`, `lang`, `flag`, `ask`, `open`, `echo`, `connect4`) is linkable, and nothing hidden is — a
+link must not hand out an easter egg. Games are linkable: they write nothing until the reader
+plays. `connect4` is the exception, because it creates a room or claims a seat.
 
 **Shell versions of the tools.** No pipes: the shell has none and adding them would be the special
 case the registry exists to avoid. `sha256sum` and `base64` take a fake-filesystem file when the
@@ -92,8 +93,9 @@ already holds: configured, enabled, last fetch time. Units are named after their
 frontend keeps the unit list too, so with the API down it can print every unit as `unknown`.
 
 **MCP** is hand-written rather than `@modelcontextprotocol/sdk`: a stateless Streamable-HTTP
-endpoint that answers `initialize`, `ping`, `tools/list`, `tools/call`, `resources/list` and
-`resources/read` with plain JSON, `202` for notifications, and `405` to `GET`. The server
+endpoint that answers `initialize`, `ping`, `tools/list`, `tools/call`, `resources/list`,
+`resources/templates/list` and `resources/read` with plain JSON, `202` for notifications, and
+`405` to `GET` and `DELETE`. The server
 never needs a session, a stream or a write, so the SDK's surface would be almost all unused.
 Content comes from `${FRONTEND_URL}/content.json`, cached 10 minutes.
 

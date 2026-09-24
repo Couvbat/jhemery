@@ -37,26 +37,30 @@ API down — the live cards say so instead of breaking.
 ```
 src/
   content/       plain-TS data: profile, projects, skills, music, gaming, hardware,
-                 contact, sections, views. No Vue, no `@` alias, no side effects.
+                 contact, sections, views, now. No Vue, no `@` alias, no side effects.
   terminal/      the shell: command registry, commands/, games/, vim editor,
-                 achievements, output formatting, history, aliases
+                 achievements, the CTF chain, output formatting, history, aliases
   tools/         the /tools page: registry.ts + one folder per tool (panel + pure .ts)
   rooms/         watch/radio: RoomPage, the two postMessage players, sync maths, useRoom
   components/    sections/, terminal/, effects/, ui/ (shadcn-vue via reka-ui), navbar,
                  palette, footer, toasts, ThreeBackground
-  composables/   useTerminal, useTerminalShell, useViewSwing, useCrt, useMatrix, useBoot,
-                 useSceneControl, useWeather, usePresence, useSteam, useGithub, …
+  composables/   useTerminal, useTerminalShell, useViewSwing, useTheme, useCrt, useMatrix,
+                 useBoot, useIdle, useSceneControl, useWeather, usePresence, useSteam, …
   i18n/          locale ref + the message catalogue
-  lib/           api client (`apiUrl`, typed fetchers), analytics, admin unlock, `cn()`
-  router/        home, /tools/:tool?, /watch/:code?, /radio/:code?, 404
-  views/         HomeView (all sections), ToolsView, WatchView, RadioView, NotFoundView
+  lib/           api client (`apiUrl`, typed fetchers), colour schemes, analytics,
+                 admin unlock, `cn()`
+  router/        home, /tools/:tool?, /watch/:code?, /radio/:code?, /now, 404
+  views/         HomeView (all sections), ToolsView, WatchView, RadioView, NowView,
+                 NotFoundView
 e2e/             Playwright specs + the `api` stub fixture
 vite-plugins/
-  resume.ts      emits the ANSI-coloured /resume.txt at build time
+  resume.ts      emits /resume.txt (ANSI), /resume.html + /resume.fr.html (printable),
+                 and /content.json (read by the backend's MCP endpoint) at build time
   third-party.ts emits /THIRD-PARTY.txt from the licences in node_modules
 scripts/
   gen-assets.sh        SVG → PNG, run manually and committed
   build-wordlists.mjs  word-game lists, run manually and committed
+  ctf-seal.mjs         the CTF's stage hashes and sealed finale, run manually and committed
 ```
 
 `@` is aliased to `src/`.
@@ -81,9 +85,13 @@ it up.
 terminal/
   types.ts        Command, CommandContext, OutputLine, vim types
   registry.ts     name/alias lookup, tab completion, "did you mean" suggestions
-  commands/       core · theme · navigate · content · live · ask · eggs · system · tools · games/
-  games/          pure state for the seven games, word lists, key stream, local high scores
-  achievements.ts the 37 achievements, the localStorage store, toasts
+  commands/       core · theme · navigate · content · live · ask · eggs · system · systemctl ·
+                  tools · ctf · games/
+  games/          pure state for the eight games, word lists, key stream, local high scores
+                  and the daily wordle's saved board
+  achievements.ts the 38 achievements, the localStorage store, toasts
+  ctf.ts          the CTF stages: hashes and hints, never a flag
+  diff.ts         the line diff shared by the `diff` command and the diff tool
   vimEditor.ts    pure state machine for the vim pane
   format.ts       line/blank/wrap/art helpers
 ```
@@ -102,6 +110,7 @@ Append to one of the arrays in `src/terminal/commands/` — `commands/index.ts` 
   group: 'content',     // core | navigate | content | live | fun — sets the `help` heading
   hidden: false,        // true = runnable but absent from `help` and Tab completion
   palette: true,        // surface it in Ctrl+K
+  linkable: true,       // may run from a ?run= link: never for anything that writes, or hidden
   run({ t }) {
     return [line(t({ en: 'a while', fr: 'un moment' }))]
   },

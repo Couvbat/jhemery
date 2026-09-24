@@ -2,7 +2,9 @@
 
 The `api.jhemery.xyz` service — NestJS 11, TypeScript. It backs the portfolio's live features:
 the terminal's `ask`, the contact form, Steam and GitHub activity, weather, crypto quotes, live
-presence, the session counter, the guestbook, the watch/radio rooms and the owner-only downloader.
+presence, the session counter and the daily wordle's histogram, the guestbook, the watch/radio and
+connect-four rooms, the owner-only downloader, the health report behind `systemctl status`, and a
+read-only MCP endpoint for agents.
 
 For the site itself, see the [root README](../README.md).
 
@@ -44,26 +46,33 @@ unconfigured rather than failing.
 | `GET /presence` | `presence` | SSE: one integer, the number of open connections. 25 s heartbeat. |
 | `GET /stats` | `stats` | `{ sessions }` — terminal sessions ever opened. |
 | `POST /stats/session` | `stats` | Count one session. 5/hour per IP. |
+| `GET /stats/wordle` | `stats` | `?day=YYYY-MM-DD&locale=en\|fr` → the daily wordle's seven counts (solved in 1–6, or not). |
+| `POST /stats/wordle` | `stats` | `{ day, locale, guesses }` (0 = not solved), today or yesterday UTC only; 14 days kept. 5/hour per IP. |
 | `GET /guestbook` | `guestbook` | Newest 25 entries. |
 | `POST /guestbook` | `guestbook` | Sign. 1/min per IP. |
 | `DELETE /guestbook/:id` | `guestbook` | Moderation; requires the `x-admin-password` header. |
 | `GET /rooms` | `rooms` | `{ enabled }` — the feature flag, so the pages can say so. |
-| `POST /rooms` | `rooms` | Create a `watch` or `radio` room; returns the code and the host token. 10/hour per IP. |
-| `GET /rooms/:code` | `rooms` | Snapshot: state, queue, member count. |
+| `POST /rooms` | `rooms` | Create a `watch`, `radio` or `connect4` room; returns the code and the host token. 10/hour per IP. |
+| `GET /rooms/:code` | `rooms` | Snapshot: state, queue, member count, and a game room's move list. |
 | `GET /rooms/:code/events` | `rooms` | SSE of the same snapshot on every change, plus a 25 s heartbeat. Subscribing *is* membership. |
-| `POST /rooms/:code/state` | `rooms` | Host only (`x-room-token`): media, position, playing, queue. 120/min per IP. |
+| `POST /rooms/:code/state` | `rooms` | Host only (`x-room-token`): media, position, playing, queue. 120/min per IP. Refused on a game room. |
 | `DELETE /rooms/:code` | `rooms` | Host only: ends the room for everyone. |
+| `POST /rooms/:code/join` | `rooms` | Game rooms: the second seat's token, once; a third caller gets 409. 20/min per IP. |
+| `POST /rooms/:code/move` | `rooms` | `{ column }` with a seat token in `x-room-token`; only on that seat's turn, into a column with room. 120/min per IP. |
+| `POST /rooms/:code/rematch` | `rooms` | Either seat: clears the board and swaps who opens. 20/min per IP. |
 | `GET /jobs` | `jobs` | Admin only (`x-admin-password`): `{ configured, jobs }`. Doubles as the frontend's password check. |
 | `POST /jobs` | `jobs` | Admin only: start a yt-dlp job for one video or one track. 202 with the job. 20/hour per IP. |
 | `GET /jobs/:id` | `jobs` | Admin only: poll. |
 | `GET /jobs/:id/file` | `jobs` | Admin only: the mp3, streamed once and then deleted. |
 | `DELETE /jobs/:id` | `jobs` | Admin only: cancel a running job, or dismiss a finished one. |
+| `GET /health` | `health` | `{ uptime, units }`: one line per module (active or inactive and why, cache age, a count), for `systemctl status`. |
+| `POST /mcp` | `mcp` | Read-only MCP over stateless Streamable HTTP (JSON-RPC in, JSON out). `GET`/`DELETE` answer 405. 60/min per IP. |
 
 Every optional integration degrades instead of erroring — endpoints report `configured: false` (or
 `enabled: false`) and the frontend renders that state: no Steam key hides live activity, no GitHub
 token drops the heatmap and pinned repos, no weather coordinates hide `weather`, an unreachable
-model makes the terminal say the model is asleep and point at `mail`. `ask`, `guestbook`, `rooms`
-and `jobs` are **off by default**.
+model makes the terminal say the model is asleep and point at `mail`. `ask`, `guestbook`, `rooms`,
+`jobs` and `mcp` are **off by default**; with MCP off, `/mcp` is a plain 404.
 
 Privacy is a constraint on every module, not a policy on top: `/presence` pushes one integer with
 no visitor id, `/stats` counts sessions rather than commands, `/weather` uses server-side
@@ -74,8 +83,8 @@ coordinates so everyone gets the same answer, and `ask` never logs questions or 
 **Helmet** sets a `default-src 'none'` CSP — this is a JSON API, never a document.
 
 **CORS** is limited to `localhost:5173` plus `FRONTEND_URL`, methods `GET`/`POST`/`DELETE`, and
-allows the `x-admin-password` header — without which the guestbook DELETE preflight fails in the
-browser.
+allows the `x-admin-password` and `x-room-token` headers — without which the guestbook DELETE and
+the rooms' host and seat routes fail their preflight in the browser.
 
 **`trust proxy`** is on: Apache fronts the app, so `req.ip` must come from `X-Forwarded-For` or the
 rate limiter would see one client (the proxy) for the whole internet.
@@ -138,6 +147,33 @@ relays what a host loads to everyone in the room.
   token is random, compared in constant time, returned once at creation and never again.
 - Playback state carries the server clock (`at`); a bare `{ playing: false }` pauses where the item
   actually is, because the position is recomputed to now rather than copied.
+- A `connect4` room is the one change to that trust model: it issues a second token, the seat
+  token, to the first `join` and refuses a third. The server keeps the public move list and
+  enforces seats, turn order and column height, nothing else. Who has won is worked out by the
+  frontend's pure rules module on both clients, from the same list.
+
+## `health`
+
+`GET /health` asks every feature service for its `health()` (`common/health.ts`), in a fixed order
+so the terminal's table doesn't shuffle. The rule each implementation follows: **read only what the
+service already holds** (its config, its flags, the age of the cache it keeps, a count). No probes,
+so `systemctl status steam` never calls Steam and `systemctl status ask` never wakes the model. A
+new module joins by implementing `health()` on its service, exporting that service, and being
+added to `HealthModule`'s imports and `HealthController`'s list.
+
+## `mcp`
+
+Disabled unless `MCP_ENABLED=true`. A read-only [Model Context Protocol](https://modelcontextprotocol.io)
+server, hand-written rather than the SDK: stateless, with no sessions, streams or writes for the
+SDK to manage.
+
+- Answers `initialize`, `ping`, `tools/list`, `tools/call`, `resources/list`,
+  `resources/templates/list` and `resources/read`, with `202` for notifications and batches
+  accepted. Five tools and six resources: profile, résumé (EN and FR), projects, skills, `/now`.
+- Everything comes from `${FRONTEND_URL}/content.json`, which the frontend build emits beside
+  `resume.txt`. It's cached for 10 minutes with a stale fallback, and anything but `version: 1` is
+  refused. A tool that can't reach it returns `isError` rather than a protocol error.
+- Nothing asked of it is logged, same as `ask`.
 
 ## `jobs`
 
