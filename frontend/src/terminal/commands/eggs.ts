@@ -21,6 +21,9 @@ import { ENV_FILE } from './env-file'
 import { listFiles, resolveFileLines } from './files'
 
 /** The registration record `whois` invents for this domain. */
+/** The target `/etc/shadow` names, ROT13'd there as `tvofba`. */
+const GIBSON = 'gibson'
+
 const WHOIS_RECORD: Array<[string, string]> = [
   ['Domain Name', profile.domain.toUpperCase()],
   ['Registry Domain ID', '1337-COUVBAT'],
@@ -390,6 +393,9 @@ export const eggCommands: Command[] = [
     hidden: true,
     async run(ctx) {
       const target = ctx.args[0] ?? 'mainframe'
+      // Stage 5 of the CTF chain (terminal/ctf.ts): the one target `/etc/shadow`
+      // names gets in. Every other target still gets denied.
+      const gibson = target.toLowerCase() === GIBSON
       const stages = [
         line(`nmap -sS -A ${target}`, 'muted'),
         line('PORT     STATE  SERVICE', 'muted'),
@@ -401,8 +407,17 @@ export const eggCommands: Command[] = [
         line('cracking encryption    [██████████] 100%', 'primary'),
         line('escalating privileges  [███████▒▒▒]  72%', 'warning'),
       ]
-      await paced(ctx, stages, 260)
+      await paced(ctx, gibson ? [...stages.slice(0, -1), line('escalating privileges  [██████████] 100%', 'primary')] : stages, 260)
       await sleep(prefersReducedMotion() ? 0 : 600, ctx.signal)
+      if (gibson) {
+        return [
+          blank,
+          line('ACCESS GRANTED — hack the planet.', 'success'),
+          pre('CTF{f5611df57ef74890}', 'accent'),
+          line('next: some processes only show up if you keep watching them.', 'muted'),
+          ...announce('hack', ctx.t),
+        ]
+      }
       return [blank, line('ACCESS DENIED — nice try.', 'error'), ...announce('hack', ctx.t)]
     },
   },

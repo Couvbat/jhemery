@@ -146,6 +146,11 @@ export const messages = {
       en: 'Or open the terminal and type `cd about`.',
       fr: 'Ou ouvrez le terminal et tapez `cd about`.',
     },
+    ctf: {
+      en: 'Not a page — a command. The chain starts in the terminal.',
+      fr: 'Pas une page — une commande. La chaîne commence dans le terminal.',
+    },
+    ctfOpen: { en: 'Open the terminal and type `ctf`.', fr: 'Ouvrez le terminal et tapez `ctf`.' },
   },
   tools: {
     subtitle: {
@@ -452,6 +457,34 @@ export const messages = {
       en: 'A room is a code, a playback state and a head count. No names, no ids, nothing stored: it lives in the server’s memory and is gone two hours after the last action.',
       fr: "Un salon, c'est un code, un état de lecture et un nombre de présents. Ni noms, ni identifiants, rien d'enregistré : il vit dans la mémoire du serveur et disparaît deux heures après la dernière action.",
     },
+  },
+  // Chrome for `ctf`, `flag` and `decrypt`. Stage titles, hints and rewards live on
+  // the stages themselves (terminal/ctf.ts), the way achievements carry their own.
+  ctf: {
+    board: { en: 'ctf — {n}/{total} flags', fr: 'ctf — {n}/{total} flags' },
+    hint: { en: 'hint', fr: 'indice' },
+    submit: { en: 'submit a flag with `flag CTF{…}`', fr: 'soumettez un flag avec `flag CTF{…}`' },
+    usage: { en: 'usage: flag CTF{…}', fr: 'usage : flag CTF{…}' },
+    malformed: {
+      en: 'flag: that is not a flag — they look like CTF{0123456789abcdef}',
+      fr: 'flag : ce n’est pas un flag — ils ressemblent à CTF{0123456789abcdef}',
+    },
+    wrong: { en: 'flag: unknown flag', fr: 'flag : flag inconnu' },
+    order: { en: 'flag: out of order — you’re on stage {n}', fr: 'flag : pas dans l’ordre — vous en êtes à l’étape {n}' },
+    already: { en: 'flag: stage {n} is already solved', fr: 'flag : l’étape {n} est déjà résolue' },
+    solved: { en: 'stage {n} solved: {title}', fr: 'étape {n} résolue : {title}' },
+    nudge: { en: 'still stuck? a sharper hint:', fr: 'toujours bloqué ? un indice plus précis :' },
+    complete: {
+      en: 'the chain is complete. nothing else hides here — mention `root` when you write.',
+      fr: 'la chaîne est complète. plus rien ne se cache ici — mentionnez `root` en écrivant.',
+    },
+    missing: { en: 'decrypt: missing key material — {n} of 7 flags', fr: 'decrypt : clé incomplète — {n} flags sur 7' },
+    missingStages: { en: 'still missing stages', fr: 'étapes manquantes :' },
+    corrupt: {
+      en: 'decrypt: the key does not fit. those flags were not captured here.',
+      fr: 'decrypt : la clé ne correspond pas. ces flags n’ont pas été capturés ici.',
+    },
+    reopened: { en: '(already solved — the message does not change)', fr: '(déjà résolu — le message ne change pas)' },
   },
   now: {
     heading: { en: 'What I’m doing now', fr: 'Ce que je fais en ce moment' },

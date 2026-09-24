@@ -1,6 +1,7 @@
 import { ref } from 'vue'
 import type { Localised } from '@/content/types'
 import { blank, line } from './format'
+import { loadSet, persistSet as persist } from './storage'
 import type { OutputLine } from './types'
 
 export interface Achievement {
@@ -327,6 +328,18 @@ export const achievementList: Achievement[] = [
     description: { en: 'Switched to a light theme.', fr: 'Passé à un thème clair.' },
   },
   {
+    id: 'firstBlood',
+    title: { en: 'First Blood', fr: 'Premier sang' },
+    hint: {
+      en: 'Some sites hide more than one thing.',
+      fr: 'Certains sites cachent plus d’une chose.',
+    },
+    description: {
+      en: 'Captured a flag — `ctf` shows the rest of the chain.',
+      fr: 'Capturé un flag — `ctf` montre la suite de la chaîne.',
+    },
+  },
+  {
     id: COMPLETIONIST,
     title: { en: '100%', fr: '100%' },
     hint: { en: 'For those who leave no stone unturned.', fr: 'Pour ceux qui ne laissent rien au hasard.' },
@@ -338,24 +351,6 @@ const ACHIEVEMENTS_KEY = 'couvbat:achievements'
 const SECTIONS_KEY = 'couvbat:achievements:sections'
 const THEMES_KEY = 'couvbat:achievements:themes'
 const knownIds = new Set(achievementList.map((a) => a.id))
-
-function loadSet(key: string): Set<string> {
-  if (typeof window === 'undefined') return new Set()
-  try {
-    const parsed: unknown = JSON.parse(window.localStorage.getItem(key) ?? '[]')
-    return new Set(Array.isArray(parsed) ? parsed.filter((v): v is string => typeof v === 'string') : [])
-  } catch {
-    return new Set()
-  }
-}
-
-function persist(key: string, value: Set<string>) {
-  try {
-    window.localStorage.setItem(key, JSON.stringify([...value]))
-  } catch {
-    // Private browsing or a full quota — progress just won't persist.
-  }
-}
 
 export const unlocked = ref<Set<string>>(loadSet(ACHIEVEMENTS_KEY))
 const visitedSections = ref<Set<string>>(loadSet(SECTIONS_KEY))

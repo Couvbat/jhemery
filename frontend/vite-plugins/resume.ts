@@ -26,6 +26,9 @@ const GREEN = `${ESC}38;5;46m`
 const CYAN = `${ESC}38;5;51m`
 const DIM = `${ESC}2m`
 const BOLD = `${ESC}1m`
+/** SGR 8/28: text a terminal is told not to draw. `cat -v` draws it anyway. */
+const CONCEAL = `${ESC}8m`
+const REVEAL = `${ESC}28m`
 
 const WIDTH = 76
 
@@ -103,6 +106,10 @@ export function buildResume(): string {
     `${DIM}  You are reading the curl version. The full site is at https://${profile.domain}${RESET}`,
   )
   lines.push(`${DIM}  A printable one is at https://${profile.domain}/resume.html${RESET}`)
+  // Stage 3 of the CTF chain (src/terminal/ctf.ts): present in every byte `curl`
+  // receives, invisible in any terminal that honours SGR 8. Only here, never in the
+  // terminal's own `curl`, which renders the résumé from the content instead.
+  lines.push(`${CONCEAL}  CTF{e883c12a903c4432} - next: cat /etc/shadow${REVEAL}`)
   lines.push('')
 
   return lines.join('\n')

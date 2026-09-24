@@ -1,7 +1,7 @@
 import { now, nowCategories, profile, skillNames, socials, staleDays } from '@/content'
 import type { Localised } from '@/content/types'
 import { isUnlocked } from '../achievements'
-import { blank, line, segmented, wrap } from '../format'
+import { blank, line, pre, segmented, wrap } from '../format'
 import type { OutputLine } from '../types'
 import { SECRET_FILE, secretContents } from './secret'
 import { ENV_FILE, envFileContents } from './env-file'
@@ -35,6 +35,21 @@ export function listFiles(): string[] {
   const found = HIDDEN_FILES.filter((file) => isUnlocked(FILE_ACHIEVEMENTS[file]!))
   return [...FILES, ...found, ...guestbookFilenames()]
 }
+
+/**
+ * Stage 4 of the CTF chain (terminal/ctf.ts). Stored already rotated, so the bundle
+ * carries the same gibberish the screen does. Addressable by its path only: never
+ * listed, never completed, since a real box does not advertise it either.
+ */
+export const SHADOW_FILE = '/etc/shadow'
+const SHADOW_ROT13 = [
+  'ebbg:$6$ebhaqf=5000$pbhiong$Wd3xK9iG0mD.yJ2e8zLc1pA4fUq7hStOrN6vBwXgYk5El:20355:0:99999:7:::',
+  'qnrzba:*:20355:0:99999:7:::',
+  'jjj-qngn:*:20355:0:99999:7:::',
+  'pbhiong:$6$ebhaqf=5000$grezvany$Ia7Dj2Rx5Eg8Lh1Vb4Cn6Fq9St3Uw0Xy.Mk4Pi7Oa2Zz5Yd:20355:0:99999:7:::',
+  '# synt: PGS{21q6nnqo5p940339}',
+  '# arkg: unpx tvofba',
+]
 
 /** `now.txt`: the same list `/now` renders, with the same staleness rule. */
 function nowLines(t: TFunction): OutputLine[] {
@@ -106,6 +121,10 @@ export function resolveFileLines(file: string, t: TFunction): OutputLine[] | und
 
     case SECRET_FILE:
       return secretContents(t)
+
+    case SHADOW_FILE:
+    case 'etc/shadow':
+      return SHADOW_ROT13.map((text) => pre(text, text.startsWith('#') ? 'muted' : 'default'))
 
     case ENV_FILE:
       return envFileContents(t)

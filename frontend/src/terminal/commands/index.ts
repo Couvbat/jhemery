@@ -9,6 +9,7 @@ import { eggCommands } from './eggs'
 import { gameCommands } from './games'
 import { systemCommands } from './system'
 import { themeCommands } from './theme'
+import { ctfCommands } from './ctf'
 
 export const commands: Command[] = [
   ...coreCommands,
@@ -21,4 +22,5 @@ export const commands: Command[] = [
   ...eggCommands,
   ...gameCommands,
   ...systemCommands,
+  ...ctfCommands,
 ]
