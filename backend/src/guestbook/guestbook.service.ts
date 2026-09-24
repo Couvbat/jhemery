@@ -11,6 +11,7 @@ import { ConfigService } from '@nestjs/config';
 import mongoose, { Connection, Model, Schema } from 'mongoose';
 import { SignGuestbookDto } from './guestbook.dto';
 import { GuestbookEntry } from './guestbook.types';
+import { UnitHealth } from '../common/health';
 
 /** Oldest entries are evicted past this count. */
 const MAX_ENTRIES = 500;
@@ -210,6 +211,13 @@ export class GuestbookService implements OnModuleDestroy {
     await writeFile(temp, JSON.stringify(entries, null, 2), 'utf8');
     await rename(temp, path);
     this.cache = entries;
+  }
+
+  /** Open or closed. The entry count is left out: reading it could mean a disk read. */
+  health(): UnitHealth {
+    return this.enabled
+      ? { unit: 'guestbook', state: 'active' }
+      : { unit: 'guestbook', state: 'inactive', reason: 'disabled' };
   }
 }
 

@@ -1,4 +1,5 @@
 import type { Localised } from '@/content/types'
+import { api, type WordleHistogram } from '@/lib/api'
 import { copyText } from '@/tools/clipboard'
 import { blank, line, segmented } from '../../format'
 import { keyStream } from '../../games/input'
@@ -126,6 +127,60 @@ function render(state: wordle.WordleState, header: OutputLine, status: string): 
   return out
 }
 
+/** Bars at most this wide: the grid above is 17 columns, the bars sit under it. */
+const BAR_WIDTH = 24
+
+/**
+ * Everyone's day under the board, like the real thing's distribution: one bar per
+ * guess count and one for not solved, the reader's own row marked. Drawn only when
+ * there is something to draw — an unreachable API, or a day nobody has reported,
+ * leaves the board alone.
+ */
+export function histogramLines(histogram: WordleHistogram, mine: number | null, t: CommandContext['t']): OutputLine[] {
+  const total = histogram.counts.reduce((sum, n) => sum + n, 0)
+  if (!total) return []
+  const max = Math.max(...histogram.counts)
+  return [
+    blank,
+    line(
+      t({
+        en: `everyone today: ${total} ${total === 1 ? 'player' : 'players'}`,
+        fr: `tout le monde aujourd’hui : ${total} ${total === 1 ? 'joueur' : 'joueurs'}`,
+      }),
+      'muted',
+    ),
+    ...histogram.counts.map((n, i) => {
+      const me = mine === i
+      // Never zero-width for a count above zero: one player still deserves a mark.
+      const bar = '█'.repeat(n ? Math.max(1, Math.round((n / max) * BAR_WIDTH)) : 0)
+      return segmented([
+        { text: `  ${i === 6 ? 'X' : i + 1} `, tone: 'muted' },
+        { text: bar.padEnd(BAR_WIDTH), tone: me ? 'success' : 'primary' },
+        { text: ` ${n}`, tone: 'muted' },
+        ...(me ? [{ text: `  ◂ ${t({ en: 'you', fr: 'vous' })}`, tone: 'success' as Tone }] : []),
+      ])
+    }),
+  ]
+}
+
+/**
+ * Reports a finished board once (`reported` in storage), or reads the day's tallies if
+ * it already has been. Never throws: the histogram is a garnish, and the board is the
+ * meal.
+ */
+async function everyone(ctx: CommandContext, result: DailyResult): Promise<OutputLine[]> {
+  const mine = result.won ? result.guesses.length - 1 : 6
+  try {
+    const histogram = result.reported
+      ? await api.wordleHistogram(result.day, ctx.locale)
+      : await api.recordWordle(result.day, ctx.locale, result.won ? result.guesses.length : 0)
+    if (!result.reported) recordDaily(ctx.locale, { ...result, reported: true })
+    return histogramLines(histogram, mine, ctx.t)
+  } catch {
+    return []
+  }
+}
+
 /** What a daily board looks like in storage: its guesses and their marks, and whether it is over. */
 function snapshot(state: wordle.WordleState, day: string): DailyResult {
   return {
@@ -232,6 +287,7 @@ function daily(ctx: CommandContext) {
 
     if (state.status !== 'playing') {
       paint(ctx.t(DAILY_AGAIN))
+      ctx.print(await everyone(ctx, saved!))
       return
     }
 
@@ -262,6 +318,7 @@ function daily(ctx: CommandContext) {
     } finally {
       keys.release()
     }
+    ctx.print(await everyone(ctx, snapshot(state, day)))
   })
 }
 

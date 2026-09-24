@@ -11,6 +11,8 @@ import { PresenceModule } from './presence/presence.module';
 import { StatsModule } from './stats/stats.module';
 import { RoomsModule } from './rooms/rooms.module';
 import { JobsModule } from './jobs/jobs.module';
+import { McpModule } from './mcp/mcp.module';
+import { HealthModule } from './health/health.module';
 
 @Module({
   imports: [
@@ -26,6 +28,8 @@ import { JobsModule } from './jobs/jobs.module';
     StatsModule,
     RoomsModule,
     JobsModule,
+    McpModule,
+    HealthModule,
   ],
 })
 export class AppModule {}

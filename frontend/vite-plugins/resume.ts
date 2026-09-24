@@ -1,10 +1,12 @@
 import type { Plugin } from 'vite'
 import { profile } from '../src/content/profile'
-import { skillNames } from '../src/content/skills'
+import { skillNames, skills } from '../src/content/skills'
 import { projects } from '../src/content/projects'
 import { socials } from '../src/content/contact'
 import { music } from '../src/content/music'
-import { pick, type Locale, type Localised } from '../src/content/types'
+import { now, staleDays } from '../src/content/now'
+import { sectionIds } from '../src/content/sections'
+import { isExternal, pick, type Locale, type Localised } from '../src/content/types'
 
 /**
  * Emits the résumés generated from `src/content` at build time:
@@ -14,7 +16,8 @@ import { pick, type Locale, type Localised } from '../src/content/types'
  *   "Save as PDF" gives a clean CV and a crawler gets real HTML. No script and no
  *   SPA: they are documents, not pages of the app;
  * - `resume.css` — their stylesheet, a file of its own so the CSP's `style-src 'self'`
- *   covers it with nothing added.
+ *   covers it with nothing added;
+ * - `content.json` — the same content as data, which the backend's MCP endpoint reads.
  *
  * Generated rather than served by the API, so the résumé has exactly one source. The
  * cost is that it only refreshes on a frontend deploy, which is fine for a résumé.
@@ -311,6 +314,59 @@ a { color: inherit; }
 }
 `
 
+// ---------------------------------------------------------------------------
+// content.json, for the MCP endpoint
+// ---------------------------------------------------------------------------
+
+/** A site path or section as an absolute URL: `projects` → `/#projects`, `tools/qr` → `/tools/qr`. */
+function siteUrl(where: string): string {
+  if (isExternal(where)) return where
+  const base = `https://${profile.domain}`
+  return sectionIds.includes(where) ? `${base}/#${where}` : `${base}/${where.replace(/^\/+/, '')}`
+}
+
+/**
+ * The same content the pages render, as data, for the backend's read-only MCP endpoint
+ * (`backend/src/mcp`). The backend fetches this from `FRONTEND_URL` rather than
+ * importing it, so the two apps stay independently deployable, and the content still
+ * has one source. Both languages go out; the tool asked picks one.
+ *
+ * `version` is the shape's, not the content's: the backend refuses a file whose
+ * version it does not know rather than guessing at fields.
+ */
+export function buildContentJson(at = new Date()): string {
+  return JSON.stringify({
+    version: 1,
+    generatedAt: at.toISOString(),
+    site: `https://${profile.domain}`,
+    profile: {
+      name: profile.name,
+      alias: profile.alias,
+      role: profile.role,
+      employer: profile.employer,
+      location: profile.location,
+      email: profile.email,
+      languages: profile.languages,
+      bio: profile.bio,
+      availability: profile.availability,
+    },
+    skills: skills.map((skill) => ({
+      name: skill.name,
+      usedIn: (skill.usedIn ?? []).map((evidence) => ({ what: evidence.what, url: siteUrl(evidence.where) })),
+    })),
+    projects: projects.map((project) => ({
+      name: project.name,
+      description: project.description,
+      stack: project.stack,
+      status: project.status,
+      ...(project.repo ? { repo: project.repo } : {}),
+      ...(project.live ? { live: project.live } : {}),
+    })),
+    links: socials.map((social) => ({ label: social.label, href: social.href })),
+    now: { updated: now.updated, staleDays: staleDays(now.updated, at), entries: now.entries },
+  })
+}
+
 interface EmittedFile {
   fileName: string
   contentType: string
@@ -322,6 +378,7 @@ const files: EmittedFile[] = [
   { fileName: resumeHtmlFile('en'), contentType: 'text/html; charset=utf-8', build: () => buildResumeHtml('en') },
   { fileName: resumeHtmlFile('fr'), contentType: 'text/html; charset=utf-8', build: () => buildResumeHtml('fr') },
   { fileName: 'resume.css', contentType: 'text/css; charset=utf-8', build: () => RESUME_CSS },
+  { fileName: 'content.json', contentType: 'application/json; charset=utf-8', build: () => buildContentJson() },
 ]
 
 export function resumePlugin(): Plugin {

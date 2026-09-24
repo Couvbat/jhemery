@@ -86,6 +86,8 @@ export interface DailyResult {
   marks: string[]
   done: boolean
   won: boolean
+  /** Sent to `POST /stats/wordle` — once, so a reload does not count the same board twice. */
+  reported?: boolean
 }
 
 const DAILY_KEY = 'couvbat:games:wordle:daily'

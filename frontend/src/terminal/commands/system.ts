@@ -7,6 +7,7 @@ import { sleep } from '../timing'
 import type { Command, OutputLine, Tone } from '../types'
 import { uptime } from './content'
 import { ENV_FILE, envAssignments } from './env-file'
+import { systemctl } from './systemctl'
 
 interface Proc {
   pid: number
@@ -78,6 +79,7 @@ function table(procs: Proc[]): OutputLine[] {
 }
 
 export const systemCommands: Command[] = [
+  systemctl,
   {
     name: 'ps',
     aliases: ['ps aux', 'ps -ef'],

@@ -16,6 +16,12 @@ import type { Command, CommandContext, OutputLine } from '../types'
 const motion = vi.hoisted(() => ({ reduced: true }))
 const clipboard = vi.hoisted(() => ({ copyText: vi.fn() }))
 vi.mock('@/tools/clipboard', () => clipboard)
+// The daily reports to `/stats/wordle`; nothing else in the games touches the API.
+const stats = vi.hoisted(() => ({ recordWordle: vi.fn(), wordleHistogram: vi.fn() }))
+vi.mock('@/lib/api', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@/lib/api')>()
+  return { ...actual, api: { ...actual.api, ...stats } }
+})
 vi.mock('@/composables/useCrt', () => ({
   prefersReducedMotion: () => motion.reduced,
 }))
@@ -526,6 +532,9 @@ describe('wordle daily', () => {
     vi.useFakeTimers({ toFake: ['Date'] })
     vi.setSystemTime(new Date(`${DAY}T12:00:00Z`))
     clipboard.copyText.mockReset().mockResolvedValue(true)
+    const histogram = { day: DAY, locale: 'en', counts: [1, 0, 3, 0, 0, 0, 1] }
+    stats.recordWordle.mockReset().mockResolvedValue(histogram)
+    stats.wordleHistogram.mockReset().mockResolvedValue(histogram)
   })
 
   function daily(args = ['daily']) {
@@ -590,6 +599,39 @@ describe('wordle daily', () => {
     expect(copied).toContain('?run=wordle%20daily')
     // The buffer only says it happened: emoji would shear the terminal's grid.
     expect(out.map((l) => l.text).join('')).not.toMatch(/🟩|🟨|⬛/u)
+  })
+
+  it('reports a finished board once, and draws everyone’s day with the reader marked', async () => {
+    const first = daily()
+    await loaded()
+    for (const letter of ANSWER) first.game.press(letter.toLowerCase())
+    first.game.press('Enter')
+    await first.finished
+
+    expect(stats.recordWordle).toHaveBeenCalledWith(DAY, 'en', 1)
+    const printed = first.game.printed().map((l) => l.text)
+    expect(printed.some((t) => t.includes('everyone today: 5 players'))).toBe(true)
+    expect(printed.find((t) => t.includes('◂ you'))?.trimStart().startsWith('1 ')).toBe(true)
+    expect(dailyResult('en', DAY)?.reported).toBe(true)
+
+    // The same day again reads the tallies; it does not count the board twice.
+    const second = daily()
+    await loaded()
+    await second.finished
+    expect(stats.recordWordle).toHaveBeenCalledTimes(1)
+    expect(stats.wordleHistogram).toHaveBeenCalledWith(DAY, 'en')
+  })
+
+  it('leaves the board alone when the API does not answer, and tries again next time', async () => {
+    stats.recordWordle.mockRejectedValue(new Error('down'))
+    const { game, finished } = daily()
+    await loaded()
+    for (const letter of ANSWER) game.press(letter.toLowerCase())
+    game.press('Enter')
+    await finished
+
+    expect(game.printed().some((l) => l.text.includes('everyone today'))).toBe(false)
+    expect(dailyResult('en', DAY)?.reported).toBeFalsy()
   })
 
   it('share has nothing to copy before the daily is finished', async () => {

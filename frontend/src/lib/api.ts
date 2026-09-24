@@ -178,6 +178,29 @@ export interface StatsReport {
   sessions: number
 }
 
+/** One finished daily wordle, everyone's: `counts[0..5]` solved in 1–6, `counts[6]` not solved. */
+export interface WordleHistogram {
+  day: string
+  locale: Locale
+  counts: number[]
+}
+
+/** `GET /health` — see `backend/src/common/health.ts` for what each field may and may not read. */
+export interface UnitHealth {
+  unit: string
+  state: 'active' | 'inactive'
+  reason?: 'unconfigured' | 'disabled' | 'missing-binary'
+  /** Milliseconds since the unit last fetched its upstream; null if it has not yet. */
+  cacheAge?: number | null
+  detail?: Record<string, number>
+}
+
+export interface HealthReport {
+  /** Seconds the API process has been up. */
+  uptime: number
+  units: UnitHealth[]
+}
+
 export interface GuestbookEntry {
   id: string
   name: string
@@ -352,6 +375,15 @@ export const api = {
   markets: () => request<MarketsReport>('/markets'),
   stats: () => request<StatsReport>('/stats'),
   recordSession: () => request<StatsReport>('/stats/session', { method: 'POST' }),
+  wordleHistogram: (day: string, locale: Locale) =>
+    request<WordleHistogram>(`/stats/wordle?day=${encodeURIComponent(day)}&locale=${locale}`),
+  recordWordle: (day: string, locale: Locale, guesses: number) =>
+    request<WordleHistogram>('/stats/wordle', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ day, locale, guesses }),
+    }),
+  health: () => request<HealthReport>('/health'),
   guestbook: () => request<GuestbookList>('/guestbook'),
   sign: (name: string, message: string) =>
     request<GuestbookEntry>('/guestbook', {

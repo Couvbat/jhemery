@@ -7,5 +7,6 @@ import { AskService } from './ask.service';
   imports: [ConfigModule],
   controllers: [AskController],
   providers: [AskService],
+  exports: [AskService],
 })
 export class AskModule {}

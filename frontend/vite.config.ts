@@ -97,6 +97,8 @@ export default defineConfig({
           // The printable résumés, from the same plugin. Documents with no script:
           // the SPA shell answering them would print the home page instead.
           /^\/resume(\.fr)?\.html$/,
+          // Read by the backend's MCP endpoint (vite-plugins/resume.ts), not by the app.
+          /^\/content\.json$/,
           /^\/llms\.txt$/,
           /^\/robots\.txt$/,
           /^\/sitemap\.xml$/,

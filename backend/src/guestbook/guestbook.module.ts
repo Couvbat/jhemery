@@ -5,5 +5,6 @@ import { GuestbookService } from './guestbook.service';
 @Module({
   controllers: [GuestbookController],
   providers: [GuestbookService],
+  exports: [GuestbookService],
 })
 export class GuestbookModule {}

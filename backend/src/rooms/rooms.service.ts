@@ -14,6 +14,7 @@ import {
   RoomKind,
   RoomSnapshot,
 } from './rooms.types';
+import { UnitHealth } from '../common/health';
 
 /**
  * No 0/O, no 1/I/L: a code is read out loud across a room as often as it is
@@ -267,6 +268,13 @@ export class RoomsService {
       }
       if (!this.rooms.has(code)) return code;
     }
+  }
+
+  /** On or off, and how many rooms are open right now. */
+  health(): UnitHealth {
+    return this.enabled
+      ? { unit: 'rooms', state: 'active', detail: { rooms: this.rooms.size } }
+      : { unit: 'rooms', state: 'inactive', reason: 'disabled' };
   }
 }
 

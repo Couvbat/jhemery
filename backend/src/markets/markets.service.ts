@@ -1,6 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { downsample, MarketQuote, MarketsReport } from './markets.types';
+import { cacheAge, UnitHealth } from '../common/health';
 
 /**
  * CoinGecko's free tier is generous but not unlimited, and the answer is the
@@ -97,5 +98,19 @@ export class MarketsService {
         SPARKLINE_POINTS,
       ),
     }));
+  }
+
+  /** Configured or not, and how old the cached quotes are — nothing is fetched. */
+  health(): UnitHealth {
+    const coins = (
+      this.config.get<string>('MARKETS_COINS') ?? DEFAULT_COINS
+    ).trim();
+    return coins
+      ? {
+          unit: 'markets',
+          state: 'active',
+          cacheAge: cacheAge(this.cache, CACHE_TTL_MS),
+        }
+      : { unit: 'markets', state: 'inactive', reason: 'unconfigured' };
   }
 }

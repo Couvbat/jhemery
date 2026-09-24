@@ -1,7 +1,7 @@
 // @vitest-environment node
 // The plugin runs at build time, in Node, outside the app; so does this.
 import { describe, expect, it } from 'vitest'
-import { buildResume, buildResumeHtml, escapeHtml, RESUME_CSS, resumeHtmlFile } from '../../../vite-plugins/resume'
+import { buildContentJson, buildResume, buildResumeHtml, escapeHtml, RESUME_CSS, resumeHtmlFile } from '../../../vite-plugins/resume'
 import { profile } from '../profile'
 import { projects } from '../projects'
 import { skillNames } from '../skills'
@@ -51,5 +51,37 @@ describe('resume.html', () => {
   it('has a print stylesheet that hides the screen-only chrome', () => {
     expect(RESUME_CSS).toMatch(/@media print[\s\S]*\.screen-only\s*\{\s*display:\s*none/)
     expect(RESUME_CSS).toContain('@page')
+  })
+})
+
+describe('content.json', () => {
+  const data = JSON.parse(buildContentJson(new Date('2026-09-24T00:00:00Z'))) as {
+    version: number
+    profile: { name: string; availability: { open: boolean } }
+    skills: Array<{ name: string; usedIn: Array<{ url: string }> }>
+    projects: Array<{ name: string }>
+    now: { updated: string; staleDays: number | null }
+  }
+
+  it('carries the shape version the backend checks for', () => {
+    expect(data.version).toBe(1)
+  })
+
+  it('is the same content the pages render', () => {
+    expect(data.profile.name).toBe(profile.name)
+    expect(data.projects.map((p) => p.name)).toEqual(projects.map((p) => p.name))
+    expect(data.skills.map((s) => s.name)).toEqual(skillNames)
+  })
+
+  it('turns every evidence path into an absolute URL', () => {
+    const urls = data.skills.flatMap((s) => s.usedIn.map((e) => e.url))
+    expect(urls.length).toBeGreaterThan(0)
+    for (const url of urls) expect(url).toMatch(/^https:\/\//)
+    expect(urls).toContain(`https://${profile.domain}/#projects`)
+    expect(urls).toContain(`https://${profile.domain}/tools/ffmpeg`)
+  })
+
+  it('never carries a CTF flag — the chain is not something to hand an agent whole', () => {
+    expect(buildContentJson()).not.toMatch(/CTF\{/)
   })
 })
