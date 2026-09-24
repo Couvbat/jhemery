@@ -240,6 +240,37 @@ o2switch's anti-bot layer is answering the POST with a cookie and a redirect bac
 
 **Nothing in this repository can cause or fix it.** The requests never reach Nest. Two things make that expensive to learn: the browser names CORS, which is the one layer that is definitely fine, and every other signal — clean preflight, clean `curl`, correct `VITE_API_URL`, correct `enableCors` — agrees the server is healthy, because it is. **When browsers and `curl` disagree about the same URL, the difference is never in the application; look for a header naming a vendor.**
 
+## Adding an environment variable
+
+The steps depend on which side reads the variable. The backend reads its `.env` on the server when it starts. The frontend has `VITE_*` values baked into the JavaScript when it's built. Either way, **set the value before your change reaches `master`**, because merging into `master` is what triggers the deploy.
+
+### Backend (read by Nest)
+
+1. **In the code:** read it with `ConfigService` and make it optional. If it's unset, the feature should report `configured: false` (or `enabled: false`) instead of throwing, and the frontend should render that state. If it turns on something risky, it should be off unless set to `true`, like `ROOMS_ENABLED` and `DOWNLOADER_ENABLED`.
+2. **In [backend/.env.example](../backend/.env.example):** add it with a comment explaining what it does and why the default is what it is. Everyone setting up the server copies from this file.
+3. **On the server, before the merge to `master`:** add the line to the `.env` at `BACKEND_REMOTE_PATH` (see [Part A.6](#6-create-backendenv-on-the-server)). The deploy never touches this file, so this is the only way the value gets there.
+4. **Deploy:** the merge to `master` deploys and restarts the app, and the new code picks the value up.
+
+If you change a value on the server without deploying, the running app won't see it. Restart it with cPanel → **Setup Node.js App** → **Restart**. Then check the new value really took effect: for example, the endpoint should now report `configured: true`. Passenger's restart has fooled this page before (see [Known gaps](#known-gaps)).
+
+If you forget step 3, nothing breaks, because of step 1. The feature just stays off until you add the value and restart.
+
+### Frontend (`VITE_*`, inlined at build time)
+
+A `.env` file on the server does nothing here, for the reasons in [Where the frontend's API URL comes from](#where-the-frontends-api-url-comes-from).
+
+1. **In the code:** declare it in [frontend/env.d.ts](../frontend/env.d.ts) under `ImportMetaEnv`, and handle it being unset.
+2. **Locally:** add it to `frontend/.env.development` if dev needs it, or leave it commented out, as `VITE_UMAMI_*` is.
+3. **In the build workflow:** add `VITE_FOO: ${{ vars.VITE_FOO }}` to the `env:` of the **Build** step in [frontend-build.yml](../.github/workflows/frontend-build.yml). This is the step people forget. Without it, the variable never reaches the build, even if it's set on GitHub.
+4. **On GitHub:** add it in Settings → Secrets and variables → Actions → **Variables**. Use a variable, not a secret: it ends up in a public bundle anyway, so there's nothing to hide.
+5. **Optionally:** add a check step next to the existing ones. Make a missing value fail the build if the site can't work without it (as `VITE_API_URL` does), or just print a `::notice` if it's optional (as the Umami variables do).
+
+To be sure it reached production, search the deployed bundle for the value with the same `curl` as in [Frontend configuration](#frontend-configuration).
+
+### Secrets
+
+A frontend variable can't hold anything secret, because everyone can read the bundle. Anything secret belongs in the backend's server `.env`, with the frontend going through an API route. The GitHub **secrets** in [Part B](#1-add-repository-secrets) are only the SSH, cPanel and FTP credentials used to ship the code. App configuration never goes there.
+
 ## FTP fallback
 
 [frontend-deploy-ftp.yml](../.github/workflows/frontend-deploy-ftp.yml) and [backend-deploy-ftp.yml](../.github/workflows/backend-deploy-ftp.yml) deploy the same builds over FTPS, with no dependency on the cPanel API or on SSH. They are `workflow_dispatch`-only: **Actions** → **Deploy Frontend (FTP)** / **Deploy Backend (FTP)** → **Run workflow**.
@@ -271,7 +302,7 @@ Setup, if you want this path ready before you need it:
 - **Charset.** `UTF-8` by default, and explicitly for `.txt` so the résumé's box-drawing characters survive.
 - **Caching.** Hashed assets are `immutable` for a year; `index.html` and `resume.txt` are `no-cache`, so a deploy takes effect immediately.
 - **WebAssembly.** An explicit `application/wasm` type (so the 32 MB ffmpeg core compiles while streaming) and deflate for it, since cPanel's compression switch only covers text types.
-- **Security headers.** HSTS (no `preload`, deliberately), `X-Frame-Options`, `nosniff`, `Referrer-Policy`, a deny-all `Permissions-Policy` and the Content-Security-Policy. Each CSP source is commented with the feature that needs it — the Umami origin, `'wasm-unsafe-eval'` for the ffmpeg tool, the YouTube and SoundCloud `frame-src` for the rooms and the music player. Adding an origin there should mean adding a dependency.
+- **Security headers.** HSTS (no `preload`, deliberately), `X-Frame-Options`, `nosniff`, `Referrer-Policy`, a deny-all `Permissions-Policy` and the Content-Security-Policy. Each CSP source is commented with the feature that needs it — the Umami origin, `'wasm-unsafe-eval'` for the ffmpeg tool, `blob:` in `img-src` and `media-src` for the tools' local previews, the YouTube and SoundCloud `frame-src` for the rooms and the music player. Adding an origin there should mean adding a dependency.
 
 If `mod_headers` or `mod_mime` is unavailable the `<IfModule>` guards make those blocks no-ops — the site still works, just without the cache and charset hints.
 

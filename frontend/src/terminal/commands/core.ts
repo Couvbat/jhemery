@@ -23,6 +23,7 @@ export const coreCommands: Command[] = [
     usage: 'help [command] [--all]',
     description: { en: 'List commands, or explain one', fr: 'Lister les commandes' },
     group: 'core',
+    linkable: true,
     palette: true,
     // `completionNames()` and not `allCommands()`: `help vi<Tab>` must not hand
     // out `vim`, for the same reason the command word itself doesn't.
@@ -114,6 +115,7 @@ export const coreCommands: Command[] = [
     name: 'whoami',
     description: { en: 'Print the current user', fr: "Afficher l'utilisateur" },
     group: 'core',
+    linkable: true,
     run() {
       return [line(profile.handle, 'primary')]
     },

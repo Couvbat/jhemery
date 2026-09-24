@@ -225,7 +225,7 @@ const badLink = computed(() => t(props.kind === 'watch' ? m.rooms.badLinkWatch :
           bash: cd: {{ view.label.en }}/{{ rawCode }}: No such file or directory
         </p>
         <p v-if="status === 'checking'" class="text-sm text-muted-foreground">…</p>
-        <p v-else-if="status === 'off'" class="text-sm text-yellow-400">{{ t(m.rooms.off) }}</p>
+        <p v-else-if="status === 'off'" class="text-sm text-warning">{{ t(m.rooms.off) }}</p>
         <div v-else class="grid gap-4 sm:grid-cols-2">
           <div class="rounded border border-border bg-card p-4 md:p-6 space-y-3">
             <h2 class="font-semibold text-foreground">{{ t(m.rooms.host) }}</h2>

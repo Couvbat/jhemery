@@ -8,6 +8,7 @@ export const messages = {
   nav: {
     toggleMenu: { en: 'Toggle menu', fr: 'Ouvrir le menu' },
     language: { en: 'Switch language', fr: 'Changer de langue' },
+    theme: { en: 'Colour scheme', fr: 'Thème de couleurs' },
   },
   hero: {
     aboutFile: { en: 'cat about.txt', fr: 'cat about.txt' },
@@ -74,6 +75,8 @@ export const messages = {
       fr: "Échec de l'envoi. Réessayez ou contactez-moi directement par email.",
     },
     directLine: { en: 'Prefer a direct line? Find me here:', fr: 'Vous préférez le contact direct ?' },
+    resume: { en: 'Résumé', fr: 'CV' },
+    resumeNote: { en: 'printable, or save as PDF', fr: 'à imprimer, ou en PDF' },
   },
   terminal: {
     open: { en: 'Open terminal', fr: 'Ouvrir le terminal' },
@@ -107,6 +110,13 @@ export const messages = {
       fr: '-- en jeu : esc ou ctrl+c pour quitter --',
     },
     cancelled: { en: '^C cancelled', fr: '^C annulé' },
+    // `{command}` is what the link asked for, echoed so the reader sees it.
+    linkRefused: {
+      en: 'a link asked to run `{command}` — that one only runs if you type it yourself.',
+      fr: 'un lien a demandé `{command}` — celle-ci ne s’exécute que si vous la tapez vous-même.',
+    },
+    // Faded placeholder text at an empty prompt; `{command}` is from the registry.
+    suggestion: { en: 'try: {command}', fr: 'essayez : {command}' },
   },
   // Chrome around `ask` only. The *answer* is generated in the requested locale
   // by the model itself and is never translated client-side.
@@ -144,6 +154,11 @@ export const messages = {
       en: 'Or open the terminal and type `cd about`.',
       fr: 'Ou ouvrez le terminal et tapez `cd about`.',
     },
+    ctf: {
+      en: 'Not a page — a command. The chain starts in the terminal.',
+      fr: 'Pas une page — une commande. La chaîne commence dans le terminal.',
+    },
+    ctfOpen: { en: 'Open the terminal and type `ctf`.', fr: 'Ouvrez le terminal et tapez `ctf`.' },
   },
   tools: {
     subtitle: {
@@ -223,6 +238,117 @@ export const messages = {
     placeholder: {
       en: '#00ff41, rgb(0 255 65), oklch(0.87 0.29 142)…',
       fr: '#00ff41, rgb(0 255 65), oklch(0.87 0.29 142)…',
+    },
+  },
+  toolJwt: {
+    input: { en: 'token', fr: 'jeton' },
+    placeholder: { en: 'Paste a token — eyJ…', fr: 'Collez un jeton — eyJ…' },
+    header: { en: 'header', fr: 'en-tête' },
+    payload: { en: 'payload', fr: 'charge utile' },
+    signature: { en: 'signature', fr: 'signature' },
+    // The one thing this panel must say: it does not, and will not, verify.
+    decodeOnly: {
+      en: 'Decoded, not verified. Checking the signature needs the secret or the key, and a web page is no place to paste either.',
+      fr: 'Décodé, pas vérifié. Vérifier la signature demande le secret ou la clé, et une page web n’est pas l’endroit où les coller.',
+    },
+    segments: {
+      en: 'Not a JWT: expected three parts separated by dots.',
+      fr: 'Pas un JWT : trois parties séparées par des points étaient attendues.',
+    },
+    base64: { en: '{segment}: not valid base64url.', fr: '{segment} : base64url invalide.' },
+    json: { en: '{segment}: not a JSON object.', fr: '{segment} : pas un objet JSON.' },
+    iat: { en: 'issued', fr: 'émis' },
+    nbf: { en: 'not before', fr: 'pas avant' },
+    exp: { en: 'expires', fr: 'expire' },
+    expired: { en: 'expired', fr: 'expiré' },
+    notYet: { en: 'not valid yet', fr: 'pas encore valide' },
+    valid: { en: 'inside its validity window', fr: 'dans sa période de validité' },
+    noExpiry: { en: 'no expiry', fr: 'sans expiration' },
+    unsigned: { en: 'alg: none — this token is not signed at all.', fr: 'alg: none — ce jeton n’est pas signé du tout.' },
+  },
+  toolRegex: {
+    pattern: { en: 'pattern', fr: 'motif' },
+    flags: { en: 'flags', fr: 'options' },
+    text: { en: 'test text', fr: 'texte de test' },
+    placeholder: { en: 'Text to match against…', fr: 'Texte sur lequel chercher…' },
+    matches: { en: '{n} matches', fr: '{n} correspondances' },
+    one: { en: '1 match', fr: '1 correspondance' },
+    none: { en: 'no match', fr: 'aucune correspondance' },
+    truncated: { en: 'the first {n} are shown', fr: 'les {n} premières sont affichées' },
+    group: { en: 'group', fr: 'groupe' },
+    unmatched: { en: 'did not take part', fr: 'n’a pas participé' },
+    timeout: {
+      en: 'Stopped after a second: this pattern backtracks catastrophically on this text.',
+      fr: 'Arrêté après une seconde : ce motif part en retour arrière catastrophique sur ce texte.',
+    },
+    flavour: {
+      en: 'JavaScript (ECMAScript) syntax, run in a worker that is stopped after one second.',
+      fr: 'Syntaxe JavaScript (ECMAScript), exécutée dans un worker arrêté au bout d’une seconde.',
+    },
+    g: { en: 'global — every match', fr: 'global — toutes les correspondances' },
+    i: { en: 'ignore case', fr: 'ignorer la casse' },
+    m: { en: 'multiline — ^ and $ per line', fr: 'multiligne — ^ et $ par ligne' },
+    s: { en: 'dotAll — . matches newlines', fr: 'dotAll — . inclut les retours à la ligne' },
+    u: { en: 'unicode', fr: 'unicode' },
+    y: { en: 'sticky — only at lastIndex', fr: 'collant — seulement à lastIndex' },
+  },
+  toolCron: {
+    input: { en: 'expression', fr: 'expression' },
+    presets: { en: 'examples', fr: 'exemples' },
+    next: { en: 'next runs, in {zone}', fr: 'prochaines exécutions, fuseau {zone}' },
+    never: {
+      en: 'Never — no date matches in the next four years.',
+      fr: 'Jamais — aucune date ne correspond dans les quatre prochaines années.',
+    },
+    count: { en: 'Five fields expected, {n} found.', fr: 'Cinq champs attendus, {n} trouvés.' },
+    reboot: {
+      en: '@reboot runs when the machine starts: it has no calendar meaning.',
+      fr: '@reboot s’exécute au démarrage de la machine : ce n’est pas une date.',
+    },
+    syntax: { en: 'Cannot read “{token}” in the {field} field.', fr: 'Impossible de lire « {token} » dans le champ {field}.' },
+    range: { en: '“{token}” is out of range for the {field} field.', fr: '« {token} » est hors limites pour le champ {field}.' },
+    step: { en: 'The step in “{token}” ({field}) is not usable.', fr: 'Le pas de « {token} » ({field}) est inutilisable.' },
+    minute: { en: 'minute', fr: 'minute' },
+    hour: { en: 'hour', fr: 'heure' },
+    day: { en: 'day of month', fr: 'jour du mois' },
+    month: { en: 'month', fr: 'mois' },
+    weekday: { en: 'day of week', fr: 'jour de la semaine' },
+    note: {
+      en: 'Vixie cron rules: 0 and 7 are both Sunday, and when both day fields are set, either one matching is enough.',
+      fr: 'Règles de Vixie cron : 0 et 7 sont tous deux dimanche, et quand les deux champs de jour sont renseignés, l’un ou l’autre suffit.',
+    },
+  },
+  toolQr: {
+    input: { en: 'text', fr: 'texte' },
+    placeholder: { en: 'Text or a URL…', fr: 'Du texte ou une URL…' },
+    level: { en: 'error correction', fr: 'correction d’erreur' },
+    info: {
+      en: 'version {version} · {size}×{size} modules · mask {mask} · {bytes} bytes',
+      fr: 'version {version} · {size}×{size} modules · masque {mask} · {bytes} octets',
+    },
+    tooLong: {
+      en: '{bytes} bytes is more than a QR code holds at level {ecl} ({max}).',
+      fr: '{bytes} octets, c’est plus qu’un QR code n’en contient au niveau {ecl} ({max}).',
+    },
+    empty: { en: 'Type something to encode.', fr: 'Tapez quelque chose à encoder.' },
+    png: { en: 'PNG', fr: 'PNG' },
+    svg: { en: 'SVG', fr: 'SVG' },
+    note: {
+      en: 'Encoded here, from the standard: no library, no request. The code is black on white whatever the theme, because scanners want contrast.',
+      fr: 'Encodé ici, d’après la norme : aucune bibliothèque, aucune requête. Noir sur blanc quel que soit le thème, parce que les lecteurs veulent du contraste.',
+    },
+  },
+  toolDiff: {
+    from: { en: 'original', fr: 'original' },
+    to: { en: 'changed', fr: 'modifié' },
+    identical: { en: 'identical', fr: 'identiques' },
+    tooBig: {
+      en: 'Too different to diff here without freezing the page.',
+      fr: 'Trop différents pour être comparés ici sans figer la page.',
+    },
+    note: {
+      en: 'The same line diff as the terminal’s `diff` command, printed as `diff -u` would.',
+      fr: 'Le même diff ligne à ligne que la commande `diff` du terminal, affiché comme `diff -u`.',
     },
   },
   toolTime: {
@@ -450,6 +576,51 @@ export const messages = {
       en: 'A room is a code, a playback state and a head count. No names, no ids, nothing stored: it lives in the server’s memory and is gone two hours after the last action.',
       fr: "Un salon, c'est un code, un état de lecture et un nombre de présents. Ni noms, ni identifiants, rien d'enregistré : il vit dans la mémoire du serveur et disparaît deux heures après la dernière action.",
     },
+  },
+  // Chrome for `ctf`, `flag` and `decrypt`. Stage titles, hints and rewards live on
+  // the stages themselves (terminal/ctf.ts), the way achievements carry their own.
+  ctf: {
+    board: { en: 'ctf — {n}/{total} flags', fr: 'ctf — {n}/{total} flags' },
+    hint: { en: 'hint', fr: 'indice' },
+    submit: { en: 'submit a flag with `flag CTF{…}`', fr: 'soumettez un flag avec `flag CTF{…}`' },
+    usage: { en: 'usage: flag CTF{…}', fr: 'usage : flag CTF{…}' },
+    malformed: {
+      en: 'flag: that is not a flag — they look like CTF{0123456789abcdef}',
+      fr: 'flag : ce n’est pas un flag — ils ressemblent à CTF{0123456789abcdef}',
+    },
+    wrong: { en: 'flag: unknown flag', fr: 'flag : flag inconnu' },
+    order: { en: 'flag: out of order — you’re on stage {n}', fr: 'flag : pas dans l’ordre — vous en êtes à l’étape {n}' },
+    already: { en: 'flag: stage {n} is already solved', fr: 'flag : l’étape {n} est déjà résolue' },
+    solved: { en: 'stage {n} solved: {title}', fr: 'étape {n} résolue : {title}' },
+    nudge: { en: 'still stuck? a sharper hint:', fr: 'toujours bloqué ? un indice plus précis :' },
+    complete: {
+      en: 'the chain is complete. nothing else hides here — mention `root` when you write.',
+      fr: 'la chaîne est complète. plus rien ne se cache ici — mentionnez `root` en écrivant.',
+    },
+    missing: { en: 'decrypt: missing key material — {n} of 7 flags', fr: 'decrypt : clé incomplète — {n} flags sur 7' },
+    missingStages: { en: 'still missing stages', fr: 'étapes manquantes :' },
+    corrupt: {
+      en: 'decrypt: the key does not fit. those flags were not captured here.',
+      fr: 'decrypt : la clé ne correspond pas. ces flags n’ont pas été capturés ici.',
+    },
+    reopened: { en: '(already solved — the message does not change)', fr: '(déjà résolu — le message ne change pas)' },
+  },
+  // The wireframe background: the click-to-inspect label on a visitor's shape, and
+  // the one line the screensaver leaves on screen.
+  scene: {
+    visitor: { en: 'someone else, here now', fr: 'quelqu’un d’autre, ici en ce moment' },
+    wake: { en: 'move the mouse or press a key', fr: 'bougez la souris ou appuyez sur une touche' },
+  },
+  now: {
+    heading: { en: 'What I’m doing now', fr: 'Ce que je fais en ce moment' },
+    updated: { en: 'Last updated', fr: 'Mis à jour le' },
+    // `{n}` is the list's age in days. Shown instead of letting an old list pass
+    // for a current one — the only honest way a /now page survives neglect.
+    stale: {
+      en: 'This list is {n} days old. Some of it is probably no longer true.',
+      fr: 'Cette liste date de {n} jours. Une partie n’est sans doute plus vraie.',
+    },
+    about: { en: 'A /now page, as in', fr: 'Une page /now, comme sur' },
   },
   footer: {
     built: { en: 'built', fr: 'build' },

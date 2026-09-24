@@ -44,7 +44,7 @@ const cells = computed(() => [
     ></textarea>
 
     <dl class="grid grid-cols-3 gap-2 sm:grid-cols-5 lg:grid-cols-9">
-      <div v-for="cell in cells" :key="cell.label" class="rounded border border-border/60 bg-black/30 px-2 py-1.5">
+      <div v-for="cell in cells" :key="cell.label" class="rounded border border-border/60 bg-black/30 light:bg-muted px-2 py-1.5">
         <dt class="text-[10px] uppercase tracking-wider text-muted-foreground truncate">{{ cell.label }}</dt>
         <dd class="font-mono text-sm text-primary">{{ cell.value }}</dd>
       </div>
@@ -77,7 +77,7 @@ const cells = computed(() => [
           readonly
           rows="5"
           spellcheck="false"
-          class="w-full rounded border border-border bg-black/30 px-3 py-2 font-mono text-sm text-primary outline-none resize-y"
+          class="w-full rounded border border-border bg-black/30 light:bg-muted px-3 py-2 font-mono text-sm text-primary outline-none resize-y"
         ></textarea>
       </div>
     </div>

@@ -6,17 +6,23 @@ import { activeSection } from '@/composables/useActiveSection'
 import { terminalOpen } from '@/composables/useTerminalShell'
 import { BASE_SHAPE_COUNT, MAX_SHAPE_COUNT, useSceneControl } from '@/composables/useSceneControl'
 import { fetchWeather, weatherMood } from '@/composables/useWeather'
+import { useTheme } from '@/composables/useTheme'
 import { useViewSwing } from '@/composables/useViewSwing'
+import { startScreensaver, useScreensaver } from '@/composables/useIdle'
+import { useLocale } from '@/i18n'
 import { unlock, unlocked } from '@/terminal/achievements'
 
 // CRT overdrive spins the wireframes up; reading the ref inside the loop keeps the
 // animation frame allocation-free. `glitching` is the same ref that drives the CSS
 // screen-tear on `sudo rm -rf /`, so the shapes shake for exactly that window.
 const { speedMultiplier, glitching } = useCrt()
-const { shapeCount, gravityOn, constellationOn } = useSceneControl()
+const { shapeCount, gravityOn, constellationOn, visitorShapes } = useSceneControl()
+const { screensaver } = useScreensaver()
+const { t, m } = useLocale()
 // The prism swing between views (features-spec §11). The router drives one eased
 // clock; the DOM turns the pages by it and this component turns the field by it.
 const { swing, swingDirection, swinging, activeView } = useViewSwing()
+const { theme } = useTheme()
 
 const canvasRef = ref<HTMLCanvasElement | null>(null)
 /** What `click-to-inspect` is currently showing, if anything. */
@@ -58,11 +64,27 @@ interface AnimatedShape {
   /** Opacity before the weather mood scales it, so the nudge stays reversible. */
   baseOpacity: number
   kind: ShapeKind
+  /** Only on a visitor's shape: how far it has faded in, and whether it is going. */
+  presence?: { level: number; leaving: boolean }
 }
 
 const shapes: AnimatedShape[] = []
 /** Reused by the raycaster; kept in step with `shapes` on every add/remove. */
 const meshes: THREE.Mesh[] = []
+/**
+ * One shape per other person on the site (`visitorShapes`), in a pool of their own so
+ * `spawn`, `scene reset` and the accent count never see them. They fade in on arrival
+ * and out on departure, and are only disposed once fully gone.
+ */
+const visitors: AnimatedShape[] = []
+/** How much of the way to its target a visitor's fade moves each frame. */
+const VISITOR_FADE = 0.025
+
+/** Both pools, without allocating — the swing and the render loop visit every shape. */
+function forEachShape(fn: (shape: AnimatedShape) => void) {
+  for (const shape of shapes) fn(shape)
+  for (const shape of visitors) fn(shape)
+}
 
 const accentSeeds = 3
 /** Roughly the initial 3-in-18 ratio, for anything `spawn` adds later. */
@@ -96,12 +118,14 @@ const FIELD_DEPTH = -4
 const FIELD_YAW = (40 * Math.PI) / 180
 const DOLLY = 6
 
+let stopScreensaver: (() => void) | null = null
+
 let mouseX = 0
 let mouseY = 0
 let pointerActive = false
 let pointerIdleTimer: ReturnType<typeof setTimeout> | undefined
 
-/** The four neon hues from the stylesheet, read once on mount. */
+/** The four neon hues from the stylesheet — or from the `theme` written over it. */
 const neon: Record<string, THREE.Color> = {}
 
 interface Palette {
@@ -199,6 +223,12 @@ function applyPalette() {
     // weather changes can't ratchet every shape down to invisible.
     material.opacity = Math.min(baseOpacity * mood.opacity, 0.6)
   }
+  for (const shape of visitors) {
+    const material = shape.mesh.material as THREE.MeshBasicMaterial
+    const colour = neon[palette.base]
+    if (colour) material.color.copy(colour)
+    material.opacity = visitorOpacity(shape)
+  }
   if (links) {
     const colour = neon[palette.base]
     if (colour) (links.material as THREE.LineBasicMaterial).color.copy(colour)
@@ -216,7 +246,7 @@ function sampleHome(out: THREE.Vector3): THREE.Vector3 {
   return out.set((Math.random() - 0.5) * spread, (Math.random() - 0.5) * 14, (Math.random() - 0.5) * 12)
 }
 
-function addShape(accent: boolean) {
+function addShape(accent: boolean, pool: AnimatedShape[] = shapes) {
   if (!field || !camera) return
 
   const kind = KINDS[Math.floor(Math.random() * KINDS.length)]!
@@ -235,7 +265,7 @@ function addShape(accent: boolean) {
   mesh.rotation.set(Math.random() * Math.PI, Math.random() * Math.PI, Math.random() * Math.PI)
 
   field.add(mesh)
-  shapes.push({
+  const shape: AnimatedShape = {
     mesh,
     home,
     offset: new THREE.Vector3(),
@@ -247,19 +277,70 @@ function addShape(accent: boolean) {
       y: (Math.random() - 0.5) * 0.006,
       z: (Math.random() - 0.5) * 0.004,
     },
-  })
-  meshes.push(mesh)
+  }
+  pool.push(shape)
+  if (pool === shapes) meshes.push(mesh)
+  else {
+    // Invisible until the loop fades it in; at full straight away when nothing loops.
+    shape.presence = { level: animationFrameId === null ? 1 : 0, leaving: false }
+    material.opacity = visitorOpacity(shape)
+  }
+}
+
+function disposeShape(shape: AnimatedShape) {
+  if (focused === shape) focused = null
+  field?.remove(shape.mesh)
+  shape.mesh.geometry.dispose()
+  ;(shape.mesh.material as THREE.Material).dispose()
+}
+
+/** A visitor's opacity: what any shape would have under this weather, times its fade. */
+function visitorOpacity(shape: AnimatedShape): number {
+  return Math.min(shape.baseOpacity * weatherMood.value.opacity, 0.6) * (shape.presence?.level ?? 1)
+}
+
+/**
+ * Brings the visitor pool to `visitorShapes`: arrivals are added at zero opacity, and
+ * departures are marked rather than removed, so the loop can fade them out. A
+ * departure still fading is taken back first if someone else arrives.
+ */
+function syncVisitors() {
+  const wanted = visitorShapes.value
+  const staying = () => visitors.filter((v) => !v.presence!.leaving)
+  for (const shape of visitors) {
+    if (shape.presence!.leaving && staying().length < wanted) shape.presence!.leaving = false
+  }
+  while (staying().length < wanted) addShape(false, visitors)
+  const present = staying()
+  for (let i = present.length - 1; i >= wanted; i--) present[i]!.presence!.leaving = true
+
+  // With no loop running there is no fade: settle the pool now.
+  if (animationFrameId === null) {
+    for (let i = visitors.length - 1; i >= 0; i--) {
+      if (visitors[i]!.presence!.leaving) disposeShape(visitors.splice(i, 1)[0]!)
+    }
+    if (renderer && scene && camera) renderer.render(scene, camera)
+  }
+}
+
+/** One frame of the visitors' fades; removes whoever has finished leaving. */
+function fadeVisitors() {
+  for (let i = visitors.length - 1; i >= 0; i--) {
+    const shape = visitors[i]!
+    const presence = shape.presence!
+    presence.level += ((presence.leaving ? 0 : 1) - presence.level) * VISITOR_FADE
+    if (presence.leaving && presence.level < 0.01) {
+      disposeShape(visitors.splice(i, 1)[0]!)
+      continue
+    }
+    ;(shape.mesh.material as THREE.MeshBasicMaterial).opacity = visitorOpacity(shape)
+  }
 }
 
 function removeShape() {
   const shape = shapes.pop()
   meshes.pop()
-  if (!shape) return
-
-  if (focused === shape) focused = null
-  field?.remove(shape.mesh)
-  shape.mesh.geometry.dispose()
-  ;(shape.mesh.material as THREE.Material).dispose()
+  if (shape) disposeShape(shape)
 }
 
 /** Brings the scene to `shapeCount`, adding or removing one at a time. */
@@ -270,11 +351,16 @@ function syncShapeCount() {
   if (animationFrameId === null && renderer && scene && camera) renderer.render(scene, camera)
 }
 
-function createInitialShapes() {
+/** Called on mount and again on every `theme` switch, which rewrites the properties. */
+function readNeon() {
   neon.green = readNeonColor('--neon-green', '#00ff41')
   neon.cyan = readNeonColor('--neon-cyan', '#00ffff')
   neon.purple = readNeonColor('--neon-purple', '#bf00ff')
   neon.pink = readNeonColor('--neon-pink', '#ff0080')
+}
+
+function createInitialShapes() {
+  readNeon()
 
   // Exactly three accents in the opening scene, so "not all of them are the same
   // colour" is a fact rather than a probability.
@@ -362,17 +448,21 @@ function handleClick(event: MouseEvent) {
   )
   raycaster.setFromCamera(pointerNdc, camera)
 
-  const hit = raycaster.intersectObjects(meshes, false)[0]
+  const hit = raycaster.intersectObjects([...meshes, ...visitors.map((v) => v.mesh)], false)[0]
   if (!hit) return
 
-  const shape = shapes.find((s) => s.mesh === hit.object)
+  const shape = shapes.find((s) => s.mesh === hit.object) ?? visitors.find((v) => v.mesh === hit.object)
   if (!shape) return
 
   focused = shape
   focusUntil = performance.now() + FOCUS_MS
 
   inspected.value = {
-    text: shape.accent ? `${shape.kind.label} · accent` : shape.kind.label,
+    text: shape.presence
+      ? `${shape.kind.label} · ${t(m.scene.visitor)}`
+      : shape.accent
+        ? `${shape.kind.label} · accent`
+        : shape.kind.label,
     x: event.clientX,
     y: event.clientY,
   }
@@ -408,11 +498,11 @@ function handleResize() {
  */
 function rehome() {
   const finalYaw = -swingDirection.value * FIELD_YAW
-  for (const shape of shapes) {
+  forEachShape((shape) => {
     sampleHome(worldPosition).applyAxisAngle(Y_AXIS, -finalYaw)
     shape.offset.add(shape.home).sub(worldPosition)
     shape.home.copy(worldPosition)
-  }
+  })
 }
 
 /**
@@ -425,10 +515,10 @@ function rehome() {
 function bake() {
   if (!field) return
   const yaw = field.rotation.y
-  for (const shape of shapes) {
+  forEachShape((shape) => {
     shape.home.applyAxisAngle(Y_AXIS, yaw)
     shape.offset.applyAxisAngle(Y_AXIS, yaw)
-  }
+  })
   field.rotation.y = 0
 }
 
@@ -459,7 +549,8 @@ function animate() {
     pointerWorld.set(mouseX * half.x, -mouseY * half.y, 0)
   }
 
-  shapes.forEach(({ mesh, speed, home, offset }) => {
+  fadeVisitors()
+  forEachShape(({ mesh, speed, home, offset }) => {
     mesh.rotation.x += speed.x * boost
     mesh.rotation.y += speed.y * boost
     mesh.rotation.z += speed.z * boost
@@ -517,7 +608,15 @@ function animate() {
 // The weather rides along on the same watcher: it only ever scales what the
 // palette already decided, so there is nothing for it to apply separately.
 watch([activeSection, activeView, unlocked, weatherMood], applyPalette)
+// A scheme changes what the palette's names mean, not which names it picks — so the
+// same recolour, after re-reading the hues. `useTheme` has already written the new
+// properties by the time this runs.
+watch(theme, () => {
+  readNeon()
+  applyPalette()
+})
 watch(shapeCount, syncShapeCount)
+watch(visitorShapes, syncVisitors)
 watch(constellationOn, (on) => (on ? ensureLinks() : disposeLinks()))
 
 onMounted(() => {
@@ -537,6 +636,7 @@ onMounted(() => {
 
     createInitialShapes()
     if (constellationOn.value) ensureLinks()
+    syncVisitors()
   } catch (error) {
     console.warn('ThreeBackground: WebGL unavailable, skipping animated background.', error)
     return
@@ -554,6 +654,9 @@ onMounted(() => {
 
   window.addEventListener('resize', handleResize)
   window.addEventListener('click', handleClick)
+  // Only once there is a field to hand the screen to: a failed WebGL context returns
+  // above, and reduced motion never mounts this component at all.
+  stopScreensaver = startScreensaver()
 
   // One request, from the surface that actually reacts to the answer. This
   // component is not mounted under reduced motion, so the call is never made
@@ -572,8 +675,11 @@ onUnmounted(() => {
   window.removeEventListener('mousemove', handleMouseMove)
   window.removeEventListener('click', handleClick)
 
+  stopScreensaver?.()
+  stopScreensaver = null
   disposeLinks()
   while (shapes.length) removeShape()
+  while (visitors.length) disposeShape(visitors.pop()!)
 
   renderer?.forceContextLoss()
   renderer?.dispose()
@@ -602,5 +708,23 @@ onUnmounted(() => {
     >
       {{ inspected.text }}
     </div>
+  </Transition>
+
+  <!-- Kept visible through the screensaver's fade (see main.css), so the page never
+       looks like it has simply broken. -->
+  <Transition
+    enter-active-class="transition duration-700 delay-1000 ease-out"
+    enter-from-class="opacity-0"
+    leave-active-class="transition duration-150"
+    leave-to-class="opacity-0"
+  >
+    <p
+      v-if="screensaver"
+      data-screensaver-keep
+      data-testid="screensaver-hint"
+      class="fixed inset-x-0 bottom-8 text-center font-mono text-xs text-muted-foreground/70 pointer-events-none"
+    >
+      {{ t(m.scene.wake) }}
+    </p>
   </Transition>
 </template>

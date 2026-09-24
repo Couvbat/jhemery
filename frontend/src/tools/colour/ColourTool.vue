@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
+import { useTheme } from '@/composables/useTheme'
 import { useLocale } from '@/i18n'
 import CopyButton from '../CopyButton.vue'
 import ToolFrame from '../ToolFrame.vue'
@@ -15,6 +16,7 @@ import {
 } from './colour'
 
 const { t, m } = useLocale()
+const { theme } = useTheme()
 
 const input = ref('#00ff41')
 const against = ref('#0d0f0d')
@@ -23,14 +25,19 @@ const colour = computed(() => parseColour(input.value))
 const other = computed(() => parseColour(against.value))
 const invalid = computed(() => input.value.trim() !== '' && !colour.value)
 
-/** The stylesheet's own tokens, read once so the presets can never drift from the
- *  theme. Their values are `oklch()` strings, which the parser handles. */
+/** The stylesheet's own tokens, read live so the presets can never drift from the
+ *  theme — on mount, and again whenever `theme` writes new ones over them. The
+ *  default's are `oklch()` strings and the other schemes' hex; the parser takes both. */
 interface Preset {
   name: string
   value: string
 }
 const presets = ref<Preset[]>([])
-onMounted(() => {
+/** The background last copied into `against`, so a scheme switch can tell whether the
+ *  field still holds the page's colour or something the visitor typed. */
+let pageBackground: string | null = null
+
+function readPresets() {
   const style = getComputedStyle(document.documentElement)
   const read = (name: string) => style.getPropertyValue(name).trim()
   presets.value = (
@@ -48,8 +55,13 @@ onMounted(() => {
     .map(([variable, name]) => ({ name, value: read(variable) }))
     .filter((p) => parseColour(p.value))
   const background = read('--background')
-  if (parseColour(background)) against.value = background
-})
+  if (!parseColour(background)) return
+  if (pageBackground === null || against.value === pageBackground) against.value = background
+  pageBackground = background
+}
+
+onMounted(readPresets)
+watch(theme, readPresets)
 
 const formats = computed(() =>
   colour.value
@@ -79,7 +91,7 @@ const table = computed(() =>
 const LEVEL_CLASS: Record<WcagLevel, string> = {
   AAA: 'text-primary',
   AA: 'text-primary',
-  'AA large': 'text-yellow-400',
+  'AA large': 'text-warning',
   fail: 'text-destructive',
 }
 
@@ -141,7 +153,7 @@ function swatch(value: string): string {
       <div
         v-for="format in formats"
         :key="format.label"
-        class="flex items-center gap-2 rounded border border-border/60 bg-black/30 px-3 py-2"
+        class="flex items-center gap-2 rounded border border-border/60 bg-black/30 light:bg-muted px-3 py-2"
       >
         <dt class="w-12 text-xs text-muted-foreground">{{ format.label }}</dt>
         <dd class="flex-1 font-mono text-sm text-primary break-all">{{ format.value }}</dd>

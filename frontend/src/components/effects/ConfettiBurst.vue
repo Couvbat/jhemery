@@ -8,7 +8,14 @@ import { drainConfetti, confettiQueue } from '@/composables/useConfetti'
  * tinted with the neon palette.
  */
 const GLYPHS = ['$', '>', '<', '/', '\\', '*', '#', '+', '=', '~', '^', '1', '0', '{', '}']
-const COLOURS = ['#00ff41', '#00ffff', '#bf00ff', '#ff0080', '#d0ffd8']
+const PALETTE = ['--neon-green', '--neon-cyan', '--neon-purple', '--neon-pink', '--foreground']
+const FALLBACK = ['#00ff41', '#00ffff', '#bf00ff', '#ff0080', '#d0ffd8']
+
+/** Read per burst rather than once, so the confetti is in whatever scheme `theme` set. */
+function colours(): string[] {
+  const style = getComputedStyle(document.documentElement)
+  return PALETTE.map((name, i) => style.getPropertyValue(name).trim() || FALLBACK[i]!)
+}
 
 const BASE_COUNT = 34
 const GRAVITY = 900 // px/s²
@@ -55,6 +62,7 @@ function spawn(x: number, y: number, intensity: number) {
   // Phones get half the confetti: same effect, a third of the fill cost.
   const scale = window.innerWidth < 640 ? 0.5 : 1
   const count = Math.round(BASE_COUNT * intensity * scale)
+  const palette = colours()
 
   for (let i = 0; i < count; i++) {
     // Full 360° with an upward bias, so gravity turns the burst into a fountain
@@ -73,7 +81,7 @@ function spawn(x: number, y: number, intensity: number) {
       ttl: 1.1 + Math.random() * 0.8,
       size: 11 + Math.random() * 8,
       glyph: GLYPHS[Math.floor(Math.random() * GLYPHS.length)]!,
-      colour: COLOURS[Math.floor(Math.random() * COLOURS.length)]!,
+      colour: palette[Math.floor(Math.random() * palette.length)]!,
     })
   }
 }

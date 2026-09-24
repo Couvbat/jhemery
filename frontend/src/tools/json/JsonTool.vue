@@ -115,7 +115,7 @@ const pointer = computed(() => {
           readonly
           rows="12"
           spellcheck="false"
-          class="w-full rounded border border-border bg-black/30 px-3 py-2 font-mono text-sm text-primary outline-none resize-y"
+          class="w-full rounded border border-border bg-black/30 light:bg-muted px-3 py-2 font-mono text-sm text-primary outline-none resize-y"
         ></textarea>
       </div>
     </div>

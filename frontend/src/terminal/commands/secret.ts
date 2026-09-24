@@ -30,6 +30,17 @@ const body: Localised<string[]> = {
   ],
 }
 
+/**
+ * Stage 1 of the CTF chain, and its on-ramp inside the site: the audience for this
+ * file is already whoever keeps pulling threads, so it hands them the next one.
+ */
+const FLAG = 'CTF{d1c8c2e0e268bb96}'
+
+const postscript: Localised = {
+  en: `P.S. ${FLAG} — there is more where that came from. Try \`ctf\`.`,
+  fr: `P.-S. ${FLAG} — il y en a d’autres. Essayez \`ctf\`.`,
+}
+
 export function secretContents(t: <T>(value: Localised<T>) => T): OutputLine[] {
   return [
     line('# .secret', 'muted'),
@@ -37,5 +48,7 @@ export function secretContents(t: <T>(value: Localised<T>) => T): OutputLine[] {
     ...t(body).map((text) => (text ? line(text, 'accent') : blank)),
     blank,
     line(`  → ${profile.email}`, 'primary'),
+    blank,
+    line(t(postscript), 'muted'),
   ]
 }

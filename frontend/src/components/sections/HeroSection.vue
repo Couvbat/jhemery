@@ -2,10 +2,14 @@
 import { computed, ref, onMounted, onUnmounted, watch } from 'vue'
 import { Badge } from '@/components/ui/badge'
 import HighlightText from '@/components/HighlightText.vue'
-import { profile, skills } from '@/content'
+import { isExternal, profile, skills } from '@/content'
 import { useLocale } from '@/i18n'
+import { goTo } from '@/composables/useViewSwing'
 
 const { t, m, locale } = useLocale()
+
+/** Only the skills this repository can show something for; the rest stay plain badges. */
+const evidenced = skills.filter((skill) => skill.usedIn?.length)
 
 const bioTerms = [profile.name, profile.alias, profile.employer, profile.location, 'France']
 
@@ -102,13 +106,48 @@ onUnmounted(() => clearInterval(timer))
             <div class="flex flex-wrap gap-2">
               <Badge
                 v-for="skill in skills"
-                :key="skill"
+                :key="skill.name"
                 variant="outline"
                 class="border-primary/50 text-primary hover:bg-primary/10 transition-colors"
               >
-                {{ skill }}
+                {{ skill.name }}<span v-if="skill.usedIn?.length" class="text-accent" aria-hidden="true">*</span>
               </Badge>
             </div>
+          </div>
+
+          <!-- skills --why: the evidence, one link per place it is used -->
+          <div>
+            <p class="text-muted-foreground text-sm mb-3">
+              <span class="text-primary">{{ profile.handle }}</span><span class="text-muted-foreground">:~$</span>
+              <span class="ml-2 text-foreground">skills --why</span>
+            </p>
+            <dl class="grid gap-x-4 gap-y-1 text-sm sm:grid-cols-[auto_1fr]" data-testid="skills-why">
+              <template v-for="skill in evidenced" :key="skill.name">
+                <dt class="text-accent">{{ skill.name }}</dt>
+                <dd class="flex flex-wrap gap-x-3 text-muted-foreground">
+                  <template v-for="(evidence, i) in skill.usedIn" :key="evidence.where">
+                    <span v-if="i > 0" aria-hidden="true">·</span>
+                    <a
+                      v-if="isExternal(evidence.where)"
+                      :href="evidence.where"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      class="hover:text-primary underline decoration-dotted underline-offset-4 transition-colors"
+                    >
+                      {{ t(evidence.what) }} ↗
+                    </a>
+                    <button
+                      v-else
+                      type="button"
+                      class="hover:text-primary underline decoration-dotted underline-offset-4 transition-colors"
+                      @click="goTo(evidence.where)"
+                    >
+                      {{ t(evidence.what) }} →
+                    </button>
+                  </template>
+                </dd>
+              </template>
+            </dl>
           </div>
         </div>
       </div>

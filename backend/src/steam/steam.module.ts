@@ -7,5 +7,6 @@ import { SteamService } from './steam.service';
   imports: [ConfigModule],
   controllers: [SteamController],
   providers: [SteamService],
+  exports: [SteamService],
 })
 export class SteamModule {}

@@ -6,6 +6,7 @@ import {
   SteamProfile,
   SteamStatus,
 } from './steam.types';
+import { cacheAge, UnitHealth } from '../common/health';
 
 const PERSONA_STATES: SteamStatus[] = [
   'offline',
@@ -163,5 +164,20 @@ export class SteamService {
       playtime2Weeks: g.playtime_2weeks ?? 0,
       playtimeForever: g.playtime_forever ?? 0,
     }));
+  }
+
+  /** Configured or not, and how old the cached profile is — nothing is fetched. */
+  health(): UnitHealth {
+    const configured = Boolean(
+      this.config.get<string>('STEAM_API_KEY') &&
+      this.config.get<string>('STEAM_ID'),
+    );
+    return configured
+      ? {
+          unit: 'steam',
+          state: 'active',
+          cacheAge: cacheAge(this.cache, CACHE_TTL_MS),
+        }
+      : { unit: 'steam', state: 'inactive', reason: 'unconfigured' };
   }
 }

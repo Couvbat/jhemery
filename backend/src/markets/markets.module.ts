@@ -7,5 +7,6 @@ import { MarketsService } from './markets.service';
   imports: [ConfigModule],
   controllers: [MarketsController],
   providers: [MarketsService],
+  exports: [MarketsService],
 })
 export class MarketsModule {}

@@ -1,6 +1,8 @@
 import { ref } from 'vue'
 import type { Localised } from '@/content/types'
+import type { Theme } from '@/lib/themes'
 import { blank, line } from './format'
+import { loadSet, persistSet as persist } from './storage'
 import type { OutputLine } from './types'
 
 export interface Achievement {
@@ -306,6 +308,39 @@ export const achievementList: Achievement[] = [
     description: { en: 'Ran `gravity off`.', fr: 'Lancé `gravity off`.' },
   },
   {
+    id: 'ricer',
+    title: { en: 'Ricer', fr: 'Ricer' },
+    hint: {
+      en: 'A real ricer never settles for the default colours.',
+      fr: 'Un vrai ricer ne se contente jamais des couleurs par défaut.',
+    },
+    description: {
+      en: 'Tried five colour schemes.',
+      fr: 'Essayé cinq thèmes de couleurs.',
+    },
+  },
+  {
+    id: 'flashbang',
+    title: { en: 'Flashbang', fr: 'Flashbang' },
+    hint: {
+      en: 'Not every colour scheme is kind to your eyes.',
+      fr: 'Tous les thèmes ne sont pas tendres avec vos yeux.',
+    },
+    description: { en: 'Switched to a light theme.', fr: 'Passé à un thème clair.' },
+  },
+  {
+    id: 'firstBlood',
+    title: { en: 'First Blood', fr: 'Premier sang' },
+    hint: {
+      en: 'Some sites hide more than one thing.',
+      fr: 'Certains sites cachent plus d’une chose.',
+    },
+    description: {
+      en: 'Captured a flag — `ctf` shows the rest of the chain.',
+      fr: 'Capturé un flag — `ctf` montre la suite de la chaîne.',
+    },
+  },
+  {
     id: COMPLETIONIST,
     title: { en: '100%', fr: '100%' },
     hint: { en: 'For those who leave no stone unturned.', fr: 'Pour ceux qui ne laissent rien au hasard.' },
@@ -315,28 +350,12 @@ export const achievementList: Achievement[] = [
 
 const ACHIEVEMENTS_KEY = 'couvbat:achievements'
 const SECTIONS_KEY = 'couvbat:achievements:sections'
+const THEMES_KEY = 'couvbat:achievements:themes'
 const knownIds = new Set(achievementList.map((a) => a.id))
-
-function loadSet(key: string): Set<string> {
-  if (typeof window === 'undefined') return new Set()
-  try {
-    const parsed: unknown = JSON.parse(window.localStorage.getItem(key) ?? '[]')
-    return new Set(Array.isArray(parsed) ? parsed.filter((v): v is string => typeof v === 'string') : [])
-  } catch {
-    return new Set()
-  }
-}
-
-function persist(key: string, value: Set<string>) {
-  try {
-    window.localStorage.setItem(key, JSON.stringify([...value]))
-  } catch {
-    // Private browsing or a full quota — progress just won't persist.
-  }
-}
 
 export const unlocked = ref<Set<string>>(loadSet(ACHIEVEMENTS_KEY))
 const visitedSections = ref<Set<string>>(loadSet(SECTIONS_KEY))
+const triedThemes = ref<Set<string>>(loadSet(THEMES_KEY))
 
 /** Newly-unlocked achievements waiting to be shown as a floating toast, oldest first. */
 export const toastQueue = ref<{ id: string; title: Localised<string> }[]>([])
@@ -390,6 +409,27 @@ export function visitSection(id: string, allSectionIds: readonly string[]): stri
   persist(SECTIONS_KEY, next)
 
   return allSectionIds.every((sectionId) => next.has(sectionId)) ? unlock('explorer') : []
+}
+
+/** How many different schemes make a ricer: enough to mean it, few enough to reach by hand. */
+export const RICER_THEMES = 5
+
+/**
+ * Records a scheme being applied, whether by `theme` or the navbar's scheme menu — the
+ * two count the same, so neither surface can hold back an achievement the other gives.
+ * Unlocks `ricer` at the fifth different scheme and `flashbang` on a light one.
+ */
+export function tryTheme({ id, mode }: Pick<Theme, 'id' | 'mode'>): string[] {
+  if (!triedThemes.value.has(id)) {
+    const next = new Set(triedThemes.value)
+    next.add(id)
+    triedThemes.value = next
+    persist(THEMES_KEY, next)
+  }
+  return [
+    ...(triedThemes.value.size >= RICER_THEMES ? unlock('ricer') : []),
+    ...(mode === 'light' ? unlock('flashbang') : []),
+  ]
 }
 
 /** Unlocks `id` and renders a toast line for it (and any cascaded unlock) — `[]` if already unlocked. */

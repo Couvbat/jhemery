@@ -81,7 +81,7 @@ const zones = computed(() =>
       <div
         v-for="row in rows"
         :key="row.label"
-        class="flex items-center gap-2 rounded border border-border/60 bg-black/30 px-3 py-2"
+        class="flex items-center gap-2 rounded border border-border/60 bg-black/30 light:bg-muted px-3 py-2"
       >
         <dt class="w-24 shrink-0 text-xs text-muted-foreground">{{ row.label }}</dt>
         <dd class="flex-1 font-mono text-sm text-primary break-all">{{ row.value }}</dd>

@@ -17,6 +17,7 @@ import { homedir } from 'node:os';
 import { isAbsolute, join } from 'node:path';
 import { acceptedUrl } from './jobs.urls';
 import { DownloadJob, JobStatus } from './jobs.types';
+import { UnitHealth } from '../common/health';
 
 /** Queued plus running. One runs at a time — it is a shared host's CPU. */
 export const MAX_PENDING = 3;
@@ -392,6 +393,15 @@ export class JobsService implements OnModuleInit, OnModuleDestroy {
   private async discard(job: InternalJob): Promise<void> {
     this.jobs.delete(job.id);
     await rm(job.dir, { recursive: true, force: true }).catch(() => undefined);
+  }
+
+  /** Off, on without its binary, or on — the same checks `GET /jobs` makes. */
+  health(): UnitHealth {
+    if (!this.enabled)
+      return { unit: 'jobs', state: 'inactive', reason: 'disabled' };
+    if (!this.configured)
+      return { unit: 'jobs', state: 'inactive', reason: 'missing-binary' };
+    return { unit: 'jobs', state: 'active', detail: { jobs: this.jobs.size } };
   }
 }
 

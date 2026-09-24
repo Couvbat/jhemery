@@ -7,6 +7,7 @@ import { sleep } from '../timing'
 import type { Command, OutputLine, Tone } from '../types'
 import { uptime } from './content'
 import { ENV_FILE, envAssignments } from './env-file'
+import { systemctl } from './systemctl'
 
 interface Proc {
   pid: number
@@ -42,6 +43,14 @@ function processes(): Proc[] {
   return list
 }
 
+const GHOST: Proc = {
+  pid: 31337,
+  state: 'S',
+  command: 'ghost --flag=CTF{4a89a7f727a2c302} --next=/llms.txt',
+  cpu: [0, 0.1],
+  mem: [0.1, 0.1],
+}
+
 function jitter([min, max]: [number, number]): string {
   return (Math.random() * (max - min) + min).toFixed(1)
 }
@@ -70,6 +79,7 @@ function table(procs: Proc[]): OutputLine[] {
 }
 
 export const systemCommands: Command[] = [
+  systemctl,
   {
     name: 'ps',
     aliases: ['ps aux', 'ps -ef'],
@@ -97,6 +107,10 @@ export const systemCommands: Command[] = [
         // read as "live", but redrawing in place just teleports the rows. The
         // jittered %CPU/%MEM is what sells it now.
         const procs = processes()
+        // Stage 6 of the CTF chain (terminal/ctf.ts): a process that only exists on
+        // the last frame, so only someone who watched `top` to the end sees it —
+        // never `ps`. Under reduced motion there is one frame, which is the last.
+        if (i === frames - 1) procs.push(GHOST)
         const load = (Math.random() * 1.5).toFixed(2)
         draw([
           line(
@@ -155,6 +169,7 @@ export const systemCommands: Command[] = [
     usage: 'achievements',
     description: { en: 'Your progress finding secrets', fr: 'Votre progression' },
     group: 'fun',
+    linkable: true,
     palette: true,
     run({ t }) {
       const total = achievementList.length

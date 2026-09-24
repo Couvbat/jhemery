@@ -133,7 +133,9 @@ page all talk to the same session, so history survives closing the panel).
 - `lines`: rendered output buffer, capped at 500 entries.
 - `history`: submitted commands, capped at 100, persisted to `localStorage`.
 - ↑/↓ walk history, `Tab` completes (common prefix first, then lists candidates),
-  `Ctrl+L` clears, `Ctrl+C` cancels an in-flight interactive prompt.
+  `Ctrl+L` clears, `Ctrl+C` cancels an in-flight command or interactive prompt. The input is
+  never `disabled` while a command runs, only `readonly` + `aria-disabled`: a disabled input
+  drops focus to `<body>`, and Ctrl+C would have nowhere to land.
 
 ### Tab completion
 
@@ -175,6 +177,19 @@ Open/close: click the launcher, press `` ` `` (backtick) anywhere outside an inp
 The overlay is lazily mounted (`v-if="terminalEverOpened"`) and the whole terminal is a separate
 Rollup chunk, so a visitor who never opens it never downloads it.
 
+**Prompt suggestions** (`composables/usePromptSuggestion.ts`). While the prompt is empty and idle,
+its `placeholder` cycles through `suggestionPool()` — visible palette commands whose usage has no
+required argument — every 3.5 s. A placeholder rather than a buffer line, so it is never typed,
+submitted or copied. The first keystroke stops it for the session; reduced motion holds one hint.
+
+**Links that run a command** (`composables/useRunLink.ts`, `runLink` in `useTerminal.ts`).
+`?run=<command>` is read once the router is ready, at the launcher's `md` breakpoint only, removed
+with `router.replace`, and handed to the lazy chunk through `pendingLinkCommand` — kept apart from
+`pendingInitialCommand`, which only this site's own buttons set. The command must opt in with
+`linkable` on `Command`; it is resolved with `resolveLink()`, which never expands the reader's
+aliases, and executed directly rather than through `run()`. A refused link prints what it asked
+for. `registry.spec.ts` holds that nothing that writes and nothing hidden is linkable.
+
 ---
 
 ## 3. Commands
@@ -191,8 +206,47 @@ Grouped as they appear in `help`.
 | `date` | Local date/time |
 | `whoami` | Prints the current user |
 | `lang [en\|fr]` | Prints or switches locale |
+| `theme [name\|random]` (alias `colorscheme`) | Lists the colour schemes with a swatch strip each, or applies one |
 | `alias` / `unalias` | Session-persistent command renames, expanded before anything else parses the line |
+| `sha256sum` (aliases `sha1sum`, `sha512sum`) · `base64 [-d]` · `uuidgen` · `jq .` | The shell versions of the hash, encode and JSON tools, each importing the pure module its panel uses. No pipes: a fake-filesystem name is read as that file, anything else as literal text |
 | `exit` (aliases `quit`, `logout`) | Closes the overlay |
+
+**Colour schemes.** `theme` offers the site's own neon (*cyberpunk*, the default) and the palettes
+r/unixporn keeps coming back to: Gruvbox, Nord, Dracula, Catppuccin, Tokyo Night, Rosé Pine,
+Everforest, Solarized, plus two light ones, Gruvbox Light and Catppuccin Latte. Each scheme in
+`src/lib/themes.ts` names a dozen colours, and `themeTokens()` derives every custom property
+`:root` declares from them. Adding a scheme is one object, and nothing in the stylesheet or the
+components knows which schemes exist. `composables/useTheme.ts` writes the properties inline on
+`<html>` along with `data-theme`, `data-mode`, `color-scheme` and the `theme-color` meta. The
+default is never written: switching back *removes* every override, so `:root` in `main.css` stays
+the default's only definition and a visitor who never types `theme` gets the page as shipped. The
+choice is saved under `couvbat:theme` and re-applied in `main.ts` before the app mounts, so a
+returning visitor's first frame is already in their colours.
+
+Surfaces: the `theme` command, and a 🎨 menu in the navbar (`components/ThemeMenu.vue`). The menu
+matters most on a phone, where there is no terminal (§9), so without it a phone visitor could never
+leave the default. It lists the same schemes with the same swatch strip (`swatch()` in `themes.ts`),
+each drawn on its scheme's own background so a light one looks light before it is picked. It stays
+open on a pick: the page repaints behind it, so browsing the list is the preview. Both surfaces apply
+through `setTheme` and record through `tryTheme`, so the flash, the saved choice and both
+achievements behave the same whichever one you use.
+
+What makes that work is that everything is a token. The `--neon-*` properties are the four hue
+slots (under Gruvbox `--neon-green` is orange). The glows `color-mix` over them instead of
+hard-coding rgba, warnings use a `--warning` token instead of `text-yellow-400`, and the three.js
+field, the confetti and the colour tool re-read the properties on a switch. Light schemes drop the
+text halos (a glow on a light page reads as a smudge) and thin the scanlines. A `light:` Tailwind
+variant covers the few fixed palette colours that stay. The listing's swatches are the one place
+output needs a colour that is *not* the current scheme's, so `OutputSegment` has a `colour` field.
+It is only ever set from the theme table. `themes.spec.ts` holds every scheme to WCAG floors
+(4.5:1 for body and primary text, 3:1 for the other tones). Three upstream colours were adjusted
+to pass, each noted in the file.
+
+Switching from a dark scheme to a light one whites the page out for 0.9 s (`theme-flash` on
+`<html>`, skipped under reduced motion). That is the joke the `flashbang` achievement is named
+after. Adding `theme` also tightened "did you mean …?": two edits in a five-letter word make a
+different word (`where` is two from `theme`), so names under six letters get one edit, and a
+swapped pair counts as one.
 
 Aliases live in `terminal/aliases.ts` and are rewritten in `useTerminal.ts`'s `run()`, ahead of
 `resolve()` — so the two-word fallback and the "did you mean …?" suggestion both reason about the
@@ -218,8 +272,11 @@ LCS line diff (`terminal/diff.ts`) rendered `-`/`+`/context. No dependency: the 
 dozen lines each, so the O(n·m) table is cheaper than a diffing library.
 
 ### content
-Reads from §1, so it can never contradict the page: `about`, `skills`, `projects [--json]`,
-`music`, `gaming`, `hardware [pc|nas|peripherals]`, `contact`, `resume`, `neofetch`, `curl`.
+Reads from §1, so it can never contradict the page: `about`, `skills [--why]`,
+`projects [--json]`, `music`, `gaming`, `hardware [pc|nas|peripherals]`, `contact`, `resume`,
+`neofetch`, `curl`. `skills --why` prints each skill's `usedIn` evidence (a `goTo` path or a repo
+URL), and `neofetch` has a `Status` row from `profile.availability`, the same flag the footer and
+both résumés read. `now.txt` is the `/now` list, with the same 90-day staleness rule.
 
 `neofetch` renders an ASCII logo beside a spec block — stack, locale, "uptime" since the first
 commit, and the live Steam status if available. `curl <domain>` re-runs `resume` when pointed at
@@ -237,6 +294,7 @@ gets `curl: (6) Could not resolve host` and a note that a browser tab cannot ope
 | `sign <message>` | `POST /guestbook` | error line |
 | `mail` | `POST /contact` | error line |
 | `ask <question>` | `POST /ask` | "the model is asleep — try `mail`" |
+| `systemctl [status [unit]]` | `GET /health` | every unit `unknown` — the unit list is kept client-side for exactly this |
 
 `mail` is interactive: it prompts name → email → subject → message in sequence via
 `ctx.prompt()`, validates the email client-side, echoes a summary, and asks for `y/n` before
@@ -252,7 +310,7 @@ interesting part.
 
 **Where:** `frontend/src/terminal/games/*` (pure state), `commands/games.ts` (renderers + commands)
 
-Seven playable games in the output buffer. `games` (alias `arcade`) lists them with the local best
+Eight playable games in the output buffer. `games` (alias `arcade`) lists them with the local best
 for each; it is the only one flagged `palette: true`, because launching a game from `Ctrl+K` would
 drop a visitor into a keyboard-captured surface they did not ask for.
 
@@ -265,6 +323,19 @@ drop a visitor into a keyboard-captured surface they did not ask for.
 | `wordle` (alias `motus`) | 5 letters, 6 rows, word list follows the locale | solve streak |
 | `hangman` (alias `pendu`) | 6 wrong guesses, same word list | win streak |
 | `wpm` (alias `typing`) | Type a line of random common words | words per minute |
+| `connect4` (aliases `c4`, `puissance4`) | Two visitors over a room code (§8 rooms) | wins in one sitting |
+
+`wordle daily` picks the answer with FNV-1a over the UTC date, modulo the locale's list, so one
+language shares one word a day. The board is saved after every guess under
+`couvbat:games:wordle:daily`, so a closed tab resumes rather than restarts, and a finished board is
+shown again instead of replayed. It is reported once to `POST /stats/wordle` and everyone's
+distribution is drawn under it. `wordle share` copies an emoji grid ending in a `?run=wordle daily`
+link, to the clipboard only.
+
+`connect4` is the only game with a second person. The rules are `games/connect4.ts`, a pure
+`replay(moves, starter)` that both players run on the room's public move list; the server enforces
+seats, turns and column height and nothing else. One inbox takes both keys and stream snapshots,
+so the loop awaits a single thing. Not linkable: it creates a room or claims a seat.
 
 Each game is a **pure state module** (plain functions over plain objects — no Vue, no `OutputLine`,
 no timers, so the interesting logic is unit-tested directly) plus a renderer that turns state into
@@ -311,7 +382,8 @@ Full design in [the first games spec](superpowers/specs/2026-08-04-terminal-game
 **Where:** `frontend/src/components/CommandPalette.vue`
 
 `Ctrl+K` / `Cmd+K` opens a filtered list of the views, the sections and every command flagged
-`palette: true` — the content and live-data commands, `tools`, `games`, `achievements`, `lang`.
+`palette: true` — the content and live-data commands, `tools`, `games`, `achievements`, `lang`,
+`theme`.
 Selecting a view or a section navigates through `goTo()` directly; selecting an output command
 opens the terminal with that command already run.
 
@@ -366,6 +438,17 @@ of opening the canvas, `sl` renders a static train, `top` draws one frame instea
 boot sequence and the Three.js background are skipped entirely, CRT overdrive resolves without
 animating, and the achievement toast shortens its dwell time.
 
+### The CTF chain
+
+**Where:** `terminal/ctf.ts`, `terminal/commands/ctf.ts`, `scripts/ctf-seal.mjs`. Built as
+[its spec](superpowers/specs/2026-08-04-ctf-flag-chain-design.md) designed it: `robots.txt` as the
+on-ramp, then `.secret`, the console, `resume.txt`, `/etc/shadow`, `hack`, `top`, `llms.txt`, and a
+`decrypt` finale sealed with AES-GCM under SHA-256 of the seven earlier flags. `ctf.ts` holds each
+stage's hash, never a flag; order is enforced, and misses sharpen the hint after three and six.
+One departure: progress stores the flag values, not just stage ids, because the board shows them
+and `decrypt` rebuilds its key from them. `ctf.spec.ts` pulls every flag out of its real surface
+and opens the finale with them, so the chain is proven solvable with no flag written in a test.
+
 ### 5.1 The vim pane
 
 **Where:** `frontend/src/components/terminal/VimPane.vue`, `frontend/src/terminal/vimEditor.ts`
@@ -393,10 +476,13 @@ editor, because a fake one that ignores `hjkl` is a worse joke than no joke.
 `components/AchievementToast.vue`
 
 Achievements covering the easter eggs above, the guestbook, `mail`, `ask`, the games, `lang`,
-`crt`, `htop`, visiting every section (`explorer`), and a `completionist` that cascades when every
-other one is done. Nothing counts them by hand — every surface reads `achievementList.length` — so the
-list is free to grow. Unlock state is `localStorage` only (`couvbat:achievements`, plus
-`couvbat:achievements:sections` for `explorer`'s progress) — there is no account and no sync.
+`crt`, `htop`, visiting every section (`explorer`), the colour schemes (`ricer` for five different
+ones, `flashbang` for a light one), the first CTF flag (`firstBlood` — finishing the chain gets
+none, per its spec), and a `completionist` that cascades when every other one is
+done. Nothing counts them by hand — every surface reads `achievementList.length` — so the list is
+free to grow. Unlock state is `localStorage` only (`couvbat:achievements`, plus
+`couvbat:achievements:sections` for `explorer`'s progress and `couvbat:achievements:themes` for
+`ricer`'s) — there is no account and no sync.
 
 The problem this solves: the eggs are hidden on purpose, so without a tracker most visitors never
 learn there was anything to find. Achievements make the hidden layer *discoverable* without
@@ -432,7 +518,8 @@ same pattern `history.ts` already uses — while the terminal command keeps usin
 **Where:** `frontend/src/components/ThreeBackground.vue`
 
 The wireframe background reads the same refs the rest of the app already exports, so none of this
-needed a new trigger:
+needed a new trigger (presence included: one shape per other visitor, from the footer's own
+integer, in a pool of its own capped at 12 that fades in and out and turns with the field):
 
 - **Pointer gravity well** — shapes within `GRAVITY_RADIUS` of the cursor's projection onto the
   z=0 plane lean towards it, hardest at the centre. Each shape keeps a `home` and an `offset`, and
@@ -448,6 +535,10 @@ needed a new trigger:
   entirely. It is the only visual state no amount of scrolling can produce.
 
 One watcher covers the last two inputs, because `currentPalette()` already encodes which wins.
+
+- **Colour scheme** — a palette picks hue *names* (`green`, `cyan`, …), and a `theme` changes what
+  those names mean by rewriting the `--neon-*` properties. So a second watcher on
+  `useTheme().theme` re-reads the four hues and runs the same in-place recolour.
 
 **Terminal control** (`composables/useSceneControl.ts`) adds three more knobs, in the same
 flag-and-watch shape as `useMatrix`/`useBoot` — the commands only ever set, the component is the
@@ -492,6 +583,15 @@ shapes are the accent colour; clicking one of those is the `cyanSpotter` achieve
   shipped, re-read every 60 s. `uptime()` lives in that composable rather than next to `neofetch`
   so the footer can show the same number without pulling the terminal registry into the main
   bundle; `commands/content.ts` re-exports it for the commands that already imported it there.
+- **Availability and `/now`** — the footer's status line also carries `profile.availability`
+  (a filled or hollow dot and the note) and links `/now`, a route outside the prism
+  (`views/NowView.vue`, `content/now.ts`). Past 90 days the page says how old the list is.
+- **`/ctf`** — the 404 page recognises the path `robots.txt` "disallows" and says it is a command,
+  not a page.
+- **Screensaver** (`composables/useIdle.ts`) — three idle minutes with the tab visible fade every
+  child of `#app` but the canvas (`[data-screensaver]` in `main.css`). The waking key or press is
+  swallowed. Vetoed by `terminalCapturing` and `roomPlaying`; started by `ThreeBackground`, so
+  reduced motion needs no branch.
 - **Console art** — `console.log` in `main.ts`. Costs nothing; the people who open DevTools on a
   developer portfolio are exactly the target audience.
 
@@ -512,6 +612,10 @@ the single source at build time is strictly better. The cost is that the résum�
 a frontend deploy, which is fine for a résumé.
 
 `.htaccess` needs `mod_rewrite` only — no `mod_proxy` — so it works on shared hosting.
+
+The same plugin emits `resume.html` and `resume.fr.html` (static, script-free, with `resume.css` as
+a sibling file so the CSP needs nothing new) and `content.json`, which the MCP endpoint reads (§8).
+All three are on `navigateFallbackDenylist` and served by the plugin's dev middleware too.
 
 ---
 
@@ -703,6 +807,33 @@ stay rejected. Rules the code cites:
   `position + (now − at)` and seek when more than two seconds out. A patch without a position
   recomputes it to now, so a bare pause lands where the item actually is.
 
+**Game rooms** (`connect4`). The one change to the rooms' trust model: a game room issues a
+second token, the seat token, on its first `POST /rooms/:code/join`, and refuses a third caller.
+`POST /rooms/:code/move` names its seat by token, and is accepted only on that seat's turn and into
+a column with room; `POST /rooms/:code/rematch` clears the board and swaps the opener. The move
+list is public, so the server keeps it honest and the clients decide the game.
+
+### `GET /health`
+
+Each service implements `health()` (`common/health.ts`), which may read only what the service
+already holds: configuration, flags, the age of the cache it keeps, a count. No probe, so asking
+for `steam`'s health never calls Steam and asking for `ask`'s never wakes the model. The terminal's
+`systemctl` renders it; a unit the frontend does not know still gets a row.
+
+### `GET /stats/wordle` · `POST /stats/wordle`
+
+Seven counts per day and language in `stats.json` beside the session total, written only once
+there is one. Only today and yesterday (UTC) are accepted, two weeks are kept, 5 reports/hour per
+IP. The report is `{ day, locale, guesses }`.
+
+### `POST /mcp`
+
+A read-only Model Context Protocol server, off unless `MCP_ENABLED`. Hand-written, stateless
+Streamable HTTP: `initialize`, `ping`, `tools/*`, `resources/*`, 202 for notifications, 405 for
+`GET`/`DELETE`. Its five tools and six resources render `${FRONTEND_URL}/content.json`, cached 10
+minutes with a stale fallback, and a tool that cannot reach it reports `isError` rather than a
+protocol error. Nothing asked is logged.
+
 ### `jobs` — the downloader, `/jobs`, `/jobs/:id`, `/jobs/:id/file`
 
 The admin tier of the tools page (§11). Rules the code cites:
@@ -747,7 +878,9 @@ Retrofitting these is painful, so they are part of the definition of done:
 
 ## 10. Explicitly out of scope
 
-- **Light theme** — the palette is committed to always-dark and reads as deliberate.
+- **A light default** — the site is committed to always-dark and reads as deliberate. Light
+  schemes exist only as opt-in choices, through `theme` or the navbar's scheme menu (§3 core), and the achievement for picking one is
+  called Flashbang. That is this entry's position, stated as a joke.
 - **Blog** — infrastructure without content is worse than no infrastructure.
 - **Command chaining / pipes** — `ls | grep` is a lot of parser for a joke nobody will run twice.
 - **Terminal on mobile** — see §9.
@@ -797,6 +930,12 @@ this section only fixes the rules the code cites.
   lives in `sessionStorage` keyed by code (a reload keeps hosting, a URL never carries it), and a
   refused token demotes the tab to guest rather than retrying. Guests seek at most once per 1.5 s,
   hosts coalesce changes for 250 ms and re-anchor every 15 s while playing. `cd watch/<code>` joins.
+- **Tools, vol. 3** — `jwt` (decode only, never verifies), `regex` (a fresh module Worker per run,
+  terminated at one second, so a backtracking pattern cannot freeze the tab), `cron` (own parser,
+  Vixie semantics, sentences in both languages, next runs walked with a four-year horizon), `qr`
+  (hand-written encoder, verified against ISO/IEC 18004's examples and a reference encoder's
+  matrices) and `diff` (`unifiedDiff` in `terminal/diff.ts`, the same code as the command, with a
+  trimmed-ends guard for large unrelated texts).
 - **The admin tier is hidden, not secret** (`download`, `lib/admin.ts`). `visibleTools()` leaves
   it out of the page, `tools`, `ls tools` and Tab until the owner unlocks — `sudo -i` in the
   terminal, or the panel's own field — but `findTool` still resolves it, so `cd tools/download`

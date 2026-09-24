@@ -360,8 +360,8 @@ onUnmounted(() => {
       <p class="text-xs text-muted-foreground -mt-2">{{ t(m.toolFfmpeg.trimHint) }}</p>
 
       <p v-if="error" class="text-xs text-destructive">{{ error }}</p>
-      <p v-else-if="source && blocked" class="text-xs text-yellow-400">{{ t(m.toolFfmpeg[blocked]) }}</p>
-      <p v-else-if="source && cut.error" class="text-xs text-yellow-400">
+      <p v-else-if="source && blocked" class="text-xs text-warning">{{ t(m.toolFfmpeg[blocked]) }}</p>
+      <p v-else-if="source && cut.error" class="text-xs text-warning">
         {{ t(m.toolFfmpeg[cut.error === 'start' ? 'badStart' : cut.error === 'end' ? 'badEnd' : 'badOrder']) }}
       </p>
 

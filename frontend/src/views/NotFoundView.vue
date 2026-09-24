@@ -10,6 +10,9 @@ const router = useRouter()
 const { t, m } = useLocale()
 
 const attemptedPath = computed(() => route.fullPath)
+// robots.txt "disallows" /ctf, which is the CTF chain's on-ramp — so anyone who
+// follows it lands here, and should be told it is a command rather than a page.
+const ctf = computed(() => /^\/ctf\/?$/i.test(route.path))
 </script>
 
 <template>
@@ -38,6 +41,8 @@ const attemptedPath = computed(() => route.fullPath)
 
           <p class="text-6xl font-bold text-destructive glow-pink">404</p>
 
+          <p v-if="ctf" data-testid="ctf-hint" class="text-accent">{{ t(m.notFound.ctf) }}</p>
+
           <div class="flex flex-wrap items-center gap-3 pt-2">
             <button
               class="px-4 py-2 rounded border border-primary/50 text-primary hover:bg-primary/10 transition-colors"
@@ -47,9 +52,9 @@ const attemptedPath = computed(() => route.fullPath)
             </button>
             <button
               class="hidden md:inline text-xs text-muted-foreground hover:text-primary transition-colors"
-              @click="openTerminal('help')"
+              @click="openTerminal(ctf ? 'ctf' : 'help')"
             >
-              {{ t(m.notFound.hint) }}
+              {{ t(ctf ? m.notFound.ctfOpen : m.notFound.hint) }}
             </button>
           </div>
         </div>

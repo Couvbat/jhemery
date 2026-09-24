@@ -2,6 +2,7 @@ import { Injectable, InternalServerErrorException, Logger } from '@nestjs/common
 import { ConfigService } from '@nestjs/config';
 import * as nodemailer from 'nodemailer';
 import { ContactDto } from './contact.dto';
+import { UnitHealth } from '../common/health';
 
 @Injectable()
 export class ContactService {
@@ -61,5 +62,12 @@ export class ContactService {
       );
       throw new InternalServerErrorException('Could not send message');
     }
+  }
+
+  /** Whether mail goes anywhere, or is only logged as it is in development. */
+  health(): UnitHealth {
+    return this.config.get<string>('SMTP_HOST')
+      ? { unit: 'contact', state: 'active' }
+      : { unit: 'contact', state: 'inactive', reason: 'unconfigured' };
   }
 }

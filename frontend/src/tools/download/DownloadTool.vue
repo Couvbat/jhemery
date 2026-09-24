@@ -167,7 +167,7 @@ onUnmounted(() => clearInterval(timer))
     </template>
 
     <template v-else>
-      <p v-if="configured === false" class="text-yellow-400">{{ t(m.toolDownload.off) }}</p>
+      <p v-if="configured === false" class="text-warning">{{ t(m.toolDownload.off) }}</p>
 
       <template v-else>
         <p class="text-muted-foreground">{{ t(m.toolDownload.intro) }}</p>

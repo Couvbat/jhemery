@@ -20,6 +20,13 @@ import { ClockSkew } from './sync'
  */
 export type RoomStatus = 'checking' | 'off' | 'lobby' | 'connecting' | 'live' | 'gone' | 'lost'
 
+/**
+ * True while any room on the page is live and playing. Module-level, like the rest of
+ * the page-wide flags, because the screensaver (`useIdle.ts`) must not fade a watch
+ * party out from under the people watching it.
+ */
+export const roomPlaying = ref(false)
+
 /** Reconnects EventSource makes on its own before this gives up and asks why. */
 const MAX_FAILURES = 3
 
@@ -170,7 +177,14 @@ export function useRoom(kind: RoomKind, code: Ref<string | null>) {
     { immediate: true },
   )
 
-  onUnmounted(close)
+  watch([status, snapshot], ([now, frame]) => {
+    roomPlaying.value = now === 'live' && Boolean(frame?.state.media && frame.state.playing)
+  })
+
+  onUnmounted(() => {
+    close()
+    roomPlaying.value = false
+  })
 
   return {
     status: computed(() => status.value),

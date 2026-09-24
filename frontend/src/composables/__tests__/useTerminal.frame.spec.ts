@@ -132,7 +132,11 @@ describe('top', () => {
 
     // Reshuffling per frame was cover for the full repaint; in place it just
     // teleports rows around. The jittered %CPU is what makes it look live now.
+    // The one sanctioned change is the CTF's ghost process (pid 31337), which only
+    // exists on the last frame so that only someone who watched to the end sees it.
     expect(seen.length).toBeGreaterThan(1)
-    for (const frame of seen) expect(frame).toEqual(seen[0])
+    for (const frame of seen) expect(frame.filter((pid) => pid !== '31337')).toEqual(seen[0])
+    expect(seen[0]).not.toContain('31337')
+    expect(seen.at(-1)).toContain('31337')
   })
 })

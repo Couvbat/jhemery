@@ -1,5 +1,6 @@
 import {
   BadRequestException,
+  ConflictException,
   ForbiddenException,
   NotFoundException,
   ServiceUnavailableException,
@@ -337,5 +338,114 @@ describe('positionAt', () => {
         T0 - 50_000,
       ),
     ).toBe(0);
+  });
+});
+
+describe('game rooms (connect4)', () => {
+  function game() {
+    const service = build();
+    const room = service.create('connect4', T0);
+    return { service, code: room.code, host: room.hostToken };
+  }
+
+  it('opens with an empty board, one seat taken, the host to move', () => {
+    const { service, code } = game();
+    expect(service.snapshot(code)!.game).toEqual({
+      moves: [],
+      seats: 1,
+      starter: 0,
+    });
+  });
+
+  it('gives the second seat to the first to ask, and to nobody after', () => {
+    const { service, code } = game();
+    const joined = service.join(code, T0);
+    expect(joined.seatToken).toBeTruthy();
+    expect(joined.game!.seats).toBe(2);
+    expect(() => service.join(code, T0)).toThrow(ConflictException);
+  });
+
+  it('refuses a move before anyone has joined', () => {
+    const { service, code, host } = game();
+    expect(() => service.move(code, host, 3, T0)).toThrow(ConflictException);
+  });
+
+  it('takes turns, host first, each seat proved by its own token', () => {
+    const { service, code, host } = game();
+    const seat = service.join(code, T0).seatToken;
+
+    expect(service.move(code, host, 3, T0).game!.moves).toEqual([3]);
+    // Twice in a row is refused, whichever token tries.
+    expect(() => service.move(code, host, 4, T0)).toThrow(ConflictException);
+    expect(service.move(code, seat, 4, T0).game!.moves).toEqual([3, 4]);
+    expect(() => service.move(code, seat, 4, T0)).toThrow(ConflictException);
+  });
+
+  it('refuses anyone who is not one of the two players', () => {
+    const { service, code } = game();
+    service.join(code, T0);
+    expect(() => service.move(code, 'guess', 0, T0)).toThrow(
+      ForbiddenException,
+    );
+    expect(() => service.move(code, undefined, 0, T0)).toThrow(
+      ForbiddenException,
+    );
+    expect(() => service.rematch(code, 'guess', T0)).toThrow(
+      ForbiddenException,
+    );
+  });
+
+  it('refuses a column off the board or already full', () => {
+    const { service, code, host } = game();
+    const seat = service.join(code, T0).seatToken;
+    expect(() => service.move(code, host, 7, T0)).toThrow(BadRequestException);
+    for (let i = 0; i < 6; i++) service.move(code, i % 2 ? seat : host, 0, T0);
+    expect(() => service.move(code, host, 0, T0)).toThrow(BadRequestException);
+  });
+
+  it('stops at a full board', () => {
+    const { service, code, host } = game();
+    const seat = service.join(code, T0).seatToken;
+    // Fill column by column; the rules module would have called a win long before,
+    // but the server only knows the board is full.
+    let turn = 0;
+    for (let column = 0; column < 7; column++) {
+      for (let row = 0; row < 6; row++) {
+        service.move(code, turn % 2 ? seat : host, column, T0);
+        turn++;
+      }
+    }
+    expect(() => service.move(code, host, 0, T0)).toThrow(ConflictException);
+  });
+
+  it('starts a rematch on a fresh board with the other seat opening', () => {
+    const { service, code, host } = game();
+    const seat = service.join(code, T0).seatToken;
+    service.move(code, host, 3, T0);
+    expect(service.rematch(code, seat, T0).game).toEqual({
+      moves: [],
+      seats: 2,
+      starter: 1,
+    });
+    expect(() => service.move(code, host, 3, T0)).toThrow(ConflictException);
+    expect(service.move(code, seat, 3, T0).game!.moves).toEqual([3]);
+  });
+
+  it('never hands a seat token to the stream, only to the joiner', () => {
+    const { service, code } = game();
+    const member = join(service, code);
+    const { seatToken } = service.join(code, T0);
+    expect(JSON.stringify(member.seen)).not.toContain(seatToken);
+    member.leave();
+  });
+
+  it('has no player to drive, and a playback room no board', () => {
+    const { service, code, host } = game();
+    expect(() => service.update(code, host, { playing: true }, T0)).toThrow(
+      BadRequestException,
+    );
+    const watch = service.create('watch', T0);
+    expect(() => service.join(watch.code, T0)).toThrow(BadRequestException);
+    expect(service.snapshot(watch.code)!.game).toBeUndefined();
   });
 });

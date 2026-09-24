@@ -60,8 +60,10 @@ export class Terminal {
     await this.input.fill(command)
     await this.input.press('Enter')
 
-    // The input is `:disabled` while a command runs, so it re-enabling is the shell
-    // itself saying it has settled — no sleep involved. The "or gone" half is not
+    // The input is `aria-disabled` while a command runs (never `disabled`: it has to
+    // keep focus for Ctrl+C), and Playwright counts that as disabled, so it
+    // re-enabling is the shell itself saying it has settled — no sleep involved. The
+    // "or gone" half is not
     // defensive padding: `cd`, `ping` and the other navigating commands close the
     // overlay on success, and waiting for an element that was unmounted on purpose
     // would turn every one of them into a timeout.

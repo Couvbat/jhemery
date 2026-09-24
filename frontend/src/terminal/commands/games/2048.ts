@@ -58,6 +58,7 @@ export const command: Command = {
   name: '2048',
   description: { en: 'Play 2048', fr: 'Jouer à 2048' },
   group: 'fun',
+  linkable: true,
   run: (ctx: CommandContext) =>
     play(ctx, '2048', async (session) => {
       // Taken before the first `await`, so the input line never blinks disabled.
