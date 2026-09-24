@@ -50,11 +50,13 @@ typed and never read by the copy-paste path. Drawn from visible commands whose u
 required argument.
 
 **Daily wordle.** The answer is `hash(YYYY-MM-DD, UTC) mod words.length` over the locale's answer
-list (FNV-1a, stable across engines). The day's result is stored under `couvbat:wordle:daily` as
-`{ day, locale, guesses, won, grid }`, so a second `wordle daily` the same day prints the grid
-instead of replaying. `wordle share` copies `jhemery.xyz wordle 2026-09-24 4/6` plus the emoji
-grid. The histogram (`POST /stats/wordle`) keeps 14 days, per locale, in `stats.json`; older days
-are dropped on write.
+list (FNV-1a, stable across engines). The board is stored per locale under
+`couvbat:games:wordle:daily` as `{ day, guesses, marks, done, won, reported }` after *every* guess,
+so closing the tab mid-game resumes the same rows rather than handing out six new ones, and a
+finished board is shown again instead of replayed. `wordle share` copies
+`jhemery.xyz wordle en 2026-09-24 4/6`, the emoji grid and a `?run=wordle%20daily` link. The
+histogram (`POST /stats/wordle`) is reported once per board (`reported`), keeps 14 days per locale
+in `stats.json`, and drops older days on write.
 
 ## Tools, vol. 3
 

@@ -4,8 +4,8 @@ Status tracker for the feature brainstorm: first three categories (three.js back
 commands, live information), then games vol. 2 (§E), views and tools (§F), and the September 2026
 batch (§G). Built feature by feature, across sessions.
 
-**Current state: every row in §A–F is shipped; §G is the next batch and nothing in it has
-started.** Anything else still open is under [Open](#open) and [Known issues](#known-issues).
+**Current state: every row below is shipped, §G included.** Anything else still open is under
+[Open](#open) and [Known issues](#known-issues).
 
 **How to use:** tick a box when the feature ships, and append the PR number. Design detail for
 each row is the "approach" column — enough to act on without re-deriving. Anything that grows into
@@ -167,33 +167,34 @@ slices in [`superpowers/plans/2026-09-22-tools-and-views.md`](superpowers/plans/
 
 Brainstormed on 2026-09-24, after §F shipped. The playground is large by now, so about half of
 this batch is about the *portfolio* rather than the toys: what the site says about the work, and
-how visitors find their way in. Nothing here is designed yet beyond the approach column; the rows
-marked M or L will want a spec of their own before they start.
+how visitors find their way in. All shipped together on `claude/roadmap-features-impl-c80870`,
+one commit per group below. The decisions the approach column left open are recorded in
+[`superpowers/specs/2026-09-24-september-batch-design.md`](superpowers/specs/2026-09-24-september-batch-design.md).
 
 ### Portfolio content
 
 | ✔ | Feature | Approach | Files | Effort |
 |---|---|---|---|---|
-| [ ] | Availability line | `profile.ts` gains `availability: { open: boolean, note: Localised }`. One fact, three readers: a `Status` row in `neofetch`, the footer status line and the résumé plugin. It stays plain content, so `purity.spec.ts` covers it for free. | `content/profile.ts`, `content/types.ts`, `commands/content.ts`, `SiteFooter.vue`, `vite-plugins/resume.ts` | S |
-| [ ] | Skills with evidence | `skills.ts` goes from a list of names to `{ name, usedIn?: { what: Localised, where: string }[] }`, where `where` is a path `goTo()` already accepts (`tools/ffmpeg`, `watch`) or a repo URL. The hero renders the links, `skills --why` prints them, and the résumé keeps the plain names. Only claim what the repo can show: SSE → presence and rooms, WebAssembly → ffmpeg, GraphQL → the heatmap. | `content/skills.ts`, `content/types.ts`, `HeroSection.vue`, `commands/content.ts`, `vite-plugins/resume.ts` | S |
-| [ ] | Printable résumé | `vite-plugins/resume.ts` also emits `/resume.html` from the same content, beside `resume.txt`: static markup with a print stylesheet, no JS and no SPA, so "Save as PDF" gives a clean CV and crawlers get real HTML. The stylesheet is its own file, so the CSP needs nothing new. Added to `navigateFallbackDenylist`, linked from the contact section and from `resume`. No PDF library. | `vite-plugins/resume.ts`, `vite.config.ts`, `ContactSection.vue`, `commands/content.ts` | S |
-| [ ] | `/now` page | `content/now.ts` holds a dated list (`updated: 'YYYY-MM-DD'`, then building / playing / learning), readable as `cat now.txt` and at `/now`. Once it is more than 90 days old the page says how old it is instead of pretending otherwise, which is the only honest way a /now page survives neglect. Open question: a fifth prism face costs navbar room (#87 was nine destinations overflowing), so it may be a route outside the prism. | `content/now.ts` (new), `content/views.ts` or the router, `views/NowView.vue` (new), `commands/files.ts` | S |
+| [x] | Availability line | `profile.ts` gains `availability: { open: boolean, note: Localised }`. One fact, three readers: a `Status` row in `neofetch`, the footer status line and the résumé plugin. It stays plain content, so `purity.spec.ts` covers it for free. | `content/profile.ts`, `content/types.ts`, `commands/content.ts`, `SiteFooter.vue`, `vite-plugins/resume.ts` | S |
+| [x] | Skills with evidence | `skills.ts` goes from a list of names to `{ name, usedIn?: { what: Localised, where: string }[] }`, where `where` is a path `goTo()` already accepts (`tools/ffmpeg`, `watch`) or a repo URL. The hero renders the links, `skills --why` prints them, and the résumé keeps the plain names. Only claim what the repo can show: SSE → presence and rooms, WebAssembly → ffmpeg, GraphQL → the heatmap. | `content/skills.ts`, `content/types.ts`, `HeroSection.vue`, `commands/content.ts`, `vite-plugins/resume.ts` | S |
+| [x] | Printable résumé | `vite-plugins/resume.ts` also emits `/resume.html` from the same content, beside `resume.txt`: static markup with a print stylesheet, no JS and no SPA, so "Save as PDF" gives a clean CV and crawlers get real HTML. The stylesheet is its own file, so the CSP needs nothing new. Added to `navigateFallbackDenylist`, linked from the contact section and from `resume`. No PDF library. | `vite-plugins/resume.ts`, `vite.config.ts`, `ContactSection.vue`, `commands/content.ts` | S |
+| [x] | `/now` page | `content/now.ts` holds a dated list (`updated: 'YYYY-MM-DD'`, then building / playing / learning), readable as `cat now.txt` and at `/now`. Once it is more than 90 days old the page says how old it is instead of pretending otherwise, which is the only honest way a /now page survives neglect. Open question: a fifth prism face costs navbar room (#87 was nine destinations overflowing), so it may be a route outside the prism. | `content/now.ts` (new), `content/views.ts` or the router, `views/NowView.vue` (new), `commands/files.ts` | S |
 
 ### Hidden layer
 
 | ✔ | Feature | Approach | Files | Effort |
 |---|---|---|---|---|
-| [ ] | CTF flag chain | Built as designed in [the spec](superpowers/specs/2026-08-04-ctf-flag-chain-design.md): eight stages across surfaces that already exist, ending in a `decrypt` finale keyed by the seven earlier flags. Its i18n and out-of-scope sections still apply. | see the spec | M |
+| [x] | CTF flag chain | Built as designed in [the spec](superpowers/specs/2026-08-04-ctf-flag-chain-design.md): eight stages across surfaces that already exist, ending in a `decrypt` finale keyed by the seven earlier flags. Its i18n and out-of-scope sections still apply. | see the spec | M |
 
 ### Terminal
 
 | ✔ | Feature | Approach | Files | Effort |
 |---|---|---|---|---|
-| [ ] | `systemctl status` | `GET /health` collects each module's existing `configured`/enabled state and cache age into one list. It adds no probes of its own and only reads what the services already know, so it never calls Steam or the model on a visitor's behalf. Rendered as unit status: `● steam.service active (running)`, `○ ask.service inactive (dead): the model is asleep`, and `systemctl status <unit>` for one. With the API down every unit reads `unknown`, which is the true answer. | `backend/src/health/*` (new), `app.module.ts`, `lib/api.ts`, `commands/system.ts` | S–M |
-| [ ] | Links that run a command | `?run=<command>` opens the shell, runs the command once and drops the parameter from the URL. Opt-in per command through `linkable?: boolean` on `Command`, beside `hidden` and `palette`, so the registry stays the API. A `registry.spec.ts` invariant stops anything that writes (`mail`, `sign`, `sudo`, `alias`) from ever being flagged. Desktop only, like the terminal: on mobile the parameter is ignored and the page loads normally. | `terminal/types.ts`, `useTerminalShell.ts`, `useTerminal.ts`, `App.vue`, `__tests__/registry.spec.ts` | S |
-| [ ] | Daily wordle + share | `wordle daily` picks the answer by hashing the UTC date into the locale's list, so everyone gets the same word per language, and one play per day is remembered beside the scores. `wordle share` copies the finished grid. Emoji go only to the clipboard, never into the buffer, where they render double-width (the reason `weather-art.ts` has none). Optional follow-up: an anonymous guess-count histogram, `POST /stats/wordle` with `{ day, guesses }` and nothing else, rate-limited like `/stats/session`. | `terminal/games/wordle.ts`, `commands/games/wordle.ts`, `terminal/games/scores.ts`, `tools/clipboard.ts`; follow-up `backend/src/stats/*` | S (+M) |
-| [ ] | Shell versions of the tools | `sha256sum`, `base64 [-d]`, `uuidgen` (`crypto.randomUUID`) and a pretty-print-only `jq .`, each importing the pure `.ts` next to its tool panel. The shell and the page then can't disagree, the same rule `cat` and `vim` follow. | `commands/tools.ts`, `tools/{hash,encode,json}/*.ts` | S each |
-| [ ] | Prompt suggestions | While the prompt is empty, faded placeholder text cycles through a few visible commands (`try: neofetch`) every few seconds, and stops for the session after the first keystroke. Drawn from the registry, never from hidden commands. Under reduced motion it shows one static hint. | `components/terminal/TerminalOverlay.vue`, `useTerminal.ts` | S |
+| [x] | `systemctl status` | `GET /health` collects each module's existing `configured`/enabled state and cache age into one list. It adds no probes of its own and only reads what the services already know, so it never calls Steam or the model on a visitor's behalf. Rendered as unit status: `● steam.service active (running)`, `○ ask.service inactive (dead): the model is asleep`, and `systemctl status <unit>` for one. With the API down every unit reads `unknown`, which is the true answer. | `backend/src/health/*` (new), `app.module.ts`, `lib/api.ts`, `commands/system.ts` | S–M |
+| [x] | Links that run a command | `?run=<command>` opens the shell, runs the command once and drops the parameter from the URL. Opt-in per command through `linkable?: boolean` on `Command`, beside `hidden` and `palette`, so the registry stays the API. A `registry.spec.ts` invariant stops anything that writes (`mail`, `sign`, `sudo`, `alias`) from ever being flagged. Desktop only, like the terminal: on mobile the parameter is ignored and the page loads normally. | `terminal/types.ts`, `useTerminalShell.ts`, `useTerminal.ts`, `App.vue`, `__tests__/registry.spec.ts` | S |
+| [x] | Daily wordle + share | `wordle daily` picks the answer by hashing the UTC date into the locale's list, so everyone gets the same word per language, and one play per day is remembered beside the scores. `wordle share` copies the finished grid. Emoji go only to the clipboard, never into the buffer, where they render double-width (the reason `weather-art.ts` has none). Optional follow-up: an anonymous guess-count histogram, `POST /stats/wordle` with `{ day, guesses }` and nothing else, rate-limited like `/stats/session`. | `terminal/games/wordle.ts`, `commands/games/wordle.ts`, `terminal/games/scores.ts`, `tools/clipboard.ts`; follow-up `backend/src/stats/*` | S (+M) |
+| [x] | Shell versions of the tools | `sha256sum`, `base64 [-d]`, `uuidgen` (`crypto.randomUUID`) and a pretty-print-only `jq .`, each importing the pure `.ts` next to its tool panel. The shell and the page then can't disagree, the same rule `cat` and `vim` follow. | `commands/tools.ts`, `tools/{hash,encode,json}/*.ts` | S each |
+| [x] | Prompt suggestions | While the prompt is empty, faded placeholder text cycles through a few visible commands (`try: neofetch`) every few seconds, and stops for the session after the first keystroke. Drawn from the registry, never from hidden commands. Under reduced motion it shows one static hint. | `components/terminal/TerminalOverlay.vue`, `useTerminal.ts` | S |
 
 ### Tools, vol. 3
 
@@ -202,25 +203,49 @@ the rest of §F.
 
 | ✔ | Feature | Approach | Files | Effort |
 |---|---|---|---|---|
-| [ ] | `jwt` | Decodes the header and payload, shows `exp`/`iat` as dates with a relative phrase (reusing `tools/time/time.ts`) and flags expired tokens. Decode only: verifying would mean pasting a secret into a web page, which the tool shouldn't encourage. | `tools/jwt/` (new), `tools/registry.ts` | S |
-| [ ] | `regex` | Pattern, flags and test text, with matches and groups highlighted. It runs in a Worker with a timeout, because a catastrophic-backtracking pattern would otherwise freeze the tab. JavaScript flavour, and the panel says so. | `tools/regex/` (new), `tools/registry.ts` | S–M |
-| [ ] | `cron` | Turns a five-field expression into a sentence in both languages ("every weekday at 09:00") and lists the next five runs in the visitor's time zone. Own parser, covering ranges, steps, lists and names. | `tools/cron/` (new), `tools/registry.ts` | S |
-| [ ] | `qr` | Text or URL to a QR code, downloadable as PNG and SVG. The encoder (Reed–Solomon, masking) is the only real work: hand-written, or a small MIT encoder inside the tool's own chunk. `ffmpeg` is the only dependency exception so far, so that choice belongs in the design. | `tools/qr/` (new), `tools/registry.ts` | S–M |
-| [ ] | `diff` | Two text areas and a unified diff, using the same `terminal/diff.ts` the `diff` command does. | `tools/diff/` (new), `tools/registry.ts`, `terminal/diff.ts` | S |
+| [x] | `jwt` | Decodes the header and payload, shows `exp`/`iat` as dates with a relative phrase (reusing `tools/time/time.ts`) and flags expired tokens. Decode only: verifying would mean pasting a secret into a web page, which the tool shouldn't encourage. | `tools/jwt/` (new), `tools/registry.ts` | S |
+| [x] | `regex` | Pattern, flags and test text, with matches and groups highlighted. It runs in a Worker with a timeout, because a catastrophic-backtracking pattern would otherwise freeze the tab. JavaScript flavour, and the panel says so. | `tools/regex/` (new), `tools/registry.ts` | S–M |
+| [x] | `cron` | Turns a five-field expression into a sentence in both languages ("every weekday at 09:00") and lists the next five runs in the visitor's time zone. Own parser, covering ranges, steps, lists and names. | `tools/cron/` (new), `tools/registry.ts` | S |
+| [x] | `qr` | Text or URL to a QR code, downloadable as PNG and SVG. The encoder (Reed–Solomon, masking) is the only real work: hand-written, or a small MIT encoder inside the tool's own chunk. `ffmpeg` is the only dependency exception so far, so that choice belongs in the design. | `tools/qr/` (new), `tools/registry.ts` | S–M |
+| [x] | `diff` | Two text areas and a unified diff, using the same `terminal/diff.ts` the `diff` command does. | `tools/diff/` (new), `tools/registry.ts`, `terminal/diff.ts` | S |
 
 ### Background and visuals
 
 | ✔ | Feature | Approach | Files | Effort |
 |---|---|---|---|---|
-| [ ] | Presence in the scene | `usePresence`'s count minus one (you) adds that many wireframes through `useSceneControl`, capped well under the 60-shape limit so a busy day can't bury the scene; they fade out as people leave. Nothing new goes over the wire: it's the same integer the footer already shows. | `usePresence.ts`, `useSceneControl.ts`, `ThreeBackground.vue` | S |
-| [ ] | Screensaver | After a few idle minutes with the tab visible, the page fades and the wireframe field takes the whole screen; any key or pointer move wakes it. It never starts while a game holds the keyboard or a room is playing. Reduced motion needs no branch, because `ThreeBackground` never mounts there. | `composables/useIdle.ts` (new), `App.vue`, `ThreeBackground.vue` | S–M |
+| [x] | Presence in the scene | `usePresence`'s count minus one (you) adds that many wireframes through `useSceneControl`, capped well under the 60-shape limit so a busy day can't bury the scene; they fade out as people leave. Nothing new goes over the wire: it's the same integer the footer already shows. | `usePresence.ts`, `useSceneControl.ts`, `ThreeBackground.vue` | S |
+| [x] | Screensaver | After a few idle minutes with the tab visible, the page fades and the wireframe field takes the whole screen; any key or pointer move wakes it. It never starts while a game holds the keyboard or a room is playing. Reduced motion needs no branch, because `ThreeBackground` never mounts there. | `composables/useIdle.ts` (new), `App.vue`, `ThreeBackground.vue` | S–M |
 
 ### Shared and AI
 
 | ✔ | Feature | Approach | Files | Effort |
 |---|---|---|---|---|
-| [ ] | Two-player games | Connect four or battleship over a five-character room code. Rooms trust only the host token today, so a game room issues a second seat token on first join and the server enforces turn order. The rules stay in a pure frontend module, like every other game. Same caps, TTL and `ROOMS_ENABLED` switch as watch and radio. | `backend/src/rooms/*`, `frontend/src/rooms/*`, `terminal/games/<game>.ts` (new) | L |
-| [ ] | MCP server | A read-only MCP endpoint exposing the résumé, projects and skills, with nothing that writes, so an agent can be pointed at the API and asked about Jules. The content lives in the frontend build, so a Vite plugin emits `content.json` beside `resume.txt`, and the backend fetches it from `FRONTEND_URL` and caches it; the two apps stay independent. Off by default (`MCP_ENABLED`), limited per IP by the existing guard, and nothing logged, same as `ask`. | `vite-plugins/resume.ts` (or a sibling), `backend/src/mcp/*` (new), `backend/.env.example` | M |
+| [x] | Two-player games | Connect four or battleship over a five-character room code. Rooms trust only the host token today, so a game room issues a second seat token on first join and the server enforces turn order. The rules stay in a pure frontend module, like every other game. Same caps, TTL and `ROOMS_ENABLED` switch as watch and radio. | `backend/src/rooms/*`, `frontend/src/rooms/*`, `terminal/games/<game>.ts` (new) | L |
+| [x] | MCP server | A read-only MCP endpoint exposing the résumé, projects and skills, with nothing that writes, so an agent can be pointed at the API and asked about Jules. The content lives in the frontend build, so a Vite plugin emits `content.json` beside `resume.txt`, and the backend fetches it from `FRONTEND_URL` and caches it; the two apps stay independent. Off by default (`MCP_ENABLED`), limited per IP by the existing guard, and nothing logged, same as `ask`. | `vite-plugins/resume.ts` (or a sibling), `backend/src/mcp/*` (new), `backend/.env.example` | M |
+
+### Departures from the approach column
+
+- **`/now`** is a route outside the prism, which settles the open question: `views.ts` keeps four
+  faces and the navbar gains nothing. It is linked from the footer and from `cat now.txt`.
+- **Printable résumé** ships in both languages, `resume.html` and `resume.fr.html`, from one builder.
+- **Skills with evidence** adds SSE, WebAssembly, GraphQL and three.js, each backed by a link, and
+  keeps `skillNames` as the plain list for every reader that only wants names.
+- **CTF chain:** progress stores the flag values, not only the stage ids — the board shows them and
+  `decrypt` rebuilds its key from them. `decrypt` solves stage 8 itself. The optional `ask`
+  hand-off in the spec is not built; the chain stands alone through `llms.txt`, as the spec
+  required.
+- **`?run=` links:** the games are linkable (they write nothing until played); `connect4` is not,
+  since it creates a room or claims a seat. Links never expand the reader's aliases.
+- **Shell tools** also answer to `sha1sum` and `sha512sum`, picking the algorithm from the name typed.
+- **Daily wordle** shipped with its histogram follow-up (`POST /stats/wordle`), and saves the
+  board after every guess so a closed tab resumes rather than restarts.
+- **`qr`** is hand-written, byte mode only; `ffmpeg` stays the only dependency exception.
+- **MCP** is hand-written rather than the SDK: stateless JSON over Streamable HTTP, with nothing
+  the SDK's sessions and streams would be used for. Five tools, six resources.
+- **Two-player games:** connect four, not battleship — battleship has hidden state the server
+  would have to hold to keep a player honest.
+- Found while building `qr`: the CSP's `img-src` has no `blob:`, so the image tool's previews are
+  most likely blocked in production. Filed separately rather than fixed here.
 
 ## Build order
 
@@ -254,8 +279,8 @@ suite that already covered everything else.
 `feat/rooms` (#82), `feat/downloader` (#83). Follow-up fixes: navbar overflow with nine
 destinations (#87), the swing's end-of-transition twitch (#89).
 
-**Phase 6 — the September 2026 batch (§G):** not started. A proposed order, cheapest and most
-self-contained first:
+**Phase 6 — the September 2026 batch (§G):** ✅ all shipped on
+`claude/roadmap-features-impl-c80870` → `dev`, one commit per step below, in this order:
 
 1. The four portfolio-content rows on one branch. They all touch `content/` and the résumé plugin,
    and none needs the backend.
@@ -269,9 +294,7 @@ self-contained first:
 
 ## Open
 
-- **CTF flag chain**: designed in
-  [`superpowers/specs/2026-08-04-ctf-flag-chain-design.md`](superpowers/specs/2026-08-04-ctf-flag-chain-design.md),
-  never built. It's now scheduled as a §G row.
+- Nothing proposed is left unbuilt. The CTF chain, the last open design, shipped with §G.
 
 ## Known issues
 

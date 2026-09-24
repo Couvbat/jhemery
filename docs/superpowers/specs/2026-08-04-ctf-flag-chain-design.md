@@ -1,6 +1,7 @@
 # Design spec — CTF flag chain
 
-Status: proposed. Not implemented. Independent of
+Status: implemented with roadmap §G (see its departures: progress stores the flag values, and
+the optional `ask` hand-off is not built). Independent of
 [terminal games](2026-08-04-terminal-games-design.md) and
 [the `ask` command](2026-08-04-ask-command-design.md); one optional stage becomes available if `ask`
 ships, and is specified as optional for that reason.

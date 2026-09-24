@@ -42,30 +42,34 @@ tools, watch-party and radio rooms, and 37 hidden achievements. English and Fren
 
 ## Highlights
 
-- 🖥️ **A real shell.** About 70 commands, plus aliases, with Tab completion, history, `alias`, a
+- 🖥️ **A real shell.** About 80 commands, plus aliases, with Tab completion, history, `alias`, a
   working modal `vim` and a "did you mean…?" for typos. The terminal and the page read the same
-  content modules, so they can't contradict each other.
+  content modules, so they can't contradict each other. A `?run=<command>` link opens the shell
+  and runs a (read-only) command for whoever clicks it.
 - 🔺 **A reactive three.js background.** Wireframe polyhedra pull towards the pointer, change
   colour with each section, react to the weather where I am and can be driven from the shell. The
   whole field swings like a prism when you change page.
 - 🎨 **Colour schemes from r/unixporn.** `theme` swaps the neon for Gruvbox, Nord, Dracula,
   Catppuccin, Tokyo Night, Rosé Pine, Everforest or Solarized. The wireframes, glows and confetti
   follow. Two schemes are light, and picking one is an achievement in itself.
-- 🎮 **Seven games in the output buffer:** `2048`, `snake`, `minesweeper`, `tetris`, `wordle`,
-  `hangman` and `wpm`. The word games use real bilingual word lists.
+- 🎮 **Eight games in the output buffer:** `2048`, `snake`, `minesweeper`, `tetris`, `wordle`
+  (with a daily word and a shareable grid), `hangman`, `wpm`, and `connect4` against another
+  visitor over a room code. The word games use real bilingual word lists.
 - 🧰 **In-browser tools at `/tools`.** Image conversion, hashing, encoding, JSON, colour, time,
-  passwords, text stats and an `ffmpeg.wasm` converter. Your files are never uploaded.
+  passwords, text stats, a JWT decoder, a regex tester, a cron explainer, a QR encoder written from
+  the standard, a text diff and an `ffmpeg.wasm` converter. Your files are never uploaded.
 - 📺 **Watch party and radio rooms.** YouTube or SoundCloud stays in sync across everyone in a
   five-character room, over SSE.
-- 🏆 **37 achievements** for finding the hidden layer, each announced with a burst of monospace
-  confetti.
+- 🏆 **38 achievements** for finding the hidden layer, each announced with a burst of monospace
+  confetti — and a capture-the-flag chain, eight stages deep, for whoever keeps pulling threads.
 - 🌐 **Live data** from Steam, GitHub, CI runs, the weather and crypto prices, plus live presence,
   a guestbook and a self-hosted LLM behind `ask`. Every integration degrades gracefully when it's
   switched off.
 - 🔒 **Privacy by construction.** Presence is one anonymous integer, stats count sessions rather
   than commands, `ask` logs nothing, analytics are self-hosted and cookieless.
-- 📄 **One source for the CV.** `curl jhemery.xyz` returns an ANSI-coloured résumé that is
-  generated at build time from the same content the page renders.
+- 📄 **One source for the CV.** `curl jhemery.xyz` returns an ANSI-coloured résumé, and
+  `/resume.html` a printable one in either language, both generated at build time from the same
+  content the page renders. So is `content.json`, which a read-only MCP endpoint serves to agents.
 
 ## Quick start
 
@@ -119,6 +123,8 @@ Each app has its own README for working on its code:
 | — click to inspect | Clicking a wireframe shows its name (`icosahedron · 20 faces`) and turns the camera towards it for a couple of seconds. Clicks on links, controls and text selections are ignored. |
 | — terminal control | `spawn`, `gravity on\|off`, `constellation on\|off` and `scene reset` drive the background from the shell. The shape count is capped at 60. |
 | — constellation | Draws lines between shapes that are closer than 5.5 world units, recomputed each frame into a pre-allocated buffer. |
+| — other visitors | Everyone else on the site right now is one more wireframe, fading in as they arrive and out as they leave, capped at 12. It's the same integer the footer shows, so nothing new crosses the wire. Click one and it says so. |
+| — screensaver | After three idle minutes with the tab visible, the page fades and the field has the screen to itself; any key or pointer movement brings the page back, and the waking key does nothing else. It never starts during a game or while a room is playing. |
 | — weather mood | The real weather nudges it: a storm speeds the wireframes up, fog dims them, snow slows them and night dims them a little more. These are small multipliers on the section palette, never a replacement for it. |
 | — view swing | Changing page rotates the wireframe field about its centre while the camera pulls back and every shape moves to a new position. The rotation runs on a `THREE.Group`, not the camera, and is folded back into the positions at the end so the gravity maths stays correct. |
 | — performance | The component is `defineAsyncComponent`'d and only loaded on `requestIdleCallback`, so ~520 kB of three.js never competes with first paint. It is excluded from the PWA precache for the same reason. |
@@ -129,7 +135,10 @@ Each app has its own README for working on its code:
 | **CRT overdrive** | `crt` in the terminal, or the Konami code anywhere on the page, toggles scanlines and flicker, and speeds up the wireframes. The setting is saved in `localStorage`. |
 | **Colour schemes** | `theme` lists eleven schemes with a swatch strip each, and `theme <name>` (or `theme random`) applies one: the site's own *cyberpunk* default, plus Gruvbox (dark and light), Nord, Dracula, Catppuccin (Mocha and Latte), Tokyo Night, Rosé Pine, Everforest and Solarized. A scheme is a table of a dozen colours in `src/lib/themes.ts`, and every CSS token is derived from it. That means the glows, the three.js wireframes, the confetti and `neofetch`'s colour strip all follow along. Going back to the default removes every override, so the stylesheet stays the default's only definition. Switching from a dark scheme to a light one whites the screen out for a moment (skipped under reduced motion). The choice is saved in `localStorage` and applied before the app mounts. A unit test holds every scheme to WCAG contrast floors. |
 | **Boot sequence** | A fake `couvsh 1.0` kernel log plays on your first visit. `reboot` replays it on demand, and `ssh` ends by triggering it. Skipped under reduced motion. |
-| **Status ticker** | The footer shows the uptime `neofetch` reports (days since the first commit) and how long ago this build shipped. It refreshes slowly, so a tab left open stays accurate. |
+| **Status ticker** | The footer shows the uptime `neofetch` reports (days since the first commit), how long ago this build shipped, and whether I'm open to work. It refreshes slowly, so a tab left open stays accurate. |
+| **Skills with evidence** | Under the skill badges, `skills --why` links each claim to where it's actually used: SSE to the presence stream and the watch parties, WebAssembly to the ffmpeg tool, GraphQL to the heatmap. Skills with nothing to show stay plain badges. |
+| **`/now`** | What I'm doing at the moment, dated. Past 90 days old, the page says how old it is instead of passing for current. It's also `cat now.txt`, and it's a route outside the prism so the navbar stays at four faces. |
+| **Printable résumé** | `/resume.html` and `/resume.fr.html`: static, script-free, with a print stylesheet, so "Save as PDF" gives a clean CV. Linked from the contact section and `resume`. |
 | **Live presence** | The footer also shows how many people are on the site right now, over SSE. It's a single count and nothing else (see [the API](#the-api)). |
 | **Live cards** | Steam "currently playing", recent GitHub commits, the latest CI runs, a contribution heatmap and pinned repos, a SoundCloud player and the guestbook. |
 | **Guestbook ticker** | A 20 s poll (not SSE; see [the spec](docs/features-spec.md#8-backend-additions)) shows a floating notice when someone signs while you're on the page. Clicking it opens `guestbook`. It pauses while the tab is hidden and stops if the guestbook is off. |
@@ -154,6 +163,15 @@ work badly with mobile virtual keyboards, and the page itself shows the same con
 | <kbd>Esc</kbd> | Close the overlay (focus goes back where it was) |
 | traffic lights | The title-bar dots really do close, minimise and maximise |
 
+An empty prompt suggests a command in faded text (`try: neofetch`), cycling every few seconds
+until you type anything, and then not again that session. Under reduced motion it shows one.
+
+**Links that run a command.** `https://jhemery.xyz/?run=neofetch` opens the shell and runs
+`neofetch` once, then drops the parameter from the URL. A command has to opt in (`linkable` in the
+registry), and anything that writes (`mail`, `sign`, `theme`, `alias`, `connect4`…) or is hidden
+never does; a refused link says what it asked for. It ignores your own aliases, and on a phone
+the parameter is simply ignored.
+
 An unknown command gets a "did you mean …?" suggestion when it is one edit away (a swapped pair of
 letters counts as one), or two for names of six letters or more. `help` groups commands
 into *shell · navigation · content · live data · misc* and only hints that "not everything is
@@ -168,7 +186,7 @@ never show two different contents.
 ## Commands
 
 <details>
-<summary><b>shell</b>: help, clear, history, echo, lang, theme, exit…</summary>
+<summary><b>shell</b>: help, clear, history, echo, lang, theme, sha256sum, base64, jq, exit…</summary>
 
 | Command | Aliases | Usage |
 |---|---|---|
@@ -180,6 +198,10 @@ never show two different contents.
 | `whoami` | | Print the current user |
 | `lang` | | `lang [en\|fr]`: show or switch language |
 | `theme` | `colorscheme` | `theme [name\|random]`: list the colour schemes, or switch to one |
+| `sha256sum` | `sha1sum`, `sha512sum` | `sha256sum <file\|text>`: the digest of a file in the fake filesystem, or of some text, as the hash tool computes it |
+| `base64` | | `base64 [-d] <file\|text>`: encode or decode, as the encode tool does |
+| `uuidgen` | | A random v4 UUID |
+| `jq` | | `jq . <json>`: pretty-print, pointing at the error when it isn't JSON |
 | `exit` | `quit`, `logout` | Close the terminal |
 
 </details>
@@ -193,7 +215,7 @@ never show two different contents.
 | `cd` | `cd <section>` scrolls there, routing home first if you're on another page. `cd tools` and `cd tools/<tool>` open the tools page or a single tool. `cd watch/<code>` and `cd radio/<code>` join a room. `cd`, `cd ~` and `cd /` go home |
 | `pwd` | Print where you are: `/home/couvbat/projects` on the page, `/home/couvbat/tools/image` with a tool open, `/home/couvbat/watch/AB3DE` in a room |
 | `tools` | `tools [<tool>]`: list the tools with their descriptions, or open one |
-| `cat` | `cat <file>`: `about.txt`, `skills.txt`, `contact.txt`, guestbook entries, … |
+| `cat` | `cat <file>`: `about.txt`, `skills.txt`, `contact.txt`, `now.txt`, guestbook entries, … |
 | `diff` | `diff <file> <file>`: unified line diff of any two files in the fake filesystem |
 | `ping` | `ping <section\|page>`: four fake round trips, then it actually goes there |
 | `open` | `open <github\|linkedin\|soundcloud\|steam\|email>` |
@@ -206,20 +228,20 @@ never show two different contents.
 | Command | Aliases | Does |
 |---|---|---|
 | `about` | `bio` | Who I am |
-| `skills` | | Tech I work with |
+| `skills` | | Tech I work with. `skills --why` shows where each one is used |
 | `projects` | | What I've built. `projects --json` gives a machine-readable version |
 | `music` | | What I produce |
 | `gaming` | | What I play |
 | `hardware` | | `hardware [pc\|nas\|peripherals]` |
 | `contact` | `links` | How to reach me |
-| `neofetch` | `fetch` | System summary with an ASCII logo and an "uptime" counted from the first commit |
-| `resume` | `cv` | Condensed résumé |
+| `neofetch` | `fetch` | System summary with an ASCII logo, an "uptime" counted from the first commit and whether I'm open to work |
+| `resume` | `cv` | Condensed résumé, with a link to the printable one |
 | `curl` | | `curl jhemery.xyz` fetches the résumé the way a real curl would |
 
 </details>
 
 <details>
-<summary><b>live data</b>: steam, gitlog, weather, btc, guestbook, mail, ask</summary>
+<summary><b>live data</b>: steam, gitlog, weather, btc, guestbook, mail, ask, systemctl</summary>
 
 | Command | Aliases | Does |
 |---|---|---|
@@ -231,6 +253,7 @@ never show two different contents.
 | `sign` | | `sign <message>` leaves a message |
 | `mail` | `sendmail`, `write` | Send me a message without leaving the terminal |
 | `ask` | | `ask <question>` streams an answer from a self-hosted LLM |
+| `systemctl` | | `systemctl status [unit]`: what the API is running, one unit per module, from `GET /health`. With the API down every unit reads `unknown` |
 
 </details>
 
@@ -238,8 +261,10 @@ never show two different contents.
 <summary><b>misc</b>: games, achievements, play, background control</summary>
 
 - **Games:** `games` (`arcade`), `2048`, `snake`, `minesweeper` (`mines`), `tetris`, `wordle`
-  (`motus`), `hangman` (`pendu`), `wpm` (`typing`). See [Games](#games).
-- **Progress:** `achievements` (`trophies`) prints the same list as the trophy modal.
+  (`motus`), `hangman` (`pendu`), `wpm` (`typing`), `connect4` (`c4`, `puissance4`). See
+  [Games](#games).
+- **Progress:** `achievements` (`trophies`) prints the same list as the trophy modal. `ctf`
+  (`flags`) is the capture-the-flag board: solved stages, and a hint for the one you're on.
 - **Music:** `play` scrolls to the music section and starts the player.
 - **Background control:** `spawn [n]`, `gravity [on|off]`, `constellation [on|off]` (`stars`) and
   `scene [reset]`.
@@ -252,7 +277,7 @@ never show two different contents.
 `sudo`, `matrix`, `reboot` (`restart`), `ssh`, `whois`, `crt`, `vim` (`vi`/`nvim`/`emacs`), `:q`
 (`:q!`/`:wq`/`:x`/…), `hack`, `coffee` (`brew`), `cowsay`, `fortune`, `sl`, `rickroll`, `banner`,
 `uname`, `ps` (`ps aux`/`ps -ef`), `top` (`htop`), `env` (`printenv`/`export`), `alias`,
-`unalias`, `gravity`, `spawn`, `constellation`, `scene`.
+`unalias`, `gravity`, `spawn`, `constellation`, `scene`, and the CTF's `flag` and `decrypt`.
 
 `alias gl='git log'` names your own commands, saved in `localStorage`. `unalias <name>` removes
 one.
@@ -266,7 +291,7 @@ fake as they look. `ls -a` lists both, and `cat` and `vim` can read them.
 
 ## Games
 
-All seven run inside the terminal buffer and take over the keyboard while they're running.
+All eight run inside the terminal buffer and take over the keyboard while they're running.
 **<kbd>Esc</kbd> or <kbd>Ctrl</kbd>+<kbd>C</kbd> quits any of them.** That's the universal exit
 because three of the games read letters, so they can't use `q` for it. Best scores are kept per
 game in `localStorage` and shown by `games`.
@@ -277,9 +302,10 @@ game in `localStorage` and shown by `games`.
 | **`snake`** | Arrows or `wasd` | Eat, grow, mind the walls. With reduced motion there's no clock: the snake moves one step per keypress. |
 | **`minesweeper`** (`mines`) | Arrows/`wasd` move, <kbd>Space</kbd> reveals, `f` flags | 16×10 with 25 mines. The first reveal is never a mine. Scored on time, so this is the one game where a *lower* number is better. |
 | **`tetris`** | Arrows/`wasd` move and rotate, <kbd>Space</kbd> hard-drops | 10×18 well, no speed curve. With reduced motion, each keypress drops the piece one row, so it falls exactly as fast as you play. |
-| **`wordle`** (`motus`) | Type, <kbd>Backspace</kbd>, <kbd>Enter</kbd>, `r` for a new word | Five letters, six tries. The word list follows the site's language, and accents are folded, so you can type `EPEE` for `ÉPÉE`. Scored on solve streak. |
+| **`wordle`** (`motus`) | Type, <kbd>Backspace</kbd>, <kbd>Enter</kbd>, `r` for a new word | Five letters, six tries. The word list follows the site's language, and accents are folded, so you can type `EPEE` for `ÉPÉE`. Scored on solve streak. `wordle daily` is the same word for everyone reading the same language that day (UTC), one board a day, resumed if you close the tab, with everyone's results drawn under it. `wordle share` copies the emoji grid — to the clipboard only, since emoji would shear the terminal's grid. |
 | **`hangman`** (`pendu`) | Type a letter | Six wrong guesses, same bilingual word list. Guessing a letter again doesn't cost a life. Scored on win streak. |
 | **`wpm`** (`typing`) | Type, <kbd>Backspace</kbd> corrects | Type a line of random common words and get your words per minute and accuracy. A character you got wrong still counts against accuracy after you correct it. |
+| **`connect4`** (`c4`, `puissance4`) | ←/→ or `a`/`d` aim, <kbd>Enter</kbd> or `1`–`7` drop, `r` rematch | Two players on two machines. `connect4` opens a room and prints its code; `connect4 <code>` takes the second seat. The server enforces turns; the rules, wins included, run on both machines from the same move list. Needs rooms on (`ROOMS_ENABLED`). Scored on wins in one sitting. |
 
 ## Tools
 
@@ -299,6 +325,11 @@ to its panel, with its own tests.
 | **`time`** | Converts an epoch in seconds or milliseconds, an ISO 8601 date or `now` into all of those. Also shows your time zone, a relative phrase (*in 3 days*), the ISO week and day of the year, and the same instant in nine time zones with their offsets. |
 | **`password`** | Random passwords with a length slider and character classes (look-alikes optional), or diceware passphrases drawn from the typing game's word lists. Shows the entropy in bits and a grade. Generated locally with `crypto.getRandomValues` and never stored. |
 | **`text`** | Word, character, line, sentence and paragraph counts, UTF-8 bytes, reading and speaking time, and the most frequent words. Also converts case: title, sentence, camel, pascal, snake, kebab, constant, and slug with accents folded. |
+| **`jwt`** | Decodes a token's header and payload and shows `iat`, `nbf` and `exp` as dates with a relative phrase, flagging an expired or not-yet-valid token and `alg: none`. Decode only: verifying would mean pasting a secret into a web page. |
+| **`regex`** | Pattern, flags and test text, with matches and groups highlighted as you type. Each run is a fresh Worker, stopped after one second, so a catastrophically backtracking pattern can't freeze the tab. JavaScript flavour. |
+| **`cron`** | A five-field expression (ranges, steps, lists, month and weekday names, `@hourly`-style macros) as a sentence in either language, and its next five runs in your time zone. Vixie rules: 0 and 7 are both Sunday, and when both day fields are set either one matches. |
+| **`qr`** | Text or a URL as a QR code, downloadable as PNG or SVG. The encoder is written from ISO/IEC 18004 — byte mode, versions 1–40, all four error-correction levels, penalty-chosen mask — and tested against the standard's worked examples and a reference encoder, module for module. |
+| **`diff`** | Two texts and a unified diff, from the same `terminal/diff.ts` the `diff` command uses. |
 | **`ffmpeg`** | The one tool with a dependency: ffmpeg compiled to WebAssembly. Converts to mp3, m4a, ogg, wav or flac, extracts the audio stream without re-encoding, re-encodes video to H.264 mp4, makes palette-optimised GIFs, and trims any of these. The 32 MB core is only downloaded when you press the button, from this site's own `/assets/`, and then stays in the browser cache. Input is read in place from disk, so multi-gigabyte files work. It's single-threaded, so video is slow, but audio isn't. |
 | **`download`** | The owner's tool, and the only one with a server behind it. yt-dlp on the server turns one YouTube video or one SoundCloud track into an mp3. It runs as a *job* that the page polls, and the file is handed over once and then deleted. The tool stays hidden until `sudo -i` (or the panel's own field) unlocks it with the admin password. It never accepts a playlist, set or profile: fetching a whole profile is what got the server's IP blocked for an hour. See [deploy.md](docs/deploy.md#what-the-shell-can-run--facts-for-the-downloader). |
 
@@ -314,15 +345,15 @@ Rooms are off unless the API sets `ROOMS_ENABLED`.
 
 ## Achievements
 
-There are 37 achievements, tracked in `localStorage` (`couvbat:achievements`, plus
+There are 38 achievements, tracked in `localStorage` (`couvbat:achievements`, plus
 `couvbat:achievements:sections` for the exploration one and `couvbat:achievements:themes` for the
 colour-scheme one). Unlocking one shows a floating toast with a burst of monospace-glyph confetti
 (skipped under `prefers-reduced-motion`) and prints a line in the terminal. The trophy button in
-the navbar opens a modal listing all 37: locked ones show `???` and a vague hint, and unlocked
+the navbar opens a modal listing all 38: locked ones show `???` and a vague hint, and unlocked
 ones show their title and how you got them. `achievements` (`trophies`) prints the same progress
 in the terminal.
 
-The last one unlocks itself once you have the other thirty-six. When it does, the three.js
+The last one unlocks itself once you have the other thirty-seven. When it does, the three.js
 background changes palette.
 
 <details>
@@ -366,6 +397,7 @@ background changes palette.
 | Zero-G | `gravity off` |
 | Ricer | Apply five different colour schemes with `theme` (they count across visits) |
 | Flashbang | Switch to a light scheme: `theme gruvbox-light` or `theme catppuccin-latte` |
+| First Blood | Capture any flag of the CTF chain. The first one ends `.secret`; `ctf` has the rest |
 | 100% | Unlock everything else |
 
 </details>
@@ -389,11 +421,15 @@ per-IP rate limiter sees real clients behind Apache.
 | `GET /markets` | Crypto quotes and a 7-day series from CoinGecko (no key, no account). It's a proxy only because CORS blocks the browser from calling CoinGecko directly. The coin list is server config, so no visitor data is forwarded. Cached for 5 min. |
 | `GET /presence` | Server-sent events giving how many people are on the site right now. It's one integer, pushed as visitors arrive and leave. No visitor ID is sent or assigned, and nothing is stored. |
 | `GET /stats` · `POST /stats/session` | A single running total of terminal sessions. Counted once when you open the shell, never per command, so the server never learns which commands anyone runs. 5/hour per IP. |
+| `GET /stats/wordle` · `POST /stats/wordle` | The daily wordle's distribution: seven counts per day and language (solved in 1–6, or not), today and yesterday (UTC) only, two weeks kept. A report is `{ day, locale, guesses }` and nothing else. 5/hour per IP. |
+| `GET /health` | One line per module for `systemctl status`: active or inactive and why, how old its cache is, a count it already keeps. Each module reads only what it already holds, so this never calls Steam, GitHub or the model on anyone's behalf. |
+| `POST /mcp` | A read-only [Model Context Protocol](https://modelcontextprotocol.io) endpoint (stateless Streamable HTTP, hand-written): five tools and six resources about the résumé, projects, skills and `/now`, in English or French. It reads `content.json` from `FRONTEND_URL`, caches it for 10 min, logs nothing and writes nothing. 60/min per IP. **Off by default** (`MCP_ENABLED`). |
 | `GET /guestbook` · `POST /guestbook` | Read and sign. Sanitised, link-filtered, 1/min per IP, capped at 500 entries. Stored in a JSON file under `DATA_DIR`, or in MongoDB if `MONGODB_URI` is set. **Off by default.** |
 | `DELETE /guestbook/:id` | Moderation. Requires the `x-admin-password` header. |
-| `GET /rooms` · `POST /rooms` | Whether rooms are enabled, and creating a watch or radio room. Creating one returns a five-character code and a host token that is never sent again. 10 rooms/hour per IP, 200 rooms at most, all in memory. **Off by default.** |
+| `GET /rooms` · `POST /rooms` | Whether rooms are enabled, and creating a watch, radio or connect4 room. Creating one returns a five-character code and a host token that is never sent again. 10 rooms/hour per IP, 200 rooms at most, all in memory. **Off by default.** |
 | `GET /rooms/:code` · `GET /rooms/:code/events` | A room's snapshot, and the SSE stream every member keeps open: the host's playback state tied to the server clock, the queue, and a head count. As with `/presence`, it's a number, never a list of who's there. |
 | `POST /rooms/:code/state` · `DELETE /rooms/:code` | Changing the room's state and closing it, host only (`x-room-token`). What a host can load is allowlisted on the server: an eleven-character YouTube ID or an https soundcloud.com URL. Nothing else can reach a guest's iframe. 120 state changes/min per IP. |
+| `POST /rooms/:code/join` · `/move` · `/rematch` | Connect four. The first `join` gets the second seat's token and a third is refused; a `move` carries a seat token (`x-room-token`) and is accepted only on that seat's turn, into a column with room; a `rematch` clears the board and swaps who opens. Wins are the clients' to work out from the public move list. |
 | `GET /jobs` · `POST /jobs` | Owner only (`x-admin-password` on every route). Returns the downloader's state, or starts a job for one YouTube video or one SoundCloud track. URLs must match an allowlist, and sets and profiles are refused. yt-dlp runs on the server in the background, and the request returns immediately with a job ID. 20/hour per IP, at most three pending and one running, ten minutes per job. **Off by default.** |
 | `GET /jobs/:id` · `GET /jobs/:id/file` · `DELETE /jobs/:id` | Poll a job, fetch its file (once: it's deleted as soon as the download completes, or 30 minutes after it was produced), or cancel/dismiss it. |
 
@@ -405,6 +441,8 @@ per-IP rate limiter sees real clients behind Apache.
 - An unreachable model makes the terminal say it's asleep and suggest `mail`.
 - With rooms off, the watch and radio pages say so.
 - With the downloader off, its panel says so once unlocked.
+- With MCP off, `/mcp` is a 404.
+- With the whole API down, `systemctl status` shows every unit as `unknown`.
 
 Endpoints report `configured: false` rather than returning an error.
 
