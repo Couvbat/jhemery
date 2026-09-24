@@ -88,6 +88,15 @@
   #   img-src      https: rather than a list — Steam avatars and game icons come
   #                back from the API on rotating *.steamstatic.com CDN hosts that
   #                cannot be enumerated ahead of time. This still blocks http:.
+  #                blob: is for the image and ffmpeg tools, whose previews are
+  #                object URLs over the visitor's own file and the re-encoded
+  #                result. Those bytes never leave the browser, and a blob: URL
+  #                can only be minted by script already running on this origin.
+  #                'self' never matches the scheme, hence naming it.
+  #   media-src    blob: alone, for the ffmpeg tool's <audio>/<video> preview of
+  #                its output, as above. Unset, this fell back to default-src and
+  #                refused the preview; 'self' is left out because nothing here
+  #                plays a same-origin media file.
   #   connect-src  api.jhemery.xyz is the backend (contact form, guestbook, ask);
   #                'self' covers same-origin builds and the precached assets.
   #   frame-src    w.soundcloud.com is the player embed in MusicSection.vue and
@@ -98,7 +107,7 @@
   #   object-src / base-uri / form-action are locked down because nothing here
   #                uses them, and each is a known way to turn a stray HTML
   #                injection into something worse.
-  Header always set Content-Security-Policy "default-src 'self'; script-src 'self' 'wasm-unsafe-eval' https://umami.jhemery.xyz; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self' data:; connect-src 'self' https://api.jhemery.xyz https://umami.jhemery.xyz; frame-src https://w.soundcloud.com https://www.youtube-nocookie.com; worker-src 'self'; manifest-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'; upgrade-insecure-requests"
+  Header always set Content-Security-Policy "default-src 'self'; script-src 'self' 'wasm-unsafe-eval' https://umami.jhemery.xyz; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https:; media-src blob:; font-src 'self' data:; connect-src 'self' https://api.jhemery.xyz https://umami.jhemery.xyz; frame-src https://w.soundcloud.com https://www.youtube-nocookie.com; worker-src 'self'; manifest-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'; upgrade-insecure-requests"
 
   # Only files under /assets/ carry a content hash in their name, so they are the
   # only ones safe to freeze. Matching by extension instead would also freeze

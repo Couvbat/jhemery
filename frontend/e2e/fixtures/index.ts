@@ -1,6 +1,7 @@
 import { test as base } from '@playwright/test'
 import { ApiStub } from './api'
 import { AppState } from './app'
+import { enforceProductionCsp } from './csp'
 import { Terminal } from './terminal'
 
 export { expect } from '@playwright/test'
@@ -21,6 +22,12 @@ interface Fixtures {
    * already happened.
    */
   pageErrors: string[]
+  /**
+   * Opt-in: naming it runs the test under public/.htaccess's Content-Security-Policy,
+   * and it holds whatever that policy refused. Needs `serviceWorkers: 'block'` — see
+   * the fixture.
+   */
+  cspViolations: string[]
 }
 
 /**
@@ -62,6 +69,17 @@ export const test = base.extend<Fixtures>({
     },
     { auto: true },
   ],
+
+  // Not `auto`: the policy costs a round trip through `route.fetch()` per response,
+  // and most specs are about something else. The service worker has to be off because
+  // once it claims the page (`clientsClaim`) it answers navigations from its precache,
+  // nothing reaches `page.route`, and the test passes because the header never arrived.
+  cspViolations: async ({ page, serviceWorkers }, use) => {
+    if (serviceWorkers !== 'block') {
+      throw new Error("cspViolations needs test.use({ serviceWorkers: 'block' })")
+    }
+    await use(await enforceProductionCsp(page))
+  },
 
   terminal: async ({ page }, use) => {
     await use(new Terminal(page))

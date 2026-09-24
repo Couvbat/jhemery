@@ -302,7 +302,7 @@ Setup, if you want this path ready before you need it:
 - **Charset.** `UTF-8` by default, and explicitly for `.txt` so the résumé's box-drawing characters survive.
 - **Caching.** Hashed assets are `immutable` for a year; `index.html` and `resume.txt` are `no-cache`, so a deploy takes effect immediately.
 - **WebAssembly.** An explicit `application/wasm` type (so the 32 MB ffmpeg core compiles while streaming) and deflate for it, since cPanel's compression switch only covers text types.
-- **Security headers.** HSTS (no `preload`, deliberately), `X-Frame-Options`, `nosniff`, `Referrer-Policy`, a deny-all `Permissions-Policy` and the Content-Security-Policy. Each CSP source is commented with the feature that needs it — the Umami origin, `'wasm-unsafe-eval'` for the ffmpeg tool, the YouTube and SoundCloud `frame-src` for the rooms and the music player. Adding an origin there should mean adding a dependency.
+- **Security headers.** HSTS (no `preload`, deliberately), `X-Frame-Options`, `nosniff`, `Referrer-Policy`, a deny-all `Permissions-Policy` and the Content-Security-Policy. Each CSP source is commented with the feature that needs it — the Umami origin, `'wasm-unsafe-eval'` for the ffmpeg tool, `blob:` in `img-src` and `media-src` for the tools' local previews, the YouTube and SoundCloud `frame-src` for the rooms and the music player. Adding an origin there should mean adding a dependency.
 
 If `mod_headers` or `mod_mime` is unavailable the `<IfModule>` guards make those blocks no-ops — the site still works, just without the cache and charset hints.
 
