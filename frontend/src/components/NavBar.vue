@@ -5,6 +5,7 @@ import { useLocale } from '@/i18n'
 import { activeSection } from '@/composables/useActiveSection'
 import { activeView, goTo } from '@/composables/useViewSwing'
 import AchievementsModal from '@/components/AchievementsModal.vue'
+import ThemeMenu from '@/components/ThemeMenu.vue'
 
 const { t, m, locale, toggleLocale } = useLocale()
 
@@ -42,7 +43,8 @@ onUnmounted(() => window.removeEventListener('scroll', onScroll))
   <header
     class="fixed top-0 left-0 right-0 z-50 bg-background/90 backdrop-blur border-b border-border"
   >
-    <nav class="max-w-5xl mx-auto px-4 h-14 flex items-center justify-between">
+    <!-- `relative` for `ThemeMenu`, which hangs its menu from the bar's right edge. -->
+    <nav class="relative max-w-5xl mx-auto px-4 h-14 flex items-center justify-between">
       <!-- Logo / Name -->
       <button
         @click="go('')"
@@ -52,8 +54,8 @@ onUnmounted(() => window.removeEventListener('scroll', onScroll))
       </button>
 
       <!-- Desktop links.
-           `lg`, not `md`: six sections plus three pages plus the two buttons need
-           about 940px of bar, and the container is capped at `max-w-5xl` — 992px
+           `lg`, not `md`: six sections plus three pages plus the three buttons need
+           about 960px of bar, and the container is capped at `max-w-5xl` — 992px
            inside its padding. At `md` the bar was 40px short of its own contents,
            which pushed the language and achievement buttons off the right edge on a
            1024-wide window, and split every link between its `./` and its label on
@@ -61,7 +63,9 @@ onUnmounted(() => window.removeEventListener('scroll', onScroll))
            all in the menu below, `pages` included.
            `gap-0.5` rather than `gap-1` for the same reason: it buys 20px, which
            takes the slack from 3% of the bar to 5%, and this broke on a machine
-           whose monospace renders a little wider than the one measured on. -->
+           whose monospace renders a little wider than the one measured on. The
+           scheme button spent most of that, so the two emoji buttons are `px-1.5`,
+           square rather than wide, which gives 8px back: 3.5% of slack. -->
       <ul class="hidden lg:flex gap-0.5 items-center">
         <li v-for="s in sections" :key="s.id">
           <button
@@ -104,11 +108,16 @@ onUnmounted(() => window.removeEventListener('scroll', onScroll))
           </button>
         </li>
         <li>
+          <ThemeMenu
+            class="ml-1 px-1.5 py-1 text-xs rounded border border-border text-muted-foreground hover:text-primary hover:border-primary/50 transition-colors"
+          />
+        </li>
+        <li>
           <button
             @click="achievementsOpen = true"
             :title="t(m.achievements.open)"
             :aria-label="t(m.achievements.open)"
-            class="ml-1 px-2 py-1 text-xs rounded border border-border text-muted-foreground hover:text-primary hover:border-primary/50 transition-colors"
+            class="ml-1 px-1.5 py-1 text-xs rounded border border-border text-muted-foreground hover:text-primary hover:border-primary/50 transition-colors"
           >
             🏆
           </button>
@@ -124,6 +133,7 @@ onUnmounted(() => window.removeEventListener('scroll', onScroll))
         >
           🏆
         </button>
+        <ThemeMenu class="px-2 py-1 text-xs rounded border border-border text-muted-foreground" />
         <button
           @click="toggleLocale"
           :aria-label="t(m.nav.language)"

@@ -1,5 +1,6 @@
 import { ref } from 'vue'
 import type { Localised } from '@/content/types'
+import type { Theme } from '@/lib/themes'
 import { blank, line } from './format'
 import { loadSet, persistSet as persist } from './storage'
 import type { OutputLine } from './types'
@@ -314,8 +315,8 @@ export const achievementList: Achievement[] = [
       fr: 'Un vrai ricer ne se contente jamais des couleurs par défaut.',
     },
     description: {
-      en: 'Tried five colour schemes with `theme`.',
-      fr: 'Essayé cinq thèmes de couleurs avec `theme`.',
+      en: 'Tried five colour schemes.',
+      fr: 'Essayé cinq thèmes de couleurs.',
     },
   },
   {
@@ -413,15 +414,22 @@ export function visitSection(id: string, allSectionIds: readonly string[]): stri
 /** How many different schemes make a ricer: enough to mean it, few enough to reach by hand. */
 export const RICER_THEMES = 5
 
-/** Records a scheme applied with `theme`; unlocks `ricer` at the fifth different one. */
-export function tryTheme(id: string): string[] {
+/**
+ * Records a scheme being applied, whether by `theme` or the navbar's scheme menu — the
+ * two count the same, so neither surface can hold back an achievement the other gives.
+ * Unlocks `ricer` at the fifth different scheme and `flashbang` on a light one.
+ */
+export function tryTheme({ id, mode }: Pick<Theme, 'id' | 'mode'>): string[] {
   if (!triedThemes.value.has(id)) {
     const next = new Set(triedThemes.value)
     next.add(id)
     triedThemes.value = next
     persist(THEMES_KEY, next)
   }
-  return triedThemes.value.size >= RICER_THEMES ? unlock('ricer') : []
+  return [
+    ...(triedThemes.value.size >= RICER_THEMES ? unlock('ricer') : []),
+    ...(mode === 'light' ? unlock('flashbang') : []),
+  ]
 }
 
 /** Unlocks `id` and renders a toast line for it (and any cascaded unlock) — `[]` if already unlocked. */

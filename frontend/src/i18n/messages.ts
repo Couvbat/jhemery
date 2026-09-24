@@ -8,6 +8,7 @@ export const messages = {
   nav: {
     toggleMenu: { en: 'Toggle menu', fr: 'Ouvrir le menu' },
     language: { en: 'Switch language', fr: 'Changer de langue' },
+    theme: { en: 'Colour scheme', fr: 'Thème de couleurs' },
   },
   hero: {
     aboutFile: { en: 'cat about.txt', fr: 'cat about.txt' },

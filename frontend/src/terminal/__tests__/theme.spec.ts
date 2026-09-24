@@ -149,6 +149,19 @@ describe('theme', () => {
 
       expect(second.achievements.isUnlocked('ricer')).toBe(true)
     })
+
+    // The navbar's scheme menu records through `tryTheme` directly, with no command
+    // around it; the two have to add up to the same five.
+    it('counts schemes picked from the navbar menu along with typed ones', async () => {
+      const { run, achievements, themes } = await reload()
+
+      for (const id of ['gruvbox', 'nord', 'dracula', 'catppuccin']) {
+        achievements.tryTheme(themes.find((scheme) => scheme.id === id)!)
+      }
+      const out = await run('tokyo-night')
+
+      expect(text(out)).toContain('achievement unlocked: Ricer')
+    })
   })
 
   describe('flashbang', () => {
@@ -160,6 +173,15 @@ describe('theme', () => {
       expect(achievements.isUnlocked('flashbang')).toBe(true)
       expect(text(out)).toContain('Flashbang out!')
       expect(text(out)).toContain('achievement unlocked: Flashbang')
+    })
+
+    it('unlocks from the navbar menu too, as a floating toast', async () => {
+      const { achievements, themes } = await reload()
+
+      const newly = achievements.tryTheme(themes.find((scheme) => scheme.id === 'gruvbox-light')!)
+
+      expect(newly).toEqual(['flashbang'])
+      expect(achievements.toastQueue.value.map((entry) => entry.id)).toEqual(['flashbang'])
     })
 
     it('stays locked on dark schemes', async () => {

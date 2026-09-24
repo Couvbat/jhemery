@@ -266,6 +266,12 @@ export function findTheme(id: string): Theme | undefined {
   return themes.find((theme) => theme.id === id.toLowerCase())
 }
 
+/** A scheme's colours in the order its swatch strip shows them: `theme`'s listing and the
+ *  navbar's scheme menu both draw from this, so the two strips can't disagree. */
+export function swatch({ colours: c }: Theme): string[] {
+  return [c.primary, c.accent, c.secondary, c.highlight, c.warning, c.destructive, c.foreground, c.muted]
+}
+
 /**
  * Every custom property a scheme writes, derived from its dozen colours. Text laid on a
  * filled `primary`/`accent`/`secondary` uses the page background, which is what keeps
