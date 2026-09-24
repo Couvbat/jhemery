@@ -7,11 +7,15 @@ import type { Board, Dir } from '../games/2048'
 import * as minesweeper from '../games/minesweeper'
 import { HEIGHT, WIDTH } from '../games/snake'
 import { ANSWERS } from '../games/data/words-en'
+import { dailyResult, recordDaily } from '../games/scores'
+import { dailyIndex, fold } from '../games/wordle'
 import type { Command, CommandContext, OutputLine } from '../types'
 
 // Snake has two loops — a 120 ms tick and a reduced-motion step-per-keypress —
 // and both have to reach the achievement. Flipped per test.
 const motion = vi.hoisted(() => ({ reduced: true }))
+const clipboard = vi.hoisted(() => ({ copyText: vi.fn() }))
+vi.mock('@/tools/clipboard', () => clipboard)
 vi.mock('@/composables/useCrt', () => ({
   prefersReducedMotion: () => motion.reduced,
 }))
@@ -509,6 +513,90 @@ describe('wordle', () => {
 
     game.abort()
     await expect(finished).rejects.toThrow()
+  })
+})
+
+describe('wordle daily', () => {
+  const WORDS = ANSWERS.split(' ')
+  const DAY = '2026-09-24'
+  const ANSWER = WORDS[dailyIndex(DAY, WORDS.length)]!
+
+  beforeEach(() => {
+    // Only the clock: the word loads through real timers and promises.
+    vi.useFakeTimers({ toFake: ['Date'] })
+    vi.setSystemTime(new Date(`${DAY}T12:00:00Z`))
+    clipboard.copyText.mockReset().mockResolvedValue(true)
+  })
+
+  function daily(args = ['daily']) {
+    const game = harness()
+    game.ctx.args = args
+    return { game, finished: command('wordle').run(game.ctx) as Promise<OutputLine[]> }
+  }
+
+  it('plays the day’s word, ends by itself, and remembers the board', async () => {
+    const { game, finished } = daily()
+    await loaded()
+    for (const letter of ANSWER) game.press(letter.toLowerCase())
+    game.press('Enter')
+    await finished
+
+    expect(isUnlocked('wordle')).toBe(true)
+    expect(dailyResult('en', DAY)).toMatchObject({ done: true, won: true, guesses: [fold(ANSWER)], marks: ['hhhhh'] })
+    expect(game.frame().some((l) => l.text.includes('wordle share'))).toBe(true)
+  })
+
+  it('shows a finished board again instead of replaying it', async () => {
+    recordDaily('en', { day: DAY, guesses: [fold(ANSWER)], marks: ['hhhhh'], done: true, won: true })
+    const { game, finished } = daily()
+    await loaded()
+    await finished
+    expect(game.frame().some((l) => l.text.includes('already played today'))).toBe(true)
+  })
+
+  it('resumes a board left half-played rather than handing out six new rows', async () => {
+    const wrong = WORDS.find((word) => fold(word) !== fold(ANSWER))!
+    const first = daily()
+    await loaded()
+    for (const letter of wrong) first.game.press(letter.toLowerCase())
+    first.game.press('Enter')
+    await drain()
+    first.game.abort()
+    await expect(first.finished).rejects.toThrow()
+
+    const second = daily()
+    await loaded()
+    // The guess made before closing is still on the board, scored.
+    const spelled = ` ${[...fold(wrong)].join('  ')} `
+    expect(second.game.frame().some((l) => l.text.includes(spelled))).toBe(true)
+    expect(dailyResult('en', DAY)).toMatchObject({ done: false, guesses: [fold(wrong)] })
+    second.game.abort()
+    await expect(second.finished).rejects.toThrow()
+  })
+
+  it('is a different board in each language, and tomorrow a different word', () => {
+    recordDaily('en', { day: DAY, guesses: [], marks: [], done: true, won: false })
+    expect(dailyResult('fr', DAY)).toBeNull()
+    expect(dailyResult('en', '2026-09-25')).toBeNull()
+  })
+
+  it('share copies the emoji grid to the clipboard and prints none of it', async () => {
+    recordDaily('en', { day: DAY, guesses: ['ABCDE', fold(ANSWER)], marks: ['mnmmh', 'hhhhh'], done: true, won: true })
+    const { finished } = daily(['share'])
+    const out = await finished
+    const copied = clipboard.copyText.mock.calls[0]![0] as string
+    expect(copied).toContain(`wordle en ${DAY} 2/6`)
+    expect(copied).toContain('⬛🟨⬛⬛🟩\n🟩🟩🟩🟩🟩')
+    expect(copied).toContain('?run=wordle%20daily')
+    // The buffer only says it happened: emoji would shear the terminal's grid.
+    expect(out.map((l) => l.text).join('')).not.toMatch(/🟩|🟨|⬛/u)
+  })
+
+  it('share has nothing to copy before the daily is finished', async () => {
+    const { finished } = daily(['share'])
+    const out = await finished
+    expect(clipboard.copyText).not.toHaveBeenCalled()
+    expect(out[0]!.text).toContain('finish `wordle daily` first')
   })
 })
 

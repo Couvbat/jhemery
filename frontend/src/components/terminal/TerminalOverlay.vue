@@ -3,6 +3,8 @@ import { computed, nextTick, onMounted, ref, watch } from 'vue'
 import { profile } from '@/content'
 import { useLocale } from '@/i18n'
 import { useTerminal } from '@/composables/useTerminal'
+import { usePromptSuggestion } from '@/composables/usePromptSuggestion'
+import { suggestionPool } from '@/terminal/registry'
 import TerminalOutput from './TerminalOutput.vue'
 import VimPane from './VimPane.vue'
 
@@ -42,6 +44,22 @@ let previouslyFocused: HTMLElement | null = null
 /** A command is in flight and wants nothing from the keyboard but Ctrl+C: no
  *  capture, no prompt. `ping`, `ask`, anything that just awaits. */
 const running = computed(() => busy.value && !pendingPrompt.value && !capturing.value)
+
+// `try: neofetch` in the empty input. A placeholder, not a buffer line: it is never
+// typed, never submitted and never copied. Off whenever the prompt is doing
+// anything else — a question, a game, a running command, the vim pane.
+const { suggestion, dismiss } = usePromptSuggestion(
+  suggestionPool,
+  computed(
+    () => input.value === '' && !pendingPrompt.value && !capturing.value && !running.value && !vimBuffer.value,
+  ),
+)
+const placeholder = computed(() =>
+  suggestion.value ? t(m.terminal.suggestion).replace('{command}', suggestion.value) : '',
+)
+watch(input, (value) => {
+  if (value) dismiss()
+})
 
 const promptLabel = computed(() => {
   if (pendingPrompt.value) return pendingPrompt.value.question
@@ -307,7 +325,8 @@ function onPanelKeydown(event: KeyboardEvent) {
             spellcheck="false"
             :readonly="capturing || running"
             :aria-disabled="running"
-            class="flex-1 bg-transparent outline-none text-foreground caret-primary aria-disabled:opacity-50"
+            :placeholder="placeholder"
+            class="flex-1 bg-transparent outline-none text-foreground caret-primary aria-disabled:opacity-50 placeholder:text-muted-foreground/50"
             @keydown="onKeydown"
           />
         </form>

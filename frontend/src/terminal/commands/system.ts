@@ -167,6 +167,7 @@ export const systemCommands: Command[] = [
     usage: 'achievements',
     description: { en: 'Your progress finding secrets', fr: 'Votre progression' },
     group: 'fun',
+    linkable: true,
     palette: true,
     run({ t }) {
       const total = achievementList.length

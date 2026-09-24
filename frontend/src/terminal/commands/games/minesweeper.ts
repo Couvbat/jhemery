@@ -79,6 +79,7 @@ export const command: Command = {
   aliases: ['mines'],
   description: { en: 'Play minesweeper', fr: 'Jouer au démineur' },
   group: 'fun',
+  linkable: true,
   run: (ctx: CommandContext) =>
     play(ctx, 'minesweeper', async (session) => {
       const keys = keyStream(ctx.capture)

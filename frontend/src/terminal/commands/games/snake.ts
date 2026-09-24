@@ -47,6 +47,7 @@ export const command: Command = {
   name: 'snake',
   description: { en: 'Play snake', fr: 'Jouer à snake' },
   group: 'fun',
+  linkable: true,
   run: (ctx: CommandContext) =>
     play(ctx, 'snake', async (session) => {
       const stepped = prefersReducedMotion()

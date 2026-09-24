@@ -238,3 +238,31 @@ describe('generated word lists', () => {
     expect([...LISTS.fr.accepted].some((word) => /[À-ÿ]/.test(word))).toBe(false)
   })
 })
+
+describe('the daily word', () => {
+  it('reads the day in UTC, whatever the local zone', () => {
+    expect(wordle.utcDay(new Date('2026-09-24T23:30:00-05:00'))).toBe('2026-09-25')
+  })
+
+  it('hashes a day to the same index every time, always inside the list', () => {
+    const first = wordle.dailyIndex('2026-09-24', 1000)
+    expect(wordle.dailyIndex('2026-09-24', 1000)).toBe(first)
+    for (let d = 1; d <= 28; d++) {
+      const index = wordle.dailyIndex(`2026-02-${String(d).padStart(2, '0')}`, 7)
+      expect(index).toBeGreaterThanOrEqual(0)
+      expect(index).toBeLessThan(7)
+    }
+  })
+
+  it('spreads consecutive days across the list rather than walking it', () => {
+    const days = Array.from({ length: 30 }, (_, i) => `2026-10-${String(i + 1).padStart(2, '0')}`)
+    const picks = new Set(days.map((day) => wordle.dailyIndex(day, 500)))
+    expect(picks.size).toBeGreaterThan(25)
+  })
+
+  it('shares X/6 for a loss', () => {
+    const text = wordle.shareText({ day: '2026-09-24', locale: 'fr', marks: Array(6).fill('mmmmm'), won: false })
+    expect(text.split('\n')[0]).toBe('jhemery.xyz wordle fr 2026-09-24 X/6')
+    expect(text.split('\n')).toHaveLength(8)
+  })
+})

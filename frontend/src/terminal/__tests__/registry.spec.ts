@@ -6,7 +6,9 @@ import {
   completionNames,
   paletteCommands,
   resolve,
+  resolveLink,
   suggest,
+  suggestionPool,
   visibleCommands,
 } from '../registry'
 
@@ -189,6 +191,51 @@ describe('suggest', () => {
     for (const name of hidden) {
       const result = suggest(name.slice(0, -1) + 'z')
       if (result) expect(hidden.has(result), `suggest leaked "${result}"`).toBe(false)
+    }
+  })
+})
+
+describe('links (?run=)', () => {
+  /**
+   * A link is written by someone other than the person who clicks it. Anything
+   * that writes on the reader's behalf — to the server, to their settings, to their
+   * shell — must only ever run when they type it.
+   */
+  const WRITERS = ['mail', 'sign', 'sudo', 'alias', 'unalias', 'theme', 'lang', 'flag', 'ask', 'open', 'echo']
+
+  it.each(WRITERS)('never lets a link run `%s`', (name) => {
+    const command = resolve(name)
+    expect(command, `${name} is not registered`).toBeDefined()
+    expect(command!.linkable, `${name} is linkable`).toBeFalsy()
+  })
+
+  it('never lets a link run a hidden command — that would hand out an easter egg', () => {
+    for (const command of allCommands().filter((c) => c.linkable)) {
+      expect(command.hidden, `${command.name} is linkable and hidden`).toBeFalsy()
+    }
+  })
+
+  it('has something worth linking to', () => {
+    expect(allCommands().filter((c) => c.linkable).map((c) => c.name)).toEqual(
+      expect.arrayContaining(['neofetch', 'projects', 'wordle', 'ctf']),
+    )
+  })
+
+  it('resolves two-word names and splits off the arguments', () => {
+    expect(resolveLink('wordle daily')).toMatchObject({ command: { name: 'wordle' }, args: ['daily'] })
+    expect(resolveLink('git log')).toMatchObject({ command: { name: 'gitlog' }, args: [] })
+    expect(resolveLink('nope')).toBeUndefined()
+  })
+})
+
+describe('prompt suggestions', () => {
+  it('only suggests visible commands that run without an argument', () => {
+    const pool = suggestionPool()
+    expect(pool.length).toBeGreaterThan(3)
+    for (const name of pool) {
+      const command = resolve(name)!
+      expect(command.hidden, name).toBeFalsy()
+      expect(command.usage ?? '', name).not.toContain('<')
     }
   })
 })

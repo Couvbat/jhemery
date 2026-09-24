@@ -25,6 +25,30 @@ export function resolve(name: string): Command | undefined {
   return byName.get(name.toLowerCase())
 }
 
+/**
+ * The command a `?run=` link names, linkable or not — the shell says why it refused
+ * rather than pretending the link was empty. Resolved **without** the reader's
+ * aliases: a link's author must not be able to reach whatever the reader happens to
+ * have named `ls`. Two-word names (`git log`) resolve as they do when typed.
+ */
+export function resolveLink(input: string): { command: Command; args: string[] } | undefined {
+  const [name = '', ...args] = input.trim().split(/\s+/)
+  const direct = resolve(name)
+  if (direct) return { command: direct, args }
+  const twoWord = resolve(`${name} ${args[0] ?? ''}`.trim())
+  return twoWord ? { command: twoWord, args: args.slice(1) } : undefined
+}
+
+/**
+ * What the empty prompt may suggest: visible, curated into the palette, and runnable
+ * with no argument — `try: cd` would only teach someone an error message.
+ */
+export function suggestionPool(): string[] {
+  return commands
+    .filter((c) => !c.hidden && c.palette && !c.usage?.includes('<'))
+    .map((c) => c.name)
+}
+
 /** Every name and alias that can be tab-completed. */
 export function completionNames(): string[] {
   const names: string[] = []

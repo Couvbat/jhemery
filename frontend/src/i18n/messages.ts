@@ -109,6 +109,13 @@ export const messages = {
       fr: '-- en jeu : esc ou ctrl+c pour quitter --',
     },
     cancelled: { en: '^C cancelled', fr: '^C annulé' },
+    // `{command}` is what the link asked for, echoed so the reader sees it.
+    linkRefused: {
+      en: 'a link asked to run `{command}` — that one only runs if you type it yourself.',
+      fr: 'un lien a demandé `{command}` — celle-ci ne s’exécute que si vous la tapez vous-même.',
+    },
+    // Faded placeholder text at an empty prompt; `{command}` is from the registry.
+    suggestion: { en: 'try: {command}', fr: 'essayez : {command}' },
   },
   // Chrome around `ask` only. The *answer* is generated in the requested locale
   // by the model itself and is never translated client-side.
