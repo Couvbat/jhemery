@@ -30,10 +30,10 @@ export const profile = {
    * changes together.
    */
   availability: {
-    open: true,
+    open: false,
     note: {
-      en: 'Open to freelance & new opportunities',
-      fr: 'Ouvert au freelance & aux nouvelles opportunités',
+      en: 'Not looking for new opportunities right now',
+      fr: 'Pas à la recherche de nouvelles opportunités pour le moment',
     },
   } satisfies Availability,
   bio: {

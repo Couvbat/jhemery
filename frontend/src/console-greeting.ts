@@ -21,7 +21,7 @@ export function greet() {
       'Press ` or click the button in the corner. Try `ls -a`.',
     muted,
   )
-  console.log(`%cHiring? ${profile.email}`, neon)
+  console.log(`%cSay hello: ${profile.email}`, neon)
   // Stage 2 of the CTF chain (terminal/ctf.ts): base64, so it reads as noise to anyone
   // not looking for it and as an invitation to anyone who is.
   console.log('%cQ1RGe2Q3YjI1OWExNzkxYzg0OWJ9IC0gbmV4dDogY3VybCBqaGVtZXJ5Lnh5eiwgZnJvbSBhIHJlYWwgdGVybWluYWw=', muted)
