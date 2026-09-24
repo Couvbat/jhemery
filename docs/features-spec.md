@@ -382,8 +382,8 @@ Full design in [the first games spec](superpowers/specs/2026-08-04-terminal-game
 **Where:** `frontend/src/components/CommandPalette.vue`
 
 `Ctrl+K` / `Cmd+K` opens a filtered list of the views, the sections and every command flagged
-`palette: true` — the content and live-data commands, `tools`, `games`, `achievements`, `lang`,
-`theme`.
+`palette: true` — `help`, the content and live-data commands, `tools`, `games`, `achievements`,
+`ctf`, `play`, `lang`, `theme`.
 Selecting a view or a section navigates through `goTo()` directly; selecting an output command
 opens the terminal with that command already run.
 
@@ -424,7 +424,7 @@ It shares the registry, so it needs no separate maintenance.
 | `ps` (aliases `ps aux`, `ps -ef`) | Fake process table of the site's own "services", partly derived from real page state — `crt-shader.ko` only appears while overdrive is on, `soundcloud-embed --autoplay` only after playback starts, and `[rm -rf /] <defunct>` is a permanent zombie |
 | `top` (alias `htop`) | The same table as a monitor, six refresh frames with jittered CPU/MEM (one frame under reduced motion) |
 | `uname` | `couvsh 1.0 jhemery.xyz x86_64 GNU/Portfolio` |
-| DevTools console | ASCII art + a short hiring pitch on load |
+| DevTools console | ASCII art + a short hello and contact line on load |
 
 Hidden commands (`sudo`, `vim`, `:q`, `matrix`, `reboot`, `ssh`, `whois`, `crt`, `hack`, `coffee`,
 `sl`, `rickroll`, `cowsay`, `fortune`, `banner`, `env`, `alias`, `unalias`, `ps`, `top`, `uname`,

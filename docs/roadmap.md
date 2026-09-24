@@ -190,11 +190,11 @@ one commit per group below. The decisions the approach column left open are reco
 
 | ✔ | Feature | Approach | Files | Effort |
 |---|---|---|---|---|
-| [x] | `systemctl status` | `GET /health` collects each module's existing `configured`/enabled state and cache age into one list. It adds no probes of its own and only reads what the services already know, so it never calls Steam or the model on a visitor's behalf. Rendered as unit status: `● steam.service active (running)`, `○ ask.service inactive (dead): the model is asleep`, and `systemctl status <unit>` for one. With the API down every unit reads `unknown`, which is the true answer. | `backend/src/health/*` (new), `app.module.ts`, `lib/api.ts`, `commands/system.ts` | S–M |
-| [x] | Links that run a command | `?run=<command>` opens the shell, runs the command once and drops the parameter from the URL. Opt-in per command through `linkable?: boolean` on `Command`, beside `hidden` and `palette`, so the registry stays the API. A `registry.spec.ts` invariant stops anything that writes (`mail`, `sign`, `sudo`, `alias`) from ever being flagged. Desktop only, like the terminal: on mobile the parameter is ignored and the page loads normally. | `terminal/types.ts`, `useTerminalShell.ts`, `useTerminal.ts`, `App.vue`, `__tests__/registry.spec.ts` | S |
+| [x] | `systemctl status` | `GET /health` collects each module's existing `configured`/enabled state and cache age into one list. It adds no probes of its own and only reads what the services already know, so it never calls Steam or the model on a visitor's behalf. Rendered as unit status: `● steam.service active (running)`, `○ ask.service inactive (dead): the model is asleep`, and `systemctl status <unit>` for one. With the API down every unit reads `unknown`, which is the true answer. | `backend/src/health/*` (new), `backend/src/common/health.ts` (new), a `health()` on each service, `app.module.ts`, `lib/api.ts`, `commands/systemctl.ts` (new) | S–M |
+| [x] | Links that run a command | `?run=<command>` opens the shell, runs the command once and drops the parameter from the URL. Opt-in per command through `linkable?: boolean` on `Command`, beside `hidden` and `palette`, so the registry stays the API. A `registry.spec.ts` invariant stops anything that writes (`mail`, `sign`, `sudo`, `alias`) from ever being flagged. Desktop only, like the terminal: on mobile the parameter is ignored and the page loads normally. | `terminal/types.ts`, `registry.ts` (`resolveLink`), `useRunLink.ts` (new), `useTerminalShell.ts`, `useTerminal.ts`, `App.vue`, `__tests__/registry.spec.ts` | S |
 | [x] | Daily wordle + share | `wordle daily` picks the answer by hashing the UTC date into the locale's list, so everyone gets the same word per language, and one play per day is remembered beside the scores. `wordle share` copies the finished grid. Emoji go only to the clipboard, never into the buffer, where they render double-width (the reason `weather-art.ts` has none). Optional follow-up: an anonymous guess-count histogram, `POST /stats/wordle` with `{ day, guesses }` and nothing else, rate-limited like `/stats/session`. | `terminal/games/wordle.ts`, `commands/games/wordle.ts`, `terminal/games/scores.ts`, `tools/clipboard.ts`; follow-up `backend/src/stats/*` | S (+M) |
 | [x] | Shell versions of the tools | `sha256sum`, `base64 [-d]`, `uuidgen` (`crypto.randomUUID`) and a pretty-print-only `jq .`, each importing the pure `.ts` next to its tool panel. The shell and the page then can't disagree, the same rule `cat` and `vim` follow. | `commands/tools.ts`, `tools/{hash,encode,json}/*.ts` | S each |
-| [x] | Prompt suggestions | While the prompt is empty, faded placeholder text cycles through a few visible commands (`try: neofetch`) every few seconds, and stops for the session after the first keystroke. Drawn from the registry, never from hidden commands. Under reduced motion it shows one static hint. | `components/terminal/TerminalOverlay.vue`, `useTerminal.ts` | S |
+| [x] | Prompt suggestions | While the prompt is empty, faded placeholder text cycles through a few visible commands (`try: neofetch`) every few seconds, and stops for the session after the first keystroke. Drawn from the registry, never from hidden commands. Under reduced motion it shows one static hint. | `composables/usePromptSuggestion.ts` (new), `registry.ts` (`suggestionPool`), `components/terminal/TerminalOverlay.vue` | S |
 
 ### Tools, vol. 3
 
@@ -220,8 +220,8 @@ the rest of §F.
 
 | ✔ | Feature | Approach | Files | Effort |
 |---|---|---|---|---|
-| [x] | Two-player games | Connect four or battleship over a five-character room code. Rooms trust only the host token today, so a game room issues a second seat token on first join and the server enforces turn order. The rules stay in a pure frontend module, like every other game. Same caps, TTL and `ROOMS_ENABLED` switch as watch and radio. | `backend/src/rooms/*`, `frontend/src/rooms/*`, `terminal/games/<game>.ts` (new) | L |
-| [x] | MCP server | A read-only MCP endpoint exposing the résumé, projects and skills, with nothing that writes, so an agent can be pointed at the API and asked about Jules. The content lives in the frontend build, so a Vite plugin emits `content.json` beside `resume.txt`, and the backend fetches it from `FRONTEND_URL` and caches it; the two apps stay independent. Off by default (`MCP_ENABLED`), limited per IP by the existing guard, and nothing logged, same as `ask`. | `vite-plugins/resume.ts` (or a sibling), `backend/src/mcp/*` (new), `backend/.env.example` | M |
+| [x] | Two-player games | Connect four or battleship over a five-character room code. Rooms trust only the host token today, so a game room issues a second seat token on first join and the server enforces turn order. The rules stay in a pure frontend module, like every other game. Same caps, TTL and `ROOMS_ENABLED` switch as watch and radio. | `backend/src/rooms/*`, `frontend/src/rooms/*`, `terminal/games/connect4.ts` (new), `commands/games/connect4.ts` (new) | L |
+| [x] | MCP server | A read-only MCP endpoint exposing the résumé, projects and skills, with nothing that writes, so an agent can be pointed at the API and asked about Jules. The content lives in the frontend build, so a Vite plugin emits `content.json` beside `resume.txt`, and the backend fetches it from `FRONTEND_URL` and caches it; the two apps stay independent. Off by default (`MCP_ENABLED`), limited per IP by the existing guard, and nothing logged, same as `ask`. | `vite-plugins/resume.ts`, `backend/src/mcp/*` (new), `backend/.env.example` | M |
 
 ### Departures from the approach column
 
@@ -283,9 +283,9 @@ destinations (#87), the swing's end-of-transition twitch (#89).
 **Phase 6 — the September 2026 batch (§G):** ✅ all shipped on
 `claude/roadmap-features-impl-c80870` → `dev` (#98), one commit per step below, in this order:
 
-1. The four portfolio-content rows on one branch. They all touch `content/` and the résumé plugin,
+1. The four portfolio-content rows in one commit. They all touch `content/` and the résumé plugin,
    and none needs the backend.
-2. The CTF chain on its own branch, following its spec.
+2. The CTF chain in its own commit, following its spec.
 3. The terminal rows that need no backend: prompt suggestions, `?run=` links, the shell versions
    of the tools, and the daily wordle without its histogram.
 4. Tools vol. 3, five pure additions to the registry.
