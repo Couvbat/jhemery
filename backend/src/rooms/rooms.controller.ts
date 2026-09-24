@@ -14,9 +14,14 @@ import {
 } from '@nestjs/common';
 import { Observable } from 'rxjs';
 import { RateLimit, RateLimitGuard } from '../common/rate-limit.guard';
-import { CreateRoomDto, UpdateRoomDto } from './rooms.dto';
+import { CreateRoomDto, MoveDto, UpdateRoomDto } from './rooms.dto';
 import { CODE_PATTERN, RoomsService } from './rooms.service';
-import type { RoomCreated, RoomSnapshot, RoomsInfo } from './rooms.types';
+import type {
+  RoomCreated,
+  RoomJoined,
+  RoomSnapshot,
+  RoomsInfo,
+} from './rooms.types';
 
 @Controller('rooms')
 @UseGuards(RateLimitGuard)
@@ -82,6 +87,39 @@ export class RoomsController {
     @Headers('x-room-token') token?: string,
   ): void {
     this.rooms.end(normaliseCode(code), token);
+  }
+
+  /**
+   * A game room's second seat. Twenty a minute: someone mistyping a code a few times
+   * is fine, someone walking the code space looking for open seats is not.
+   */
+  @Post(':code/join')
+  @HttpCode(200)
+  @RateLimit({ limit: 20, windowMs: 60_000 })
+  join(@Param('code') code: string): RoomJoined {
+    return this.rooms.join(normaliseCode(code));
+  }
+
+  /** One drop. As generous as the host's seek limit: a game is a few dozen moves. */
+  @Post(':code/move')
+  @HttpCode(200)
+  @RateLimit({ limit: 120, windowMs: 60_000 })
+  move(
+    @Param('code') code: string,
+    @Body() dto: MoveDto,
+    @Headers('x-room-token') token?: string,
+  ): RoomSnapshot {
+    return this.rooms.move(normaliseCode(code), token, dto.column);
+  }
+
+  @Post(':code/rematch')
+  @HttpCode(200)
+  @RateLimit({ limit: 20, windowMs: 60_000 })
+  rematch(
+    @Param('code') code: string,
+    @Headers('x-room-token') token?: string,
+  ): RoomSnapshot {
+    return this.rooms.rematch(normaliseCode(code), token);
   }
 }
 

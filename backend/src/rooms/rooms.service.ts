@@ -1,5 +1,6 @@
 import {
   BadRequestException,
+  ConflictException,
   ForbiddenException,
   Injectable,
   NotFoundException,
@@ -11,6 +12,7 @@ import { Observable, Subject } from 'rxjs';
 import {
   PlaybackState,
   RoomCreated,
+  RoomJoined,
   RoomKind,
   RoomSnapshot,
 } from './rooms.types';
@@ -35,6 +37,10 @@ export const MAX_QUEUE = 50;
  *  figure as `/presence`. */
 const HEARTBEAT_MS = 25_000;
 
+/** Connect four's board, the only game room so far. */
+export const BOARD_COLUMNS = 7;
+export const BOARD_ROWS = 6;
+
 const YOUTUBE_ID = /^[A-Za-z0-9_-]{11}$/;
 const SOUNDCLOUD_HOSTS = new Set([
   'soundcloud.com',
@@ -51,6 +57,7 @@ const SOUNDCLOUD_HOSTS = new Set([
  * host's own page thought of it.
  */
 export function validMedia(kind: RoomKind, media: string): boolean {
+  if (kind === 'connect4') return false;
   if (kind === 'watch') return YOUTUBE_ID.test(media);
   if (media.length > 300) return false;
   let url: URL;
@@ -79,6 +86,12 @@ interface Room {
   expiresAt: number;
   /** Every change, pushed to every open stream. Completed when the room ends. */
   readonly updates: Subject<RoomSnapshot>;
+  /**
+   * Only on a game room. `seatToken` is null until the second player arrives. Rooms
+   * trusted one token until games: the host's. A game needs two, one per seat, and
+   * the server checks which one a move carries before it checks whose turn it is.
+   */
+  game?: { moves: number[]; seatToken: string | null; starter: 0 | 1 };
 }
 
 /**
@@ -116,6 +129,9 @@ export class RoomsService {
       members: 0,
       expiresAt: now + IDLE_TTL_MS,
       updates: new Subject<RoomSnapshot>(),
+      ...(kind === 'connect4'
+        ? { game: { moves: [], seatToken: null, starter: 0 as const } }
+        : {}),
     };
     this.rooms.set(room.code, room);
     return { ...this.snapshotOf(room), hostToken: room.hostToken };
@@ -139,6 +155,9 @@ export class RoomsService {
     now = Date.now(),
   ): RoomSnapshot {
     const room = this.host(code, token);
+    if (room.game) {
+      throw new BadRequestException('A game room has no player to drive');
+    }
     if (patch.media != null && !validMedia(room.kind, patch.media)) {
       throw new BadRequestException(
         room.kind === 'watch'
@@ -178,6 +197,85 @@ export class RoomsService {
   /** Closes the room for everyone: every stream completes, the code stops resolving. */
   end(code: string, token: string | undefined): void {
     this.remove(this.host(code, token));
+  }
+
+  /**
+   * Takes a game room's second seat. First come, first seated: the token is issued
+   * once, and a third caller is told the room is full rather than handed a seat that
+   * would let them move for somebody else.
+   */
+  join(code: string, now = Date.now()): RoomJoined {
+    const room = this.gameRoom(code);
+    if (room.game.seatToken) throw new ConflictException('The room is full');
+    room.game.seatToken = randomBytes(24).toString('base64url');
+    this.touch(room, now);
+    this.publish(room);
+    return { ...this.snapshotOf(room), seatToken: room.game.seatToken };
+  }
+
+  /**
+   * One drop. The token names the seat; the seat must be the one whose turn it is;
+   * the column must have room. Everything else — four in a row, a full board — is
+   * the rules module's, on both clients, from the same move list.
+   */
+  move(
+    code: string,
+    token: string | undefined,
+    column: number,
+    now = Date.now(),
+  ): RoomSnapshot {
+    const room = this.gameRoom(code);
+    const game = room.game;
+    const seat = this.seatOf(room, token);
+    if (!game.seatToken) {
+      throw new ConflictException('Nobody to play against yet');
+    }
+    if (game.moves.length >= BOARD_COLUMNS * BOARD_ROWS) {
+      throw new ConflictException('The board is full');
+    }
+    if (seat !== (game.starter + game.moves.length) % 2) {
+      throw new ConflictException('Not your turn');
+    }
+    if (!Number.isInteger(column) || column < 0 || column >= BOARD_COLUMNS) {
+      throw new BadRequestException('No such column');
+    }
+    if (game.moves.filter((c) => c === column).length >= BOARD_ROWS) {
+      throw new BadRequestException('That column is full');
+    }
+    game.moves.push(column);
+    this.touch(room, now);
+    this.publish(room);
+    return this.snapshotOf(room);
+  }
+
+  /** A fresh board, with the other seat opening. Either player may ask. */
+  rematch(
+    code: string,
+    token: string | undefined,
+    now = Date.now(),
+  ): RoomSnapshot {
+    const room = this.gameRoom(code);
+    this.seatOf(room, token);
+    room.game.moves = [];
+    room.game.starter = room.game.starter === 0 ? 1 : 0;
+    this.touch(room, now);
+    this.publish(room);
+    return this.snapshotOf(room);
+  }
+
+  private gameRoom(code: string): Room & { game: NonNullable<Room['game']> } {
+    const room = this.rooms.get(code);
+    if (!room) throw new NotFoundException('No such room');
+    if (!room.game) throw new BadRequestException('Not a game room');
+    return room as Room & { game: NonNullable<Room['game']> };
+  }
+
+  /** 0 for the host's token, 1 for the second seat's; anything else is refused. */
+  private seatOf(room: Room, token: string | undefined): 0 | 1 {
+    if (token && sameToken(token, room.hostToken)) return 0;
+    const seat = room.game?.seatToken;
+    if (token && seat && sameToken(token, seat)) return 1;
+    throw new ForbiddenException('Only the two players can do that');
   }
 
   /**
@@ -257,6 +355,15 @@ export class RoomsService {
       state: { ...room.state },
       queue: [...room.queue],
       members: room.members,
+      ...(room.game
+        ? {
+            game: {
+              moves: [...room.game.moves],
+              seats: room.game.seatToken ? 2 : 1,
+              starter: room.game.starter,
+            },
+          }
+        : {}),
     };
   }
 

@@ -3,6 +3,7 @@ import { blank, line } from '../../format'
 import type { GameId } from '../../games/scores'
 import type { Command, Tone } from '../../types'
 import { command as game2048 } from './2048'
+import { command as connect4 } from './connect4'
 import { command as hangman } from './hangman'
 import { command as minesweeper } from './minesweeper'
 import { bestScore, formatBest } from './shared'
@@ -46,6 +47,10 @@ const GAMES: { id: GameId; blurb: Localised<string> }[] = [
   {
     id: 'wpm',
     blurb: { en: 'type a line, see how fast', fr: 'tapez une ligne, mesurez votre vitesse' },
+  },
+  {
+    id: 'connect4',
+    blurb: { en: 'against another visitor, by room code', fr: 'contre un autre visiteur, par code' },
   },
 ]
 
@@ -104,4 +109,5 @@ export const gameCommands: Command[] = [
   wordle,
   hangman,
   wpm,
+  connect4,
 ]

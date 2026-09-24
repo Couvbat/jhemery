@@ -201,7 +201,7 @@ describe('links (?run=)', () => {
    * that writes on the reader's behalf — to the server, to their settings, to their
    * shell — must only ever run when they type it.
    */
-  const WRITERS = ['mail', 'sign', 'sudo', 'alias', 'unalias', 'theme', 'lang', 'flag', 'ask', 'open', 'echo']
+  const WRITERS = ['mail', 'sign', 'sudo', 'alias', 'unalias', 'theme', 'lang', 'flag', 'ask', 'open', 'echo', 'connect4']
 
   it.each(WRITERS)('never lets a link run `%s`', (name) => {
     const command = resolve(name)

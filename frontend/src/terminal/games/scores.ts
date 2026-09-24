@@ -9,6 +9,7 @@ export type GameId =
   | 'wordle'
   | 'hangman'
   | 'wpm'
+  | 'connect4'
 
 /**
  * `better` exists for exactly one game: minesweeper is scored on how long the
@@ -25,6 +26,8 @@ const GAMES: Record<GameId, { key: string; better: 'higher' | 'lower' }> = {
   wordle: { key: 'couvbat:games:wordle', better: 'higher' },
   hangman: { key: 'couvbat:games:hangman', better: 'higher' },
   wpm: { key: 'couvbat:games:wpm', better: 'higher' },
+  // Most wins in one sitting against the same opponent: there is no score in the game.
+  connect4: { key: 'couvbat:games:connect4', better: 'higher' },
 }
 
 export function isLowerBetter(game: GameId): boolean {

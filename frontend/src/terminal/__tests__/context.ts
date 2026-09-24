@@ -13,6 +13,8 @@ export interface Recorded {
   navigated: string[]
   ran: string[]
   copied: string[]
+  /** Hands a key to whatever currently holds the keyboard through `capture`. */
+  press: (key: string) => void
 }
 
 export function recordingContext(
@@ -27,6 +29,7 @@ export function recordingContext(
   const copied: string[] = []
   const toLines = (input: OutputLine | OutputLine[] | string): OutputLine[] =>
     typeof input === 'string' ? [{ text: input }] : Array.isArray(input) ? input : [input]
+  let captured: ((key: string) => void) | null = null
 
   const ctx: CommandContext = {
     args,
@@ -48,7 +51,12 @@ export function recordingContext(
       return options.navigate ? options.navigate(target) : true
     },
     prompt: () => Promise.resolve(''),
-    capture: () => () => {},
+    capture: (handler) => {
+      captured = handler
+      return () => {
+        if (captured === handler) captured = null
+      }
+    },
     run: (input) => {
       ran.push(input)
       return Promise.resolve()
@@ -56,7 +64,7 @@ export function recordingContext(
     effects: {} as CommandContext['effects'],
     signal: options.signal ?? new AbortController().signal,
   }
-  return { ctx, printed, navigated, ran, copied }
+  return { ctx, printed, navigated, ran, copied, press: (key) => captured?.(key) }
 }
 
 /** Runs `command` and returns everything it printed and returned, as text. */

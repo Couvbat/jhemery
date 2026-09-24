@@ -213,7 +213,16 @@ export interface GuestbookList {
   entries?: GuestbookEntry[]
 }
 
-export type RoomKind = 'watch' | 'radio'
+export type RoomKind = 'watch' | 'radio' | 'connect4'
+
+/** A game room's public state: every move, in order. See `backend/src/rooms/rooms.types.ts`. */
+export interface GameState {
+  moves: number[]
+  /** 1 until someone takes the second seat, then 2. */
+  seats: 1 | 2
+  /** Which seat opened this round: 0 is the host. */
+  starter: 0 | 1
+}
 
 /** The host's playback, anchored to the server clock — see `rooms/sync.ts` for the maths. */
 export interface PlaybackState {
@@ -233,6 +242,13 @@ export interface RoomSnapshot {
   state: PlaybackState
   queue: string[]
   members: number
+  /** Only on a game room. */
+  game?: GameState
+}
+
+/** The second seat of a game room, handed to whoever takes it first. */
+export interface RoomJoined extends RoomSnapshot {
+  seatToken: string
 }
 
 export interface RoomCreated extends RoomSnapshot {
@@ -419,6 +435,15 @@ export const api = {
     }),
   endRoom: (code: string, token: string) =>
     request<void>(`/rooms/${code}`, { method: 'DELETE', headers: { 'x-room-token': token } }),
+  joinRoom: (code: string) => request<RoomJoined>(`/rooms/${code}/join`, { method: 'POST' }),
+  move: (code: string, token: string, column: number) =>
+    request<RoomSnapshot>(`/rooms/${code}/move`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'x-room-token': token },
+      body: JSON.stringify({ column }),
+    }),
+  rematch: (code: string, token: string) =>
+    request<RoomSnapshot>(`/rooms/${code}/rematch`, { method: 'POST', headers: { 'x-room-token': token } }),
   jobs: (password: string) => request<JobsInfo>('/jobs', { headers: adminHeaders(password) }),
   startJob: (password: string, url: string) =>
     request<DownloadJob>('/jobs', {
