@@ -167,7 +167,7 @@ slices in [`superpowers/plans/2026-09-22-tools-and-views.md`](superpowers/plans/
 
 Brainstormed on 2026-09-24, after §F shipped. The playground is large by now, so about half of
 this batch is about the *portfolio* rather than the toys: what the site says about the work, and
-how visitors find their way in. All shipped together on `claude/roadmap-features-impl-c80870`,
+how visitors find their way in. All shipped together in #98, on `claude/roadmap-features-impl-c80870`,
 one commit per group below. The decisions the approach column left open are recorded in
 [`superpowers/specs/2026-09-24-september-batch-design.md`](superpowers/specs/2026-09-24-september-batch-design.md).
 
@@ -280,7 +280,7 @@ suite that already covered everything else.
 destinations (#87), the swing's end-of-transition twitch (#89).
 
 **Phase 6 — the September 2026 batch (§G):** ✅ all shipped on
-`claude/roadmap-features-impl-c80870` → `dev`, one commit per step below, in this order:
+`claude/roadmap-features-impl-c80870` → `dev` (#98), one commit per step below, in this order:
 
 1. The four portfolio-content rows on one branch. They all touch `content/` and the résumé plugin,
    and none needs the backend.
