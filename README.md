@@ -5,8 +5,8 @@
 # jhemery.xyz
 
 The personal portfolio of **Jules Hémery** (*Couvbat*): a terminal-flavoured site over a wireframe
-three.js background. It has a real shell you can type into, seven games, a page of in-browser
-tools, watch-party and radio rooms, and 37 hidden achievements. English and French throughout.
+three.js background. It has a real shell you can type into, eight games, a page of in-browser
+tools, watch-party and radio rooms, and 38 hidden achievements. English and French throughout.
 
 [![Frontend checks](https://github.com/Couvbat/jhemery/actions/workflows/frontend-pr-check.yml/badge.svg?branch=dev)](https://github.com/Couvbat/jhemery/actions/workflows/frontend-pr-check.yml)
 [![Backend checks](https://github.com/Couvbat/jhemery/actions/workflows/backend-pr-check.yml/badge.svg?branch=dev)](https://github.com/Couvbat/jhemery/actions/workflows/backend-pr-check.yml)
@@ -101,7 +101,7 @@ documents every variable, including why the risky ones ship disabled.
 ```
 frontend/   Vue 3 + Vite + Tailwind 4 SPA: sections, terminal, games, tools, rooms, PWA
 backend/    NestJS 11 API: ask, contact, steam, github, weather, markets, presence,
-            stats, guestbook, rooms, jobs
+            stats, guestbook, rooms, jobs, health, mcp
 docs/       features spec, roadmap, deployment guide, per-feature design specs and plans
 .github/    PR checks, builds, SSH deploys with an FTP fallback, Dependabot
 ```

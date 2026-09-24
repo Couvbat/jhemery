@@ -78,8 +78,13 @@ Everything under `frontend/src/content/` is the single source of truth for site 
 module graph. So these modules may only import their siblings — no Vue, no `@` alias, no
 `window`/`document`/`localStorage`/`navigator`. `src/content/__tests__/purity.spec.ts` enforces
 this; violating it breaks `npm run build` with an error pointing at the résumé plugin instead of
-the offending file. The résumé served at `/resume.txt` (and by the terminal's `curl`) is generated
-from here, so the CV has exactly one source.
+the offending file. The résumé plugin generates `/resume.txt` (also what the terminal's `curl`
+prints), the printable `/resume.html` and `/resume.fr.html`, and `/content.json` from here, so the
+CV has exactly one source. `content.json` is fetched at runtime by the **backend's** MCP endpoint
+from `${FRONTEND_URL}`. That is the one place the two apps depend on each other, and the shape is
+mirrored rather than shared (`backend/src/mcp/mcp.types.ts`), with the backend refusing any
+`version` but 1. So a change to its shape needs a new `version` and a backend change that deploys
+with it.
 
 `sections.ts` defines the six sections once; the navbar, terminal `ls`/`cd`/`pwd`, command palette
 and every section header consume it.
@@ -97,8 +102,11 @@ content strings in `src/content/`. Facts (tech names, URLs, specs) stay plain st
 `src/terminal/commands/*.ts` each export an array of `Command` objects; `commands/index.ts`
 concatenates them and `registry.ts` builds the name/alias map. Adding a command means adding one
 object — never a special case in the shell. A `Command` declares its own `hidden` (out of `help`
-and Tab), `palette` (in Ctrl+K), `group`, and `complete(ctx)` for argument completion; the shell
-handles prefix filtering, common-prefix insertion and ambiguity listing generically.
+and Tab), `palette` (in Ctrl+K), `linkable` (may run from a `?run=` link), `group`, and
+`complete(ctx)` for argument completion; the shell handles prefix filtering, common-prefix
+insertion and ambiguity listing generically. `linkable` is opt-in because a link's author is not
+the person clicking it: `registry.spec.ts` fails if anything that writes (to the server, settings
+or the shell) or anything hidden sets it.
 
 `CommandContext` (in `terminal/types.ts`) is the whole capability surface a command gets: `print`,
 `frame()` for redrawable animation regions, `capture()` for holding the keyboard (how the games
@@ -142,10 +150,10 @@ carries the cross-cutting decisions and explains each in comments: helmet with a
 whitelisting `ValidationPipe`.
 
 **Everything optional degrades gracefully.** No Steam key → live activity hidden; no GitHub token
-→ heatmap dropped; unreachable LLM → the terminal says it's asleep. `ask` and `guestbook` are
-**off by default**. Endpoints report `configured: false` rather than erroring, and the frontend
-renders that state. Preserve this when adding integrations. `backend/.env.example` documents every
-variable and why the risky ones are off.
+→ heatmap dropped; unreachable LLM → the terminal says it's asleep. `ask`, `guestbook`, `rooms`,
+`jobs` and `mcp` are **off by default**. Endpoints report `configured: false` rather than
+erroring, and the frontend renders that state. Preserve this when adding integrations.
+`backend/.env.example` documents every variable and why the risky ones are off.
 
 Privacy is a design constraint, not an afterthought: `/presence` pushes one integer over SSE with
 no visitor id, `/stats` counts sessions not commands, `/weather` uses server-side coordinates so

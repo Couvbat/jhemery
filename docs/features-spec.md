@@ -382,8 +382,8 @@ Full design in [the first games spec](superpowers/specs/2026-08-04-terminal-game
 **Where:** `frontend/src/components/CommandPalette.vue`
 
 `Ctrl+K` / `Cmd+K` opens a filtered list of the views, the sections and every command flagged
-`palette: true` — the content and live-data commands, `tools`, `games`, `achievements`, `lang`,
-`theme`.
+`palette: true` — `help`, the content and live-data commands, `tools`, `games`, `achievements`,
+`ctf`, `play`, `lang`, `theme`.
 Selecting a view or a section navigates through `goTo()` directly; selecting an output command
 opens the terminal with that command already run.
 

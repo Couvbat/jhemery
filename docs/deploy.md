@@ -300,7 +300,7 @@ Setup, if you want this path ready before you need it:
 - **SPA fallback.** Vue Router uses `createWebHistory`, so every non-file request is handed to `index.html`. Without this, a hard refresh on any path other than `/` 404s before Vue Router ever sees the URL.
 - **`curl jhemery.xyz` → the ANSI résumé.** Matches on `User-Agent` at the site root and serves `resume.txt`, generated at build time by [vite-plugins/resume.ts](../frontend/vite-plugins/resume.ts). The same rule covers LLM crawlers, which would otherwise fetch an empty `<div id="app">`.
 - **Charset.** `UTF-8` by default, and explicitly for `.txt` so the résumé's box-drawing characters survive.
-- **Caching.** Hashed assets are `immutable` for a year; `index.html` and `resume.txt` are `no-cache`, so a deploy takes effect immediately.
+- **Caching.** Hashed assets are `immutable` for a year. `index.html` and everything the résumé plugin emits (`resume.txt`, `resume.html`, `resume.fr.html`, `resume.css`, and `content.json`, which the backend's MCP endpoint reads) are `no-cache`, so a deploy takes effect immediately.
 - **WebAssembly.** An explicit `application/wasm` type (so the 32 MB ffmpeg core compiles while streaming) and deflate for it, since cPanel's compression switch only covers text types.
 - **Security headers.** HSTS (no `preload`, deliberately), `X-Frame-Options`, `nosniff`, `Referrer-Policy`, a deny-all `Permissions-Policy` and the Content-Security-Policy. Each CSP source is commented with the feature that needs it — the Umami origin, `'wasm-unsafe-eval'` for the ffmpeg tool, `blob:` in `img-src` and `media-src` for the tools' local previews, the YouTube and SoundCloud `frame-src` for the rooms and the music player. Adding an origin there should mean adding a dependency.
 
