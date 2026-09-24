@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { diffLines, hasChanges } from '../diff'
+import { diffLines, diffTrimmed, hasChanges, tooBigToDiff, unifiedDiff, unifiedHunks } from '../diff'
 
 describe('diffLines', () => {
   it('reports no changes for identical input', () => {
@@ -55,5 +55,45 @@ describe('diffLines', () => {
       .filter((op) => op.kind !== 'remove')
       .map((op) => op.text)
     expect(rebuilt).toEqual(right)
+  })
+})
+
+describe('unifiedDiff', () => {
+  const a = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '10', '11', '12']
+
+  it('prints hunks with three lines of context, as diff -u does', () => {
+    const b = a.map((line) => (line === '6' ? 'six' : line))
+    expect(unifiedDiff(a, b, { from: 'a', to: 'b' })).toBe(
+      ['--- a', '+++ b', '@@ -3,7 +3,7 @@', ' 3', ' 4', ' 5', '-6', '+six', ' 7', ' 8', ' 9'].join('\n'),
+    )
+  })
+
+  it('merges changes whose context would touch, and splits those that would not', () => {
+    const close = a.map((line) => (line === '3' || line === '9' ? `${line}!` : line))
+    expect(unifiedHunks(diffTrimmed(a, close))).toHaveLength(1)
+    const far = [...a, ...a.map((l) => `x${l}`)]
+    const farChanged = far.map((line) => (line === '1' || line === 'x12' ? `${line}!` : line))
+    expect(unifiedHunks(diffTrimmed(far, farChanged))).toHaveLength(2)
+  })
+
+  it('uses GNU ranges: no ,1, and the line before for an empty side', () => {
+    expect(unifiedDiff(['a'], ['b']).split('\n')[2]).toBe('@@ -1 +1 @@')
+    expect(unifiedDiff([], ['new']).split('\n')[2]).toBe('@@ -0,0 +1 @@')
+  })
+
+  it('is empty when nothing changed', () => {
+    expect(unifiedDiff(a, [...a])).toBe('')
+  })
+
+  it('trims the shared ends without changing the answer', () => {
+    const b = ['0', ...a.slice(0, 5), 'mid', ...a.slice(5)]
+    expect(diffTrimmed(a, b)).toEqual(diffLines(a, b))
+  })
+
+  it('declines two large texts that share nothing', () => {
+    const big = Array.from({ length: 2100 }, (_, i) => `a${i}`)
+    expect(tooBigToDiff(big, big.map((l) => `b${l}`))).toBe(true)
+    // …but not the same texts with a one-line edit: the shared ends are free.
+    expect(tooBigToDiff(big, [...big.slice(0, 1000), 'x', ...big.slice(1001)])).toBe(false)
   })
 })
