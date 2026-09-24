@@ -115,7 +115,7 @@
     Header set Cache-Control "public, max-age=0, must-revalidate"
   </FilesMatch>
 
-  <FilesMatch "^(index\.html|resume\.txt)$">
+  <FilesMatch "^(index\.html|resume\.txt|resume(\.fr)?\.html|resume\.css)$">
     Header set Cache-Control "no-cache"
   </FilesMatch>
 

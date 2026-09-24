@@ -74,6 +74,8 @@ export const messages = {
       fr: "Échec de l'envoi. Réessayez ou contactez-moi directement par email.",
     },
     directLine: { en: 'Prefer a direct line? Find me here:', fr: 'Vous préférez le contact direct ?' },
+    resume: { en: 'Résumé', fr: 'CV' },
+    resumeNote: { en: 'printable, or save as PDF', fr: 'à imprimer, ou en PDF' },
   },
   terminal: {
     open: { en: 'Open terminal', fr: 'Ouvrir le terminal' },
@@ -450,6 +452,17 @@ export const messages = {
       en: 'A room is a code, a playback state and a head count. No names, no ids, nothing stored: it lives in the server’s memory and is gone two hours after the last action.',
       fr: "Un salon, c'est un code, un état de lecture et un nombre de présents. Ni noms, ni identifiants, rien d'enregistré : il vit dans la mémoire du serveur et disparaît deux heures après la dernière action.",
     },
+  },
+  now: {
+    heading: { en: 'What I’m doing now', fr: 'Ce que je fais en ce moment' },
+    updated: { en: 'Last updated', fr: 'Mis à jour le' },
+    // `{n}` is the list's age in days. Shown instead of letting an old list pass
+    // for a current one — the only honest way a /now page survives neglect.
+    stale: {
+      en: 'This list is {n} days old. Some of it is probably no longer true.',
+      fr: 'Cette liste date de {n} jours. Une partie n’est sans doute plus vraie.',
+    },
+    about: { en: 'A /now page, as in', fr: 'Une page /now, comme sur' },
   },
   footer: {
     built: { en: 'built', fr: 'build' },

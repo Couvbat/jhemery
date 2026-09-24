@@ -1,7 +1,7 @@
-import { profile, socials, skills, availability } from '@/content'
+import { now, nowCategories, profile, skillNames, socials, staleDays } from '@/content'
 import type { Localised } from '@/content/types'
 import { isUnlocked } from '../achievements'
-import { blank, line, wrap } from '../format'
+import { blank, line, segmented, wrap } from '../format'
 import type { OutputLine } from '../types'
 import { SECRET_FILE, secretContents } from './secret'
 import { ENV_FILE, envFileContents } from './env-file'
@@ -10,7 +10,7 @@ import { guestbookFilenames, resolveGuestbookFile } from './guestbook-fs'
 type TFunction = <T>(value: Localised<T>) => T
 
 /** Files `ls` always lists, in listing order. */
-export const FILES = ['about.txt', 'skills.txt', 'contact.txt'] as const
+export const FILES = ['about.txt', 'skills.txt', 'contact.txt', 'now.txt'] as const
 
 /** Files only `ls -a` reveals, in listing order. */
 export const HIDDEN_FILES = [SECRET_FILE, ENV_FILE] as const
@@ -36,6 +36,38 @@ export function listFiles(): string[] {
   return [...FILES, ...found, ...guestbookFilenames()]
 }
 
+/** `now.txt`: the same list `/now` renders, with the same staleness rule. */
+function nowLines(t: TFunction): OutputLine[] {
+  const stale = staleDays(now.updated, new Date())
+  const width = Math.max(...Object.values(nowCategories).map((label) => t(label).length))
+  return [
+    line(`# now — ${t({ en: 'updated', fr: 'mis à jour le' })} ${now.updated}`, 'muted'),
+    ...(stale === null
+      ? []
+      : [
+          line(
+            t({
+              en: `(${stale} days old — treat it as history, not news)`,
+              fr: `(vieux de ${stale} jours — c’est de l’histoire, pas des nouvelles)`,
+            }),
+            'warning',
+          ),
+        ]),
+    blank,
+    ...now.entries.flatMap((entry) => {
+      const label = t(nowCategories[entry.category]).padEnd(width)
+      return wrap(t(entry.text), 72 - width - 2).map((text, i) =>
+        segmented([
+          { text: `${i === 0 ? label : ' '.repeat(width)}  `, tone: 'primary' },
+          { text },
+        ]),
+      )
+    }),
+    blank,
+    line(t({ en: 'also at /now', fr: 'aussi sur /now' }), 'muted'),
+  ]
+}
+
 /**
  * The fake filesystem shared by `cat` and `vim` — one source of truth for what a
  * given filename contains, so the two commands can never show different content
@@ -55,7 +87,7 @@ export function resolveFileLines(file: string, t: TFunction): OutputLine[] | und
 
     case 'skills.txt':
     case 'competences.txt':
-      return wrap(skills.join('  ·  ')).map((text) => line(text, 'primary'))
+      return wrap(skillNames.join('  ·  ')).map((text) => line(text, 'primary'))
 
     case 'contact.txt':
       return [
@@ -65,8 +97,12 @@ export function resolveFileLines(file: string, t: TFunction): OutputLine[] | und
           pre: true,
         })),
         blank,
-        line(t(availability), 'muted'),
+        line(t(profile.availability.note), 'muted'),
       ]
+
+    case 'now.txt':
+    case 'maintenant.txt':
+      return nowLines(t)
 
     case SECRET_FILE:
       return secretContents(t)

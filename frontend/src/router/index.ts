@@ -35,6 +35,14 @@ const router = createRouter({
       component: () => import('../views/RadioView.vue'),
     },
     {
+      // Deliberately not a face of the prism (it is absent from `content/views.ts`):
+      // a fifth destination would cost the navbar room it does not have (#87).
+      // `viewIndex()` puts it after the last face, as it does the 404.
+      path: '/now',
+      name: 'now',
+      component: () => import('../views/NowView.vue'),
+    },
+    {
       // Needs the .htaccess rewrite in public/ to survive a hard refresh on Apache.
       path: '/:pathMatch(.*)*',
       name: 'not-found',

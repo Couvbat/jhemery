@@ -8,7 +8,7 @@ const t = <T,>(value: Localised<T>): T => value.en
 
 describe('resolveFileLines', () => {
   it('resolves the visible files', () => {
-    for (const file of ['about.txt', 'skills.txt', 'contact.txt']) {
+    for (const file of ['about.txt', 'skills.txt', 'contact.txt', 'now.txt']) {
       expect(resolveFileLines(file, t), file).toBeDefined()
     }
   })

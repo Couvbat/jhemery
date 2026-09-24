@@ -1,4 +1,4 @@
-import type { Localised } from './types'
+import type { Availability, Localised } from './types'
 
 export const profile = {
   name: 'Jules Hémery',
@@ -24,6 +24,18 @@ export const profile = {
     en: 'French · English',
     fr: 'Français · Anglais',
   } satisfies Localised,
+  /**
+   * One fact, several readers: the footer's status line, `neofetch`'s `Status` row,
+   * `contact`, `contact.txt` and both résumés. Flip `open` here and every one of them
+   * changes together.
+   */
+  availability: {
+    open: true,
+    note: {
+      en: 'Open to freelance & new opportunities',
+      fr: 'Ouvert au freelance & aux nouvelles opportunités',
+    },
+  } satisfies Availability,
   bio: {
     en: [
       "Hey, I'm Jules Hémery, aka Couvbat.",
