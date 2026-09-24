@@ -133,7 +133,9 @@ page all talk to the same session, so history survives closing the panel).
 - `lines`: rendered output buffer, capped at 500 entries.
 - `history`: submitted commands, capped at 100, persisted to `localStorage`.
 - ↑/↓ walk history, `Tab` completes (common prefix first, then lists candidates),
-  `Ctrl+L` clears, `Ctrl+C` cancels an in-flight interactive prompt.
+  `Ctrl+L` clears, `Ctrl+C` cancels an in-flight command or interactive prompt. The input is
+  never `disabled` while a command runs, only `readonly` + `aria-disabled`: a disabled input
+  drops focus to `<body>`, and Ctrl+C would have nowhere to land.
 
 ### Tab completion
 
