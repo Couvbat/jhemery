@@ -30,6 +30,11 @@ test('a saved scheme is painted on load', async ({ page, app }) => {
 })
 
 test('a light scheme repaints the page and drops the glows', async ({ page, app, terminal }) => {
+  test.skip(
+    test.info().project.name === 'mobile',
+    'Driven through `theme`, and a phone has no terminal: the launcher is `hidden md:flex`.',
+  )
+
   await page.goto('/')
   await terminal.open()
 
