@@ -12,7 +12,7 @@ const toneClass: Record<string, string> = {
   secondary: 'text-secondary',
   error: 'text-destructive',
   success: 'text-primary',
-  warning: 'text-yellow-400',
+  warning: 'text-warning',
 }
 </script>
 
@@ -36,7 +36,7 @@ const toneClass: Record<string, string> = {
   </p>
 
   <!-- Per-run tones, for surfaces that need a colour per character rather than
-       per line — the game boards. Still plain text, just sliced. -->
+       per line — the game boards, and `theme`'s swatches. Still plain text, just sliced. -->
   <p
     v-else-if="line.segments"
     :class="[
@@ -47,6 +47,7 @@ const toneClass: Record<string, string> = {
       v-for="(segment, i) in line.segments"
       :key="i"
       :class="segment.tone ? toneClass[segment.tone] : undefined"
+      :style="segment.colour ? { color: segment.colour } : undefined"
     >{{ segment.text }}</span></p>
 
   <!-- Plain output. `pre` keeps ASCII art and padded columns aligned. The

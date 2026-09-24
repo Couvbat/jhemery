@@ -16,6 +16,8 @@ export interface SeedState {
   crt?: boolean
   achievements?: string[]
   history?: string[]
+  /** A `theme` id, as `useTheme` saves it. */
+  theme?: string
 }
 
 // Only the keys the suite actually seeds or reads. The app persists more of them —
@@ -27,6 +29,7 @@ const KEYS = {
   crt: 'couvbat:crt',
   achievements: 'couvbat:achievements',
   history: 'couvbat:history',
+  theme: 'couvbat:theme',
 } as const
 
 /**
@@ -60,6 +63,7 @@ export class AppState {
     if (state.crt !== undefined) entries.push([KEYS.crt, String(state.crt)])
     if (state.achievements) entries.push([KEYS.achievements, JSON.stringify(state.achievements)])
     if (state.history) entries.push([KEYS.history, JSON.stringify(state.history)])
+    if (state.theme !== undefined) entries.push([KEYS.theme, state.theme])
 
     await this.page.addInitScript((pairs: [string, string | null][]) => {
       for (const [key, value] of pairs) {

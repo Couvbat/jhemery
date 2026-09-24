@@ -182,37 +182,53 @@ test.describe('terminal', () => {
     })
 
     /**
-     * KNOWN GAP, and the reason this test is marked as expected-to-fail rather than
-     * deleted or weakened.
+     * A command that holds no capture — `ask`, `ping`, anything that just awaits —
+     * used to leave the input `disabled` for the duration. A disabled input cannot
+     * hold focus: about a frame later the browser moves `document.activeElement` to
+     * `<body>`, outside the panel, and Ctrl+C lands on nothing while the command runs
+     * to completion. The input is now `readonly` + `aria-disabled` instead, as it
+     * already was under a capture, so it keeps focus the whole time.
      *
-     * A command that does *not* take a capture — `ping`, and anything else that
-     * awaits — leaves the input `:disabled` for the duration. A disabled input cannot
-     * hold focus, so `document.activeElement` falls back to `<body>`, outside the
-     * panel entirely: the Ctrl+C handler on the input never fires, and neither does
-     * the panel's Escape handler. The AbortController and the `ctx.signal` plumbing
-     * are all in place and correct — there is simply no reachable way for a visitor
-     * to pull the trigger. Clicking the scrollback does not help either, since its
-     * click-to-refocus targets the same disabled input.
-     *
-     * When that is fixed, this test starts passing and Playwright reports it as
-     * "expected to fail but passed", which is the signal to drop the annotation.
+     * The old version of this test, marked `test.fail()`, raced `ping` and usually
+     * *passed*. Its Ctrl+C went out a few milliseconds after Enter, before the
+     * browser had moved focus off the just-disabled input, so the key still reached
+     * the handler. That is why this one holds the command open on a request that
+     * never answers, and lets a couple of frames pass before touching the keyboard.
      */
-    test('Ctrl+C aborts an in-flight command that holds no capture', async ({ terminal }) => {
-      test.fail()
+    test('Ctrl+C aborts an in-flight command that holds no capture', async ({
+      api,
+      page,
+      terminal,
+    }) => {
+      api.any('/ask', () => new Promise<void>(() => {}))
 
       await terminal.open()
-
-      // `ping` prints a reply every 280 ms through an abortable sleep, so there is a
-      // wide window in which an abort would land.
-      await terminal.input.fill('ping about')
+      await terminal.input.fill('ask who are you')
       await terminal.input.press('Enter')
-      await terminal.expectOutput('PING about')
+      await terminal.expectOutput('thinking')
+      await expect(terminal.input).toBeDisabled()
 
-      await terminal.page.keyboard.press('Control+c')
+      await page.evaluate(
+        () => new Promise((done) => requestAnimationFrame(() => requestAnimationFrame(done))),
+      )
+      await expect(terminal.input).toBeFocused()
 
-      // Exactly one `^C`, printed as the run unwinds, and a live prompt afterwards.
+      // Focused but inert: readonly stops typing, and the overlay swallows the keys
+      // that would otherwise submit a second line or write history/completions into
+      // the input.
+      for (const key of ['x', 'Tab', 'ArrowUp', 'Enter']) await page.keyboard.press(key)
+      await expect(terminal.input).toHaveValue('')
+
+      await page.keyboard.press('Control+c')
+
       await terminal.expectOutput('^C')
       await expect(terminal.input).toBeEnabled()
+      await expect(terminal.input).toBeFocused()
+      // `ask` redraws its `thinking…` frame away as it unwinds. Had the Enter above
+      // gone through, its echoed prompt line would have landed under the frame, and
+      // the redraw, which replaces the buffer's last rows, would have removed that
+      // line instead, leaving `thinking…` stuck in the scrollback.
+      await expect(terminal.output).not.toContainText('thinking')
     })
   })
 })

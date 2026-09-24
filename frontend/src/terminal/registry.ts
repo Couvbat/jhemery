@@ -67,24 +67,37 @@ export function commonPrefix(candidates: string[]): string {
   return prefix
 }
 
-/** Levenshtein-lite suggestion for "command not found — did you mean …?". */
+/**
+ * How far a miss may be before it stops being a typo. A flat two let `where` — two
+ * substitutions from `theme` — read as a misspelt command, which buried the `ask` hint
+ * for anyone typing `where does he work`: in a word that short, two edits make a
+ * different word. Longer names keep the slack.
+ */
+function allowedEdits(needle: string): number {
+  return needle.length >= 6 ? 2 : 1
+}
+
+/** Edit-distance suggestion for "command not found — did you mean …?". */
 export function suggest(name: string): string | undefined {
   const needle = name.toLowerCase()
   let best: { name: string; distance: number } | undefined
 
   for (const candidate of completionNames()) {
     const distance = editDistance(needle, candidate)
-    if (distance <= 2 && (!best || distance < best.distance)) {
+    if (distance <= allowedEdits(needle) && (!best || distance < best.distance)) {
       best = { name: candidate, distance }
     }
   }
   return best?.name
 }
 
+/** Levenshtein plus adjacent swaps at a cost of one (optimal string alignment):
+ *  `hlep` is one slip of the fingers, and a one-edit budget has to see it as one. */
 function editDistance(a: string, b: string): number {
   if (a === b) return 0
   if (Math.abs(a.length - b.length) > 2) return 99
 
+  let beforePrevious: number[] = []
   let previous = Array.from({ length: b.length + 1 }, (_, i) => i)
 
   for (let i = 1; i <= a.length; i++) {
@@ -92,7 +105,11 @@ function editDistance(a: string, b: string): number {
     for (let j = 1; j <= b.length; j++) {
       const cost = a[i - 1] === b[j - 1] ? 0 : 1
       current[j] = Math.min(current[j - 1]! + 1, previous[j]! + 1, previous[j - 1]! + cost)
+      if (i > 1 && j > 1 && a[i - 1] === b[j - 2] && a[i - 2] === b[j - 1]) {
+        current[j] = Math.min(current[j]!, beforePrevious[j - 2]! + 1)
+      }
     }
+    beforePrevious = previous
     previous = current
   }
   return previous[b.length]!

@@ -17,8 +17,8 @@ const tabs = computed(() => [
 ])
 
 const osColor: Record<string, string> = {
-  'Tiny 11 25H2': 'text-blue-400 border-blue-400/40',
-  'Arch Linux': 'text-cyan-400 border-cyan-400/40',
+  'Tiny 11 25H2': 'text-blue-400 border-blue-400/40 light:text-blue-700 light:border-blue-700/40',
+  'Arch Linux': 'text-cyan-400 border-cyan-400/40 light:text-cyan-700 light:border-cyan-700/40',
   'TrueNAS CE': 'text-secondary border-secondary/40',
 }
 </script>
@@ -82,7 +82,7 @@ const osColor: Record<string, string> = {
           v-for="machine in nas"
           :key="machine.name"
           class="bg-card border-border overflow-hidden gap-0 py-0"
-          style="box-shadow: 0 0 8px rgba(191, 0, 255, 0.15)"
+          style="box-shadow: 0 0 8px color-mix(in srgb, var(--neon-purple) 15%, transparent)"
         >
           <div class="flex items-center gap-2 px-4 py-2 bg-muted border-b border-border">
             <span class="w-3 h-3 rounded-full bg-red-500/80"></span>

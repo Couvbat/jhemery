@@ -15,9 +15,11 @@ import { hardwareTab, isHardwareTab } from '@/composables/useHardwareTab'
 import { useSteam } from '@/composables/useSteam'
 import { uptime } from '@/composables/useStatus'
 import { useStats } from '@/composables/useStats'
+import { useTheme } from '@/composables/useTheme'
 import { MARK } from '../ascii'
-import { blank, heading, keyValues, line, tags, wrap } from '../format'
+import { blank, heading, keyValues, line, segmented, tags, wrap } from '../format'
 import type { Command, OutputLine } from '../types'
+import { swatches } from './theme'
 
 // `uptime` moved to `composables/useStatus` once the footer's status ticker needed
 // it too; re-exported here so `neofetch`'s neighbours keep importing it from where
@@ -183,6 +185,7 @@ export const contentCommands: Command[] = [
     run({ t, locale }) {
       // Read-only: the gaming section owns the fetch, this just reflects it if present.
       const steam = useSteam(false).profile.value
+      const theme = useTheme().theme.value
       const info: Array<[string, string]> = [
         [`${profile.handle}@${profile.host}`, ''],
         ['OS', 'Portfolio 1.0 (Vue 3 / Vite)'],
@@ -191,7 +194,7 @@ export const contentCommands: Command[] = [
         ['Uptime', uptime()],
         ['Shell', 'couvsh 1.0'],
         ['DE', 'TailwindCSS 4'],
-        ['Theme', 'cyberpunk-dark'],
+        ['Theme', `${theme.name} [${theme.mode}]`],
         ['Locale', locale],
         ['Role', t(profile.role)],
         ['Location', profile.location],
@@ -208,12 +211,19 @@ export const contentCommands: Command[] = [
       }
 
       const markLines = MARK.split('\n')
-      const rows = Math.max(markLines.length, info.length)
+      // The real thing ends on a strip of the terminal's colours, one row below the
+      // info; this one is the current scheme's.
+      const swatchRow = info.length + 1
+      const rows = Math.max(markLines.length, swatchRow + 1)
       const markWidth = markLines.reduce((max, l) => Math.max(max, l.length), 0)
       const out: OutputLine[] = []
 
       for (let i = 0; i < rows; i++) {
         const left = (markLines[i] ?? '').padEnd(markWidth + 4)
+        if (i === swatchRow) {
+          out.push(segmented([{ text: left, tone: 'primary' }, ...swatches(theme)]))
+          continue
+        }
         const entry = info[i]
         if (!entry) {
           out.push({ text: left, tone: 'primary', pre: true })

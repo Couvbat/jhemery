@@ -22,7 +22,7 @@ const { commits, contributions, pinnedRepos, workflowRuns } = useGithub()
 
 const statusColor: Record<ProjectStatus, string> = {
   production: 'text-primary border-primary/50',
-  wip: 'text-yellow-400 border-yellow-400/50',
+  wip: 'text-warning border-warning/50',
   archived: 'text-muted-foreground border-border',
 }
 

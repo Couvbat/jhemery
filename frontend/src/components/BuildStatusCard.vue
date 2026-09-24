@@ -28,9 +28,9 @@ function label(run: WorkflowRun): string {
 
 const TONES: Record<string, string> = {
   success: 'text-primary',
-  failure: 'text-red-400',
+  failure: 'text-destructive',
   cancelled: 'text-muted-foreground',
-  running: 'text-yellow-400',
+  running: 'text-warning',
   queued: 'text-muted-foreground',
 }
 
@@ -40,9 +40,9 @@ function tone(run: WorkflowRun): string {
 
 const DOTS: Record<string, string> = {
   success: 'bg-primary',
-  failure: 'bg-red-400',
+  failure: 'bg-destructive',
   cancelled: 'bg-muted-foreground',
-  running: 'bg-yellow-400 motion-safe:animate-pulse',
+  running: 'bg-warning motion-safe:animate-pulse',
   queued: 'bg-muted-foreground motion-safe:animate-pulse',
 }
 

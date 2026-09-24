@@ -39,6 +39,10 @@ const panelEl = ref<HTMLElement | null>(null)
 /** Restored when the overlay closes, so keyboard users land back where they started. */
 let previouslyFocused: HTMLElement | null = null
 
+/** A command is in flight and wants nothing from the keyboard but Ctrl+C: no
+ *  capture, no prompt. `ping`, `ask`, anything that just awaits. */
+const running = computed(() => busy.value && !pendingPrompt.value && !capturing.value)
+
 const promptLabel = computed(() => {
   if (pendingPrompt.value) return pendingPrompt.value.question
   if (capturing.value) return t(m.terminal.playing)
@@ -74,9 +78,10 @@ watch(open, (isOpen) => {
   }
 })
 
-// A command that takes the keyboard re-enables the input it was just disabled in
-// (games run with `busy === true`), so make sure focus is still on it — a blurred
-// input means the keys land nowhere and the game looks frozen.
+// A game's keys only arrive while the input has focus, and a blurred input makes
+// the game look frozen. The input no longer drops focus on its own when a command
+// starts (it is never `disabled`, see the template), so this is a safety net for a
+// capture that begins with focus somewhere else, not a repair.
 watch(capturing, async (active) => {
   if (!active) return
   await nextTick()
@@ -100,6 +105,14 @@ function onKeydown(event: KeyboardEvent) {
   if (capturing.value && event.key !== 'Escape' && handleCaptureKeydown(event)) {
     event.preventDefault()
     event.stopPropagation()
+    return
+  }
+
+  // `readonly` stops typing but not these. Enter would still submit the form, and
+  // history and completion write `input` directly. Ctrl+C has to get through, since
+  // it is the only thing a running command is waiting on.
+  if (running.value && ['Enter', 'Tab', 'ArrowUp', 'ArrowDown'].includes(event.key)) {
+    event.preventDefault()
     return
   }
 
@@ -250,7 +263,7 @@ function onPanelKeydown(event: KeyboardEvent) {
           <span class="ml-3 text-xs text-muted-foreground flex-1"
             >{{ profile.handle }}@{{ profile.host }} ~ {{ t(m.terminal.title) }}</span
           >
-          <span v-if="vimBuffer?.mode === 'insert'" class="text-xs text-yellow-400">-- INSERT --</span>
+          <span v-if="vimBuffer?.mode === 'insert'" class="text-xs text-warning">-- INSERT --</span>
         </div>
 
         <!-- Output -->
@@ -272,7 +285,11 @@ function onPanelKeydown(event: KeyboardEvent) {
              Escape would be dead, which reads exactly like a frozen editor. -->
         <VimPane v-else :buffer="vimBuffer" @click="inputEl?.focus()" />
 
-        <!-- Input -->
+        <!-- Input. Never `disabled`, even while a command runs: a disabled input
+             loses focus to <body> a frame later, outside every listener here, and
+             Ctrl+C then has nothing to land on. `readonly` keeps it focused and
+             `aria-disabled` still tells assistive tech (and the dimming) it is
+             inert. -->
         <form
           class="flex items-center gap-2 px-4 py-3 border-t border-border bg-card/50 shrink-0 font-mono text-xs sm:text-sm"
           @submit.prevent="onSubmit"
@@ -288,9 +305,9 @@ function onPanelKeydown(event: KeyboardEvent) {
             autocapitalize="off"
             autocorrect="off"
             spellcheck="false"
-            :disabled="busy && !pendingPrompt && !capturing"
-            :readonly="capturing"
-            class="flex-1 bg-transparent outline-none text-foreground caret-primary disabled:opacity-50"
+            :readonly="capturing || running"
+            :aria-disabled="running"
+            class="flex-1 bg-transparent outline-none text-foreground caret-primary aria-disabled:opacity-50"
             @keydown="onKeydown"
           />
         </form>

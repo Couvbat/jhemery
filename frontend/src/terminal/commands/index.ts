@@ -8,9 +8,11 @@ import { askCommands } from './ask'
 import { eggCommands } from './eggs'
 import { gameCommands } from './games'
 import { systemCommands } from './system'
+import { themeCommands } from './theme'
 
 export const commands: Command[] = [
   ...coreCommands,
+  ...themeCommands,
   ...navigateCommands,
   ...toolCommands,
   ...contentCommands,

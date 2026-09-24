@@ -70,7 +70,7 @@ const grade = computed<Strength>(() => strength(bits.value))
 
 const GRADE_CLASS: Record<Strength, string> = {
   weak: 'bg-destructive',
-  fair: 'bg-yellow-400',
+  fair: 'bg-warning',
   strong: 'bg-primary',
   excellent: 'bg-accent',
 }
@@ -174,7 +174,7 @@ onMounted(() => void generate())
     <div class="space-y-2">
       <div class="flex items-center gap-2">
         <output
-          class="flex-1 min-h-11 rounded border border-primary/40 bg-black/30 px-3 py-2 font-mono text-base text-primary break-all select-all"
+          class="flex-1 min-h-11 rounded border border-primary/40 bg-black/30 light:bg-muted px-3 py-2 font-mono text-base text-primary break-all select-all"
           aria-live="polite"
           >{{ output || '—' }}</output
         >
