@@ -17,6 +17,22 @@ export const terminalTrapped = ref(false)
  *  TerminalOverlay so it isn't re-run on a later open. */
 export const pendingInitialCommand = ref<string | null>(null)
 
+/** Set by a `?run=` link (`useRunLink.ts`). Kept apart from `pendingInitialCommand`
+ *  because it is not trusted the same way: the palette and the 404 page are this
+ *  site's own buttons, while a link was written by someone else, so the shell checks
+ *  that the command opted in before running it. */
+export const pendingLinkCommand = ref<string | null>(null)
+
+/** True while a running command holds the keyboard. Written by `useTerminal`, read by
+ *  the eager screensaver, which must not start in the middle of a game — hence here,
+ *  in the registry-free module, rather than in the terminal's own chunk. */
+export const terminalCapturing = ref(false)
+
+export function openTerminalFromLink(input: string) {
+  terminalOpen.value = true
+  pendingLinkCommand.value = input
+}
+
 /** Instant and registry-free — just flips the boolean so `TerminalOverlay`
  *  starts mounting (and loading its chunk) behind the scenes. */
 export function openTerminal(initialCommand?: string) {

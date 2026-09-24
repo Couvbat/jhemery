@@ -9,6 +9,7 @@ import {
   GithubWorkflowStatus,
   WorkflowRun,
 } from './github.types';
+import { cacheAge, UnitHealth } from '../common/health';
 
 const CACHE_TTL_MS = 5 * 60 * 1000;
 // The contribution graph changes at most daily, so cache it far longer.
@@ -406,6 +407,17 @@ export class GithubService {
         url: item.html_url,
         date: item.commit.committer.date,
       }));
+  }
+
+  /** Configured or not, and how old the recent-commits cache is — nothing is fetched. */
+  health(): UnitHealth {
+    return this.config.get<string>('GITHUB_USERNAME')
+      ? {
+          unit: 'github',
+          state: 'active',
+          cacheAge: cacheAge(this.cache, CACHE_TTL_MS),
+        }
+      : { unit: 'github', state: 'inactive', reason: 'unconfigured' };
   }
 }
 

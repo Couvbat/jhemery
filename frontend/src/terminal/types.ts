@@ -144,6 +144,13 @@ export interface Command {
   /** Surfaced in the Ctrl+K command palette. */
   palette?: boolean
   /**
+   * May be run from a link: `?run=<command>` opens the shell and runs it once. Opt-in,
+   * because a link is written by someone other than the person clicking it — so
+   * nothing that writes (`mail`, `sign`, `alias`, `theme`…) and nothing hidden may set
+   * it. `registry.spec.ts` holds both lines.
+   */
+  linkable?: boolean
+  /**
    * Tab-completion candidates for the argument being typed. Return everything
    * valid at that position — the shell filters by prefix, inserts the common
    * prefix and prints the list when the choice is still ambiguous, exactly as

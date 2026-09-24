@@ -40,6 +40,7 @@ export const navigateCommands: Command[] = [
     usage: 'ls [-a] [path]',
     description: { en: 'List sections, pages and files', fr: 'Lister sections, pages et fichiers' },
     group: 'navigate',
+    linkable: true,
     complete: ({ index, args }) =>
       index === 0 && !args[0]?.startsWith('-')
         ? ['-a', ...destinations()]

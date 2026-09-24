@@ -83,6 +83,7 @@ export const command: Command = {
   aliases: ['typing'],
   description: { en: 'Typing test', fr: 'Test de frappe' },
   group: 'fun',
+  linkable: true,
   run: (ctx: CommandContext) =>
     play(ctx, 'wpm', async (session) => {
       const keys = keyStream(ctx.capture)

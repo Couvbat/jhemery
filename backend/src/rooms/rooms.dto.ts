@@ -3,6 +3,7 @@ import {
   IsArray,
   IsBoolean,
   IsIn,
+  IsInt,
   IsNumber,
   IsOptional,
   IsString,
@@ -13,7 +14,7 @@ import {
 import type { RoomKind } from './rooms.types';
 
 export class CreateRoomDto {
-  @IsIn(['watch', 'radio'])
+  @IsIn(['watch', 'radio', 'connect4'])
   kind: RoomKind;
 }
 
@@ -45,4 +46,13 @@ export class UpdateRoomDto {
   @IsString({ each: true })
   @MaxLength(300, { each: true })
   queue?: string[];
+}
+
+/** A drop in a game room: the column, counted from 0. Whose turn it is and whether the
+ *  column has room are the service's to check. */
+export class MoveDto {
+  @IsInt()
+  @Min(0)
+  @Max(6)
+  column: number;
 }

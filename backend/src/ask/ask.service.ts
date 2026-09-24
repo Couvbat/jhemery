@@ -6,6 +6,7 @@ import {
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { AskDto } from './ask.dto';
+import { UnitHealth } from '../common/health';
 
 /**
  * The published summary of the site, which already exists for exactly this
@@ -365,6 +366,16 @@ export class AskService {
     })();
 
     return this.corpusRefresh;
+  }
+
+  /**
+   * Whether `ask` is switched on — not whether the model is awake, which would take a
+   * request to a machine in a flat. The terminal words "off" as the model being asleep.
+   */
+  health(): UnitHealth {
+    return this.enabled
+      ? { unit: 'ask', state: 'active' }
+      : { unit: 'ask', state: 'inactive', reason: 'disabled' };
   }
 }
 

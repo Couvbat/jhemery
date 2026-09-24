@@ -1,6 +1,6 @@
 import {
-  availability,
   gaming,
+  isExternal,
   machines,
   music,
   nas,
@@ -8,6 +8,7 @@ import {
   peripherals,
   profile,
   projects,
+  skillNames,
   skills,
   socials,
 } from '@/content'
@@ -21,6 +22,11 @@ import { blank, heading, keyValues, line, segmented, tags, wrap } from '../forma
 import type { Command, OutputLine } from '../types'
 import { swatches } from './theme'
 
+/** The printable résumé `vite-plugins/resume.ts` emits, in the reader's language. */
+export function resumeHtmlPath(locale: string): string {
+  return locale === 'fr' ? '/resume.fr.html' : '/resume.html'
+}
+
 // `uptime` moved to `composables/useStatus` once the footer's status ticker needed
 // it too; re-exported here so `neofetch`'s neighbours keep importing it from where
 // they always did.
@@ -32,6 +38,7 @@ export const contentCommands: Command[] = [
     aliases: ['bio'],
     description: { en: 'Who I am', fr: 'Qui je suis' },
     group: 'content',
+    linkable: true,
     palette: true,
     run({ t }) {
       return [
@@ -48,11 +55,51 @@ export const contentCommands: Command[] = [
   },
   {
     name: 'skills',
+    usage: 'skills [--why]',
     description: { en: 'Tech I work with', fr: "Technos que j'utilise" },
     group: 'content',
+    linkable: true,
     palette: true,
-    run() {
-      return [...heading('skills'), ...tags(skills, 'primary')]
+    complete: ({ index }) => (index === 0 ? ['--why'] : []),
+    run({ args, t }) {
+      if (!args.includes('--why')) {
+        return [
+          ...heading('skills'),
+          ...tags(skillNames, 'primary'),
+          blank,
+          line(t({ en: '`skills --why` shows where each one is used.', fr: '`skills --why` montre où chacune sert.' }), 'muted'),
+        ]
+      }
+
+      // The evidence, one row per place: the reader can follow every link and check.
+      const evidenced = skills.filter((skill) => skill.usedIn?.length)
+      const width = evidenced.reduce((max, skill) => Math.max(max, skill.name.length), 0)
+      const out: OutputLine[] = [...heading('skills --why'), blank]
+      for (const skill of evidenced) {
+        skill.usedIn!.forEach((evidence, i) => {
+          const name = (i === 0 ? skill.name : '').padEnd(width)
+          out.push(
+            isExternal(evidence.where)
+              ? { text: `${name}  → ${t(evidence.what)}`, href: evidence.where, tone: 'accent', pre: true }
+              : segmented([
+                  { text: `${name}  → `, tone: 'primary' },
+                  { text: t(evidence.what) },
+                  { text: `  (cd ${evidence.where})`, tone: 'muted' },
+                ]),
+          )
+        })
+      }
+      out.push(
+        blank,
+        line(
+          t({
+            en: `${skills.length - evidenced.length} more with nothing in this repo to show for them — see \`skills\`.`,
+            fr: `${skills.length - evidenced.length} autres sans rien à montrer dans ce dépôt — voir \`skills\`.`,
+          }),
+          'muted',
+        ),
+      )
+      return out
     },
   },
   {
@@ -60,6 +107,7 @@ export const contentCommands: Command[] = [
     usage: 'projects [--json]',
     description: { en: 'What I have built', fr: "Ce que j'ai construit" },
     group: 'content',
+    linkable: true,
     palette: true,
     run({ args, t }) {
       if (args.includes('--json')) {
@@ -90,6 +138,7 @@ export const contentCommands: Command[] = [
     name: 'music',
     description: { en: 'What I produce', fr: 'Ce que je produis' },
     group: 'content',
+    linkable: true,
     palette: true,
     run({ t }) {
       return [
@@ -113,6 +162,7 @@ export const contentCommands: Command[] = [
     // terminal that has games in it should answer. The listing points back here.
     description: { en: 'What I play', fr: 'Ce que je joue' },
     group: 'content',
+    linkable: true,
     palette: true,
     run({ t }) {
       return [
@@ -131,6 +181,7 @@ export const contentCommands: Command[] = [
     usage: 'hardware [pc|nas|peripherals]',
     description: { en: 'My machines', fr: 'Mes machines' },
     group: 'content',
+    linkable: true,
     palette: true,
     run({ args }) {
       const requested = args[0]?.toLowerCase()
@@ -161,6 +212,7 @@ export const contentCommands: Command[] = [
     aliases: ['links'],
     description: { en: 'How to reach me', fr: 'Comment me joindre' },
     group: 'content',
+    linkable: true,
     palette: true,
     run({ t }) {
       return [
@@ -171,7 +223,7 @@ export const contentCommands: Command[] = [
           tone: 'accent' as const,
         })),
         blank,
-        line(t(availability), 'muted'),
+        line(t(profile.availability.note), profile.availability.open ? 'success' : 'muted'),
         line('run `mail` to send me a message from here.', 'muted'),
       ]
     },
@@ -181,6 +233,7 @@ export const contentCommands: Command[] = [
     aliases: ['fetch'],
     description: { en: 'System summary', fr: 'Résumé système' },
     group: 'content',
+    linkable: true,
     palette: true,
     run({ t, locale }) {
       // Read-only: the gaming section owns the fetch, this just reflects it if present.
@@ -198,6 +251,10 @@ export const contentCommands: Command[] = [
         ['Locale', locale],
         ['Role', t(profile.role)],
         ['Location', profile.location],
+        [
+          'Status',
+          `${profile.availability.open ? t({ en: 'open', fr: 'disponible' }) : t({ en: 'closed', fr: 'indisponible' })} — ${t(profile.availability.note)}`,
+        ],
       ]
       if (steam) {
         info.push(['Steam', steam.inGame ? `${steam.name} — ${steam.inGame}` : steam.status])
@@ -244,8 +301,9 @@ export const contentCommands: Command[] = [
     aliases: ['cv'],
     description: { en: 'Condensed résumé', fr: 'CV condensé' },
     group: 'content',
+    linkable: true,
     palette: true,
-    run({ t }) {
+    run({ t, locale }) {
       return [
         ...heading(profile.name),
         line(`${t(profile.role)} · ${profile.location} · ${profile.email}`, 'accent'),
@@ -255,11 +313,17 @@ export const contentCommands: Command[] = [
         line(`  ${t({ en: 'Web apps, REST APIs and internal tools.', fr: 'Applications web, APIs REST et outils internes.' })}`, 'muted'),
         blank,
         line('STACK', 'primary'),
-        ...tags(skills, 'muted'),
+        ...tags(skillNames, 'muted'),
         blank,
         line('LINKS', 'primary'),
         ...socials.map((s) => ({ text: `  ${s.label.padEnd(11)} ${s.href}`, href: s.href, tone: 'accent' as const, pre: true })),
         blank,
+        line(t(profile.availability.note), profile.availability.open ? 'success' : 'muted'),
+        {
+          text: t({ en: 'printable: ', fr: 'à imprimer : ' }) + resumeHtmlPath(locale),
+          href: resumeHtmlPath(locale),
+          tone: 'accent',
+        },
         line(`tip: curl ${profile.domain}`, 'muted'),
       ]
     },
@@ -272,6 +336,7 @@ export const contentCommands: Command[] = [
       fr: 'Récupérer le CV (comme un vrai curl)',
     },
     group: 'content',
+    linkable: true,
     palette: true,
     async run(ctx) {
       const target = ctx.args[0]

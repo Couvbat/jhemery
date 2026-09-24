@@ -1,9 +1,16 @@
-import { computed, nextTick, ref, shallowRef } from 'vue'
+import { computed, nextTick, ref, shallowRef, watch } from 'vue'
 import { currentLocale, useLocale } from '@/i18n'
 import { messages } from '@/i18n/messages'
 import { expandAliases } from '@/terminal/aliases'
 import { history, pushHistory } from '@/terminal/history'
-import { commonPrefix, completeCommand, filterByPrefix, resolve, suggest } from '@/terminal/registry'
+import {
+  commonPrefix,
+  completeCommand,
+  filterByPrefix,
+  resolve,
+  resolveLink,
+  suggest,
+} from '@/terminal/registry'
 import type {
   Command,
   CommandContext,
@@ -16,6 +23,8 @@ import { handleVimKey } from '@/terminal/vimEditor'
 import {
   closeTerminal,
   pendingInitialCommand,
+  pendingLinkCommand,
+  terminalCapturing,
   terminalOpen as open,
   terminalTrapped as trapped,
 } from './useTerminalShell'
@@ -47,6 +56,10 @@ const pendingPrompt = shallowRef<{
 
 /** Set while a running command holds the keyboard via `ctx.capture()`. */
 const keyCapture = shallowRef<((key: string) => void) | null>(null)
+// Mirrored into the registry-free shell module, for readers outside this chunk.
+watch(keyCapture, (handler) => {
+  terminalCapturing.value = handler !== null
+})
 
 let abortController: AbortController | null = null
 /** Bumped on every append so the view knows to scroll. */
@@ -271,6 +284,37 @@ export async function submit(value: string): Promise<void> {
   await run(value)
 }
 
+/** A link's command can never be longer than this, or carry control characters. */
+const LINK_MAX = 200
+
+/**
+ * Runs a command a `?run=` link asked for — once, and only if the command opted in
+ * (`linkable`). It is echoed as if typed, so the reader sees exactly what ran, and
+ * executed directly rather than through `run()`: that would expand the reader's own
+ * aliases, which a link's author must not be able to reach.
+ */
+export async function runLink(input: string): Promise<void> {
+  const line = Array.from(input, (c) => (c < ' ' || c === '\u007f' ? ' ' : c))
+    .join('')
+    .trim()
+    .slice(0, LINK_MAX)
+  if (!line) return
+
+  const target = resolveLink(line)
+  if (!target?.command.linkable) {
+    append({
+      text: messages.terminal.linkRefused[currentLocale()].replace('{command}', line),
+      tone: 'warning',
+    })
+    return
+  }
+
+  append({ text: line, prompt: true })
+  pushHistory(line)
+  historyIndex.value = -1
+  await execute(target.command.name, target.args, line)
+}
+
 /** Ctrl+C — abort an in-flight command or cancel a pending prompt. */
 export function cancel() {
   const pending = pendingPrompt.value
@@ -414,6 +458,11 @@ export function primeOverlay() {
     pendingInitialCommand.value = null
     void nextTick(() => submit(initialCommand))
   }
+  const linked = pendingLinkCommand.value
+  if (linked) {
+    pendingLinkCommand.value = null
+    void nextTick(() => runLink(linked))
+  }
 }
 
 export function useTerminal() {
@@ -438,5 +487,6 @@ export function useTerminal() {
     completeInput,
     clearBuffer,
     run,
+    runLink,
   }
 }

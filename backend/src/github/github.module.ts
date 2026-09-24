@@ -7,5 +7,6 @@ import { GithubService } from './github.service';
   imports: [ConfigModule],
   controllers: [GithubController],
   providers: [GithubService],
+  exports: [GithubService],
 })
 export class GithubModule {}

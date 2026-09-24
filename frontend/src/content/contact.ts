@@ -1,4 +1,4 @@
-import type { Localised, SocialLink } from './types'
+import type { SocialLink } from './types'
 
 export const socials: SocialLink[] = [
   {
@@ -26,8 +26,3 @@ export const socials: SocialLink[] = [
     keyword: 'email',
   },
 ]
-
-export const availability = {
-  en: 'Open to freelance & new opportunities',
-  fr: 'Ouvert au freelance & aux nouvelles opportunités',
-} satisfies Localised

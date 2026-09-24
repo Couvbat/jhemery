@@ -114,6 +114,61 @@ export const tools: ToolMeta[] = [
     load: () => import('./text/TextTool.vue'),
   },
   {
+    id: 'jwt',
+    name: { en: 'JWT decoder', fr: 'Décodeur JWT' },
+    description: {
+      en: 'Header, payload and the expiry as dates — decoded, never verified, never asks for a secret',
+      fr: 'En-tête, charge utile et expiration en dates — décodé, jamais vérifié, ne demande aucun secret',
+    },
+    keywords: ['jwt', 'token', 'jws', 'bearer', 'exp', 'claims', 'oauth'],
+    tier: 'client',
+    load: () => import('./jwt/JwtTool.vue'),
+  },
+  {
+    id: 'regex',
+    name: { en: 'Regex tester', fr: 'Testeur de regex' },
+    description: {
+      en: 'Matches and groups highlighted as you type, in a worker that gives up after a second',
+      fr: 'Correspondances et groupes surlignés à la frappe, dans un worker qui abandonne après une seconde',
+    },
+    keywords: ['regex', 'regexp', 'pattern', 'match', 'groups', 'javascript'],
+    tier: 'client',
+    load: () => import('./regex/RegexTool.vue'),
+  },
+  {
+    id: 'cron',
+    name: { en: 'Cron explainer', fr: 'Explication cron' },
+    description: {
+      en: 'A cron expression as a sentence, and its next five runs in your time zone',
+      fr: 'Une expression cron en une phrase, et ses cinq prochaines exécutions dans votre fuseau',
+    },
+    keywords: ['cron', 'crontab', 'schedule', 'systemd', 'timer', 'next run'],
+    tier: 'client',
+    load: () => import('./cron/CronTool.vue'),
+  },
+  {
+    id: 'qr',
+    name: { en: 'QR code', fr: 'QR code' },
+    description: {
+      en: 'Text or a URL as a QR code, as PNG or SVG — encoded here, from the standard',
+      fr: 'Du texte ou une URL en QR code, en PNG ou SVG — encodé ici, d’après la norme',
+    },
+    keywords: ['qr', 'qrcode', 'barcode', 'png', 'svg', 'url'],
+    tier: 'client',
+    load: () => import('./qr/QrTool.vue'),
+  },
+  {
+    id: 'diff',
+    name: { en: 'Text diff', fr: 'Diff de texte' },
+    description: {
+      en: 'Two texts and a unified diff, from the same code as the terminal’s `diff`',
+      fr: 'Deux textes et un diff unifié, avec le même code que le `diff` du terminal',
+    },
+    keywords: ['diff', 'compare', 'unified', 'patch', 'changes'],
+    tier: 'client',
+    load: () => import('./diff/DiffTool.vue'),
+  },
+  {
     id: 'ffmpeg',
     name: { en: 'Audio & video converter', fr: 'Convertisseur audio & vidéo' },
     description: {

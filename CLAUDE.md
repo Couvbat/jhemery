@@ -10,7 +10,7 @@ background. Two independent npm projects, no workspace/monorepo tooling:
 ```
 frontend/   Vue 3 + Vite + Tailwind 4 SPA (sections, terminal, games, achievements, PWA)
 backend/    NestJS API (ask, contact, steam, github, weather, markets, presence, stats, guestbook,
-            rooms, jobs)
+            rooms, jobs, health, mcp)
 docs/       features-spec.md, roadmap.md, deploy.md; superpowers/{specs,plans} for the bigger pieces
 ```
 
@@ -114,8 +114,8 @@ user-supplied data (guestbook entries), so there is deliberately no markup escap
 
 ### Achievements
 
-37 entries in `terminal/achievements.ts`, persisted under `couvbat:achievements` in
-`localStorage`. `completionist` cascades off the other 36 and repaints the three.js palette.
+38 entries in `terminal/achievements.ts`, persisted under `couvbat:achievements` in
+`localStorage`. `completionist` cascades off the other 37 and repaints the three.js palette.
 Adding one means adding it to `achievementList` *and* the README's spoiler table.
 
 ### Colour schemes: tokens only
@@ -135,7 +135,7 @@ the overrides, so `main.css` stays its only definition. The consequences for new
 
 ### Backend: NestJS, one module per capability
 
-`app.module.ts` wires ~10 feature modules, each `{controller, service, dto, spec}`. `main.ts`
+`app.module.ts` wires ~13 feature modules, each `{controller, service, dto, spec}`. `main.ts`
 carries the cross-cutting decisions and explains each in comments: helmet with a `default-src
 'none'` CSP (JSON API, never a document), CORS locked to `FRONTEND_URL` + localhost,
 `trust proxy` so the per-IP `common/rate-limit.guard.ts` sees real clients behind Apache, and a

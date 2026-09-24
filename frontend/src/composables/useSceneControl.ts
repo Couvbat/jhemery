@@ -1,9 +1,27 @@
 import { computed, ref } from 'vue'
+import { usePresence } from './usePresence'
 
 /** What the background starts with, and what `scene reset` goes back to. */
 export const BASE_SHAPE_COUNT = 18
 /** A ceiling on `spawn`, so nobody can talk the page into melting their GPU. */
 export const MAX_SHAPE_COUNT = 60
+/**
+ * A ceiling on the shapes other visitors add. Well under `MAX_SHAPE_COUNT`, and a pool
+ * of its own rather than a share of `spawn`'s, so a busy day can neither bury the scene
+ * nor change what `spawn` and `scene reset` mean.
+ */
+export const MAX_VISITOR_SHAPES = 12
+
+/**
+ * One wireframe per *other* person here: the presence count minus the reader. Nothing
+ * new crosses the wire — it is the same integer the footer prints, and still says
+ * nothing about who anyone is. Zero until the stream's first message, and when there
+ * is no backend at all.
+ */
+export function visitorShapesFor(online: number | null): number {
+  if (online === null) return 0
+  return Math.min(MAX_VISITOR_SHAPES, Math.max(0, online - 1))
+}
 
 /**
  * Terminal-controllable state for the three.js background — the same
@@ -38,8 +56,10 @@ export function resetScene() {
 }
 
 export function useSceneControl() {
+  const { online } = usePresence()
   return {
     shapeCount: computed(() => shapeCount.value),
+    visitorShapes: computed(() => visitorShapesFor(online.value)),
     gravityOn: computed(() => gravity.value),
     constellationOn: computed(() => constellation.value),
     spawnShapes,

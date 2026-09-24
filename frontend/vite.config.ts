@@ -94,6 +94,11 @@ export default defineConfig({
           // SW would answer them with index.html, silently breaking `/resume.txt`
           // and the machine-readable endpoints.
           /^\/resume\.txt$/,
+          // The printable résumés, from the same plugin. Documents with no script:
+          // the SPA shell answering them would print the home page instead.
+          /^\/resume(\.fr)?\.html$/,
+          // Read by the backend's MCP endpoint (vite-plugins/resume.ts), not by the app.
+          /^\/content\.json$/,
           /^\/llms\.txt$/,
           /^\/robots\.txt$/,
           /^\/sitemap\.xml$/,

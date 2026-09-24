@@ -12,6 +12,7 @@ import { useMatrix } from '@/composables/useMatrix'
 import { useTabTitle } from '@/composables/useTabTitle'
 import { terminalOpen } from '@/composables/useTerminalShell'
 import { installViewSwing, untilSettled, useViewSwing } from '@/composables/useViewSwing'
+import { consumeRunParam } from '@/composables/useRunLink'
 import { track } from '@/lib/analytics'
 import { unlock } from '@/terminal/achievements'
 import AchievementToast from '@/components/AchievementToast.vue'
@@ -42,7 +43,8 @@ const showThreeBackground = ref(false)
 // ends when that clock does (`untilSettled`), and `ThreeBackground` reads the same
 // clock for the wireframes. Under reduced motion the `<Transition>` puts no classes
 // on and the composable never starts a tween, so the pages swap instantly.
-installViewSwing(useRouter())
+const router = useRouter()
+installViewSwing(router)
 const { swing, swingDirection, swinging, leaveScroll } = useViewSwing()
 const reducedMotion = useMediaQuery('(prefers-reduced-motion: reduce)')
 const stageStyle = computed(() => ({
@@ -72,6 +74,7 @@ useKonami(() => {
 
 onMounted(() => {
   restoreCrt()
+  void consumeRunParam(router)
 
   if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return
 

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+import { computed, ref } from 'vue'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
@@ -9,7 +9,10 @@ import { socials } from '@/content'
 import { useLocale } from '@/i18n'
 import { api, ApiError } from '@/lib/api'
 
-const { t, m } = useLocale()
+const { t, m, locale } = useLocale()
+
+// Plain files beside the SPA, not routes: a RouterLink would hand them to the router.
+const resumeHref = computed(() => (locale.value === 'fr' ? '/resume.fr.html' : '/resume.html'))
 
 const form = ref({ name: '', email: '', subject: '', message: '' })
 const status = ref<'idle' | 'sending' | 'success' | 'error'>('idle')
@@ -145,6 +148,19 @@ async function submit() {
               <span class="text-primary font-mono text-sm w-20 shrink-0">{{ s.label }}</span>
               <span class="text-foreground group-hover:text-primary transition-colors text-sm">{{
                 s.handle
+              }}</span>
+              <span class="ml-auto text-muted-foreground group-hover:text-primary transition-colors"
+                >→</span
+              >
+            </a>
+            <a
+              :href="resumeHref"
+              data-testid="printable-resume"
+              class="flex items-center gap-4 p-4 rounded border border-border bg-card hover:border-primary/50 hover:bg-card/80 transition-all group"
+            >
+              <span class="text-primary font-mono text-sm w-20 shrink-0">{{ t(m.contact.resume) }}</span>
+              <span class="text-foreground group-hover:text-primary transition-colors text-sm">{{
+                t(m.contact.resumeNote)
               }}</span>
               <span class="ml-auto text-muted-foreground group-hover:text-primary transition-colors"
                 >→</span

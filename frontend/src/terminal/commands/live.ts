@@ -107,6 +107,7 @@ export const liveCommands: Command[] = [
     aliases: ['playing'],
     description: { en: 'Live Steam activity', fr: 'Activité Steam en direct' },
     group: 'live',
+    linkable: true,
     palette: true,
     async run({ print, t }) {
       print(line('fetching…', 'muted'))
@@ -147,6 +148,7 @@ export const liveCommands: Command[] = [
     aliases: ['git log', 'commits'],
     description: { en: 'Recent public commits', fr: 'Commits publics récents' },
     group: 'live',
+    linkable: true,
     palette: true,
     async run({ print }) {
       print(line('fetching…', 'muted'))
@@ -169,6 +171,7 @@ export const liveCommands: Command[] = [
     aliases: ['wttr'],
     description: { en: 'Current conditions where I am', fr: 'La météo là où je suis' },
     group: 'live',
+    linkable: true,
     palette: true,
     async run({ print, t }) {
       print(line('fetching…', 'muted'))
@@ -191,6 +194,7 @@ export const liveCommands: Command[] = [
     aliases: ['stonks', 'crypto'],
     description: { en: 'Crypto prices, 7-day trend', fr: 'Cours crypto, tendance 7 jours' },
     group: 'live',
+    linkable: true,
     palette: true,
     async run({ print, t }) {
       print(line('fetching…', 'muted'))
@@ -231,6 +235,7 @@ export const liveCommands: Command[] = [
     aliases: ['gb'],
     description: { en: 'Read what visitors left', fr: 'Lire les messages des visiteurs' },
     group: 'live',
+    linkable: true,
     palette: true,
     async run({ print }) {
       print(line('fetching…', 'muted'))

@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { onMounted } from 'vue'
+import { RouterLink } from 'vue-router'
 import { profile } from '@/content'
 import { useLocale } from '@/i18n'
 import { useStatus } from '@/composables/useStatus'
@@ -50,11 +51,13 @@ onMounted(startPresence)
 
       <span class="text-muted-foreground/60">{{ t(m.footer.built) }} {{ builtLabel }}</span>
 
+      <RouterLink to="/now" class="ml-auto hover:text-primary transition-colors">/now</RouterLink>
+
       <a
         :href="repo"
         target="_blank"
         rel="noopener noreferrer"
-        class="ml-auto hover:text-primary transition-colors"
+        class="hover:text-primary transition-colors"
       >
         {{ t(m.footer.source) }} ↗
       </a>
@@ -68,6 +71,14 @@ onMounted(startPresence)
       <span>uptime {{ uptime }}</span>
       <span class="text-muted-foreground/40" aria-hidden="true">·</span>
       <span>deploy {{ lastDeploy }}</span>
+      <span class="text-muted-foreground/40" aria-hidden="true">·</span>
+      <!-- The same fact neofetch's Status row prints; one flag in profile.ts flips both. -->
+      <span
+        data-testid="footer-availability"
+        :class="profile.availability.open ? 'text-primary/80' : 'text-muted-foreground/70'"
+      >
+        {{ profile.availability.open ? '●' : '○' }} {{ t(profile.availability.note) }}
+      </span>
       <span class="text-muted-foreground/40" aria-hidden="true">·</span>
       <template v-if="online !== null">
         <span>{{ t(online === 1 ? m.footer.onlineOne : m.footer.online).replace('{n}', String(online)) }}</span>

@@ -159,3 +159,64 @@ export function nextWord(
 ): WordleState {
   return newGame(words, state.locale, random)
 }
+
+// ---------------------------------------------------------------------------
+// The daily word
+// ---------------------------------------------------------------------------
+
+/** `YYYY-MM-DD` in UTC — the day a daily wordle belongs to, the same everywhere at once. */
+export function utcDay(at: Date): string {
+  return at.toISOString().slice(0, 10)
+}
+
+/**
+ * Which answer a day gets: FNV-1a over the date string, modulo the list. Stable across
+ * engines and sessions, which anything seeded from `Math.random` is not, so everyone
+ * reading the same language gets the same word on the same day.
+ */
+export function dailyIndex(day: string, count: number): number {
+  let hash = 0x811c9dc5
+  for (let i = 0; i < day.length; i++) {
+    hash ^= day.charCodeAt(i)
+    hash = Math.imul(hash, 0x01000193) >>> 0
+  }
+  return hash % count
+}
+
+export function newDailyGame(words: WordleWords, locale: Locale, day: string): WordleState {
+  const display = words.answers[dailyIndex(day, words.answers.length)]!
+  return { ...newGame(words, locale), answer: fold(display), display }
+}
+
+/** Replays guesses already made today onto a fresh daily board — how a daily
+ *  survives a closed tab without handing out a second set of six rows. */
+export function resumeDaily(state: WordleState, guesses: readonly string[]): WordleState {
+  let next = state
+  for (const guess of guesses) next = submit({ ...next, current: guess }).state
+  return next
+}
+
+/** One letter per mark, which is how a finished grid is stored. */
+export const MARK_CODES: Record<Mark, string> = { hit: 'h', near: 'n', miss: 'm' }
+
+const SHARE_GLYPHS: Record<string, string> = { h: '🟩', n: '🟨', m: '⬛' }
+
+/**
+ * The text `wordle share` copies. Emoji go to the clipboard and nowhere else: in the
+ * buffer they render double-width and shear the grid, the reason `weather-art.ts` has
+ * none. The link at the end is a `?run=` link, so pasting it invites someone straight
+ * into the same day's word.
+ */
+export function shareText(result: {
+  day: string
+  locale: Locale
+  marks: readonly string[]
+  won: boolean
+}): string {
+  const tally = result.won ? String(result.marks.length) : 'X'
+  return [
+    `jhemery.xyz wordle ${result.locale} ${result.day} ${tally}/${ROWS}`,
+    ...result.marks.map((row) => [...row].map((code) => SHARE_GLYPHS[code] ?? '⬛').join('')),
+    'https://jhemery.xyz/?run=wordle%20daily',
+  ].join('\n')
+}

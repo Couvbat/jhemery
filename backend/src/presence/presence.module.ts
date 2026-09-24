@@ -5,5 +5,6 @@ import { PresenceService } from './presence.service';
 @Module({
   controllers: [PresenceController],
   providers: [PresenceService],
+  exports: [PresenceService],
 })
 export class PresenceModule {}

@@ -5,6 +5,7 @@ import {
   WeatherForecastDay,
   WeatherReport,
 } from './weather.types';
+import { cacheAge, UnitHealth } from '../common/health';
 
 /** Weather changes slowly and Open-Meteo asks for courtesy, not a key. */
 const CACHE_TTL_MS = 10 * 60 * 1000;
@@ -136,6 +137,24 @@ export class WeatherService {
       },
       forecast,
     };
+  }
+
+  /** Configured or not, and how old the cached report is — nothing is fetched. */
+  health(): UnitHealth {
+    const latitude = Number(this.config.get<string>('WEATHER_LATITUDE'));
+    const longitude = Number(this.config.get<string>('WEATHER_LONGITUDE'));
+    const configured =
+      Boolean(this.config.get<string>('WEATHER_LATITUDE')) &&
+      Boolean(this.config.get<string>('WEATHER_LONGITUDE')) &&
+      Number.isFinite(latitude) &&
+      Number.isFinite(longitude);
+    return configured
+      ? {
+          unit: 'weather',
+          state: 'active',
+          cacheAge: cacheAge(this.cache, CACHE_TTL_MS),
+        }
+      : { unit: 'weather', state: 'inactive', reason: 'unconfigured' };
   }
 }
 

@@ -76,6 +76,37 @@ export interface GameEntry {
   status: Localised
 }
 
+/** One place a skill is actually used, so the claim can be checked. */
+export interface SkillEvidence {
+  what: Localised
+  /** A path `goTo()` accepts (`tools/ffmpeg`, `watch`, `projects`) or an `https:` URL. */
+  where: string
+}
+
+export interface Skill {
+  /** A technology name — a proper noun, never translated. */
+  name: string
+  usedIn?: SkillEvidence[]
+}
+
+/** Whether an evidence link leaves the site, or is a path inside it. */
+export function isExternal(where: string): boolean {
+  return /^https?:\/\//.test(where)
+}
+
+export interface Availability {
+  /** The fact the footer and `neofetch` branch on. */
+  open: boolean
+  note: Localised
+}
+
+export type NowCategory = 'building' | 'playing' | 'learning' | 'listening'
+
+export interface NowEntry {
+  category: NowCategory
+  text: Localised
+}
+
 /** Resolve a localised value, falling back to English when a translation is missing. */
 export function pick<T>(value: Localised<T>, locale: Locale): T {
   return value[locale] ?? value.en

@@ -178,6 +178,29 @@ export interface StatsReport {
   sessions: number
 }
 
+/** One finished daily wordle, everyone's: `counts[0..5]` solved in 1–6, `counts[6]` not solved. */
+export interface WordleHistogram {
+  day: string
+  locale: Locale
+  counts: number[]
+}
+
+/** `GET /health` — see `backend/src/common/health.ts` for what each field may and may not read. */
+export interface UnitHealth {
+  unit: string
+  state: 'active' | 'inactive'
+  reason?: 'unconfigured' | 'disabled' | 'missing-binary'
+  /** Milliseconds since the unit last fetched its upstream; null if it has not yet. */
+  cacheAge?: number | null
+  detail?: Record<string, number>
+}
+
+export interface HealthReport {
+  /** Seconds the API process has been up. */
+  uptime: number
+  units: UnitHealth[]
+}
+
 export interface GuestbookEntry {
   id: string
   name: string
@@ -190,7 +213,16 @@ export interface GuestbookList {
   entries?: GuestbookEntry[]
 }
 
-export type RoomKind = 'watch' | 'radio'
+export type RoomKind = 'watch' | 'radio' | 'connect4'
+
+/** A game room's public state: every move, in order. See `backend/src/rooms/rooms.types.ts`. */
+export interface GameState {
+  moves: number[]
+  /** 1 until someone takes the second seat, then 2. */
+  seats: 1 | 2
+  /** Which seat opened this round: 0 is the host. */
+  starter: 0 | 1
+}
 
 /** The host's playback, anchored to the server clock — see `rooms/sync.ts` for the maths. */
 export interface PlaybackState {
@@ -210,6 +242,13 @@ export interface RoomSnapshot {
   state: PlaybackState
   queue: string[]
   members: number
+  /** Only on a game room. */
+  game?: GameState
+}
+
+/** The second seat of a game room, handed to whoever takes it first. */
+export interface RoomJoined extends RoomSnapshot {
+  seatToken: string
 }
 
 export interface RoomCreated extends RoomSnapshot {
@@ -352,6 +391,15 @@ export const api = {
   markets: () => request<MarketsReport>('/markets'),
   stats: () => request<StatsReport>('/stats'),
   recordSession: () => request<StatsReport>('/stats/session', { method: 'POST' }),
+  wordleHistogram: (day: string, locale: Locale) =>
+    request<WordleHistogram>(`/stats/wordle?day=${encodeURIComponent(day)}&locale=${locale}`),
+  recordWordle: (day: string, locale: Locale, guesses: number) =>
+    request<WordleHistogram>('/stats/wordle', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ day, locale, guesses }),
+    }),
+  health: () => request<HealthReport>('/health'),
   guestbook: () => request<GuestbookList>('/guestbook'),
   sign: (name: string, message: string) =>
     request<GuestbookEntry>('/guestbook', {
@@ -387,6 +435,15 @@ export const api = {
     }),
   endRoom: (code: string, token: string) =>
     request<void>(`/rooms/${code}`, { method: 'DELETE', headers: { 'x-room-token': token } }),
+  joinRoom: (code: string) => request<RoomJoined>(`/rooms/${code}/join`, { method: 'POST' }),
+  move: (code: string, token: string, column: number) =>
+    request<RoomSnapshot>(`/rooms/${code}/move`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'x-room-token': token },
+      body: JSON.stringify({ column }),
+    }),
+  rematch: (code: string, token: string) =>
+    request<RoomSnapshot>(`/rooms/${code}/rematch`, { method: 'POST', headers: { 'x-room-token': token } }),
   jobs: (password: string) => request<JobsInfo>('/jobs', { headers: adminHeaders(password) }),
   startJob: (password: string, url: string) =>
     request<DownloadJob>('/jobs', {

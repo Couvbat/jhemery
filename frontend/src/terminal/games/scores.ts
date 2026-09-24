@@ -9,6 +9,7 @@ export type GameId =
   | 'wordle'
   | 'hangman'
   | 'wpm'
+  | 'connect4'
 
 /**
  * `better` exists for exactly one game: minesweeper is scored on how long the
@@ -25,6 +26,8 @@ const GAMES: Record<GameId, { key: string; better: 'higher' | 'lower' }> = {
   wordle: { key: 'couvbat:games:wordle', better: 'higher' },
   hangman: { key: 'couvbat:games:hangman', better: 'higher' },
   wpm: { key: 'couvbat:games:wpm', better: 'higher' },
+  // Most wins in one sitting against the same opponent: there is no score in the game.
+  connect4: { key: 'couvbat:games:connect4', better: 'higher' },
 }
 
 export function isLowerBetter(game: GameId): boolean {
@@ -67,4 +70,65 @@ export function recordScore(game: GameId, score: number): number {
     // Private browsing or a full quota — the score just won't outlive the tab.
   }
   return best
+}
+
+// ---------------------------------------------------------------------------
+// The daily wordle
+// ---------------------------------------------------------------------------
+
+/**
+ * Today's daily, per locale, kept beside the scores. Saved after every guess, not only
+ * at the end: a daily that forgot an abandoned attempt would be six new rows for the
+ * price of a closed tab.
+ */
+export interface DailyResult {
+  day: string
+  /** Folded guesses, in order. */
+  guesses: string[]
+  /** One `h`/`n`/`m` string per guess — enough to share without the word list. */
+  marks: string[]
+  done: boolean
+  won: boolean
+  /** Sent to `POST /stats/wordle` — once, so a reload does not count the same board twice. */
+  reported?: boolean
+}
+
+const DAILY_KEY = 'couvbat:games:wordle:daily'
+
+function readDaily(): Record<string, DailyResult> {
+  if (typeof window === 'undefined') return {}
+  try {
+    const parsed: unknown = JSON.parse(window.localStorage.getItem(DAILY_KEY) ?? '{}')
+    return parsed && typeof parsed === 'object' && !Array.isArray(parsed)
+      ? (parsed as Record<string, DailyResult>)
+      : {}
+  } catch {
+    return {}
+  }
+}
+
+function isDaily(value: unknown): value is DailyResult {
+  const v = value as DailyResult | null
+  return (
+    !!v &&
+    typeof v.day === 'string' &&
+    Array.isArray(v.guesses) &&
+    Array.isArray(v.marks) &&
+    typeof v.done === 'boolean' &&
+    typeof v.won === 'boolean'
+  )
+}
+
+/** The saved daily for `locale`, or null if there is none for `day`. */
+export function dailyResult(locale: string, day: string): DailyResult | null {
+  const saved = readDaily()[locale]
+  return isDaily(saved) && saved.day === day ? saved : null
+}
+
+export function recordDaily(locale: string, result: DailyResult): void {
+  try {
+    window.localStorage.setItem(DAILY_KEY, JSON.stringify({ ...readDaily(), [locale]: result }))
+  } catch {
+    // Private browsing or a full quota — the daily just won't remember itself.
+  }
 }

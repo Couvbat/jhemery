@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { BehaviorSubject, merge, Observable } from 'rxjs';
 import { map } from 'rxjs/operators';
 import { PresenceUpdate } from './presence.types';
+import { UnitHealth } from '../common/health';
 
 /**
  * Apache sits in front of this app and will close an idle connection. A message
@@ -53,5 +54,14 @@ export class PresenceService {
   /** Exposed for the test; nothing in the app reads it. */
   get connections(): number {
     return this.online;
+  }
+
+  /** Always running: the count is the only thing it holds. */
+  health(): UnitHealth {
+    return {
+      unit: 'presence',
+      state: 'active',
+      detail: { online: this.online },
+    };
   }
 }
