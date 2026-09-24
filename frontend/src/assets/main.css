@@ -324,3 +324,25 @@
 @media (prefers-reduced-motion: reduce) {
   .theme-flash::after { display: none; }
 }
+
+/*
+ * The screensaver (`useIdle.ts`): every child of #app fades except the wireframe
+ * canvas and whatever opts out, leaving the field on its own. The fade out is slow,
+ * so it reads as the page dimming rather than vanishing; the way back is quick,
+ * because whoever moved the mouse wants the page now.
+ */
+/* `:where()` so this weighs nothing: a child with its own `transition-*` utility keeps it. */
+:where(#app > *) {
+  transition: opacity 0.35s ease-out;
+}
+
+[data-screensaver] #app > :not(canvas):not([data-screensaver-keep]) {
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 1.6s ease-in;
+}
+
+[data-screensaver] #app > canvas {
+  filter: brightness(1.5);
+  transition: filter 1.6s ease-in;
+}

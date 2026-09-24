@@ -604,6 +604,12 @@ export const messages = {
     },
     reopened: { en: '(already solved — the message does not change)', fr: '(déjà résolu — le message ne change pas)' },
   },
+  // The wireframe background: the click-to-inspect label on a visitor's shape, and
+  // the one line the screensaver leaves on screen.
+  scene: {
+    visitor: { en: 'someone else, here now', fr: 'quelqu’un d’autre, ici en ce moment' },
+    wake: { en: 'move the mouse or press a key', fr: 'bougez la souris ou appuyez sur une touche' },
+  },
   now: {
     heading: { en: 'What I’m doing now', fr: 'Ce que je fais en ce moment' },
     updated: { en: 'Last updated', fr: 'Mis à jour le' },
