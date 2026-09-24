@@ -6,6 +6,7 @@ import { activeSection } from '@/composables/useActiveSection'
 import { terminalOpen } from '@/composables/useTerminalShell'
 import { BASE_SHAPE_COUNT, MAX_SHAPE_COUNT, useSceneControl } from '@/composables/useSceneControl'
 import { fetchWeather, weatherMood } from '@/composables/useWeather'
+import { useTheme } from '@/composables/useTheme'
 import { useViewSwing } from '@/composables/useViewSwing'
 import { unlock, unlocked } from '@/terminal/achievements'
 
@@ -17,6 +18,7 @@ const { shapeCount, gravityOn, constellationOn } = useSceneControl()
 // The prism swing between views (features-spec §11). The router drives one eased
 // clock; the DOM turns the pages by it and this component turns the field by it.
 const { swing, swingDirection, swinging, activeView } = useViewSwing()
+const { theme } = useTheme()
 
 const canvasRef = ref<HTMLCanvasElement | null>(null)
 /** What `click-to-inspect` is currently showing, if anything. */
@@ -101,7 +103,7 @@ let mouseY = 0
 let pointerActive = false
 let pointerIdleTimer: ReturnType<typeof setTimeout> | undefined
 
-/** The four neon hues from the stylesheet, read once on mount. */
+/** The four neon hues from the stylesheet — or from the `theme` written over it. */
 const neon: Record<string, THREE.Color> = {}
 
 interface Palette {
@@ -270,11 +272,16 @@ function syncShapeCount() {
   if (animationFrameId === null && renderer && scene && camera) renderer.render(scene, camera)
 }
 
-function createInitialShapes() {
+/** Called on mount and again on every `theme` switch, which rewrites the properties. */
+function readNeon() {
   neon.green = readNeonColor('--neon-green', '#00ff41')
   neon.cyan = readNeonColor('--neon-cyan', '#00ffff')
   neon.purple = readNeonColor('--neon-purple', '#bf00ff')
   neon.pink = readNeonColor('--neon-pink', '#ff0080')
+}
+
+function createInitialShapes() {
+  readNeon()
 
   // Exactly three accents in the opening scene, so "not all of them are the same
   // colour" is a fact rather than a probability.
@@ -517,6 +524,13 @@ function animate() {
 // The weather rides along on the same watcher: it only ever scales what the
 // palette already decided, so there is nothing for it to apply separately.
 watch([activeSection, activeView, unlocked, weatherMood], applyPalette)
+// A scheme changes what the palette's names mean, not which names it picks — so the
+// same recolour, after re-reading the hues. `useTheme` has already written the new
+// properties by the time this runs.
+watch(theme, () => {
+  readNeon()
+  applyPalette()
+})
 watch(shapeCount, syncShapeCount)
 watch(constellationOn, (on) => (on ? ensureLinks() : disposeLinks()))
 

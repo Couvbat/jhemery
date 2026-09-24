@@ -81,9 +81,9 @@ it up.
 terminal/
   types.ts        Command, CommandContext, OutputLine, vim types
   registry.ts     name/alias lookup, tab completion, "did you mean" suggestions
-  commands/       core · navigate · content · live · ask · eggs · system · tools · games/
+  commands/       core · theme · navigate · content · live · ask · eggs · system · tools · games/
   games/          pure state for the seven games, word lists, key stream, local high scores
-  achievements.ts the 35 achievements, the localStorage store, toasts
+  achievements.ts the 37 achievements, the localStorage store, toasts
   vimEditor.ts    pure state machine for the vim pane
   format.ts       line/blank/wrap/art helpers
 ```
@@ -123,7 +123,25 @@ Append to one of the arrays in `src/terminal/commands/` — `commands/index.ts` 
 
 Output is a list of `OutputLine`s of **plain text, never HTML** — commands render visitor-supplied
 data (guestbook entries), so there is deliberately no markup escape hatch. Use `segments` for
-per-run colouring, `pre` to preserve whitespace, `href` for links.
+per-run colouring, `pre` to preserve whitespace, `href` for links. A segment's `colour` paints a
+literal CSS colour instead of a tone. It exists for `theme`'s swatches, which have to show schemes
+other than the one on screen, and must never carry anything a visitor typed.
+
+### Colours and schemes
+
+Every colour on the page is a token (`text-primary`, `border-border`, `text-warning`, …), because
+`theme` swaps the tokens: each scheme in `src/lib/themes.ts` is a dozen colours that `themeTokens()`
+turns into every custom property `:root` declares. `useTheme` writes them inline on `<html>`, and
+the default scheme removes them again, so `:root` in `main.css` stays the default's only definition.
+`src/lib/__tests__/themes.spec.ts` fails if `:root` gains a token the schemes don't write, or if a
+scheme's text drops below the contrast floor.
+
+- **Use a token, not a Tailwind palette colour.** `text-yellow-400` stays yellow-400 under every
+  scheme, and it is unreadable on a light one.
+- **When a fixed colour is right** (a traffic-light dot, a brand badge), add a `light:` variant if it
+  would otherwise sit on a light page: `text-cyan-400 light:text-cyan-700`.
+- **Anything that reads colours in JS** (three.js, a canvas) reads the `--neon-*` properties at
+  draw time, or watches `useTheme().theme`. A copy cached on mount goes stale on the first switch.
 
 ### Files, achievements
 

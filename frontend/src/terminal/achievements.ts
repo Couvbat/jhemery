@@ -306,6 +306,27 @@ export const achievementList: Achievement[] = [
     description: { en: 'Ran `gravity off`.', fr: 'Lancé `gravity off`.' },
   },
   {
+    id: 'ricer',
+    title: { en: 'Ricer', fr: 'Ricer' },
+    hint: {
+      en: 'A real ricer never settles for the default colours.',
+      fr: 'Un vrai ricer ne se contente jamais des couleurs par défaut.',
+    },
+    description: {
+      en: 'Tried five colour schemes with `theme`.',
+      fr: 'Essayé cinq thèmes de couleurs avec `theme`.',
+    },
+  },
+  {
+    id: 'flashbang',
+    title: { en: 'Flashbang', fr: 'Flashbang' },
+    hint: {
+      en: 'Not every colour scheme is kind to your eyes.',
+      fr: 'Tous les thèmes ne sont pas tendres avec vos yeux.',
+    },
+    description: { en: 'Switched to a light theme.', fr: 'Passé à un thème clair.' },
+  },
+  {
     id: COMPLETIONIST,
     title: { en: '100%', fr: '100%' },
     hint: { en: 'For those who leave no stone unturned.', fr: 'Pour ceux qui ne laissent rien au hasard.' },
@@ -315,6 +336,7 @@ export const achievementList: Achievement[] = [
 
 const ACHIEVEMENTS_KEY = 'couvbat:achievements'
 const SECTIONS_KEY = 'couvbat:achievements:sections'
+const THEMES_KEY = 'couvbat:achievements:themes'
 const knownIds = new Set(achievementList.map((a) => a.id))
 
 function loadSet(key: string): Set<string> {
@@ -337,6 +359,7 @@ function persist(key: string, value: Set<string>) {
 
 export const unlocked = ref<Set<string>>(loadSet(ACHIEVEMENTS_KEY))
 const visitedSections = ref<Set<string>>(loadSet(SECTIONS_KEY))
+const triedThemes = ref<Set<string>>(loadSet(THEMES_KEY))
 
 /** Newly-unlocked achievements waiting to be shown as a floating toast, oldest first. */
 export const toastQueue = ref<{ id: string; title: Localised<string> }[]>([])
@@ -390,6 +413,20 @@ export function visitSection(id: string, allSectionIds: readonly string[]): stri
   persist(SECTIONS_KEY, next)
 
   return allSectionIds.every((sectionId) => next.has(sectionId)) ? unlock('explorer') : []
+}
+
+/** How many different schemes make a ricer: enough to mean it, few enough to reach by hand. */
+export const RICER_THEMES = 5
+
+/** Records a scheme applied with `theme`; unlocks `ricer` at the fifth different one. */
+export function tryTheme(id: string): string[] {
+  if (!triedThemes.value.has(id)) {
+    const next = new Set(triedThemes.value)
+    next.add(id)
+    triedThemes.value = next
+    persist(THEMES_KEY, next)
+  }
+  return triedThemes.value.size >= RICER_THEMES ? unlock('ricer') : []
 }
 
 /** Unlocks `id` and renders a toast line for it (and any cascaded unlock) — `[]` if already unlocked. */

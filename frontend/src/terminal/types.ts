@@ -14,6 +14,12 @@ export type Tone =
 export interface OutputSegment {
   text: string
   tone?: Tone
+  /**
+   * A literal CSS colour, which wins over `tone`. Tones follow whatever scheme is on
+   * screen, and `theme` has to preview the ones that aren't — this is for its swatches.
+   * Only ever set from the theme table, never from anything a visitor typed.
+   */
+  colour?: string
 }
 
 /**

@@ -191,8 +191,38 @@ Grouped as they appear in `help`.
 | `date` | Local date/time |
 | `whoami` | Prints the current user |
 | `lang [en\|fr]` | Prints or switches locale |
+| `theme [name\|random]` (alias `colorscheme`) | Lists the colour schemes with a swatch strip each, or applies one |
 | `alias` / `unalias` | Session-persistent command renames, expanded before anything else parses the line |
 | `exit` (aliases `quit`, `logout`) | Closes the overlay |
+
+**Colour schemes.** `theme` offers the site's own neon (*cyberpunk*, the default) and the palettes
+r/unixporn keeps coming back to: Gruvbox, Nord, Dracula, Catppuccin, Tokyo Night, Rosé Pine,
+Everforest, Solarized, plus two light ones, Gruvbox Light and Catppuccin Latte. Each scheme in
+`src/lib/themes.ts` names a dozen colours, and `themeTokens()` derives every custom property
+`:root` declares from them. Adding a scheme is one object, and nothing in the stylesheet or the
+components knows which schemes exist. `composables/useTheme.ts` writes the properties inline on
+`<html>` along with `data-theme`, `data-mode`, `color-scheme` and the `theme-color` meta. The
+default is never written: switching back *removes* every override, so `:root` in `main.css` stays
+the default's only definition and a visitor who never types `theme` gets the page as shipped. The
+choice is saved under `couvbat:theme` and re-applied in `main.ts` before the app mounts, so a
+returning visitor's first frame is already in their colours.
+
+What makes that work is that everything is a token. The `--neon-*` properties are the four hue
+slots (under Gruvbox `--neon-green` is orange). The glows `color-mix` over them instead of
+hard-coding rgba, warnings use a `--warning` token instead of `text-yellow-400`, and the three.js
+field, the confetti and the colour tool re-read the properties on a switch. Light schemes drop the
+text halos (a glow on a light page reads as a smudge) and thin the scanlines. A `light:` Tailwind
+variant covers the few fixed palette colours that stay. The listing's swatches are the one place
+output needs a colour that is *not* the current scheme's, so `OutputSegment` has a `colour` field.
+It is only ever set from the theme table. `themes.spec.ts` holds every scheme to WCAG floors
+(4.5:1 for body and primary text, 3:1 for the other tones). Three upstream colours were adjusted
+to pass, each noted in the file.
+
+Switching from a dark scheme to a light one whites the page out for 0.9 s (`theme-flash` on
+`<html>`, skipped under reduced motion). That is the joke the `flashbang` achievement is named
+after. Adding `theme` also tightened "did you mean …?": two edits in a five-letter word make a
+different word (`where` is two from `theme`), so names under six letters get one edit, and a
+swapped pair counts as one.
 
 Aliases live in `terminal/aliases.ts` and are rewritten in `useTerminal.ts`'s `run()`, ahead of
 `resolve()` — so the two-word fallback and the "did you mean …?" suggestion both reason about the
@@ -311,7 +341,8 @@ Full design in [the first games spec](superpowers/specs/2026-08-04-terminal-game
 **Where:** `frontend/src/components/CommandPalette.vue`
 
 `Ctrl+K` / `Cmd+K` opens a filtered list of the views, the sections and every command flagged
-`palette: true` — the content and live-data commands, `tools`, `games`, `achievements`, `lang`.
+`palette: true` — the content and live-data commands, `tools`, `games`, `achievements`, `lang`,
+`theme`.
 Selecting a view or a section navigates through `goTo()` directly; selecting an output command
 opens the terminal with that command already run.
 
@@ -393,10 +424,12 @@ editor, because a fake one that ignores `hjkl` is a worse joke than no joke.
 `components/AchievementToast.vue`
 
 Achievements covering the easter eggs above, the guestbook, `mail`, `ask`, the games, `lang`,
-`crt`, `htop`, visiting every section (`explorer`), and a `completionist` that cascades when every
-other one is done. Nothing counts them by hand — every surface reads `achievementList.length` — so the
-list is free to grow. Unlock state is `localStorage` only (`couvbat:achievements`, plus
-`couvbat:achievements:sections` for `explorer`'s progress) — there is no account and no sync.
+`crt`, `htop`, visiting every section (`explorer`), the colour schemes (`ricer` for five different
+ones, `flashbang` for a light one), and a `completionist` that cascades when every other one is
+done. Nothing counts them by hand — every surface reads `achievementList.length` — so the list is
+free to grow. Unlock state is `localStorage` only (`couvbat:achievements`, plus
+`couvbat:achievements:sections` for `explorer`'s progress and `couvbat:achievements:themes` for
+`ricer`'s) — there is no account and no sync.
 
 The problem this solves: the eggs are hidden on purpose, so without a tracker most visitors never
 learn there was anything to find. Achievements make the hidden layer *discoverable* without
@@ -448,6 +481,10 @@ needed a new trigger:
   entirely. It is the only visual state no amount of scrolling can produce.
 
 One watcher covers the last two inputs, because `currentPalette()` already encodes which wins.
+
+- **Colour scheme** — a palette picks hue *names* (`green`, `cyan`, …), and a `theme` changes what
+  those names mean by rewriting the `--neon-*` properties. So a second watcher on
+  `useTheme().theme` re-reads the four hues and runs the same in-place recolour.
 
 **Terminal control** (`composables/useSceneControl.ts`) adds three more knobs, in the same
 flag-and-watch shape as `useMatrix`/`useBoot` — the commands only ever set, the component is the
@@ -747,7 +784,9 @@ Retrofitting these is painful, so they are part of the definition of done:
 
 ## 10. Explicitly out of scope
 
-- **Light theme** — the palette is committed to always-dark and reads as deliberate.
+- **A light default** — the site is committed to always-dark and reads as deliberate. Light
+  schemes exist only as opt-in `theme` choices (§3 core), and the achievement for picking one is
+  called Flashbang. That is this entry's position, stated as a joke.
 - **Blog** — infrastructure without content is worse than no infrastructure.
 - **Command chaining / pipes** — `ls | grep` is a lot of parser for a joke nobody will run twice.
 - **Terminal on mobile** — see §9.

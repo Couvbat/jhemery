@@ -250,7 +250,7 @@ function onPanelKeydown(event: KeyboardEvent) {
           <span class="ml-3 text-xs text-muted-foreground flex-1"
             >{{ profile.handle }}@{{ profile.host }} ~ {{ t(m.terminal.title) }}</span
           >
-          <span v-if="vimBuffer?.mode === 'insert'" class="text-xs text-yellow-400">-- INSERT --</span>
+          <span v-if="vimBuffer?.mode === 'insert'" class="text-xs text-warning">-- INSERT --</span>
         </div>
 
         <!-- Output -->

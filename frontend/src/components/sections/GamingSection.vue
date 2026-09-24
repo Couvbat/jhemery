@@ -36,7 +36,7 @@ const displayGames = computed(() => {
 
       <div class="grid gap-4 md:grid-cols-2">
         <!-- About gaming -->
-        <Card class="bg-card border-border" style="box-shadow: 0 0 8px rgba(191, 0, 255, 0.2)">
+        <Card class="bg-card border-border" style="box-shadow: 0 0 8px color-mix(in srgb, var(--neon-purple) 20%, transparent)">
           <CardContent class="p-6 space-y-4">
             <div class="text-4xl">🎮</div>
             <p class="text-sm text-muted-foreground leading-relaxed">

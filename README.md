@@ -6,7 +6,7 @@
 
 The personal portfolio of **Jules Hémery** (*Couvbat*): a terminal-flavoured site over a wireframe
 three.js background. It has a real shell you can type into, seven games, a page of in-browser
-tools, watch-party and radio rooms, and 35 hidden achievements. English and French throughout.
+tools, watch-party and radio rooms, and 37 hidden achievements. English and French throughout.
 
 [![Frontend checks](https://github.com/Couvbat/jhemery/actions/workflows/frontend-pr-check.yml/badge.svg?branch=dev)](https://github.com/Couvbat/jhemery/actions/workflows/frontend-pr-check.yml)
 [![Backend checks](https://github.com/Couvbat/jhemery/actions/workflows/backend-pr-check.yml/badge.svg?branch=dev)](https://github.com/Couvbat/jhemery/actions/workflows/backend-pr-check.yml)
@@ -48,13 +48,16 @@ tools, watch-party and radio rooms, and 35 hidden achievements. English and Fren
 - 🔺 **A reactive three.js background.** Wireframe polyhedra pull towards the pointer, change
   colour with each section, react to the weather where I am and can be driven from the shell. The
   whole field swings like a prism when you change page.
+- 🎨 **Colour schemes from r/unixporn.** `theme` swaps the neon for Gruvbox, Nord, Dracula,
+  Catppuccin, Tokyo Night, Rosé Pine, Everforest or Solarized. The wireframes, glows and confetti
+  follow. Two schemes are light, and picking one is an achievement in itself.
 - 🎮 **Seven games in the output buffer:** `2048`, `snake`, `minesweeper`, `tetris`, `wordle`,
   `hangman` and `wpm`. The word games use real bilingual word lists.
 - 🧰 **In-browser tools at `/tools`.** Image conversion, hashing, encoding, JSON, colour, time,
   passwords, text stats and an `ffmpeg.wasm` converter. Your files are never uploaded.
 - 📺 **Watch party and radio rooms.** YouTube or SoundCloud stays in sync across everyone in a
   five-character room, over SSE.
-- 🏆 **35 achievements** for finding the hidden layer, each announced with a burst of monospace
+- 🏆 **37 achievements** for finding the hidden layer, each announced with a burst of monospace
   confetti.
 - 🌐 **Live data** from Steam, GitHub, CI runs, the weather and crypto prices, plus live presence,
   a guestbook and a self-hosted LLM behind `ask`. Every integration degrades gracefully when it's
@@ -124,6 +127,7 @@ Each app has its own README for working on its code:
 | **Views** | home · tools · watch · radio. These are the routes, defined once in `src/content/views.ts` in the order they sit on the prism. The navbar, `cd` and <kbd>Ctrl</kbd>+<kbd>K</kbd> all navigate through the same `goTo()`, which goes home first when you ask for a section from another page. |
 | **Prism swing** | Changing view turns the page like a face of a prism whose axis runs through the centre of the three.js scene. The old page rotates out and the new one rotates in from the same side, in 3D CSS on a fixed, clipped stage, over 650 ms. The navbar and launcher stay put. Going back turns the other way. Under `prefers-reduced-motion` the pages simply swap. It works without three.js loaded. |
 | **CRT overdrive** | `crt` in the terminal, or the Konami code anywhere on the page, toggles scanlines and flicker, and speeds up the wireframes. The setting is saved in `localStorage`. |
+| **Colour schemes** | `theme` lists eleven schemes with a swatch strip each, and `theme <name>` (or `theme random`) applies one: the site's own *cyberpunk* default, plus Gruvbox (dark and light), Nord, Dracula, Catppuccin (Mocha and Latte), Tokyo Night, Rosé Pine, Everforest and Solarized. A scheme is a table of a dozen colours in `src/lib/themes.ts`, and every CSS token is derived from it. That means the glows, the three.js wireframes, the confetti and `neofetch`'s colour strip all follow along. Going back to the default removes every override, so the stylesheet stays the default's only definition. Switching from a dark scheme to a light one whites the screen out for a moment (skipped under reduced motion). The choice is saved in `localStorage` and applied before the app mounts. A unit test holds every scheme to WCAG contrast floors. |
 | **Boot sequence** | A fake `couvsh 1.0` kernel log plays on your first visit. `reboot` replays it on demand, and `ssh` ends by triggering it. Skipped under reduced motion. |
 | **Status ticker** | The footer shows the uptime `neofetch` reports (days since the first commit) and how long ago this build shipped. It refreshes slowly, so a tab left open stays accurate. |
 | **Live presence** | The footer also shows how many people are on the site right now, over SSE. It's a single count and nothing else (see [the API](#the-api)). |
@@ -143,14 +147,15 @@ work badly with mobile virtual keyboards, and the page itself shows the same con
 
 | Key | Does |
 |---|---|
-| <kbd>Tab</kbd> | Completes to the longest common prefix. First commands and your own aliases, then their arguments: filenames for `cat`/`vim`/`diff`, sections and pages for `cd`/`ping`, tool names, `on`/`off` for the background toggles |
+| <kbd>Tab</kbd> | Completes to the longest common prefix. First commands and your own aliases, then their arguments: filenames for `cat`/`vim`/`diff`, sections and pages for `cd`/`ping`, tool names, scheme names for `theme`, `on`/`off` for the background toggles |
 | <kbd>↑</kbd> / <kbd>↓</kbd> | Command history (saved between visits) |
 | <kbd>Ctrl</kbd>+<kbd>L</kbd> | Clear |
 | <kbd>Ctrl</kbd>+<kbd>C</kbd> | Cancel a running command |
 | <kbd>Esc</kbd> | Close the overlay (focus goes back where it was) |
 | traffic lights | The title-bar dots really do close, minimise and maximise |
 
-An unknown command gets a Levenshtein-based "did you mean …?" suggestion. `help` groups commands
+An unknown command gets a "did you mean …?" suggestion when it is one edit away (a swapped pair of
+letters counts as one), or two for names of six letters or more. `help` groups commands
 into *shell · navigation · content · live data · misc* and only hints that "not everything is
 listed here". `help --all` reveals the hidden ones.
 
@@ -163,7 +168,7 @@ never show two different contents.
 ## Commands
 
 <details>
-<summary><b>shell</b>: help, clear, history, echo, lang, exit…</summary>
+<summary><b>shell</b>: help, clear, history, echo, lang, theme, exit…</summary>
 
 | Command | Aliases | Usage |
 |---|---|---|
@@ -174,6 +179,7 @@ never show two different contents.
 | `date` | | Current date |
 | `whoami` | | Print the current user |
 | `lang` | | `lang [en\|fr]`: show or switch language |
+| `theme` | `colorscheme` | `theme [name\|random]`: list the colour schemes, or switch to one |
 | `exit` | `quit`, `logout` | Close the terminal |
 
 </details>
@@ -308,14 +314,15 @@ Rooms are off unless the API sets `ROOMS_ENABLED`.
 
 ## Achievements
 
-There are 35 achievements, tracked in `localStorage` (`couvbat:achievements`, plus
-`couvbat:achievements:sections` for the exploration one). Unlocking one shows a floating toast
-with a burst of monospace-glyph confetti (skipped under `prefers-reduced-motion`) and prints a
-line in the terminal. The trophy button in the navbar opens a modal listing all 35: locked ones
-show `???` and a vague hint, and unlocked ones show their title and how you got them.
-`achievements` (`trophies`) prints the same progress in the terminal.
+There are 37 achievements, tracked in `localStorage` (`couvbat:achievements`, plus
+`couvbat:achievements:sections` for the exploration one and `couvbat:achievements:themes` for the
+colour-scheme one). Unlocking one shows a floating toast with a burst of monospace-glyph confetti
+(skipped under `prefers-reduced-motion`) and prints a line in the terminal. The trophy button in
+the navbar opens a modal listing all 37: locked ones show `???` and a vague hint, and unlocked
+ones show their title and how you got them. `achievements` (`trophies`) prints the same progress
+in the terminal.
 
-The last one unlocks itself once you have the other thirty-four. When it does, the three.js
+The last one unlocks itself once you have the other thirty-six. When it does, the three.js
 background changes palette.
 
 <details>
@@ -357,6 +364,8 @@ background changes palette.
 | Rare Find | Click one of the three accent-coloured wireframes |
 | Connect the Dots | `constellation on` |
 | Zero-G | `gravity off` |
+| Ricer | Apply five different colour schemes with `theme` (they count across visits) |
+| Flashbang | Switch to a light scheme: `theme gruvbox-light` or `theme catppuccin-latte` |
 | 100% | Unlock everything else |
 
 </details>

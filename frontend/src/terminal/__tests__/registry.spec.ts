@@ -168,6 +168,21 @@ describe('suggest', () => {
     expect(suggest('qwertyuiop')).toBeUndefined()
   })
 
+  it('counts two swapped letters as one slip', () => {
+    expect(suggest('hlep')).toBe('help')
+    expect(suggest('celar')).toBe('clear')
+  })
+
+  it('does not call a different short word a typo', () => {
+    // `where` is two substitutions from `theme` — a question, not a misspelling.
+    expect(suggest('where')).toBeUndefined()
+  })
+
+  it('allows a longer name two slips', () => {
+    expect(suggest('nefecth')).toBe('neofetch')
+    expect(suggest('achievmnts')).toBe('achievements')
+  })
+
   it('never suggests a hidden command', () => {
     // Suggesting `vim` to someone who typed `vom` would hand out an easter egg.
     const hidden = new Set(allCommands().filter((c) => c.hidden).map((c) => c.name))

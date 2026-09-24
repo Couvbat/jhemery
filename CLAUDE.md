@@ -110,9 +110,24 @@ user-supplied data (guestbook entries), so there is deliberately no markup escap
 
 ### Achievements
 
-35 entries in `terminal/achievements.ts`, persisted under `couvbat:achievements` in
-`localStorage`. `completionist` cascades off the other 34 and repaints the three.js palette.
+37 entries in `terminal/achievements.ts`, persisted under `couvbat:achievements` in
+`localStorage`. `completionist` cascades off the other 36 and repaints the three.js palette.
 Adding one means adding it to `achievementList` *and* the README's spoiler table.
+
+### Colour schemes: tokens only
+
+`theme` swaps every CSS token at runtime. Each scheme in `src/lib/themes.ts` is a dozen colours
+that `themeTokens()` turns into the custom properties `:root` declares, written inline on `<html>`
+by `composables/useTheme.ts`. The default (*cyberpunk*) is never written: switching back removes
+the overrides, so `main.css` stays its only definition. The consequences for new code:
+
+- Colour with tokens (`text-primary`, `text-warning`, `border-border`), never Tailwind's palette
+  (`text-yellow-400` is unreadable on the two light schemes). Where a fixed colour is right, give
+  it a `light:` variant.
+- Code that reads colours in JS (three.js, canvases) must re-read `--neon-*` on a switch, by
+  watching `useTheme().theme` or reading at draw time, not caching them on mount.
+- `themes.spec.ts` holds every scheme to contrast floors and to writing exactly the tokens
+  `:root` declares, so a new token needs deriving in `themeTokens()`.
 
 ### Backend: NestJS, one module per capability
 

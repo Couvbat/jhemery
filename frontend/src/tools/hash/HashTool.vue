@@ -129,7 +129,7 @@ onUnmounted(() => clearTimeout(pending))
           <CopyButton :text="render(results[algorithm])" />
         </dt>
         <dd
-          class="font-mono text-xs break-all rounded border border-border/60 bg-black/30 px-3 py-2 min-h-8"
+          class="font-mono text-xs break-all rounded border border-border/60 bg-black/30 light:bg-muted px-3 py-2 min-h-8"
           :class="results[algorithm] ? 'text-primary' : 'text-muted-foreground/50'"
         >
           {{ render(results[algorithm]) || '—' }}

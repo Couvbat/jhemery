@@ -5,15 +5,25 @@
 
 @custom-variant dark (&:is(.dark *));
 
+/*
+ * Light schemes only (`theme gruvbox-light`, …) — `dark:` above is unused, since the
+ * default is always dark. For the few classes that name a fixed Tailwind colour rather
+ * than a token, and would otherwise sit unreadable on a light page.
+ */
+@custom-variant light (&:where([data-mode='light'], [data-mode='light'] *));
 
-
+/*
+ * The halos are `color-mix` over the `--neon-*` tokens rather than literal rgba, so a
+ * `theme` switch recolours them with everything else. Under the default scheme they
+ * resolve to the same values as the rgba they replaced.
+ */
 @layer utilities {
-  .glow-green { text-shadow: 0 0 8px var(--neon-green), 0 0 20px rgba(0,255,65,0.4); }
-  .glow-cyan  { text-shadow: 0 0 8px var(--neon-cyan),  0 0 20px rgba(0,255,255,0.4); }
-  .glow-purple{ text-shadow: 0 0 8px var(--neon-purple), 0 0 20px rgba(191,0,255,0.4); }
-  .glow-pink  { text-shadow: 0 0 8px var(--neon-pink),  0 0 20px rgba(255,0,128,0.4); }
-  .border-glow{ box-shadow: 0 0 8px rgba(0,255,65,0.3), inset 0 0 8px rgba(0,255,65,0.05); }
-  .border-glow-cyan { box-shadow: 0 0 8px rgba(0,255,255,0.3), inset 0 0 8px rgba(0,255,255,0.05); }
+  .glow-green { text-shadow: 0 0 8px var(--neon-green), 0 0 20px color-mix(in srgb, var(--neon-green) 40%, transparent); }
+  .glow-cyan  { text-shadow: 0 0 8px var(--neon-cyan),  0 0 20px color-mix(in srgb, var(--neon-cyan) 40%, transparent); }
+  .glow-purple{ text-shadow: 0 0 8px var(--neon-purple), 0 0 20px color-mix(in srgb, var(--neon-purple) 40%, transparent); }
+  .glow-pink  { text-shadow: 0 0 8px var(--neon-pink),  0 0 20px color-mix(in srgb, var(--neon-pink) 40%, transparent); }
+  .border-glow{ box-shadow: 0 0 8px color-mix(in srgb, var(--neon-green) 30%, transparent), inset 0 0 8px color-mix(in srgb, var(--neon-green) 5%, transparent); }
+  .border-glow-cyan { box-shadow: 0 0 8px color-mix(in srgb, var(--neon-cyan) 30%, transparent), inset 0 0 8px color-mix(in srgb, var(--neon-cyan) 5%, transparent); }
   .scanlines {
     background-image: repeating-linear-gradient(
       0deg, transparent, transparent 2px,
@@ -58,7 +68,7 @@
   background: linear-gradient(
     to bottom,
     transparent,
-    rgba(0, 255, 65, 0.06),
+    color-mix(in srgb, var(--neon-green) 6%, transparent),
     transparent
   );
   animation: crt-roll 6s linear infinite;
@@ -193,6 +203,7 @@
   --color-input: var(--input);
   --color-border: var(--border);
   --color-destructive: var(--destructive);
+  --color-warning: var(--warning);
   --color-accent-foreground: var(--accent-foreground);
   --color-accent: var(--accent);
   --color-muted-foreground: var(--muted-foreground);
@@ -213,7 +224,11 @@
   --radius-xl: calc(var(--radius) + 4px);
 }
 
-/* Cyberpunk dark theme — single always-dark palette */
+/*
+ * Cyberpunk — the default scheme, and the only one the stylesheet knows about. The
+ * others (`theme` in the terminal) are tables in src/lib/themes.ts, written inline on
+ * <html> over these properties; switching back to the default removes them again.
+ */
 :root {
   --radius: 0.25rem;
   --background: oklch(0.1 0.01 145);
@@ -231,6 +246,8 @@
   --accent: oklch(0.85 0.2 200);
   --accent-foreground: oklch(0.1 0.01 145);
   --destructive: oklch(0.6 0.22 30);
+  /* Tailwind's yellow-400 — what every warning painted before it was a token. */
+  --warning: oklch(0.852 0.199 91.936);
   --border: oklch(0.28 0.08 145);
   --input: oklch(0.16 0.01 145);
   --ring: oklch(0.85 0.3 145);
@@ -265,5 +282,45 @@
   ::-webkit-scrollbar { width: 6px; }
   ::-webkit-scrollbar-track { background: var(--background); }
   ::-webkit-scrollbar-thumb { background: var(--neon-green); border-radius: 3px; }
-  ::selection { background: rgba(0,255,65,0.25); color: var(--neon-green); }
+  ::selection { background: color-mix(in srgb, var(--neon-green) 25%, transparent); color: var(--neon-green); }
+}
+
+/*
+ * A text glow is a halo of light: on a dark page it reads as a neon tube, on a light one
+ * as a smudge. Light schemes keep the colours and drop the halo.
+ */
+[data-mode='light'] :is(.glow-green, .glow-cyan, .glow-purple, .glow-pink) {
+  text-shadow: none;
+}
+
+/* The same 15% black stripe that is a texture on a near-black page is a barcode on a
+ * light one; a quarter of it keeps the texture. */
+[data-mode='light'] .scanlines {
+  background-image: repeating-linear-gradient(
+    0deg, transparent, transparent 2px,
+    rgba(0,0,0,0.04) 2px, rgba(0,0,0,0.04) 4px
+  );
+}
+
+/*
+ * The flashbang — a white-out on a dark-to-light `theme` switch, which `useTheme` adds
+ * and removes. On <html> itself, so nothing inside a view can stack above it.
+ */
+.theme-flash::after {
+  content: '';
+  position: fixed;
+  inset: 0;
+  z-index: 10000;
+  pointer-events: none;
+  background: #fff;
+  animation: theme-flash 0.9s ease-out forwards;
+}
+
+@keyframes theme-flash {
+  0%, 15% { opacity: 1; }
+  100% { opacity: 0; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .theme-flash::after { display: none; }
 }

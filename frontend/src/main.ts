@@ -5,6 +5,10 @@ import App from './App.vue'
 import router from './router'
 import { greet } from './console-greeting'
 import { initAnalytics } from './lib/analytics'
+import { restoreTheme } from './composables/useTheme'
+
+// Before mount, so nothing is ever painted in the default colours first.
+restoreTheme()
 
 const app = createApp(App)
 

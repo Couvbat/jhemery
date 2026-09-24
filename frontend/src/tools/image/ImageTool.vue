@@ -208,7 +208,7 @@ onUnmounted(() => {
       </div>
     </div>
 
-    <p v-if="unsupported" class="text-xs text-warning text-yellow-400">{{ t(m.toolImage.unsupported) }}</p>
+    <p v-if="unsupported" class="text-xs text-warning">{{ t(m.toolImage.unsupported) }}</p>
 
     <div v-if="source && result" class="grid gap-4 sm:grid-cols-2">
       <figure class="space-y-1">
