@@ -49,7 +49,7 @@ tools, watch-party and radio rooms, and 37 hidden achievements. English and Fren
 - 🔺 **A reactive three.js background.** Wireframe polyhedra pull towards the pointer, change
   colour with each section, react to the weather where I am and can be driven from the shell. The
   whole field swings like a prism when you change page.
-- 🎨 **Colour schemes from r/unixporn.** `theme` swaps the neon for Gruvbox, Nord, Dracula,
+- 🎨 **Colour schemes from r/unixporn.** `theme` (or the 🎨 button in the navbar) swaps the neon for Gruvbox, Nord, Dracula,
   Catppuccin, Tokyo Night, Rosé Pine, Everforest or Solarized. The wireframes, glows and confetti
   follow. Two schemes are light, and picking one is an achievement in itself.
 - 🎮 **Eight games in the output buffer:** `2048`, `snake`, `minesweeper`, `tetris`, `wordle`
@@ -133,7 +133,7 @@ Each app has its own README for working on its code:
 | **Views** | home · tools · watch · radio. These are the routes, defined once in `src/content/views.ts` in the order they sit on the prism. The navbar, `cd` and <kbd>Ctrl</kbd>+<kbd>K</kbd> all navigate through the same `goTo()`, which goes home first when you ask for a section from another page. |
 | **Prism swing** | Changing view turns the page like a face of a prism whose axis runs through the centre of the three.js scene. The old page rotates out and the new one rotates in from the same side, in 3D CSS on a fixed, clipped stage, over 650 ms. The navbar and launcher stay put. Going back turns the other way. Under `prefers-reduced-motion` the pages simply swap. It works without three.js loaded. |
 | **CRT overdrive** | `crt` in the terminal, or the Konami code anywhere on the page, toggles scanlines and flicker, and speeds up the wireframes. The setting is saved in `localStorage`. |
-| **Colour schemes** | `theme` lists eleven schemes with a swatch strip each, and `theme <name>` (or `theme random`) applies one: the site's own *cyberpunk* default, plus Gruvbox (dark and light), Nord, Dracula, Catppuccin (Mocha and Latte), Tokyo Night, Rosé Pine, Everforest and Solarized. A scheme is a table of a dozen colours in `src/lib/themes.ts`, and every CSS token is derived from it. That means the glows, the three.js wireframes, the confetti and `neofetch`'s colour strip all follow along. Going back to the default removes every override, so the stylesheet stays the default's only definition. Switching from a dark scheme to a light one whites the screen out for a moment (skipped under reduced motion). The choice is saved in `localStorage` and applied before the app mounts. A unit test holds every scheme to WCAG contrast floors. |
+| **Colour schemes** | `theme` lists eleven schemes with a swatch strip each, and `theme <name>` (or `theme random`) applies one: the site's own *cyberpunk* default, plus Gruvbox (dark and light), Nord, Dracula, Catppuccin (Mocha and Latte), Tokyo Night, Rosé Pine, Everforest and Solarized. A scheme is a table of a dozen colours in `src/lib/themes.ts`, and every CSS token is derived from it. That means the glows, the three.js wireframes, the confetti and `neofetch`'s colour strip all follow along. Going back to the default removes every override, so the stylesheet stays the default's only definition. Switching from a dark scheme to a light one whites the screen out for a moment (skipped under reduced motion). The choice is saved in `localStorage` and applied before the app mounts. A unit test holds every scheme to WCAG contrast floors. The 🎨 button in the navbar opens the same list as a menu, drawing each scheme's strip on its own background. It's the only way to switch on a phone, which has no terminal. It stays open while you pick, so the page behind it is the preview. |
 | **Boot sequence** | A fake `couvsh 1.0` kernel log plays on your first visit. `reboot` replays it on demand, and `ssh` ends by triggering it. Skipped under reduced motion. |
 | **Status ticker** | The footer shows the uptime `neofetch` reports (days since the first commit), how long ago this build shipped, and whether I'm open to work. It refreshes slowly, so a tab left open stays accurate. |
 | **Skills with evidence** | Under the skill badges, `skills --why` links each claim to where it's actually used: SSE to the presence stream and the watch parties, WebAssembly to the ffmpeg tool, GraphQL to the heatmap. Skills with nothing to show stay plain badges. |
@@ -395,8 +395,8 @@ background changes palette.
 | Rare Find | Click one of the three accent-coloured wireframes |
 | Connect the Dots | `constellation on` |
 | Zero-G | `gravity off` |
-| Ricer | Apply five different colour schemes with `theme` (they count across visits) |
-| Flashbang | Switch to a light scheme: `theme gruvbox-light` or `theme catppuccin-latte` |
+| Ricer | Apply five different colour schemes, with `theme` or the navbar's 🎨 menu (they count across visits) |
+| Flashbang | Switch to a light scheme: `theme gruvbox-light` or `theme catppuccin-latte`, or either from the 🎨 menu |
 | First Blood | Capture any flag of the CTF chain. The first one ends `.secret`; `ctf` has the rest |
 | 100% | Unlock everything else |
 

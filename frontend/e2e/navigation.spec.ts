@@ -65,7 +65,9 @@ test.describe('sections', () => {
       const ul = nav.querySelector('ul')!
       const logo = nav.firstElementChild as HTMLElement
       const style = getComputedStyle(nav)
-      const links = [...ul.querySelectorAll('li > a, li > button')] as HTMLElement[]
+      // `li > div > button` is the scheme menu's trigger, which sits in a wrapper that
+      // also holds the menu.
+      const links = [...ul.querySelectorAll('li > a, li > button, li > div > button')] as HTMLElement[]
       return {
         room: nav.clientWidth - parseFloat(style.paddingLeft) - parseFloat(style.paddingRight),
         needed: Math.round(logo.getBoundingClientRect().width + ul.scrollWidth),
@@ -79,8 +81,8 @@ test.describe('sections', () => {
     // One line of 14px text sits well under this; two lines do not.
     expect(fit.tallestLink).toBeLessThan(32)
     expect(fit.headerHeight).toBeLessThan(72)
-    // Every section, every view but home, plus the language and trophy buttons.
-    expect(fit.links).toBe(sections.length + views.length - 1 + 2)
+    // Every section, every view but home, plus the language, scheme and trophy buttons.
+    expect(fit.links).toBe(sections.length + views.length - 1 + 3)
   })
 
   test('the burger menu reaches every section on a phone', async ({ page }) => {

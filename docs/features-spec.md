@@ -223,6 +223,14 @@ the default's only definition and a visitor who never types `theme` gets the pag
 choice is saved under `couvbat:theme` and re-applied in `main.ts` before the app mounts, so a
 returning visitor's first frame is already in their colours.
 
+Surfaces: the `theme` command, and a 🎨 menu in the navbar (`components/ThemeMenu.vue`). The menu
+matters most on a phone, where there is no terminal (§9), so without it a phone visitor could never
+leave the default. It lists the same schemes with the same swatch strip (`swatch()` in `themes.ts`),
+each drawn on its scheme's own background so a light one looks light before it is picked. It stays
+open on a pick: the page repaints behind it, so browsing the list is the preview. Both surfaces apply
+through `setTheme` and record through `tryTheme`, so the flash, the saved choice and both
+achievements behave the same whichever one you use.
+
 What makes that work is that everything is a token. The `--neon-*` properties are the four hue
 slots (under Gruvbox `--neon-green` is orange). The glows `color-mix` over them instead of
 hard-coding rgba, warnings use a `--warning` token instead of `text-yellow-400`, and the three.js
@@ -871,7 +879,7 @@ Retrofitting these is painful, so they are part of the definition of done:
 ## 10. Explicitly out of scope
 
 - **A light default** — the site is committed to always-dark and reads as deliberate. Light
-  schemes exist only as opt-in `theme` choices (§3 core), and the achievement for picking one is
+  schemes exist only as opt-in choices, through `theme` or the navbar's scheme menu (§3 core), and the achievement for picking one is
   called Flashbang. That is this entry's position, stated as a joke.
 - **Blog** — infrastructure without content is worse than no infrastructure.
 - **Command chaining / pipes** — `ls | grep` is a lot of parser for a joke nobody will run twice.

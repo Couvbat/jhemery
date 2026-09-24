@@ -1,6 +1,6 @@
 import { useTheme } from '@/composables/useTheme'
-import { DEFAULT_THEME, findTheme, themes, type Theme } from '@/lib/themes'
-import { announce, toast, tryTheme } from '../achievements'
+import { DEFAULT_THEME, findTheme, swatch, themes, type Theme } from '@/lib/themes'
+import { toast, tryTheme } from '../achievements'
 import { blank, line, segmented } from '../format'
 import type { Command, OutputLine, OutputSegment } from '../types'
 
@@ -9,10 +9,8 @@ import type { Command, OutputLine, OutputSegment } from '../types'
  * ends with. Literal colours rather than tones, since tones would paint every row of
  * the listing in whichever scheme happens to be on screen.
  */
-export function swatches({ colours: c }: Theme): OutputSegment[] {
-  return [c.primary, c.accent, c.secondary, c.highlight, c.warning, c.destructive, c.foreground, c.muted].map(
-    (colour) => ({ text: '███', colour }),
-  )
+export function swatches(theme: Theme): OutputSegment[] {
+  return swatch(theme).map((colour) => ({ text: '███', colour }))
 }
 
 const HINT = {
@@ -72,8 +70,7 @@ export const themeCommands: Command[] = [
       return [
         segmented([{ text: `theme: ${next.name}  `, tone: 'primary' }, ...swatches(next)]),
         ...(from.mode === 'dark' && next.mode === 'light' ? [line(t(FLASHBANG), 'muted')] : []),
-        ...toast(tryTheme(next.id), t),
-        ...(next.mode === 'light' ? announce('flashbang', t) : []),
+        ...toast(tryTheme(next), t),
       ]
     },
   },
