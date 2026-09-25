@@ -8,6 +8,7 @@ import {
 } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import { Request } from 'express';
+import { BlockList, isIPv6 } from 'node:net';
 
 export interface RateLimitOptions {
   /** Allowed requests per window, per client IP. */
@@ -19,6 +20,15 @@ export const RATE_LIMIT_KEY = 'rate-limit';
 
 export const RateLimit = (options: RateLimitOptions) =>
   SetMetadata(RATE_LIMIT_KEY, options);
+
+/**
+ * Buckets held at once, across every limited route. Keys are real addresses, so
+ * filling this takes that many distinct clients inside one window. Past it the
+ * oldest bucket is dropped rather than the newcomer refused: refusing would let
+ * whoever filled the map lock every new visitor out, where dropping only lets a
+ * botnet that size do what it could do anyway.
+ */
+export const MAX_BUCKETS = 10_000;
 
 /**
  * Per-IP fixed-window limiter held in memory.
@@ -48,6 +58,13 @@ export class RateLimitGuard implements CanActivate {
 
     const entry = this.hits.get(key);
     if (!entry || entry.resetAt <= now) {
+      // Delete before re-setting so the Map's insertion order stays the order the
+      // windows opened, which is what makes its first key the oldest bucket.
+      this.hits.delete(key);
+      if (this.hits.size >= MAX_BUCKETS) {
+        const [oldest] = this.hits.keys();
+        this.hits.delete(oldest);
+      }
       this.hits.set(key, { count: 1, resetAt: now + options.windowMs });
       return true;
     }
@@ -64,7 +81,7 @@ export class RateLimitGuard implements CanActivate {
     return true;
   }
 
-  /** Drop expired entries occasionally so the map cannot grow without bound. */
+  /** Drop expired entries occasionally, leaving MAX_BUCKETS as only a backstop. */
   private sweep(now: number) {
     if (now - this.lastSweep < 60_000) return;
     this.lastSweep = now;
@@ -74,15 +91,68 @@ export class RateLimitGuard implements CanActivate {
   }
 }
 
+/**
+ * Cloudflare's published edge ranges (https://www.cloudflare.com/ips/, as of
+ * 25 September 2026). A range added later fails safe: visitors arriving through it
+ * are bucketed by edge address, so they are over-limited, never unlimited.
+ */
+const CLOUDFLARE = new BlockList();
+for (const cidr of [
+  '173.245.48.0/20',
+  '103.21.244.0/22',
+  '103.22.200.0/22',
+  '103.31.4.0/22',
+  '141.101.64.0/18',
+  '108.162.192.0/18',
+  '190.93.240.0/20',
+  '188.114.96.0/20',
+  '197.234.240.0/22',
+  '198.41.128.0/17',
+  '162.158.0.0/15',
+  '104.16.0.0/13',
+  '104.24.0.0/14',
+  '172.64.0.0/13',
+  '131.0.72.0/22',
+  '2400:cb00::/32',
+  '2606:4700::/32',
+  '2803:f800::/32',
+  '2405:b500::/32',
+  '2405:8100::/32',
+  '2a06:98c0::/29',
+  '2c0f:f248::/32',
+]) {
+  const [network, prefix] = cidr.split('/');
+  CLOUDFLARE.addSubnet(
+    network,
+    Number(prefix),
+    isIPv6(network) ? 'ipv6' : 'ipv4',
+  );
+}
+
+/**
+ * Production is Cloudflare → Apache → Passenger → Node, and every hop appends to
+ * X-Forwarded-For, so the header's first entry is whatever the client chose to
+ * send. Keying on it let a fresh random header open a fresh bucket per request.
+ *
+ * `request.ip` is the last entry instead: with `trust proxy` at 1 (main.ts says
+ * why 1) it is the address Passenger appended, the peer that opened the
+ * connection to Apache, which nothing upstream can write. Behind Cloudflare that
+ * peer is an edge node shared by many visitors, so there the visitor comes from
+ * CF-Connecting-IP, which Cloudflare overwrites on every request. But only when
+ * the peer really is Cloudflare: the origin answers anyone who connects to it
+ * directly, and for them the header is theirs to invent.
+ */
 function clientIp(request: Request): string {
-  // o2switch fronts the Node app with Apache, so the socket address is always the
-  // proxy. Trust the first hop in X-Forwarded-For, falling back to the socket.
-  const forwarded = request.headers['x-forwarded-for'];
-  if (typeof forwarded === 'string' && forwarded.length > 0) {
-    return forwarded.split(',')[0].trim();
+  const peer = request.ip ?? request.socket.remoteAddress;
+  if (!peer) return 'unknown';
+
+  const visitor = request.headers['cf-connecting-ip'];
+  if (typeof visitor === 'string' && visitor.length > 0 && isCloudflare(peer)) {
+    return visitor.trim();
   }
-  if (Array.isArray(forwarded) && forwarded.length > 0) {
-    return forwarded[0].split(',')[0].trim();
-  }
-  return request.ip ?? request.socket.remoteAddress ?? 'unknown';
+  return peer;
+}
+
+function isCloudflare(address: string): boolean {
+  return CLOUDFLARE.check(address, isIPv6(address) ? 'ipv6' : 'ipv4');
 }
