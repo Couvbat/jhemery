@@ -405,8 +405,9 @@ background changes palette.
 ## The API
 
 NestJS, with CORS restricted to `FRONTEND_URL`, a global whitelisting validation pipe, a
-`default-src 'none'` CSP (it's a JSON API, never a document), and `trust proxy` enabled so the
-per-IP rate limiter sees real clients behind Apache.
+`default-src 'none'` CSP (it's a JSON API, never a document), and a per-IP rate limiter that keys
+on the address Apache saw, or on `CF-Connecting-IP` when that address is Cloudflare's. It never
+uses the front of `X-Forwarded-For`, which any client can write.
 
 | Route | Purpose |
 |---|---|
