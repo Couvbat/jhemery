@@ -1,11 +1,13 @@
 import { createRouter, createWebHistory } from 'vue-router'
 import HomeView from '../views/HomeView.vue'
+import { decorativeMotion } from '../composables/useMotion'
 
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
   scrollBehavior(to) {
     if (to.hash) {
-      return { el: to.hash, behavior: 'smooth' }
+      // Jumps with motion paused, as `scrollToSection` does.
+      return { el: to.hash, behavior: decorativeMotion() === 'paused' ? 'auto' : 'smooth' }
     }
     return { top: 0 }
   },

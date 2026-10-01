@@ -559,6 +559,8 @@ Recorded as each row ships.
     bare listing would gain nothing from reading as `none`, since `motion` is never worth a link.
   - `main.css` now also stops `.animate-pulse` under `prefers-reduced-motion`: the hero's cursor
     pulsed with no guard at all, beside the `motion-safe:` ones.
+  - Outside the census: scrolling to a section (`scrollToSection()` and the router's hash
+    scroll) was smooth even under reduced motion. It jumps with motion `paused` now.
 
 ## Build order
 

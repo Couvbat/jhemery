@@ -1098,7 +1098,8 @@ Retrofitting these is painful, so they are part of the definition of done:
     flashbang or theme circle; prompt cycling, the tagline, the boot sequence and the animations
     of typed commands stay.
   - *paused* — nothing moves. The three.js chunk isn't fetched until some other level is chosen,
-    and is never unloaded after: pausing stops its loop.
+    and is never unloaded after: pausing stops its loop. Scrolling to a section jumps rather
+    than glides, from a link and from `cd` alike.
 
   Decorative surfaces read `decorativeMotion()` and take their own threshold: the swing, the
   confetti, the glitch, the flashbang and the theme circle need *full*; the tagline, the prompt
