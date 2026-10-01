@@ -109,7 +109,9 @@ interface Command {
 }
 ```
 
-`CommandContext` carries the parsed `args`, the `raw` input, the current `locale`, the `t()`
+`CommandContext` carries the parsed `args`, the stage's own `raw` text, `stdin` (what a `|`
+handed it), `tty` (false on the left of a `|`, where `capture` and `prompt` throw), the current
+`locale`, the `t()`
 resolver, and the side-effect handles a command may use: `print()`, `clear()`, `close()`,
 `frame()` (a redrawable output region — animations and game boards), `navigate(target)` (anything
 `cd` accepts, through `goTo()` — §11), `prompt(question, { mask })` (resolves to the next line the
@@ -130,7 +132,7 @@ before there was an observer. The two pollers the visitor didn't ask for, the gu
 the download tool's interval, mark themselves `background`. `strace` is the only observer, and it
 prints shapes: keys two levels deep, arrays as their length, and query values masked.
 
-`OutputLine` is `{ text; tone?; segments?; href?; pre?; prompt? }`, where `Tone` is
+`OutputLine` is `{ text; tone?; segments?; href?; pre?; prompt?; stderr? }`, where `Tone` is
 `default|muted|primary|accent|secondary|error|success|warning`. `segments` splits a line into
 differently-toned runs (a game board needs a colour per cell) while `text` stays their plain
 concatenation; `pre` preserves runs of spaces for ASCII art and tables; `prompt` marks an echoed
@@ -178,9 +180,13 @@ with no operator runs exactly as it did. `useTerminal.quoting.spec.ts` pins that
 `sign` and `ask`.
 
 **Running a line.** Aliases are expanded per stage and the line is read again, since an alias may
-hold a pipe. Then every stage resolves (`registry.resolveStage`, the rule links and Tab share)
-before any runs: an unknown stage runs nothing, and when it follows an operator the shell
-suggests quoting, so `sign great site; love it` never posts half an entry. Stages run one after
+hold a pipe. Then every stage resolves (`registry.resolveStage`, the rule the shell and links share)
+before any runs: an unknown stage runs nothing, and when it follows a command that took free text
+the shell suggests quoting. A command that writes to the server with text of its own (`sign`,
+`ask`) must have that text quoted when the line holds an operator, or nothing runs: otherwise
+`sign love it; why not` would post "love it" and run `why`. `sign` drops one pair of outer
+quotes, as `ask` does. Aliases expand in place, stage by stage and round after round, so an alias
+can pipe into another and env words stay as typed. A link may carry no env words at all. Stages run one after
 another, because commands return arrays rather than streams. A stage's output, minus its
 `stderr` lines, is the next stage's `stdin`, `OutputLine`s and their colours included; its
 `stderr` lines (`fail()`, achievement toasts) go to the screen wherever it stands, so
@@ -207,7 +213,9 @@ match (or the longest common prefix) and prints the list when the choice is stil
 Only the *source* of the candidates changes:
 
 - **the first word** — every visible command and alias, plus whatever the visitor named with
-  `alias`. Hidden commands stay out, same as in `help`.
+  `alias`. Hidden commands stay out, same as in `help`. Tab
+  resolves two-word names only once a third word is typed (`git lo<Tab>` is still a command
+  word), which is where it differs from `registry.resolveStage`.
 - **anything after it** — the command's own `complete()`. Keeping it on the command is what keeps
   the registry the API: `cd` knows it takes a section, `unalias` knows it takes an alias name, and
   the shell needs no table of special cases. It receives the arguments, the index of the word being
@@ -719,7 +727,7 @@ A link may only pass it the arguments its Tab offers: the domain, `-I` and the s
 colours as SGR, links as OSC 8, prompt lines dropped) with a footer, plus a generated `help.txt`
 index. The pages are vitest snapshots (`curl-pages.spec.ts`), committed and never written by CI,
 so a change to a command or the content fails CI until they are regenerated with `-u`. A page is
-any command a link could run with no arguments that isn't hidden, live or a game (by module); the
+any command a link could run with no arguments that isn't hidden, live, a game or a text command (both by module); the
 spec names a reason for each other exclusion (`curl`, `ctf`, `achievements`, `games`, `tour`,
 `resume`, `help`). Each runs in both locales under two clocks years apart, and any line that
 differs is dropped, which removes the uptimes and durations that would otherwise go stale between

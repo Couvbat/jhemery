@@ -145,6 +145,11 @@ export const messages = {
       en: 'to pass all of it on as text, quote it: `{example}`',
       fr: 'pour tout passer en texte, mettez-le entre guillemets : `{example}`',
     },
+    // A message to the server, unquoted, on a line with an operator in it.
+    quoteMessage: {
+      en: 'its text shares the line with an operator, so nothing ran',
+      fr: 'son texte partage la ligne avec un opérateur, donc rien n’a été lancé',
+    },
     linkRefused: {
       en: 'a link asked to run `{command}` — that one only runs if you type it yourself.',
       fr: 'un lien a demandé `{command}` — celle-ci ne s’exécute que si vous la tapez vous-même.',

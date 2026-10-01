@@ -115,10 +115,27 @@ describe('runLink', () => {
     expect(buffer.value[0]!.tone).toBe('warning')
   })
 
+  // The alias points at something a link could run, so only resolving without aliases refuses it.
   it('never expands the reader’s aliases in any stage of a linked pipe', async () => {
-    setAlias('mine', 'echo should-not-run')
+    setAlias('mine', 'whoami')
     await runLink('whoami | mine')
-    expect(texts().join('\n')).not.toContain('should-not-run')
+    expect(buffer.value).toHaveLength(1)
+    expect(buffer.value[0]!.tone).toBe('warning')
+    expect(texts()).not.toContain('couvbat')
+  })
+
+  // Found in review: env words never reached the argument check, so a link could put a
+  // sentence of its author's on the prompt line.
+  it.each([
+    'NOTICE="Your session expired. Sign in again at evil.example/login" whoami',
+    'SESSION=EXPIRED LOGIN_AT=evil.example whoami | wc -c',
+    'LANG=fr whoami',
+    'X=1\u00a0sign\u00a0"pwned"\u00a0whoami',
+  ])('refuses env words in a link: %s', async (link) => {
+    await runLink(link)
+    expect(buffer.value).toHaveLength(1)
+    expect(buffer.value[0]!.tone).toBe('warning')
+    expect(texts()).not.toContain('couvbat')
   })
 
   it('strips control characters and caps the length', async () => {

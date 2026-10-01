@@ -25,6 +25,8 @@ export interface Stage {
   argv: string[]
   /** Leading `NAME=value` words, which apply to this stage only (`LANG=fr neofetch`). */
   env: Record<string, string>
+  /** Where `raw` starts in the line, so an alias can be expanded in place, everything else untouched. */
+  at: number
 }
 
 export type Operator = ';' | '&&' | '||'
@@ -37,7 +39,8 @@ export interface Link {
 
 export type Parsed = { ok: true; chain: Link[] } | { ok: false; error: string }
 
-const isSpace = (c: string | undefined) => c === ' ' || c === '\t' || c === '\n'
+// Any space, a no-break one included: the words split on `\s`, so the operators must too.
+const isSpace = (c: string | undefined) => c !== undefined && /\s/.test(c)
 const ENV = /^([A-Za-z_][A-Za-z0-9_]*)=([\s\S]*)$/
 
 /** The operator starting at `i`, if one does. */
@@ -62,7 +65,7 @@ function closingQuote(line: string, start: number): number {
 
 const unquote = (value: string) => value.replace(/^(['"])([\s\S]*)\1$/, '$2')
 
-function toStage(text: string, words: string[]): Stage {
+function toStage(text: string, words: string[], start: number): Stage {
   // Env words lead, and only count when a command follows them.
   const env: Record<string, string> = {}
   let skip = 0
@@ -74,12 +77,13 @@ function toStage(text: string, words: string[]): Stage {
   }
   let raw = text.trimStart()
   for (const word of words.slice(0, skip)) raw = raw.slice(word.length).trimStart()
+  const at = start + (text.length - raw.length)
   raw = raw.trimEnd()
-  return { raw, argv: raw.split(/\s+/), env }
+  return { raw, argv: raw.split(/\s+/), env, at }
 }
 
 export function parseLine(line: string): Parsed {
-  const pieces: { text: string; words: string[] }[] = []
+  const pieces: { text: string; words: string[]; start: number }[] = []
   const ops: string[] = []
   let words: string[] = []
   let word = ''
@@ -93,7 +97,7 @@ export function parseLine(line: string): Parsed {
     const op = operatorAt(line, i)
     if (op) {
       endWord()
-      pieces.push({ text: line.slice(sliceStart, i), words })
+      pieces.push({ text: line.slice(sliceStart, i), words, start: sliceStart })
       ops.push(op)
       words = []
       i += op.length
@@ -119,7 +123,7 @@ export function parseLine(line: string): Parsed {
     i++
   }
   endWord()
-  pieces.push({ text: line.slice(sliceStart), words })
+  pieces.push({ text: line.slice(sliceStart), words, start: sliceStart })
 
   const chain: Link[] = []
   let pipeline: Stage[] = []
@@ -135,7 +139,7 @@ export function parseLine(line: string): Parsed {
       return { ok: false, error: `couvsh: syntax error near unexpected token '${after ?? before}'` }
     }
     if (++stages > MAX_STAGES) return { ok: false, error: `couvsh: more than ${MAX_STAGES} commands in one line` }
-    pipeline.push(toStage(piece.text, piece.words))
+    pipeline.push(toStage(piece.text, piece.words, piece.start))
     if (after === '|') continue
     chain.push({ op: joined, pipeline })
     pipeline = []
@@ -144,20 +148,19 @@ export function parseLine(line: string): Parsed {
   return { ok: true, chain }
 }
 
-/** A chain back as a line, for re-parsing once its stages' aliases are expanded. */
-export function joinChain(chain: readonly Link[]): string {
-  return chain
-    .map((link) => {
-      const pipeline = link.pipeline
-        .map((stage) => {
-          const env = Object.entries(stage.env).map(([name, value]) => (/\s/.test(value) ? `${name}="${value}"` : `${name}=${value}`))
-          return [...env, stage.raw].join(' ')
-        })
-        .join(' | ')
-      return link.op ? ` ${link.op} ${pipeline}` : pipeline
-    })
-    .join('')
-    .trim()
+/**
+ * The line with some stages' text replaced (aliases expanded), every other character as
+ * it was typed: env words, operators, quotes and spacing. `replace` returns a stage's new
+ * text, or undefined to leave it.
+ */
+export function replaceStages(line: string, chain: readonly Link[], replace: (stage: Stage) => string | undefined): string {
+  const stages = chain.flatMap((link) => link.pipeline).sort((a, b) => b.at - a.at)
+  let out = line
+  for (const stage of stages) {
+    const text = replace(stage)
+    if (text !== undefined && text !== stage.raw) out = `${out.slice(0, stage.at)}${text}${out.slice(stage.at + stage.raw.length)}`
+  }
+  return out
 }
 
 /**

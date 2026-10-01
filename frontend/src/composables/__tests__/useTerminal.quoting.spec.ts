@@ -42,13 +42,15 @@ describe('quoting, as it was before pipes', () => {
     expect(last()).toBe(printed)
   })
 
-  it('hands sign the message with the quotes typed, and the name from the prompt', async () => {
+  // The one change: since the shell now tells visitors to quote a message holding an
+  // operator, sign drops that one pair of outer quotes, as ask always has.
+  it('hands sign the message without its outer quotes, and the name from the prompt', async () => {
     mocks.sign.mockResolvedValue({ id: '1', name: 'J', message: 'x', date: '2026-10-01' })
-    const done = run('sign "great site"')
+    const done = run('sign "great site; love it"')
     await vi.waitFor(() => expect(buffer.value.some((l) => l.text.includes('your name'))).toBe(true))
     await submit('J')
     await done
-    expect(mocks.sign).toHaveBeenCalledWith('J', '"great site"')
+    expect(mocks.sign).toHaveBeenCalledWith('J', 'great site; love it')
   })
 
   it("hands sign an elided French message whole: c'est top", async () => {

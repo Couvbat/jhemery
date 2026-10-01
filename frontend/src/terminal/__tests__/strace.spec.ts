@@ -98,6 +98,15 @@ describe('strace', () => {
     expect(texts().at(-1)).toBe("strace: Can't stat 'nope': No such file or directory")
   })
 
+  // Found in review: the command strace ran never saw the pipe's input.
+  it('hands the traced command what came in through the pipe', async () => {
+    await run('sha256sum about.txt')
+    const digest = texts().at(-1)!.split(/\s+/)[0]
+    clearBuffer()
+    await run('cat about.txt | strace sha256sum')
+    expect(texts().some((l) => l.startsWith(`${digest}  -`))).toBe(true)
+  })
+
   it('links a two-word command the way it links it bare', () => {
     expect(isLinkable(resolve('git log')!, [])).toBe(true)
     expect(isLinkable(resolve('strace')!, ['git', 'log'])).toBe(true)

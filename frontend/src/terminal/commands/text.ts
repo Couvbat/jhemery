@@ -52,6 +52,7 @@ function parse(args: readonly string[], known: string, counted = false): Parsed 
   for (let i = 0; i < args.length; i++) {
     const arg = args[i]!
     if (counted && /^-\d+$/.test(arg)) count = Number(arg.slice(1))
+    else if (counted && /^-n\d+$/.test(arg)) count = Number(arg.slice(2))
     else if (counted && arg === '-n') {
       const value = args[++i]
       if (!value || !/^\d+$/.test(value)) return `option requires a number -- 'n'`

@@ -52,6 +52,7 @@ describe('head and tail', () => {
     expect(text(await piped('head', [], many))).toHaveLength(10)
     expect(text(await piped('head', ['-n', '2'], many))).toEqual(['l1', 'l2'])
     expect(text(await piped('head', ['-3'], many))).toEqual(['l1', 'l2', 'l3'])
+    expect(text(await piped('head', ['-n3'], many))).toEqual(['l1', 'l2', 'l3'])
     expect(text(await piped('tail', [], many))).toEqual(text(many.slice(5)))
     expect(text(await piped('tail', ['-n', '2'], many))).toEqual(['l14', 'l15'])
     expect(text(await piped('tail', ['-0'], many))).toEqual([])

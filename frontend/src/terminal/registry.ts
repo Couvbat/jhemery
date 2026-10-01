@@ -54,7 +54,8 @@ export function writesOf(command: Command, args: readonly string[] = []): Writes
  * `?run=whoami your session expired, sign in at …` would print that line on the page.
  * A command that takes arguments from links declares them in `complete()`.
  */
-function argsOffered(command: Command, args: readonly string[]): boolean {
+/** Whether every argument is one the command offers for Tab: the test for free text a link (or a hint) needs. */
+export function argsOffered(command: Command, args: readonly string[]): boolean {
   return args.every((arg, index) => {
     const offered = command.complete?.({ args: [...args], index, word: arg }) ?? []
     return offered.some((candidate) => candidate.toLowerCase() === arg.toLowerCase())

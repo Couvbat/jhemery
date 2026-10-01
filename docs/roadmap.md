@@ -435,6 +435,10 @@ Recorded as each row ships.
     before it.
   - A link may not pass `grep` a pattern: it is free text, held to Tab's offers like any other.
   - The text commands have no curl pages: with no pipe they have nothing to read.
+  - Found in review: a message to the server (`sign`, `ask`) on a line with an operator must be
+    quoted, or nothing runs, since `why`, `about` and `play` are commands as well as words;
+    `sign` drops one pair of outer quotes for it. A link may carry no env words. A game says
+    "not a tty" before it touches anything, so `connect4 | cat` takes nobody's seat.
 
 ## Build order
 

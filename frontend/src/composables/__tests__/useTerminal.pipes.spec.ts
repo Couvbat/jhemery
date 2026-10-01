@@ -4,10 +4,10 @@ vi.mock('@/composables/useCrt', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@/composables/useCrt')>()),
   prefersReducedMotion: () => true,
 }))
-const mocks = vi.hoisted(() => ({ sign: vi.fn() }))
+const mocks = vi.hoisted(() => ({ sign: vi.fn(), askStream: vi.fn() }))
 vi.mock('@/lib/api', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@/lib/api')>()
-  return { ...actual, api: { ...actual.api, sign: mocks.sign } }
+  return { ...actual, api: { ...actual.api, sign: mocks.sign, askStream: mocks.askStream } }
 })
 
 import { currentLocale, setLocale } from '@/i18n'
@@ -90,6 +90,26 @@ describe('pipes', () => {
     await run('who2')
     expect(texts()).toEqual(['8'])
   })
+
+  // Found in review: a stage an expansion made was never expanded itself.
+  it('expands an alias that an alias pipes into, and keeps env words as typed', async () => {
+    setAlias('me', 'whoami')
+    setAlias('count', 'me | wc -c')
+    await run('count')
+    expect(texts()).toEqual(['8'])
+    clearBuffer()
+    await run(`X='a;b' me`)
+    expect(texts()).toEqual(['couvbat'])
+  })
+
+  it('refuses a game on the left of a pipe before it does anything', async () => {
+    const { api } = await import('@/lib/api')
+    const create = vi.spyOn(api, 'createRoom')
+    await run('connect4 | cat')
+    expect(create).not.toHaveBeenCalled()
+    expect(texts().join('\n')).toContain(messages.terminal.notATty.en)
+    expect(texts().join('\n')).not.toMatch(/[╔║]/)
+  })
 })
 
 describe('; && ||', () => {
@@ -110,12 +130,47 @@ describe('; && ||', () => {
     expect(texts()).toEqual(['couvbat'])
   })
 
+  // Found in review: `why` is a command, so resolving every stage first wasn't enough.
+  it('runs nothing when a message to the server shares an unquoted line with an operator', async () => {
+    await run('sign love it; why not')
+    expect(mocks.sign).not.toHaveBeenCalled()
+    expect(texts()[0]).toMatch(/^sign: /)
+    expect(texts()[1]).toContain('`sign "love it; why not"`')
+  })
+
+  // `ask` keeps its partial answer on Ctrl+C rather than rethrowing; the cow must not draw it.
+  it('stops a pipe at Ctrl+C even when a stage keeps what it had instead of rethrowing', async () => {
+    mocks.askStream.mockImplementation(async function* (_q: string, _l: string, signal: AbortSignal) {
+      yield 'partial'
+      if (!signal.aborted) await new Promise((resolve) => signal.addEventListener('abort', resolve))
+    })
+    const done = run('ask "who is he" | cowsay')
+    await vi.waitFor(() => expect(mocks.askStream).toHaveBeenCalled())
+    cancel()
+    await done
+    expect(texts().join('\n')).not.toContain('(oo)')
+    expect(texts().filter((l) => l === messages.terminal.cancelled.en)).toHaveLength(1)
+  })
+
+  it('offers no quoting hint after a command that takes no free text', async () => {
+    await run('ls | frobnicate')
+    expect(texts().join('\n')).not.toContain('"')
+  })
+
   it('runs nothing when any stage is unknown, and suggests quoting after an operator', async () => {
     const done = run('sign great site; love it')
     await done
     expect(mocks.sign).not.toHaveBeenCalled()
     expect(texts()[0]).toBe(`love: ${messages.terminal.notFound.en}`)
     expect(texts()[1]).toContain('`sign "great site; love it"`')
+  })
+
+  // Found in review: `t` was fixed at the language the stage started in.
+  it('toasts in the language lang has just switched to', async () => {
+    window.localStorage.clear()
+    await run('lang fr')
+    expect(texts().join('\n')).toContain('Bilingue')
+    setLocale('en')
   })
 
   it('reads LANG for one stage and leaves the visitor’s language alone', async () => {
@@ -126,7 +181,7 @@ describe('; && ||', () => {
 
   // `sign` waits on its name prompt, which is where the Ctrl+C lands.
   it('stops the whole line on one Ctrl+C, with one ^C', async () => {
-    const done = run('sign hi ; whoami ; pwd')
+    const done = run('sign "hi" ; whoami ; pwd')
     await vi.waitFor(() => expect(texts().some((l) => l.includes('your name'))).toBe(true))
     cancel()
     await done

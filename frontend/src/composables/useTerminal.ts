@@ -5,16 +5,18 @@ import { expandAliases } from '@/terminal/aliases'
 import { history, pushHistory } from '@/terminal/history'
 import { pick, type Locale } from '@/content/types'
 import { fail } from '@/terminal/format'
-import { joinChain, lastStageStart, parseLine, type Link, type Stage } from '@/terminal/parse'
+import { lastStageStart, parseLine, replaceStages, type Link, type Stage } from '@/terminal/parse'
 import {
   commonPrefix,
   completeCommand,
   filterByPrefix,
+  argsOffered,
   isLinkable,
   resolve,
   resolveLink,
   resolveStage,
   suggest,
+  writesOf,
 } from '@/terminal/registry'
 import type {
   Command,
@@ -225,13 +227,14 @@ interface Scope {
   signal: AbortSignal
   sink: Sink
   tty: boolean
-  locale: Locale
+  /** The stage's own language (`LANG=fr`), or undefined to follow the visitor's as it changes. */
+  locale: Locale | undefined
 }
 
 /** `LANG=fr neofetch`: this stage in French, the visitor's own setting untouched. */
-function localeOf(env: Record<string, string>): Locale {
+function localeOf(env: Record<string, string>): Locale | undefined {
   const asked = (env.LC_ALL || env.LANG || '').slice(0, 2).toLowerCase()
-  return asked === 'fr' || asked === 'en' ? asked : currentLocale()
+  return asked === 'fr' || asked === 'en' ? asked : undefined
 }
 
 function notATty(raw: string): Error {
@@ -246,8 +249,10 @@ function buildContext(args: string[], raw: string, scope: Scope, stdin?: OutputL
     raw,
     stdin,
     tty,
-    locale,
-    t: (value) => pick(value, locale),
+    locale: locale ?? currentLocale(),
+    // Read when called, unless the stage asked for a language: `lang fr` switches the
+    // language and then toasts in it, as it always did.
+    t: (value) => pick(value, locale ?? currentLocale()),
     print: (input) => sink.print(toLines(input)),
     frame: () => sink.frame(),
     clear: () => sink.clear(),
@@ -281,7 +286,7 @@ function buildContext(args: string[], raw: string, scope: Scope, stdin?: OutputL
         if (keyCapture.value === handler) keyCapture.value = null
       }
     },
-    run: (input: string) => runNested(input, scope),
+    run: (input: string) => runNested(input, scope, stdin),
     effects,
     signal,
   }
@@ -294,7 +299,7 @@ function buildContext(args: string[], raw: string, scope: Scope, stdin?: OutputL
  * still running. It never expands the visitor's aliases: the parent may be a link or
  * `tour`, which the visitor didn't type. Two-word names resolve as typed ones do.
  */
-async function runNested(input: string, scope: Scope): Promise<void> {
+async function runNested(input: string, scope: Scope, stdin?: OutputLine[]): Promise<void> {
   const target = resolveLink(input)
   if (!target) {
     const [name = ''] = input.trim().split(/\s+/)
@@ -305,7 +310,8 @@ async function runNested(input: string, scope: Scope): Promise<void> {
   // whether the child took the keyboard, released it, or threw.
   const parentCapture = keyCapture.value
   try {
-    const result = await target.command.run(buildContext(target.args, input.trim(), scope))
+    // The parent's stdin too: `cat about.txt | strace sha256sum` hashes what came in.
+    const result = await target.command.run(buildContext(target.args, input.trim(), scope, stdin))
     if (result) scope.sink.print(toLines(result))
   } finally {
     keyCapture.value = parentCapture
@@ -355,24 +361,21 @@ function resolveChain(chain: Link[]): { links: ResolvedLink[] } | { unknown: Sta
 }
 
 /** Why a line ran nothing: which word is not a command, and what the visitor may have meant. */
-function reportUnknown(stage: Stage, first: boolean, input: string, single: boolean): void {
+function reportUnknown(stage: Stage, line: string, chain: Link[]): void {
   const locale = currentLocale()
   const [name = ''] = stage.argv
   append(fail(`${name}: ${messages.terminal.notFound[locale]}`))
+  const stages = chain.flatMap((link) => link.pipeline)
+  const before = stages[stages.indexOf(stage) - 1]
+  const previous = before ? resolveStage(before.argv) : undefined
   const hint = suggest(name)
   if (hint) {
     append({ text: `${messages.terminal.didYouMean[locale]} \`${hint}\`?`, tone: 'muted' })
-  } else if (!first) {
-    // After an operator, the likelier story is text that should have been quoted:
-    // `sign great site; love it` must not post "great site" and then fail on `love`.
-    const [command = ''] = input.trim().split(/\s+/)
-    const rest = input.trim().slice(command.length).trim()
-    const quote = rest.includes('"') ? "'" : '"'
-    append({
-      text: messages.terminal.quoteIt[locale].replace('{example}', `${command} ${quote}${rest}${quote}`),
-      tone: 'muted',
-    })
-  } else if (single && stage.raw.includes(' ')) {
+  } else if (before && previous && previous.args.length && !argsOffered(previous.command, previous.args)) {
+    // After an operator, and after a command that takes free text, the likelier story is
+    // text that wanted quoting: `sign great site; love it`. Nothing ran, so nothing posted.
+    append({ text: messages.terminal.quoteIt[locale].replace('{example}', quoteExample(line, before)), tone: 'muted' })
+  } else if (stages.length === 1 && stage.raw.includes(' ')) {
     // Nothing is within two edits of it and it has a space in it, so it reads
     // as a sentence rather than a typo. Someone who types `where does he work`
     // into a terminal has told you exactly what they want.
@@ -404,6 +407,9 @@ async function runPipeline(stages: ResolvedStage[], signal: AbortSignal): Promis
       ok = false
     }
     if (sink.failed) ok = false
+    // A stage may keep what it had on Ctrl+C rather than rethrow (`ask`); the line stops
+    // here all the same, before anything after it starts.
+    if (signal.aborted) throw Object.assign(new Error('aborted'), { name: 'AbortError' })
     stdin = 'lines' in sink ? (sink as ReturnType<typeof collector>).lines : undefined
   }
   return ok
@@ -451,28 +457,59 @@ export async function run(input: string): Promise<void> {
 
   // Aliases are rewritten before anything else looks at a stage, so resolving, the
   // two-word fallback and "did you mean …?" all reason about the command that will
-  // actually run; and the line is read again, because an alias may hold a pipe.
-  // `alias` itself is never expanded — it reads its own raw line — because it is a
-  // real command and aliases cannot shadow those.
+  // actually run; and the line is read again, because an alias may hold a pipe, and
+  // again, because what it holds may be another alias. Each stage is replaced in place,
+  // so env words and quoting stay as typed. `alias` itself is never expanded — it reads
+  // its own raw line — because it is a real command and aliases cannot shadow those.
+  let line = input
   let chain = parsed.chain
-  const expanded = chain.map((link) => ({
-    ...link,
-    pipeline: link.pipeline.map((stage) => ({ ...stage, raw: expandAliases(stage.raw, namesCommand) })),
-  }))
-  if (expanded.some((link, i) => link.pipeline.some((stage, j) => stage.raw !== chain[i]!.pipeline[j]!.raw))) {
-    const again = parseLine(joinChain(expanded))
+  for (let round = 0; round < EXPANSION_ROUNDS; round++) {
+    const next = replaceStages(line, chain, (stage) => expandAliases(stage.raw, namesCommand))
+    if (next === line) break
+    const again = parseLine(next)
     if (!again.ok) return void append(fail(again.error))
+    line = next
     chain = again.chain
   }
 
   // Every stage resolves before any runs: an unknown one runs nothing, so a line the
-  // visitor meant as text never half-runs (the guestbook never gets a truncated entry).
+  // visitor meant as text never half-runs.
   const resolved = resolveChain(chain)
   if ('unknown' in resolved) {
-    reportUnknown(resolved.unknown, resolved.first, input, chain.length === 1 && chain[0]!.pipeline.length === 1)
+    reportUnknown(resolved.unknown, line, chain)
+    return
+  }
+  // Nor does a message: text that goes to the server and shares its line with an operator
+  // must be quoted, or `sign love it; why not` would post "love it" and run `why`.
+  const unquoted = chain.length > 1 || chain[0]!.pipeline.length > 1 ? unquotedMessage(resolved.links, chain) : undefined
+  if (unquoted) {
+    append(fail(`${unquoted.name}: ${messages.terminal.quoteMessage[currentLocale()]}`))
+    append({ text: messages.terminal.quoteIt[currentLocale()].replace('{example}', quoteExample(line, unquoted.stage)), tone: 'muted' })
     return
   }
   await runChain(resolved.links)
+}
+
+/** Rounds of alias expansion a line may take; each also re-reads it, and MAX_STAGES bounds what it grows to. */
+const EXPANSION_ROUNDS = 8
+
+/** A server-bound stage whose text isn't one quoted group, in a line with an operator in it. */
+function unquotedMessage(links: ResolvedLink[], chain: Link[]): { name: string; stage: Stage } | undefined {
+  const stages = chain.flatMap((link) => link.pipeline)
+  const resolved = links.flatMap((link) => link.stages)
+  for (const [i, stage] of resolved.entries()) {
+    if (!stage.args.length || writesOf(stage.command, stage.args) !== 'server') continue
+    if (!/^(["'])[\s\S]*\1$/.test(stage.args.join(' '))) return { name: stage.command.name, stage: stages[i]! }
+  }
+  return undefined
+}
+
+/** `sign "great site; love it"`: the stage's command, then the rest of the line from its text on, quoted. */
+function quoteExample(line: string, stage: Stage): string {
+  const [command = ''] = stage.argv
+  const rest = line.slice(stage.at + command.length).trim()
+  const quote = rest.includes('"') ? "'" : '"'
+  return `${command} ${quote}${rest}${quote}`
 }
 
 /** Handles the Enter key: either answers a pending prompt or runs a command. */
@@ -504,7 +541,9 @@ const LINK_MAX = 200
  * able to reach.
  */
 export async function runLink(input: string): Promise<void> {
-  const line = Array.from(input, (c) => (c < ' ' || c === '\u007f' ? ' ' : c))
+  // Every kind of space becomes a plain one, so the words the shell checks are the
+  // words it echoes: a no-break space must not hide one command behind another.
+  const line = Array.from(input, (c) => (c < ' ' || c === '\u007f' || /\s/.test(c) ? ' ' : c))
     .join('')
     .trim()
     .slice(0, LINK_MAX)
@@ -517,7 +556,10 @@ export async function runLink(input: string): Promise<void> {
   const parsed = parseLine(line)
   const resolved = parsed.ok && parsed.chain.length ? resolveChain(parsed.chain) : undefined
   const links = resolved && 'links' in resolved ? resolved.links : undefined
-  if (!links || !links.every((link) => link.stages.every((stage) => isLinkable(stage.command, stage.args)))) {
+  // No env words from a link: `NOTICE="Your session expired…" whoami` would print the
+  // author's sentence on the prompt line, past every check on the command's arguments.
+  const plain = links?.every((link) => link.stages.every((stage) => !Object.keys(stage.env).length))
+  if (!links || !plain || !links.every((link) => link.stages.every((stage) => isLinkable(stage.command, stage.args)))) {
     // Quoted short: a refused link's text is the link author's, not the site's.
     const asked = line.length > 60 ? `${line.slice(0, 59)}…` : line
     append({

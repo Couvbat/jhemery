@@ -4,7 +4,7 @@ import { previewTheme, useTheme } from '@/composables/useTheme'
 import { findTheme } from '@/lib/themes'
 import { docUrl } from '@/lib/source'
 import { achievementList, unlockedCount } from '../achievements'
-import { blank, line, link, pre } from '../format'
+import { blank, fail, line, link, pre } from '../format'
 import { closest } from '../fuzzy'
 import { sleep } from '../timing'
 import type { Command, CommandContext, OutputLine, OutputSegment } from '../types'
@@ -164,7 +164,7 @@ export const workCommands: Command[] = [
       if (decision) return decisionLines(decision, t)
       const hint = closest(topic, decisions.map((d) => d.id))
       return [
-        line(`why: ${topic}: ${t({ en: 'no such topic', fr: 'sujet inconnu' })}`, 'error'),
+        fail(`why: ${topic}: ${t({ en: 'no such topic', fr: 'sujet inconnu' })}`),
         line(
           hint
             ? `${t({ en: 'did you mean', fr: 'vouliez-vous dire' })} \`why ${hint}\`?`

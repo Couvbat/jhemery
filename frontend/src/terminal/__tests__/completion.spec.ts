@@ -32,9 +32,8 @@ describe('completeInput', () => {
     expect(line('ls | whoam')).toBe('ls | whoami ')
     expect(line('pwd; whoam')).toBe('pwd; whoami ')
     expect(line('pwd && cat ab')).toBe('pwd && cat about.txt ')
-    // Inside a closed group an operator is text, so this is still an argument of echo;
-    // an unclosed quote is a letter, as it would be on Enter.
-    expect(line('echo "a | b" whoam')).toBe('echo "a | b" whoam')
+    // An unclosed quote is a letter, as it would be on Enter, so the `|` is an operator.
+    // (A closed group hiding one is `lastStageStart` in parse.spec.ts.)
     expect(line('echo "a | whoam')).toBe('echo "a | whoami ')
   })
 
