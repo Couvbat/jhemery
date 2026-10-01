@@ -3,14 +3,15 @@
 import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs'
 import { dirname, join, relative, resolve } from 'node:path'
 import { fileURLToPath, URL } from 'node:url'
+import ts from 'typescript'
 import { describe, expect, it } from 'vitest'
 
 /**
  * No new import cycles. A cycle is harmless until something in it runs at import time,
  * and then it fails only in the one load order nobody tried; the registry's did, during
- * an HMR reload. The walk is dependency-free: static imports and re-exports, with type-only
- * ones skipped because they are erased, and dynamic `import()` skipped because it runs
- * later.
+ * an HMR reload. The walk reads static imports, re-exports and bare side-effect imports
+ * with TypeScript's own parser (a regex lost edges across statements), skips type-only
+ * ones because they are erased, and skips dynamic `import()` because it runs later.
  *
  * The allowlist is the cycles that exist on purpose. The registry's is matched by
  * pattern, so a command module may import the registry (help, alias, and later strace,
@@ -53,18 +54,19 @@ function scriptOf(path: string): string {
 /** Runtime specifiers: `import … from`, `export … from` and bare `import '…'`, minus type-only ones. */
 function runtimeImports(code: string): string[] {
   const out: string[] = []
-  const statement = /(?:^|[\n;])\s*(import|export)\s+([\s\S]*?)\s*from\s*['"]([^'"]+)['"]|(?:^|[\n;])\s*import\s*['"]([^'"]+)['"]/g
-  for (const m of code.matchAll(statement)) {
-    if (m[4]) {
-      out.push(m[4])
-      continue
+  const file = ts.createSourceFile('x.ts', code, ts.ScriptTarget.Latest, false, ts.ScriptKind.TS)
+  for (const statement of file.statements) {
+    if (ts.isImportDeclaration(statement) && ts.isStringLiteral(statement.moduleSpecifier)) {
+      const clause = statement.importClause
+      // `import type …`, or `import { type A, type B }`, imports nothing at runtime.
+      const named = clause?.namedBindings && ts.isNamedImports(clause.namedBindings) ? clause.namedBindings.elements : undefined
+      const typeOnly = clause?.isTypeOnly || (clause && !clause.name && named?.length && named.every((e) => e.isTypeOnly))
+      if (!typeOnly) out.push(statement.moduleSpecifier.text)
+    } else if (ts.isExportDeclaration(statement) && statement.moduleSpecifier && ts.isStringLiteral(statement.moduleSpecifier)) {
+      const named = statement.exportClause && ts.isNamedExports(statement.exportClause) ? statement.exportClause.elements : undefined
+      const typeOnly = statement.isTypeOnly || (named?.length && named.every((e) => e.isTypeOnly))
+      if (!typeOnly) out.push(statement.moduleSpecifier.text)
     }
-    const clause = m[2]!
-    if (/^type\b/.test(clause)) continue
-    // `import { type A, type B } from` imports nothing at runtime.
-    const named = clause.match(/^\{([\s\S]*)\}$/)
-    if (named && named[1]!.split(',').every((part) => !part.trim() || /^type\b/.test(part.trim()))) continue
-    out.push(m[3]!)
   }
   return out
 }
@@ -127,6 +129,26 @@ for (const file of sourceFiles(SRC)) {
   graph.set(relative(SRC, file), [...new Set(edges.map((target) => relative(SRC, target)))])
 }
 const found = cycles(graph)
+
+describe('reading imports', () => {
+  it('keeps a bare side-effect import that another import follows', () => {
+    expect(runtimeImports("import './register'\nimport { x } from './x'")).toEqual(['./register', './x'])
+  })
+
+  it('keeps a runtime import that follows an exported type', () => {
+    expect(runtimeImports("export type T = number\nexport { a } from './a'")).toEqual(['./a'])
+    expect(runtimeImports("export type T = number\nimport { a } from './a'")).toEqual(['./a'])
+  })
+
+  it('drops imports that are erased, and only those', () => {
+    expect(runtimeImports("import type { A } from './a'")).toEqual([])
+    expect(runtimeImports("import { type A, type B } from './a'")).toEqual([])
+    expect(runtimeImports("import { type A, b } from './a'")).toEqual(['./a'])
+    expect(runtimeImports("export type { A } from './a'")).toEqual([])
+    expect(runtimeImports("export * from './a'")).toEqual(['./a'])
+    expect(runtimeImports("const later = () => import('./a')")).toEqual([])
+  })
+})
 
 describe('import cycles', () => {
   it('walks the source tree', () => {

@@ -634,7 +634,10 @@ describe('AskService', () => {
 
       const urls = fetchMock.mock.calls.map(([url]) => String(url));
       expect(urls.some((url) => url.includes('llms.txt'))).toBe(false);
-      expect(promptAt(0)).toContain('jhemery.xyz');
+      // The second question is the one the unset branch decides: the first is always
+      // answered from the fallback anyway, before any refresh could land.
+      expect(promptAt(1)).toContain('produces hard electronic music');
+      expect(promptAt(1)).not.toContain('# corpus');
     });
 
     it('backs off instead of re-dialling a broken host every question', async () => {

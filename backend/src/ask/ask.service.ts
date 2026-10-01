@@ -329,17 +329,18 @@ export class AskService {
     return this.corpus?.text ?? FALLBACK_CORPUS;
   }
 
+  /** `${FRONTEND_URL}/llms.txt`, or null when there is nowhere to read it from. */
+  private get corpusUrl(): string | null {
+    const base = this.config.get<string>('FRONTEND_URL')?.replace(/\/+$/, '');
+    return base ? `${base}/llms.txt` : null;
+  }
+
   /**
    * Same fetch-and-cache shape as `github.service.ts` and `steam.service.ts`,
    * but off the request path. A failure parks the fallback for `CORPUS_RETRY_MS`
    * rather than leaving the cache empty, so a wedged host is dialled once every
    * few minutes instead of once per question.
    */
-  private get corpusUrl(): string | null {
-    const base = this.config.get<string>('FRONTEND_URL')?.replace(/\/+$/, '');
-    return base ? `${base}/llms.txt` : null;
-  }
-
   private refreshCorpus(): Promise<void> {
     if (this.corpusRefresh) return this.corpusRefresh;
 
