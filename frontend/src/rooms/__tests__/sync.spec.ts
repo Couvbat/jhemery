@@ -5,7 +5,10 @@ import {
   expectedPosition,
   formatClock,
   isSeek,
+  itemLabel,
   mediaLabel,
+  mediaSource,
+  moveItem,
   normaliseCode,
   parseMedia,
   parseSoundCloud,
@@ -82,12 +85,80 @@ describe('rooms sync', () => {
       }
     })
 
-    it('is what parseMedia dispatches to, per kind', () => {
+    it('is what parseMedia dispatches to: YouTube only in watch, either in radio', () => {
       expect(parseMedia('watch', 'https://youtu.be/aqz-KE-bpKQ')).toBe('aqz-KE-bpKQ')
-      expect(parseMedia('radio', 'https://youtu.be/aqz-KE-bpKQ')).toBeNull()
+      expect(parseMedia('watch', 'https://soundcloud.com/couvbat/abysses')).toBeNull()
       expect(parseMedia('radio', 'https://soundcloud.com/couvbat/abysses')).toBe('https://soundcloud.com/couvbat/abysses')
-      expect(mediaLabel('radio', 'https://soundcloud.com/couvbat/abysses')).toBe('couvbat/abysses')
-      expect(mediaLabel('watch', 'aqz-KE-bpKQ')).toBe('aqz-KE-bpKQ')
+      expect(parseMedia('radio', 'https://youtu.be/aqz-KE-bpKQ')).toBe('aqz-KE-bpKQ')
+      expect(parseMedia('radio', 'aqz-KE-bpKQ')).toBe('aqz-KE-bpKQ')
+      expect(parseMedia('radio', 'https://vimeo.com/12345')).toBeNull()
+    })
+  })
+
+  describe('mediaSource and mediaLabel', () => {
+    it('tells the two sources apart by the item alone', () => {
+      expect(mediaSource('aqz-KE-bpKQ')).toBe('youtube')
+      expect(mediaSource('https://soundcloud.com/couvbat/abysses')).toBe('soundcloud')
+      // Every item parseMedia can produce lands on the source that parsed it.
+      expect(mediaSource(parseMedia('radio', 'https://youtu.be/aqz-KE-bpKQ')!)).toBe('youtube')
+      expect(mediaSource(parseMedia('radio', 'https://m.soundcloud.com/couvbat/sets/mon-bruit')!)).toBe('soundcloud')
+    })
+
+    it('prints a track by its path and marks a video as YouTube’s', () => {
+      expect(mediaLabel('https://soundcloud.com/couvbat/abysses')).toBe('couvbat/abysses')
+      expect(mediaLabel('aqz-KE-bpKQ')).toBe('youtube:aqz-KE-bpKQ')
+    })
+  })
+
+  describe('itemLabel', () => {
+    const track = 'https://soundcloud.com/couvbat/abysses'
+
+    it('prints the server’s title when there is one', () => {
+      expect(itemLabel('aqz-KE-bpKQ', { 'aqz-KE-bpKQ': 'Big Buck Bunny' })).toBe('Big Buck Bunny')
+      expect(itemLabel(track, { [track]: 'Abysses by couvbat' })).toBe('Abysses by couvbat')
+    })
+
+    it('falls back to mediaLabel without one, or without titles at all', () => {
+      expect(itemLabel('aqz-KE-bpKQ', { [track]: 'Abysses by couvbat' })).toBe(mediaLabel('aqz-KE-bpKQ'))
+      expect(itemLabel(track, undefined)).toBe(mediaLabel(track))
+      expect(itemLabel(track, {})).toBe('couvbat/abysses')
+      expect(itemLabel(track, { [track]: '' })).toBe('couvbat/abysses')
+    })
+
+    it('never answers from the prototype: `constructor` is a valid video id', () => {
+      expect(itemLabel('constructor', {})).toBe('youtube:constructor')
+      expect(itemLabel('constructor', JSON.parse('{"__proto__": {"constructor": "x"}}'))).toBe('youtube:constructor')
+      expect(itemLabel('constructor', { constructor: 'A real title' } as Record<string, string>)).toBe('A real title')
+    })
+  })
+
+  describe('moveItem', () => {
+    const queue = ['a', 'b', 'c', 'd'] as const
+
+    it('moves one item up or down and leaves the rest in order', () => {
+      expect(moveItem(queue, 2, 1)).toEqual(['a', 'c', 'b', 'd'])
+      expect(moveItem(queue, 0, 1)).toEqual(['b', 'a', 'c', 'd'])
+      expect(moveItem(queue, 3, 0)).toEqual(['d', 'a', 'b', 'c'])
+      expect(moveItem(queue, 1, 3)).toEqual(['a', 'c', 'd', 'b'])
+    })
+
+    it('returns a new array and never touches the one it was given', () => {
+      const list = ['a', 'b']
+      const moved = moveItem(list, 0, 1)
+      expect(moved).not.toBe(list)
+      expect(list).toEqual(['a', 'b'])
+      expect(moveItem(list, 1, 1)).toEqual(['a', 'b'])
+    })
+
+    it('moves nothing when either index is off the end', () => {
+      expect(moveItem(queue, 0, -1)).toEqual([...queue])
+      expect(moveItem(queue, 3, 4)).toEqual([...queue])
+      expect(moveItem(queue, 7, 0)).toEqual([...queue])
+      expect(moveItem([], 0, 0)).toEqual([])
+    })
+
+    it('keeps duplicates apart, moving only the one at the index', () => {
+      expect(moveItem(['x', 'y', 'x'], 2, 1)).toEqual(['x', 'x', 'y'])
     })
   })
 
@@ -140,11 +211,22 @@ describe('rooms sync', () => {
     })
 
     it('embeds the widget with the shop closed', () => {
-      const url = new URL(soundcloudEmbed('https://soundcloud.com/couvbat/abysses'))
+      const url = new URL(soundcloudEmbed('https://soundcloud.com/couvbat/abysses', '#fe8019'))
       expect(url.origin).toBe('https://w.soundcloud.com')
       expect(url.searchParams.get('url')).toBe('https://soundcloud.com/couvbat/abysses')
       expect(url.searchParams.get('buying')).toBe('false')
       expect(url.searchParams.get('sharing')).toBe('false')
+    })
+
+    // The scheme's colour, never whatever string the property held, and one `auto_play`.
+    it('draws it in the scheme, falls back on anything but hex, and asks to play once', () => {
+      const track = 'https://soundcloud.com/couvbat/abysses'
+      expect(new URL(soundcloudEmbed(track, ' #FE8019 ')).searchParams.get('color')).toBe('#fe8019')
+      for (const odd of ['oklch(0.85 0.3 145)', 'red', '', '#fe80', '#fe8019&auto_play=true']) {
+        expect(new URL(soundcloudEmbed(track, odd)).searchParams.get('color'), odd).toBe('#00ff41')
+      }
+      expect(new URL(soundcloudEmbed(track, '#fe8019', true)).searchParams.getAll('auto_play')).toEqual(['true'])
+      expect(new URL(soundcloudEmbed(track, '#fe8019')).searchParams.getAll('auto_play')).toEqual(['false'])
     })
   })
 

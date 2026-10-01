@@ -85,14 +85,15 @@ export function parseColour(input: string): RGB | null {
     case 'rgba': {
       const channel = (t: string) => clamp(Math.round(num(t, 255)), 0, 255)
       const rgb = { r: channel(x), g: channel(y), b: channel(z), a }
-      return [rgb.r, rgb.g, rgb.b].some(Number.isNaN) ? null : rgb
+      return [rgb.r, rgb.g, rgb.b].every(Number.isFinite) ? rgb : null
     }
     case 'hsl':
     case 'hsla': {
       const h = num(x)
       const s = num(y)
       const l = num(z)
-      if ([h, s, l].some(Number.isNaN)) return null
+      // Finite, not just a number: `1e999` reads as Infinity and would paint NaN.
+      if (![h, s, l].every(Number.isFinite)) return null
       return { ...hslToRgb({ h, s: clamp(s, 0, 1), l: clamp(l, 0, 1) }), a }
     }
     case 'oklch': {
@@ -100,7 +101,7 @@ export function parseColour(input: string): RGB | null {
       // Chroma percentages are relative to 0.4, per the spec.
       const c = num(y, 0.4)
       const h = num(z)
-      if ([l, c, h].some(Number.isNaN)) return null
+      if (![l, c, h].every(Number.isFinite)) return null
       return { ...oklchToRgb({ l: clamp(l, 0, 1), c: Math.max(0, c), h }).rgb, a }
     }
   }

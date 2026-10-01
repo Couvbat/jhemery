@@ -57,17 +57,21 @@ tools, watch-party and radio rooms, and 38 hidden achievements. English and Fren
   visitor over a room code. The word games use real bilingual word lists.
 - 🧰 **In-browser tools at `/tools`.** Image conversion, hashing, encoding, JSON, colour, time,
   passwords, text stats, a JWT decoder, a regex tester, a cron explainer, a QR encoder written from
-  the standard, a text diff and an `ffmpeg.wasm` converter. Your files are never uploaded.
-- 📺 **Watch party and radio rooms.** YouTube or SoundCloud stays in sync across everyone in a
-  five-character room, over SSE.
+  the standard, a text diff, a TB-303-style acid sequencer and an `ffmpeg.wasm` converter. Your
+  files are never uploaded.
+- 📺 **Watch party and radio rooms.** A YouTube video, or a radio queue that mixes SoundCloud
+  tracks and YouTube videos, stays in sync across everyone in a five-character room, over SSE.
 - 🏆 **38 achievements** for finding the hidden layer, each announced with a burst of monospace
   confetti — and a capture-the-flag chain, eight stages deep, for whoever keeps pulling threads.
 - 🌐 **Live data** from Steam, GitHub, CI runs, the weather and crypto prices, plus live presence,
   a guestbook and a self-hosted LLM behind `ask`. Every integration degrades gracefully when it's
   switched off.
-- 🔒 **Privacy by construction.** Presence is one anonymous integer, stats count sessions rather
-  than commands, `ask` logs nothing, analytics are self-hosted and cookieless.
-- 📄 **One source for the CV.** `curl jhemery.xyz` returns an ANSI-coloured résumé, and
+- 🔒 **Privacy by construction.** Presence is one anonymous integer (and `wall`'s wave carries
+  nothing at all), stats count sessions rather than commands, `ask` logs nothing, analytics are
+  self-hosted and cookieless. `strace <cmd>` shows every request a command makes and the shape of
+  what it carries, never a value.
+- 📄 **One source for the CV.** `curl jhemery.xyz` returns an ANSI-coloured résumé (and
+  `curl jhemery.xyz/help` the shell's other pages), and
   `/resume.html` a printable one in either language, both generated at build time from the same
   content the page renders. So is `content.json`, which a read-only MCP endpoint serves to agents.
   Experience and education are dated, never typed as durations: every résumé works out "3 years"
@@ -129,28 +133,29 @@ Each app has its own README for working on its code:
 | — screensaver | After three idle minutes with the tab visible, the page fades and the field has the screen to itself; any key or pointer movement brings the page back, and the waking key does nothing else. It never starts during a game or while a room is playing. |
 | — weather mood | The real weather nudges it: a storm speeds the wireframes up, fog dims them, snow slows them and night dims them a little more. These are small multipliers on the section palette, never a replacement for it. |
 | — view swing | Changing page rotates the wireframe field about its centre while the camera pulls back and every shape moves to a new position. The rotation runs on a `THREE.Group`, not the camera, and is folded back into the positions at the end so the gravity maths stays correct. |
-| — performance | The component is `defineAsyncComponent`'d and only loaded on `requestIdleCallback`, so ~520 kB of three.js never competes with first paint. It is excluded from the PWA precache for the same reason. |
-| — accessibility | `prefers-reduced-motion` skips loading it entirely. WebGL failures are caught and leave the canvas blank. Geometries, materials and the renderer are disposed on unmount. |
+| — performance | The component is `defineAsyncComponent`'d and only loaded on `requestIdleCallback`, so ~520 kB of three.js never competes with first paint. It is excluded from the PWA precache for the same reason. The loop runs on elapsed time rather than counting frames, so a 120 Hz screen no longer spins it twice as fast, and it draws at most 60 frames a second, 30 while the terminal is open. |
+| — accessibility | It isn't loaded while motion is paused, which `prefers-reduced-motion` forces; pausing later stops the loop and leaves one still frame. WebGL failures are caught and leave the canvas blank. Geometries, materials and the renderer are disposed on unmount. |
 | **Sections** | about · projects · music · gaming · hardware · contact. They are defined once in `src/content/sections.ts` and read by the navbar, the terminal's `ls`/`cd`/`pwd`, the command palette and every section header. |
 | **Views** | home · tools · watch · radio. These are the routes, defined once in `src/content/views.ts` in the order they sit on the prism. The navbar, `cd` and <kbd>Ctrl</kbd>+<kbd>K</kbd> all navigate through the same `goTo()`, which goes home first when you ask for a section from another page. |
-| **Prism swing** | Changing view turns the page like a face of a prism whose axis runs through the centre of the three.js scene. The old page rotates out and the new one rotates in from the same side, in 3D CSS on a fixed, clipped stage, over 650 ms. The navbar and launcher stay put. Going back turns the other way. Under `prefers-reduced-motion` the pages simply swap. It works without three.js loaded. |
+| **Prism swing** | Changing view turns the page like a face of a prism whose axis runs through the centre of the three.js scene. The old page rotates out and the new one rotates in from the same side, in 3D CSS on a fixed, clipped stage, over 650 ms. The navbar and launcher stay put. Going back turns the other way. It only turns at full motion: under *calm*, *paused* or `prefers-reduced-motion` the pages simply swap. It works without three.js loaded. Once it has settled, focus moves to the new page's heading (or, from a link with a section in it, that section's) and one status line announces the page, unless you're typing in the terminal or the palette; the page turning away is `inert` for the whole turn. A *Skip to content* link is the first thing <kbd>Tab</kbd> reaches. |
+| **Motion control** | *full · calm · paused*, in the 🎨 menu and as `motion`, saved in `localStorage` and applied before the app mounts. *calm* slows the wireframes to a third of their speed at 30 fps, stops them following the pointer, and drops the swing, the confetti, the glitch, the flashbang and the theme circle; prompt hints, the tagline and the animations of commands you type stay. *paused* stops everything, and the three.js chunk isn't fetched at all. Your system's reduced-motion setting is a floor this can't lift: it holds the page at *paused*, and the menu says so. The games ignore it, since their stepped mode changes the rules. |
 | **CRT overdrive** | `crt` in the terminal, or the Konami code anywhere on the page, toggles scanlines and flicker, and speeds up the wireframes. The setting is saved in `localStorage`. |
-| **Colour schemes** | `theme` lists eleven schemes with a swatch strip each, and `theme <name>` (or `theme random`) applies one: the site's own *cyberpunk* default, plus Gruvbox (dark and light), Nord, Dracula, Catppuccin (Mocha and Latte), Tokyo Night, Rosé Pine, Everforest and Solarized. A scheme is a table of a dozen colours in `src/lib/themes.ts`, and every CSS token is derived from it. That means the glows, the three.js wireframes, the confetti and `neofetch`'s colour strip all follow along. Going back to the default removes every override, so the stylesheet stays the default's only definition. Switching from a dark scheme to a light one whites the screen out for a moment (skipped under reduced motion). The choice is saved in `localStorage` and applied before the app mounts. Muted and body text are lifted to 4.5:1 on every surface by one rule, and a unit test holds every scheme to the same WCAG floors. The 🎨 button in the navbar opens the same list as a menu, drawing each scheme's strip on its own background. It's the only way to switch on a phone, which has no terminal. It stays open while you pick, so the page behind it is the preview. |
-| **Boot sequence** | A fake `couvsh 1.0` kernel log plays on your first visit. `reboot` replays it on demand, and `ssh` ends by triggering it. Skipped under reduced motion. |
+| **Colour schemes** | `theme` lists eleven schemes with a swatch strip each, and `theme <name>` (or `theme random`) applies one: the site's own *cyberpunk* default, plus Gruvbox (dark and light), Nord, Dracula, Catppuccin (Mocha and Latte), Tokyo Night, Rosé Pine, Everforest and Solarized. A scheme is a table of a dozen colours in `src/lib/themes.ts`, and every CSS token is derived from it. That means the glows, the three.js wireframes, the confetti, the matrix rain, the SoundCloud players, the CRT fringe, every window's title-bar dots and `neofetch`'s colour strip all follow along. Going back to the default removes every override, so the stylesheet stays the default's only definition. A switch spreads the new scheme in a circle from where you picked it (`document.startViewTransition`, 450 ms; the terminal's start from the middle) while the wireframes ease to their new colours, except from a dark scheme to a light one, which whites the screen out for a moment instead. Both only at full motion: otherwise the page simply repaints. The choice is saved in `localStorage` and applied before the app mounts. Muted and body text are lifted to 4.5:1 on every surface by one rule, and a unit test holds every scheme to the same WCAG floors. The 🎨 button in the navbar opens the same list as a menu, drawing each scheme's strip on its own background. It's the only way to switch on a phone, which has no terminal. It stays open while you pick, so the page behind it is the preview. **Forge your own**: `theme forge #d65d0e` (add `light` for a light one, or use *make one…* in the menu) grows a twelve-colour scheme in OKLCH around that colour and steps each tone's lightness until it passes the same floors, warning about any it can't. It becomes the one `custom` scheme, saved as its finished colours and restored before mount. `theme export alacritty`, `kitty` or `base16` prints the scheme on screen as a config for a real terminal. |
+| **Boot sequence** | A fake `couvsh 1.0` kernel log plays on your first visit. `reboot` replays it on demand, and `ssh` ends by triggering it. Skipped with motion paused (reduced motion forces that). |
 | **Status ticker** | The footer shows the uptime `neofetch` reports (days since the first commit), how long ago this build shipped, and whether I'm open to work. It refreshes slowly, so a tab left open stays accurate. |
 | **Skills with evidence** | Under the skill badges, `skills --why` links each claim to where it's actually used: SSE to the presence stream and the watch parties, WebAssembly to the ffmpeg tool, GraphQL to the heatmap. Skills with nothing to show stay plain badges. |
 | **`/now`** | What I'm doing at the moment, dated. Past 90 days old, the page says how old it is instead of passing for current. It's also `cat now.txt`, and it's a route outside the prism so the navbar stays at four faces. |
 | **Printable résumé** | `/resume.html` and `/resume.fr.html`: static, script-free, with a print stylesheet, so "Save as PDF" gives a clean CV. Linked from the contact section and `resume`. |
 | **Case studies** | `/work/<part>`: eight parts of this site, from the vim pane and the QR encoder to the rooms and the word lists. Each has what was hard, its numbers, the code at the build's commit and its design, and most have a *try it* link and the `why` behind them. They're linked from a "How this site is built" grid in the projects section, and say the same as `projects <part>`. A test holds every number to the line of code it comes from, or marks it as measured. |
 | **Design notes** | [`/notes/`](https://jhemery.xyz/notes/): the design specs in `docs/superpowers/specs`, published as static, script-free pages by a small hand-written markdown renderer. Each one says which language it is in (one is French). `why` links into them. |
-| **Live presence** | The footer also shows how many people are on the site right now, over SSE. It's a single count and nothing else (see [the API](#the-api)). |
+| **Live presence** | The footer also shows how many people are on the site right now, over SSE. It's a single count and nothing else (see [the API](#the-api)). `who` draws the same count as anonymous ttys, and `wall` sends everyone else a wave with no content: their wireframes ripple outward and an open terminal says *Broadcast message from somebody@jhemery.xyz*. The stream starts with the footer on the home page, or when `who` or `wall` asks for it. |
 | **Live cards** | Steam "currently playing", recent GitHub commits, the latest CI runs, a contribution heatmap and pinned repos, a SoundCloud player and the guestbook. |
 | **Guestbook ticker** | A 20 s poll (not SSE; see [the spec](docs/features-spec.md#8-backend-additions)) shows a floating notice when someone signs while you're on the page. Clicking it opens `guestbook`. It pauses while the tab is hidden and stops if the guestbook is off. |
 | **Command palette** | <kbd>Ctrl</kbd>/<kbd>⌘</kbd>+<kbd>K</kbd> opens a fuzzy list of views, sections and palette-flagged commands. It's keyboard-navigable and keeps the selection in view. |
 | **Matrix rain** | `matrix` follows the white rabbit. The effect component is lazy-loaded on demand. |
 | **i18n** | English and French. The language comes from `navigator.language` and can be changed with the navbar toggle or `lang en\|fr`. It's saved in `localStorage`. All content and every terminal string is `Localised<T>`. |
 | **PWA** | Installable, with an `autoUpdate` service worker, maskable icons and an offline navigation fallback. |
-| **`curl jhemery.xyz`** | A Vite plugin generates an ANSI-coloured `resume.txt` from `src/content` at build time, so the résumé has exactly one source. LLM crawlers get the same file. |
+| **`curl jhemery.xyz`** | A Vite plugin generates an ANSI-coloured `resume.txt` from `src/content` at build time, so the résumé has exactly one source. LLM crawlers get the same file, and so does the terminal's own `curl`, which fetches it for real and turns its colours into the scheme's. `curl jhemery.xyz/help` lists the other pages a real terminal can read, one per command (`/neofetch`, `/skills`, `/why`…), in English or, with `Accept-Language: fr`, French. `/jules.1` and `/jules.fr.1` are the person as a roff manual page. |
 
 ## The terminal
 
@@ -160,21 +165,27 @@ work badly with mobile virtual keyboards, and the page itself shows the same con
 
 | Key | Does |
 |---|---|
-| <kbd>Tab</kbd> | Completes to the longest common prefix. First commands and your own aliases, then their arguments: filenames for `cat`/`vim`/`diff`, sections and pages for `cd`/`ping`, tool names, scheme names for `theme`, `on`/`off` for the background toggles |
-| <kbd>↑</kbd> / <kbd>↓</kbd> | Command history (saved between visits) |
+| `\|` `;` `&&` `\|\|` | Pipes and chains: `fortune \| cowsay`, `history \| grep theme`, `cat about.txt \| sha256sum`, `projects --json \| jq .`, `cat nope && pwd`. A stage keeps its colours across a pipe. Quote text that holds an operator (`sign "great site; love it"`): an apostrophe inside a word is a letter, so `c'est` needs nothing. `LANG=fr neofetch` runs one command in French |
+| <kbd>Tab</kbd> | Completes to the longest common prefix. First commands and your own aliases, then their arguments: filenames for `cat`/`vim`/`diff`, sections and pages for `cd`/`ping`, tool names, scheme names for `theme`, the three settings for `motion`, `on`/`off` for the background toggles |
+| <kbd>↑</kbd> / <kbd>↓</kbd> | Command history (saved between visits). With text in the input, ↑ walks only the lines that start with it |
+| <kbd>Ctrl</kbd>+<kbd>R</kbd> | Reverse search through history: type to narrow, <kbd>Ctrl</kbd>+<kbd>R</kbd> again for an older match, Enter to run it, Esc, → or Tab to edit it, <kbd>Ctrl</kbd>+<kbd>C</kbd> to give up. Cmd+R still reloads |
+| <kbd>→</kbd> / <kbd>End</kbd> | Takes the faded suggestion after the caret, which only ever comes from your own history |
+| `!!` `!$` `!N` `^a^b` | The last line, its last word, line N of `history`, and the last line with `a` replaced by `b`. The expansion is shown before it runs, and one that would change something is put in history for ↑ and Enter instead. A line with `sign`, `mail` or `ask` in it is never expanded, so `sign Great site!!` posts what you typed, and `:q!` is just `:q!` |
+| `--help` | As the first argument, any command's usage and flags: `ls --help` |
+| `-`<kbd>Tab</kbd> | Completes a flag, listing what each does when several are left: `grep -`<kbd>Tab</kbd> |
 | <kbd>Ctrl</kbd>+<kbd>L</kbd> | Clear |
 | <kbd>Ctrl</kbd>+<kbd>C</kbd> | Cancel a running command |
 | <kbd>Esc</kbd> | Close the overlay (focus goes back where it was) |
 | traffic lights | The title-bar dots really do close, minimise and maximise |
 
 An empty prompt suggests a command in faded text (`try: neofetch`), cycling every few seconds
-until you type anything, and then not again that session. Under reduced motion it shows one.
+until you type anything, and then not again that session. With motion paused it shows one.
 
 **Links that run a command.** `https://jhemery.xyz/?run=neofetch` opens the shell and runs
 `neofetch` once (`?run=tour` is the one to put in a bio), then drops the parameter from the URL. A command has to opt in (`linkable`), and
 even then a link only runs it if, with those arguments, it writes nothing and isn't hidden. Every
 command declares what it writes (`none`, `local` or `server`), so `?run=theme dracula`,
-`?run=sign hi`, `?run=help vim` and `?run=ls -a` are all refused. A link's arguments must be ones
+`?run=sign hi`, `?run=help vim`, `?run=ls -a` and `?run=acid` are all refused. A link's arguments must be ones
 the command offers for Tab (`?run=wordle daily`, `?run=projects --json`), so a link can't put
 free text on the screen as if you'd typed it. A refused link says what it asked for. It ignores your own aliases, and on a phone
 the parameter is simply ignored.
@@ -194,22 +205,29 @@ never show two different contents.
 ## Commands
 
 <details>
-<summary><b>shell</b>: help, clear, history, echo, lang, theme, sha256sum, base64, jq, exit…</summary>
+<summary><b>shell</b>: help, clear, history, echo, lang, theme, motion, sha256sum, base64, jq, exit…</summary>
 
 | Command | Aliases | Usage |
 |---|---|---|
-| `help` | `?`, `man` | `help [command] [--all]`: list commands, or explain one |
+| `help` | `?` | `help [command] [--all]`: list commands, or explain one |
+| `man` | | `man [section] <page>`: a command's manual page, in a `less`-style pager (space and `b` to turn, `/` to search, `q` to quit). Every command has one; section 6 is the games and the rest of the fun. `man jules` is the person, and `curl -s jhemery.xyz/jules.1 \| man -l -` reads the same page in a real `man` |
 | `clear` | `cls` | Clear the screen |
 | `history` | | Show command history |
 | `echo` | | `echo <text>` |
 | `date` | | Current date |
 | `whoami` | | Print the current user |
 | `lang` | | `lang [en\|fr]`: show or switch language |
-| `theme` | `colorscheme` | `theme [name\|random]`: list the colour schemes, or switch to one |
+| `theme` | `colorscheme` | `theme [name\|random]`: list the colour schemes, or switch to one. `theme forge <colour> [light]` grows one of your own from a colour, and `theme export <alacritty\|kitty\|base16>` prints the scheme on screen as a terminal config |
+| `motion` | | `motion [full\|calm\|paused]`: show or set how much the page moves. Never runs from a link |
 | `sha256sum` | `sha1sum`, `sha512sum` | `sha256sum <file\|text>`: the digest of a file in the fake filesystem, or of some text, as the hash tool computes it |
 | `base64` | | `base64 [-d] <file\|text>`: encode or decode, as the encode tool does |
 | `uuidgen` | | A random v4 UUID |
 | `jq` | | `jq . <json>`: pretty-print, pointing at the error when it isn't JSON |
+| `grep` | | `grep [-i -v -n -c] <text> [file]`: the lines containing some text, matched literally |
+| `head` · `tail` | | `head [-n N \| -N] [file]`: the first (or last) ten lines, or N |
+| `wc` | | `wc [-l -w -c] [file]`: lines, words and bytes |
+| `sort` · `uniq` | | `sort [-r -n -u]`, `uniq [-c]`: sort lines; fold neighbouring repeats |
+| `strace` | | `strace <command>`: run a command and list the requests it made (`GET /weather = 200 · 1.10 kB · 84 ms`), with the keys of each body and never their values. `strace ls` prints just what `ls` does |
 | `exit` | `quit`, `logout` | Close the terminal |
 
 </details>
@@ -244,14 +262,14 @@ never show two different contents.
 | `contact` | `links` | How to reach me |
 | `neofetch` | `fetch` | System summary with an ASCII logo, an "uptime" counted from the first commit and whether I'm open to work |
 | `resume` | `cv` | Condensed résumé (experience, education, stack, links), with a link to the printable one |
-| `curl` | | `curl jhemery.xyz` fetches the résumé the way a real curl would |
+| `curl` | | `curl [-I] jhemery.xyz[/path]`: a real request to this site. The bare host is `resume.txt`, coloured, with the hidden parts left hidden; `-I` prints the real response headers. Any other host can't be resolved from a browser tab |
 | `why` | | `why <topic>`: what the site chose, what it turned down and why, the PR, and a link to the design note. `why` alone lists the fifteen topics (`why mcp-sdk`, `why polling`, `why battleship`…) |
 | `tour` | | A one-minute walk through the site: `neofetch`, a colour scheme shown for a moment and put back, the games, the `curl` hint, and how many achievements you've found. `?run=tour` is the link to share |
 
 </details>
 
 <details>
-<summary><b>live data</b>: steam, gitlog, weather, btc, guestbook, mail, ask, systemctl</summary>
+<summary><b>live data</b>: steam, gitlog, weather, btc, guestbook, mail, ask, systemctl, who, wall</summary>
 
 | Command | Aliases | Does |
 |---|---|---|
@@ -264,18 +282,24 @@ never show two different contents.
 | `mail` | `sendmail`, `write` | Send me a message without leaving the terminal |
 | `ask` | | `ask <question>` streams an answer from a self-hosted LLM |
 | `systemctl` | | `systemctl status [unit]`: what the API is running, one unit per module, from `GET /health`. With the API down every unit reads `unknown` |
+| `who` | | Everyone on the site right now, as anonymous ttys: `you pts/0`, then `somebody pts/N` for each other visitor, twelve at most and then "… and N more" |
+| `wall` | | Wave at everyone else on the site. It carries no message (any you type are dropped, and it says so), never runs from a link, and says so when the server has broadcasts switched off |
 
 </details>
 
 <details>
-<summary><b>misc</b>: games, achievements, play, background control</summary>
+<summary><b>misc</b>: games, achievements, play, acid, background control</summary>
 
 - **Games:** `games` (`arcade`), `2048`, `snake`, `minesweeper` (`mines`), `tetris`, `wordle`
   (`motus`), `hangman` (`pendu`), `wpm` (`typing`), `connect4` (`c4`, `puissance4`). See
   [Games](#games).
 - **Progress:** `achievements` (`trophies`) prints the same list as the trophy modal. `ctf`
   (`flags`) is the capture-the-flag board: solved stages, and a hint for the one you're on.
-- **Music:** `play` scrolls to the music section and starts the player.
+- **Music:** `play` scrolls to the music section and starts the player. `acid [<code>]` plays a
+  pattern from the [acid sequencer](#tools) in the buffer, with a playhead: the tool's own, or the
+  one a code from its *copy link* holds. `q`, <kbd>Esc</kbd> or <kbd>Ctrl</kbd>+<kbd>C</kbd> stop
+  it, and so do a hidden tab, closing the terminal and two minutes. **Never from a link:**
+  `?run=acid` is refused, because a link that starts sound is hostile.
 - **Background control:** `spawn [n]`, `gravity [on|off]`, `constellation [on|off]` (`stars`) and
   `scene [reset]`.
 
@@ -328,7 +352,7 @@ to its panel, with its own tests.
 
 | Tool | Does |
 |---|---|
-| **`image`** | Converts between PNG, JPEG and WebP, resizes to a maximum width, and sets the quality. Re-encoding through a canvas drops EXIF, GPS and colour-profile data by construction. When a browser can't write the requested format (Safari and WebP), the tool says so and names the file after the format it actually produced. |
+| **`image`** | Converts between PNG, JPEG and WebP, resizes to a maximum width, and sets the quality. First it lists what the file gives away: camera, serial number, lens, software, timestamps, artist, and GPS as decimal degrees ("this says where you stood"), read by its own parser of JPEG, PNG and WebP metadata, from the whole file up to 64 MB. HEIC, AVIF and GIF are reported as unreadable, never as clean. A photo is turned upright from its Orientation tag before encoding. Then the tool reads its own output back with the same parser and shows "0 fields — verified", or how many fields survived and which. Chromium's JPEG and WebP encoders write an sRGB colour profile of their own, which counts as one; its PNG carries none. When a browser can't write the requested format (Safari and WebP), the tool says so and names the file after the format it actually produced. |
 | **`hash`** | SHA-1, SHA-256 and SHA-512 of some text or a dropped file, in hex or base64, using Web Crypto. |
 | **`encode`** | Base64 (UTF-8 safe, accepts the URL-safe alphabet and missing padding), URL encoding and hex, in both directions. Malformed input is reported rather than guessed at. |
 | **`json`** | Pretty-prints with 2, 4 or tab indentation, or minifies. Invalid JSON is reported with its line and column and a caret under the offending character. It uses its own scanner, because `JSON.parse`'s messages no longer include a position. |
@@ -341,6 +365,7 @@ to its panel, with its own tests.
 | **`cron`** | A five-field expression (ranges, steps, lists, month and weekday names, `@hourly`-style macros) as a sentence in either language, and its next five runs in your time zone. Vixie rules: 0 and 7 are both Sunday, and when both day fields are set either one matches. |
 | **`qr`** | Text or a URL as a QR code, downloadable as PNG or SVG. The encoder is written from ISO/IEC 18004 — byte mode, versions 1–40, all four error-correction levels, penalty-chosen mask — and tested against the standard's worked examples and a reference encoder, module for module. |
 | **`diff`** | Two texts and a unified diff, from the same `terminal/diff.ts` the `diff` command uses. |
+| **`acid`** | A 16-step TB-303-style bassline in plain Web Audio: saw or square into a resonant low-pass (capped at 18 dB, short of self-oscillation), a `tanh` drive, accent and slide per step, 60 to 300 bpm, and *randomise in phrygian*. One oscillator is scheduled against the audio clock, 120 ms ahead, through a master at −12 dB and a limiter. The link is the save file: the whole pattern packs into 27 bytes behind a version byte, in `?p=`, and a code that has been tampered with is clamped or refused rather than trusted. Nothing sounds until you press play, and it stops when the tab goes to the background. `acid <code>` plays the same pattern in the terminal. |
 | **`ffmpeg`** | The one tool with a dependency: ffmpeg compiled to WebAssembly. Converts to mp3, m4a, ogg, wav or flac, extracts the audio stream without re-encoding, re-encodes video to H.264 mp4, makes palette-optimised GIFs, and trims any of these. The 32 MB core is only downloaded when you press the button, from this site's own `/assets/`, and then stays in the browser cache. Input is read in place from disk, so multi-gigabyte files work. It's single-threaded, so video is slow, but audio isn't. |
 | **`download`** | The owner's tool, and the only one with a server behind it. yt-dlp on the server turns one YouTube video or one SoundCloud track into an mp3. It runs as a *job* that the page polls, and the file is handed over once and then deleted. The tool stays hidden until `sudo -i` (or the panel's own field) unlocks it with the admin password. It never accepts a playlist, set or profile: fetching a whole profile is what got the server's IP blocked for an hour. See [deploy.md](docs/deploy.md#what-the-shell-can-run--facts-for-the-downloader). |
 
@@ -348,9 +373,15 @@ The page, the `tools` command and Tab completion all read `src/tools/registry.ts
 means adding one object there, plus the tool's folder.
 
 **Rooms.** `/watch` and `/radio` are the third and fourth faces of the prism. A room is a
-five-character code. The host pastes a YouTube link (watch) or queues SoundCloud tracks and sets
-(radio), and every guest's player follows the host's play, pause and seeks to within two seconds,
-correcting for drift against the server's clock. Both embeds are controlled over `postMessage`, so
+five-character code. The host pastes a YouTube link (watch) or queues SoundCloud tracks, sets and
+YouTube videos in any mix (radio), and every guest's player follows the host's play, pause and seeks to within two seconds,
+correcting for drift against the server's clock. An *up next* sidebar, beside the player on a wide
+screen and under it on a phone, shows what is playing and the numbered queue, by title where the
+server found one: the host skips, reorders and removes from it with buttons, and guests only read
+it. The player is chosen per item,
+so a radio hands over from the SoundCloud widget to YouTube and back as the queue moves on. A
+video in a radio plays in a small player, at least 200 pixels each way, because YouTube's terms
+don't allow hiding it to keep the sound. Both embeds are controlled over `postMessage`, so
 no YouTube or SoundCloud script runs on the page, and the CSP only needs one extra `frame-src`.
 Rooms are off unless the API sets `ROOMS_ENABLED`.
 
@@ -359,7 +390,7 @@ Rooms are off unless the API sets `ROOMS_ENABLED`.
 There are 38 achievements, tracked in `localStorage` (`couvbat:achievements`, plus
 `couvbat:achievements:sections` for the exploration one and `couvbat:achievements:themes` for the
 colour-scheme one). Unlocking one shows a floating toast with a burst of monospace-glyph confetti
-(skipped under `prefers-reduced-motion`) and prints a line in the terminal. The trophy button in
+(only at full motion) and prints a line in the terminal. The trophy button in
 the navbar opens a modal listing all 38: locked ones show `???` and a vague hint, and unlocked
 ones show their title and how you got them. `achievements` (`trophies`) prints the same progress
 in the terminal.
@@ -431,7 +462,8 @@ uses the front of `X-Forwarded-For`, which any client can write.
 | `GET /github/workflow-status` | The four most recent Actions runs for `GITHUB_REPO`. Uses the public REST API, so the token is optional. Cached for only 60 s, because a build in progress is the one case where a stale answer is wrong. |
 | `GET /weather` | Current conditions and a short forecast from Open-Meteo (no key, no account). The coordinates are **mine**, from server config. Nothing about the visitor is read or sent, so everyone gets the same answer and one 10-minute cache serves them all. |
 | `GET /markets` | Crypto quotes and a 7-day series from CoinGecko (no key, no account). It's a proxy only because CORS blocks the browser from calling CoinGecko directly. The coin list is server config, so no visitor data is forwarded. Cached for 5 min. |
-| `GET /presence` | Server-sent events giving how many people are on the site right now. It's one integer, pushed as visitors arrive and leave. No visitor ID is sent or assigned, and nothing is stored. |
+| `GET /presence` | Server-sent events giving how many people are on the site right now. It's one integer, pushed as visitors arrive and leave. No visitor ID is sent or assigned, and nothing is stored. With `wall` on, the same stream also carries a named `wave` event whose data is `{}`. |
+| `POST /presence/wall` | `wall`'s wave to every connection, coalesced to one every 15 s across the site. Takes `application/json` only (415 otherwise), so other sites can't send it unseen. Always a bare 204 when enabled, so it says nothing about anyone else; `{ configured: false }` when not. 2 per 10 min per IP. **Off by default** (`WALL_ENABLED`). |
 | `GET /stats` · `POST /stats/session` | A single running total of terminal sessions. Counted once when you open the shell, never per command, so the server never learns which commands anyone runs. 5/hour per IP. |
 | `GET /stats/wordle` · `POST /stats/wordle` | The daily wordle's distribution: seven counts per day and language (solved in 1–6, or not), today and yesterday (UTC) only, two weeks kept. A report is `{ day, locale, guesses }` and nothing else. 5/hour per IP. |
 | `GET /health` | One line per module for `systemctl status`: active or inactive and why, how old its cache is, a count it already keeps. Each module reads only what it already holds, so this never calls Steam, GitHub or the model on anyone's behalf. |
@@ -439,8 +471,8 @@ uses the front of `X-Forwarded-For`, which any client can write.
 | `GET /guestbook` · `POST /guestbook` | Read and sign. Sanitised, link-filtered, 1/min per IP, capped at 500 entries. Stored in a JSON file under `DATA_DIR`, or in MongoDB if `MONGODB_URI` is set. **Off by default.** |
 | `DELETE /guestbook/:id` | Moderation. Requires the `x-admin-password` header. |
 | `GET /rooms` · `POST /rooms` | Whether rooms are enabled, and creating a watch, radio or connect4 room. Creating one returns a five-character code and a host token that is never sent again. 10 rooms/hour per IP, 200 rooms at most, all in memory. **Off by default.** |
-| `GET /rooms/:code` · `GET /rooms/:code/events` | A room's snapshot, and the SSE stream every member keeps open: the host's playback state tied to the server clock, the queue, and a head count. As with `/presence`, it's a number, never a list of who's there. |
-| `POST /rooms/:code/state` · `DELETE /rooms/:code` | Changing the room's state and closing it, host only (`x-room-token`). What a host can load is allowlisted on the server: an eleven-character YouTube ID or an https soundcloud.com URL. Nothing else can reach a guest's iframe. 120 state changes/min per IP. |
+| `GET /rooms/:code` · `GET /rooms/:code/events` | A room's snapshot, and the SSE stream every member keeps open: the host's playback state tied to the server clock, the queue, and a head count. As with `/presence`, it's a number, never a list of who's there. Beside the queue, `titles` maps each item to the title the server found for it (and `state.title` repeats the current one's): the server asks YouTube's or SoundCloud's oEmbed endpoint in the background, so a host can't put text in front of the guests. Each item is asked about once and a miss again after ten minutes, at most 30 lookups a minute and four at once across every room; an item with no title stays its bare ID. |
+| `POST /rooms/:code/state` · `DELETE /rooms/:code` | Changing the room's state and closing it, host only (`x-room-token`). What a host can load is allowlisted on the server: an eleven-character YouTube ID in a watch room, and either that or an https soundcloud.com URL in a radio room, queue items included. Nothing else can reach a guest's iframe. 120 state changes/min per IP. |
 | `POST /rooms/:code/join` · `/move` · `/rematch` | Connect four. The first `join` gets the second seat's token and a third is refused; a `move` carries a seat token (`x-room-token`) and is accepted only on that seat's turn, into a column with room; a `rematch` clears the board and swaps who opens. Wins are the clients' to work out from the public move list. |
 | `GET /jobs` · `POST /jobs` | Owner only (`x-admin-password` on every route). Returns the downloader's state, or starts a job for one YouTube video or one SoundCloud track. URLs must match an allowlist, and sets and profiles are refused. yt-dlp runs on the server in the background, and the request returns immediately with a job ID. 20/hour per IP, at most three pending and one running, ten minutes per job. **Off by default.** |
 | `GET /jobs/:id` · `GET /jobs/:id/file` · `DELETE /jobs/:id` | Poll a job, fetch its file (once: it's deleted as soon as the download completes, or 30 minutes after it was produced), or cancel/dismiss it. |
@@ -454,6 +486,7 @@ uses the front of `X-Forwarded-For`, which any client can write.
 - With rooms off, the watch and radio pages say so.
 - With the downloader off, its panel says so once unlocked.
 - With MCP off, `/mcp` is a 404.
+- With `wall` off, it says broadcasts are switched off here; `who` works either way.
 - With the whole API down, `systemctl status` shows every unit as `unknown`.
 
 Endpoints report `configured: false` rather than returning an error.
@@ -506,8 +539,8 @@ This is a personal site, but the workflow is written down so it stays consistent
 - **The registry is the API.** A new terminal command is one object in `src/terminal/commands/`,
   and a new tool is one entry in `src/tools/registry.ts`. `help`, Tab, the palette and `ls` pick
   them up automatically.
-- **Every user-visible string is `Localised<{ en, fr }>`**, and every animation checks
-  `prefers-reduced-motion`.
+- **Every user-visible string is `Localised<{ en, fr }>`**, and every animation checks the motion
+  level (`decorativeMotion()`, which `prefers-reduced-motion` holds at `paused`).
 - **`src/content/` is imported at build time** and must stay free of Vue, the `@` alias and
   browser globals. `purity.spec.ts` enforces this.
 - **Update this README** when you change a command, achievement or API route it documents.

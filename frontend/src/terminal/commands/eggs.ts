@@ -1,5 +1,5 @@
 import { profile } from '@/content'
-import { prefersReducedMotion } from '@/composables/useCrt'
+import { decorativeMotion } from '@/composables/useMotion'
 import {
   MAX_SHAPE_COUNT,
   resetScene,
@@ -81,9 +81,16 @@ const VIM_SPLASH: string[] = [
   "(Esc still won't save you)",
 ]
 
-/** Instant when the visitor asked for reduced motion, animated otherwise. */
+/**
+ * Instant with motion paused (reduced motion forces that), animated otherwise. A typed
+ * command's own animation is something the visitor asked for by name, so `calm` keeps it.
+ */
+function still(): boolean {
+  return decorativeMotion() === 'paused'
+}
+
 async function paced(ctx: CommandContext, output: OutputLine[], stepMs: number) {
-  if (prefersReducedMotion()) {
+  if (still()) {
     ctx.print(output)
     return
   }
@@ -211,8 +218,8 @@ export const eggCommands: Command[] = [
     hidden: true,
     run({ effects, close, t }) {
       const toast = announce('matrix', t)
-      if (prefersReducedMotion()) {
-        return [line('Wake up, Neo… (animation skipped: reduced motion)', 'primary'), ...toast]
+      if (still()) {
+        return [line('Wake up, Neo… (animation skipped: motion paused)', 'primary'), ...toast]
       }
       close()
       effects.matrix()
@@ -227,8 +234,8 @@ export const eggCommands: Command[] = [
     hidden: true,
     run({ effects, close, t }) {
       const toast = announce('reboot', t)
-      if (prefersReducedMotion()) {
-        return [line('rebooting… (animation skipped: reduced motion)', 'primary'), ...toast]
+      if (still()) {
+        return [line('rebooting… (animation skipped: motion paused)', 'primary'), ...toast]
       }
       close()
       effects.reboot()
@@ -278,8 +285,8 @@ export const eggCommands: Command[] = [
       )
 
       const toast = announce('ssh', ctx.t)
-      if (prefersReducedMotion()) {
-        return [blank, line('connected. (boot animation skipped: reduced motion)', 'success'), ...toast]
+      if (still()) {
+        return [blank, line('connected. (boot animation skipped: motion paused)', 'success'), ...toast]
       }
 
       ctx.print([blank, line(`${user}@${host}'s shell is starting…`, 'success')])
@@ -432,7 +439,7 @@ export const eggCommands: Command[] = [
         line('escalating privileges  [███████▒▒▒]  72%', 'warning'),
       ]
       await paced(ctx, gibson ? [...stages.slice(0, -1), line('escalating privileges  [██████████] 100%', 'primary')] : stages, 260)
-      await sleep(prefersReducedMotion() ? 0 : 600, ctx.signal)
+      await sleep(still() ? 0 : 600, ctx.signal)
       if (gibson) {
         return [
           blank,
@@ -478,8 +485,10 @@ export const eggCommands: Command[] = [
     group: 'fun',
     writes: 'local',
     hidden: true,
-    run({ args, t }) {
-      const text = args.join(' ') || 'moo'
+    run({ args, stdin, t }) {
+      // What came in through a `|`, as one line of speech: `fortune | cowsay`.
+      const piped = stdin?.map((l) => l.text.trim()).filter(Boolean).join(' ')
+      const text = args.join(' ') || piped || 'moo'
       const width = Math.min(text.length, 40)
       const wrapped: string[] = []
       for (let i = 0; i < text.length; i += width) wrapped.push(text.slice(i, i + width))
@@ -522,7 +531,7 @@ export const eggCommands: Command[] = [
     hidden: true,
     async run(ctx) {
       const rows = TRAIN.split('\n')
-      if (prefersReducedMotion()) {
+      if (still()) {
         return [...art(TRAIN, 'accent'), line('(you meant `ls`)', 'muted'), ...announce('sl', ctx.t)]
       }
 

@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref } from 'vue'
-import type { PlayerReading } from './players'
+import type { PlayerProps, PlayerReading } from './players'
 import { YOUTUBE_ORIGIN, youtubeEmbed } from './sync'
 
 /**
@@ -10,7 +10,7 @@ import { YOUTUBE_ORIGIN, youtubeEmbed } from './sync'
  * SoundCloud widget), and the CSP grows by one `frame-src`, not a `script-src`.
  * `enablejsapi=1` and an `origin` equal to ours are what make the frame listen.
  */
-const props = defineProps<{ media: string; host: boolean; autoplay: boolean }>()
+const props = defineProps<PlayerProps>()
 const emit = defineEmits<{ reading: [reading: PlayerReading]; finished: [] }>()
 
 const frame = ref<HTMLIFrameElement | null>(null)
@@ -102,7 +102,8 @@ defineExpose({
     ref="frame"
     :key="media"
     :src="src"
-    class="aspect-video w-full rounded border border-border bg-black"
+    :class="compact ? 'aspect-video w-full max-w-md min-h-[200px]' : 'aspect-video w-full'"
+    class="rounded border border-border bg-black"
     allow="autoplay; encrypted-media; fullscreen; picture-in-picture"
     allowfullscreen
     referrerpolicy="strict-origin-when-cross-origin"

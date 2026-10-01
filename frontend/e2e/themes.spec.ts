@@ -1,5 +1,6 @@
 import { expect, test } from './fixtures'
 import { messages } from '@/i18n/messages'
+import { forgeScheme } from '@/lib/forge'
 import { findTheme } from '@/lib/themes'
 
 /**
@@ -12,6 +13,7 @@ import { findTheme } from '@/lib/themes'
 
 const gruvbox = findTheme('gruvbox')!
 const latte = findTheme('catppuccin-latte')!
+const dracula = findTheme('dracula')!
 
 /** `#rrggbb` as the `rgb(r, g, b)` string `getComputedStyle` reports. */
 function rgb(hex: string): string {
@@ -28,6 +30,31 @@ test('a saved scheme is painted on load', async ({ page, app }) => {
   // `text-primary` is a Tailwind utility over `--color-primary` over `--primary` — the
   // whole chain has to resolve for this to be orange.
   await expect(page.locator('#about h1').first()).toHaveCSS('color', rgb(gruvbox.colours.primary))
+})
+
+// A forge comes back from its stored colours before mount, with no `forge.ts` in the entry.
+test('a forged scheme is painted on load', async ({ page, app }) => {
+  const forged = forgeScheme('#1e66f5', 'light')!.theme
+  await app.seed({ theme: 'custom', customTheme: { seed: forged.seed!, mode: forged.mode, colours: { ...forged.colours } } })
+  await page.goto('/')
+
+  await expect(page.locator('html')).toHaveAttribute('data-theme', 'custom')
+  await expect(page.locator('html')).toHaveAttribute('data-mode', 'light')
+  await expect(page.locator('body')).toHaveCSS('background-color', rgb(forged.colours.background))
+  await expect(page.locator('#about h1').first()).toHaveCSS('color', rgb(forged.colours.primary))
+})
+
+// "make one…" loads the forge chunk only once a colour comes back from the picker.
+test('the menu forges a scheme from the colour picker', async ({ page, app }) => {
+  await page.goto('/')
+  await page.getByRole('button', { name: messages.nav.theme.en }).click()
+  await page.getByRole('menuitem', { name: messages.nav.forge.en }).click()
+  // The native picker is the browser's; the input behind it is what the page reads.
+  await page.getByLabel(messages.nav.forgeFrom.en).fill('#2ea043')
+
+  await expect(page.locator('html')).toHaveAttribute('data-theme', 'custom')
+  await expect(page.getByRole('menuitemradio', { name: 'custom' })).toHaveAttribute('aria-checked', 'true')
+  expect(JSON.parse((await app.read('customTheme'))!)).toMatchObject({ seed: '#2ea043', mode: 'dark' })
 })
 
 test('a light scheme repaints the page and drops the glows', async ({ page, app, terminal }) => {
@@ -67,4 +94,65 @@ test('the navbar menu switches scheme, on a phone too', async ({ page, app }) =>
 
   await page.keyboard.press('Escape')
   await expect(latteItem).toBeHidden()
+})
+
+/**
+ * The circle a new scheme spreads in (`document.startViewTransition`). The unit spec pins
+ * when it is asked for; what only a browser shows is that it actually runs, ends on the
+ * new scheme, leaves no `::view-transition` overlay behind, and trips nothing under the
+ * production CSP — the clip-path is animated from script, on a pseudo-element.
+ */
+test.describe('the theme circle', () => {
+  test.use({ serviceWorkers: 'block' })
+
+  test('a pick spreads, then leaves the page painted and nothing over it', async ({ page, browserName, cspViolations, pageErrors }) => {
+    test.skip(browserName !== 'chromium', 'The other engines here take the instant repaint.')
+    const consoleErrors: string[] = []
+    // Errors the page's own code logs. A resource the offline stubs leave unanswered
+    // (a third-party avatar, say) reports itself here too, and says nothing about this.
+    page.on('console', (message) => {
+      if (message.type() === 'error' && !message.text().startsWith('Failed to load resource')) {
+        consoleErrors.push(`${message.text()} (${message.location().url})`)
+      }
+    })
+    await page.addInitScript(() => {
+      const start = document.startViewTransition?.bind(document)
+      if (!start) return
+      const counted = window as unknown as { __circles: number }
+      counted.__circles = 0
+      document.startViewTransition = ((update: ViewTransitionUpdateCallback) => {
+        counted.__circles++
+        return start(update)
+      }) as typeof document.startViewTransition
+    })
+    await page.goto('/')
+
+    await page.getByRole('button', { name: messages.nav.theme.en }).click()
+    await page.getByRole('menuitemradio', { name: dracula.id }).click()
+
+    await expect(page.locator('body')).toHaveCSS('background-color', rgb(dracula.colours.background))
+    await expect(page.locator('html')).toHaveAttribute('data-theme', dracula.id)
+    expect(await page.evaluate(() => (window as unknown as { __circles: number }).__circles)).toBe(1)
+    // Over once it is over: no animation left on a transition pseudo-element, and no
+    // transition active on the document.
+    await expect
+      .poll(() =>
+        page.evaluate(() => {
+          const overlays = document
+            .getAnimations()
+            .filter((animation) => (animation.effect as KeyframeEffect | null)?.pseudoElement?.startsWith('::view-transition'))
+          let active = false
+          try {
+            active = document.documentElement.matches(':active-view-transition')
+          } catch {
+            // An engine without the pseudo-class has nothing to report.
+          }
+          return overlays.length + Number(active)
+        }),
+      )
+      .toBe(0)
+    expect(cspViolations).toEqual([])
+    expect(pageErrors).toEqual([])
+    expect(consoleErrors).toEqual([])
+  })
 })

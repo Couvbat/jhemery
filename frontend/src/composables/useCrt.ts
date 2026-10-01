@@ -21,13 +21,19 @@ function syncDocument() {
 export function setCrt(enabled?: boolean): boolean {
   overdrive.value = enabled ?? !overdrive.value
   syncDocument()
-  if (typeof window !== 'undefined') {
+  try {
     window.localStorage.setItem(STORAGE_KEY, String(overdrive.value))
+  } catch {
+    // Private browsing or a full quota — overdrive just won't survive a reload.
   }
   return overdrive.value
 }
 
-/** Brief screen-tear used by `sudo rm -rf /`. Resolves when it finishes. */
+/**
+ * Brief screen-tear used by `sudo rm -rf /`. Resolves when it finishes. The terminal's
+ * `effects.glitch` also holds it to `full` motion; that check lives there, because
+ * `useMotion` imports this module and the reverse import would close a cycle.
+ */
 export function glitch(durationMs = 900): Promise<void> {
   if (prefersReducedMotion()) return Promise.resolve()
 
@@ -44,7 +50,14 @@ export function glitch(durationMs = 900): Promise<void> {
 
 export function restoreCrt() {
   if (typeof window === 'undefined') return
-  if (window.localStorage.getItem(STORAGE_KEY) === 'true') setCrt(true)
+  let stored: string | null
+  try {
+    stored = window.localStorage.getItem(STORAGE_KEY)
+  } catch {
+    // Safari's private mode and blocked site data both throw here, and this runs on mount.
+    return
+  }
+  if (stored === 'true') setCrt(true)
 }
 
 export function useCrt() {

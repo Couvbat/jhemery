@@ -19,6 +19,7 @@ function context(args: string[] = []): CommandContext & { navigated: string[] } 
     navigated,
     args,
     raw: args.join(' '),
+    tty: true,
     locale: 'en',
     t: (<T,>(value: Localised<T>) => value.en) as CommandContext['t'],
     print: () => {},

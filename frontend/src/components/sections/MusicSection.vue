@@ -1,13 +1,28 @@
 <script setup lang="ts">
+import { computed, ref, watch } from 'vue'
 import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import SectionHeader from '@/components/SectionHeader.vue'
+import WindowDots from '@/components/WindowDots.vue'
 import { music, soundcloudEmbedSrc } from '@/content'
 import { useLocale } from '@/i18n'
 import { useMusicPlayer } from '@/composables/useMusicPlayer'
+import { embedColour } from '@/composables/useTheme'
 
 const { t, m } = useLocale()
 const { autoplayNonce } = useMusicPlayer()
+
+
+// The player is drawn in the scheme's green, read when the frame mounts and again on each
+// `play` remount — never on a scheme change: a new `src` reloads the cross-origin player
+// and stops whatever it was playing. During setup, so the first `src` is already right.
+// `embedColour()` is the scheme's green, but never a forged one's: that would follow the
+// visitor to SoundCloud on every visit.
+const colour = ref(embedColour())
+watch(autoplayNonce, () => {
+  colour.value = embedColour()
+})
+const src = computed(() => soundcloudEmbedSrc(colour.value, autoplayNonce.value > 0))
 </script>
 
 <template>
@@ -57,9 +72,7 @@ const { autoplayNonce } = useMusicPlayer()
         <!-- Terminal music player mock -->
         <div class="rounded border border-border bg-card overflow-hidden">
           <div class="flex items-center gap-2 px-4 py-2 bg-muted border-b border-border">
-            <span class="w-3 h-3 rounded-full bg-red-500/80"></span>
-            <span class="w-3 h-3 rounded-full bg-yellow-500/80"></span>
-            <span class="w-3 h-3 rounded-full bg-green-500/80"></span>
+            <WindowDots />
             <span class="ml-3 text-xs text-muted-foreground">ncmpcpp — music player</span>
           </div>
           <div class="p-4 space-y-2">
@@ -87,7 +100,7 @@ const { autoplayNonce } = useMusicPlayer()
             -->
             <iframe
               :key="autoplayNonce"
-              :src="autoplayNonce > 0 ? `${soundcloudEmbedSrc}&auto_play=true` : soundcloudEmbedSrc"
+              :src="src"
               :loading="autoplayNonce > 0 ? 'eager' : 'lazy'"
               :allow="autoplayNonce > 0 ? 'autoplay' : undefined"
               width="100%"

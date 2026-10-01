@@ -9,6 +9,7 @@ import { HEIGHT, WIDTH } from '../games/snake'
 import { ANSWERS } from '../games/data/words-en'
 import { dailyResult, recordDaily } from '../games/scores'
 import { dailyIndex, fold } from '../games/wordle'
+import { setMotion } from '@/composables/useMotion'
 import type { Command, CommandContext, OutputLine } from '../types'
 
 // Snake has two loops — a 120 ms tick and a reduced-motion step-per-keypress —
@@ -53,6 +54,7 @@ function harness(): Harness {
   const ctx: CommandContext = {
     args: [],
     raw: '',
+    tty: true,
     locale: 'en',
     t: (<T,>(value: Localised<T>) => value.en) as CommandContext['t'],
     print: (input) => {
@@ -293,6 +295,29 @@ describe('snake', () => {
     expect(length).toBeGreaterThanOrEqual(10)
     expect(isUnlocked('snake')).toBe(true)
     expect(lines.some((l) => l.text.includes('Nokia Nostalgia'))).toBe(true)
+  })
+
+  // Motion control is for decoration and for animations a command plays; a game's clock
+  // is one of its rules, so only the OS setting moves snake to a step per keypress.
+  it('keeps its tick when motion is paused from the menu', async () => {
+    motion.reduced = false
+    setMotion('paused')
+    vi.useFakeTimers()
+    try {
+      const game = harness()
+      const finished = command('snake').run(game.ctx) as Promise<OutputLine[]>
+      const at = () => cells(game.frame(), '█').map((p) => `${p.x},${p.y}`).join(' ')
+      const before = at()
+
+      await vi.advanceTimersByTimeAsync(120 * 2)
+      expect(at()).not.toBe(before)
+
+      game.press('q')
+      await vi.advanceTimersByTimeAsync(120)
+      await finished
+    } finally {
+      setMotion('full')
+    }
   })
 
   it('still reports the unlock when the game is aborted rather than quit', async () => {
