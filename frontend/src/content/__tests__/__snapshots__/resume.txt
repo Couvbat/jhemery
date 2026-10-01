@@ -1,0 +1,64 @@
+
+[1m[38;5;46m  Jules Hémery[0m  [2m(Couvbat)[0m
+  [38;5;51mFull-Stack Developer[0m [2m·[0m In-Leed [2m·[0m France
+  [2mNot looking for new opportunities right now[0m
+
+[2m────────────────────────────────────────────────────────────────────────────[0m
+
+[1m[38;5;46mABOUT[0m
+  Hey, I'm Jules Hémery, aka Couvbat.
+
+  25 y/o Full-Stack Developer at In-Leed, based in France — building web
+  apps with modern stacks. When I'm not shipping features I'm producing
+  music, playing games w/friends, or tinkering with AI.
+
+  [2mLanguages:[0m French · English
+
+[1m[38;5;46mEXPERIENCE[0m
+  [38;5;51mIn-Leed[0m [2m·[0m Full-Stack Developer
+    [2mNov 2023 – present · 3 years[0m
+    Web apps, REST APIs and internal tools.
+
+  [38;5;51mA family roofing company[0m [2m·[0m Web Developer
+    [2mMay 2023 – Nov 2023 · 7 months[0m
+
+[1m[38;5;46mEDUCATION[0m
+  [38;5;51mCCI (Chamber of Commerce and Industry)[0m [2m· 2021 – 2022[0m
+    Web and mobile web developer (DWWM)
+    [2mWith highest honours (mention Très bien)[0m
+
+  [38;5;51mESD — École Supérieure du Digital[0m [2m· 2019 – 2020[0m
+    Web design and digital media, first year
+
+[1m[38;5;46mSTACK[0m
+  HTML · CSS · JavaScript · TypeScript · PHP · Python · React · MySQL ·
+  MongoDB · Vue.js · NestJS · Node.js · Express · SSE · WebAssembly ·
+  GraphQL · three.js · Docker · Git · Bash
+
+[1m[38;5;46mPROJECTS[0m
+  [38;5;51mjhemery-portfolio[0m [2m[production][0m
+    This portfolio: a shell in Vue 3 over a three.js wireframe field, with a
+    NestJS API behind it. How its parts were built is below.
+    [2mVue 3 · NestJS · TypeScript · TailwindCSS · three.js · WebAssembly · SSE[0m
+    https://github.com/Couvbat/jhemery
+
+  [38;5;51min-leed / work projects[0m [2m[production][0m
+    Professional fullstack projects at In-Leed — web apps, REST APIs and
+    internal tools.
+    [2mReact · Node.js · Express · MongoDB · MySQL · PHP · Docker[0m
+
+[1m[38;5;46mMUSIC[0m
+  Hardcore, Techno, Acidcore, Hard Techno —
+  https://soundcloud.com/couvbat/sets/mon-bruit
+
+[1m[38;5;46mLINKS[0m
+  [38;5;46mGitHub    [0m  https://github.com/Couvbat
+  [38;5;46mLinkedIn  [0m  https://www.linkedin.com/in/jules-h%C3%A9mery-338134195/
+  [38;5;46mSoundCloud[0m  https://soundcloud.com/couvbat
+  [38;5;46mEmail     [0m  mailto:contact@jhemery.xyz
+
+[2m────────────────────────────────────────────────────────────────────────────[0m
+[2m  You are reading the curl version. The full site is at https://jhemery.xyz[0m
+[2m  A printable one is at https://jhemery.xyz/resume.html[0m
+[2m  tip: curl jhemery.xyz/help lists the other pages a terminal can read[0m
+[8m  CTF{e883c12a903c4432} - next: cat /etc/shadow[28m

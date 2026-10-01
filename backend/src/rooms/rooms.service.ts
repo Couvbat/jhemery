@@ -53,12 +53,15 @@ const SOUNDCLOUD_HOSTS = new Set([
  * Whether a host may put this string in front of every guest. It ends up as an
  * iframe `src` on every member's page, so this is an allowlist per kind, not a
  * sanitiser: a YouTube id is eleven characters from a known alphabet, a SoundCloud
- * item is an https URL on soundcloud.com. Anything else is a 400, whatever the
- * host's own page thought of it.
+ * item is an https URL on soundcloud.com. Watch takes YouTube only; radio takes
+ * either, and the two can't be mistaken for each other (an id has no `:`), which is
+ * what lets one radio queue mix them. Anything else is a 400, whatever the host's
+ * own page thought of it.
  */
 export function validMedia(kind: RoomKind, media: string): boolean {
   if (kind === 'connect4') return false;
-  if (kind === 'watch') return YOUTUBE_ID.test(media);
+  if (YOUTUBE_ID.test(media)) return true;
+  if (kind === 'watch') return false;
   if (media.length > 300) return false;
   let url: URL;
   try {
@@ -162,7 +165,7 @@ export class RoomsService {
       throw new BadRequestException(
         room.kind === 'watch'
           ? 'Not a YouTube video id'
-          : 'Not a soundcloud.com URL',
+          : 'Not a soundcloud.com URL or a YouTube video id',
       );
     }
     if (patch.queue) {

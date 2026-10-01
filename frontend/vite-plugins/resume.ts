@@ -9,6 +9,8 @@ import { durationLabel, periodLabel, yearSpan } from '../src/content/dates'
 import { education, experience } from '../src/content/experience'
 import { sectionIds } from '../src/content/sections'
 import { isExternal, pick, type Locale, type Localised } from '../src/content/types'
+import { julesManual } from '../src/content/manual'
+import { SGR_TONES } from '../src/terminal/ansi'
 
 /**
  * Emits the résumés generated from `src/content` at build time:
@@ -25,11 +27,14 @@ import { isExternal, pick, type Locale, type Localised } from '../src/content/ty
  * cost is that it only refreshes on a frontend deploy, which is fine for a résumé.
  */
 
+// The colours are the terminal's palette (`src/terminal/ansi.ts`), so `curl` in a real
+// terminal and the site's own `curl` agree on what green means. Bold and the concealed
+// run below are this file's alone.
 const ESC = '\u001b['
 const RESET = `${ESC}0m`
-const GREEN = `${ESC}38;5;46m`
-const CYAN = `${ESC}38;5;51m`
-const DIM = `${ESC}2m`
+const GREEN = `${ESC}${SGR_TONES.primary}m`
+const CYAN = `${ESC}${SGR_TONES.accent}m`
+const DIM = `${ESC}${SGR_TONES.muted}m`
 const BOLD = `${ESC}1m`
 /** SGR 8/28: text a terminal is told not to draw. `cat -v` draws it anyway. */
 const CONCEAL = `${ESC}8m`
@@ -128,9 +133,11 @@ export function buildResume(at = new Date()): string {
     `${DIM}  You are reading the curl version. The full site is at https://${profile.domain}${RESET}`,
   )
   lines.push(`${DIM}  A printable one is at https://${profile.domain}/resume.html${RESET}`)
+  lines.push(`${DIM}  tip: curl ${profile.domain}/help lists the other pages a terminal can read${RESET}`)
   // Stage 3 of the CTF chain (src/terminal/ctf.ts): present in every byte `curl`
-  // receives, invisible in any terminal that honours SGR 8. Only here, never in the
-  // terminal's own `curl`, which renders the résumé from the content instead.
+  // receives, invisible in any terminal that honours SGR 8. The terminal's own `curl`
+  // fetches this file too, and `terminal/ansi.ts`'s parseSgr is what keeps the line
+  // hidden there, by dropping SGR 8 runs: conceal it any other way and that must follow.
   lines.push(`${CONCEAL}  CTF{e883c12a903c4432} - next: cat /etc/shadow${REVEAL}`)
   lines.push('')
 
@@ -442,6 +449,58 @@ export function buildContentJson(at = new Date()): string {
   })
 }
 
+// ---------------------------------------------------------------------------
+// jules.1: the person as a real manual page (`curl -s jhemery.xyz/jules.1 | man -l -`)
+// ---------------------------------------------------------------------------
+
+/**
+ * Text for roff: a backslash is `\e`, a hyphen `\-` (roff's own hyphen is a different glyph,
+ * and options must copy-paste as minus signs), and no line may start with `.` or `'`, which
+ * would make it a request.
+ */
+export function escapeRoff(text: string): string {
+  return text.replace(/\\/g, '\\e').replace(/-/g, '\\-').replace(/^([.'])/gm, '\\&$1')
+}
+
+/** The same page `man jules` shows in the terminal (`content/manual.ts`), in roff. */
+export function buildManRoff(locale: Locale, at = new Date()): string {
+  const page = julesManual(at)
+  const t = <T,>(value: Localised<T>) => pick(value, locale)
+  const r = escapeRoff
+  const head = (text: string) => (/\s/.test(text) ? `.SH "${r(text.toUpperCase())}"` : `.SH ${r(text.toUpperCase())}`)
+  const fr = locale === 'fr'
+  const out: string[] = [
+    `.TH JULES ${page.section} "${at.toISOString().slice(0, 10)}" "${profile.domain}" "${fr ? 'Manuel des personnes' : 'People Manual'}"`,
+    head(fr ? 'Nom' : 'Name'),
+    `${page.name} \\- ${r(t(page.summary))}`,
+    head('Synopsis'),
+    '.nf',
+    ...page.synopsis.map(r),
+    '.fi',
+    head('Description'),
+    ...t(page.description).flatMap((paragraph, i) => [...(i ? ['.PP'] : []), r(paragraph)]),
+  ]
+  if (page.options?.length) {
+    out.push(head('Options'))
+    for (const option of page.options) out.push('.TP', `.B ${r(option.flag)}`, r(t(option.text)))
+  }
+  for (const section of page.sections ?? []) {
+    out.push(head(t(section.heading)), ...t(section.lines).flatMap((text, i) => [...(i ? ['.br'] : []), r(text)]))
+  }
+  if (page.examples?.length) {
+    out.push(head(fr ? 'Exemples' : 'Examples'))
+    for (const example of page.examples) {
+      out.push('.PP', '.nf', r(example.command), '.fi', ...(example.text ? [r(t(example.text))] : []))
+    }
+  }
+  out.push(head(fr ? 'Voir aussi' : 'See also'))
+  page.seeAlso.forEach((ref, i) => {
+    const [, name, section] = /^(.+)\((\d)\)$/.exec(ref) ?? [ref, ref, '1']
+    out.push(`.BR ${r(name!)} (${section})${i < page.seeAlso.length - 1 ? ',' : ''}`)
+  })
+  return `${out.join('\n')}\n`
+}
+
 interface EmittedFile {
   fileName: string
   contentType: string
@@ -454,6 +513,8 @@ const files: EmittedFile[] = [
   { fileName: resumeHtmlFile('fr'), contentType: 'text/html; charset=utf-8', build: () => buildResumeHtml('fr') },
   { fileName: 'resume.css', contentType: 'text/css; charset=utf-8', build: () => RESUME_CSS },
   { fileName: 'content.json', contentType: 'application/json; charset=utf-8', build: () => buildContentJson() },
+  { fileName: 'jules.1', contentType: 'text/plain; charset=utf-8', build: () => buildManRoff('en') },
+  { fileName: 'jules.fr.1', contentType: 'text/plain; charset=utf-8', build: () => buildManRoff('fr') },
 ]
 
 export function resumePlugin(): Plugin {

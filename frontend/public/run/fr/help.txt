@@ -1,0 +1,17 @@
+[38;5;46mCe qu’un terminal peut lire ici :[0m
+
+[38;5;51m  curl jhemery.xyz         [0m  le CV
+[38;5;51m  curl jhemery.xyz/about   [0m  Qui je suis
+[38;5;51m  curl jhemery.xyz/contact [0m  Comment me joindre
+[38;5;51m  curl jhemery.xyz/gaming  [0m  Ce que je joue
+[38;5;51m  curl jhemery.xyz/hardware[0m  Mes machines
+[38;5;51m  curl jhemery.xyz/ls      [0m  Lister sections, pages et fichiers
+[38;5;51m  curl jhemery.xyz/music   [0m  Ce que je produis
+[38;5;51m  curl jhemery.xyz/neofetch[0m  Résumé système
+[38;5;51m  curl jhemery.xyz/projects[0m  Ce que j'ai construit
+[38;5;51m  curl jhemery.xyz/skills  [0m  Technos que j'utilise
+[38;5;51m  curl jhemery.xyz/tools   [0m  Lister la page outils, ou ouvrir l'un de ses outils
+[38;5;51m  curl jhemery.xyz/whoami  [0m  Afficher l'utilisateur
+[38;5;51m  curl jhemery.xyz/why     [0m  Ce que le site a choisi, et ce qu’il a écarté
+
+[2mcurl jhemery.xyz/help pour les autres pages · en direct dans un navigateur : https://jhemery.xyz/?run=help[0m

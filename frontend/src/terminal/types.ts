@@ -1,4 +1,5 @@
-import type { Locale, Localised } from '@/content/types'
+// Relative: `vite-plugins/resume.ts` reaches this file through `ansi.ts`, outside the alias.
+import type { Locale, Localised } from '../content/types'
 
 export type Tone =
   | 'default'
@@ -42,6 +43,13 @@ export interface OutputLine {
   pre?: boolean
   /** Echoed prompt line rather than command output. */
   prompt?: boolean
+  /**
+   * Not output but a remark about it, which goes to the screen even from the middle of a
+   * pipeline: an error from `fail()` (which also fails the stage for `&&`/`||`), or an
+   * achievement toast (which doesn't). Without it, `fortune | cowsay` would put the toast
+   * inside the cow.
+   */
+  stderr?: boolean
 }
 
 export type CommandGroup = 'core' | 'navigate' | 'content' | 'live' | 'fun'
@@ -71,8 +79,20 @@ export type Writes = 'none' | 'local' | 'server'
 export interface CommandContext {
   /** Arguments after the command name, already split on whitespace. */
   args: string[]
-  /** The full raw line the user submitted. */
+  /** This command's own stage of the line, as typed: its spacing and quotes, not the rest of a pipeline. */
   raw: string
+  /**
+   * The previous stage's output, when this command is on the right of a `|`: its lines,
+   * colours and all, without the stderr ones. Undefined otherwise, which is not the same
+   * as an empty pipe.
+   */
+  stdin?: OutputLine[]
+  /**
+   * Whether anyone is reading this output as it appears: false on the left of a `|`,
+   * where `capture` and `prompt` throw ("not a tty"). A command that needs the keyboard
+   * can say so before it starts rather than fail halfway.
+   */
+  tty: boolean
   locale: Locale
   t: <T>(value: Localised<T>) => T
   /** Append lines to the buffer. Useful for commands that emit progressively. */
@@ -92,7 +112,7 @@ export interface CommandContext {
    * accepts — and closes the overlay on success. Returns false for an unknown target.
    */
   navigate: (target: string) => boolean
-  /** Ask the user for a line of input. Rejects if they hit Ctrl+C. */
+  /** Ask the user for a line of input. Rejects if they hit Ctrl+C, and throws when `tty` is false. */
   prompt: (question: string, options?: { mask?: boolean }) => Promise<string>
   /**
    * Routes raw keys to `handler` while the command runs — the primitive the games
@@ -101,9 +121,11 @@ export interface CommandContext {
    * so a command that throws cannot wedge the keyboard. For a command run through
    * `ctx.run`, "settles" means when it returns: the caller's own capture comes back. Only one capture is
    * active at a time: a second call replaces the first. Modifier combos never
-   * reach the handler, so `Ctrl+C` and `Ctrl+L` keep working throughout.
+   * reach the handler, so `Ctrl+C` and `Ctrl+L` keep working throughout. Escape stops the
+   * command too, unless `escape` hands it to the handler: the pager's search uses it to
+   * give up the search rather than the page.
    */
-  capture: (handler: (key: string) => void) => () => void
+  capture: (handler: (key: string) => void, options?: { escape?: boolean }) => () => void
   /**
    * Runs another command inside this one: the same signal (Ctrl+C stops both), the same
    * keyboard (the caller's capture is handed back when the child is done), and never the
@@ -197,5 +219,16 @@ export interface Command {
    * the shell needs a table of special cases.
    */
   complete?: (ctx: CompleteContext) => string[]
+  /**
+   * What `man <name>` adds to the page generated from this command (`terminal/manual.ts`):
+   * a longer DESCRIPTION, the OPTIONS text for the flags in `usage` (`manual.spec.ts` holds
+   * every flag to one), more EXAMPLES, and SEE ALSO, which may point somewhere oblique.
+   */
+  manual?: {
+    description?: Localised<string[]>
+    options?: Record<string, Localised>
+    examples?: { command: string; text?: Localised }[]
+    seeAlso?: string[]
+  }
   run: (ctx: CommandContext) => OutputLine[] | void | Promise<OutputLine[] | void>
 }

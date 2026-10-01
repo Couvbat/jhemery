@@ -56,14 +56,44 @@ export function parseSoundCloud(input: string): string | null {
   return `https://soundcloud.com${path}`
 }
 
-export function parseMedia(kind: RoomKind, input: string): string | null {
-  return kind === 'watch' ? parseYouTube(input) : parseSoundCloud(input)
+/** Which embed plays an item. */
+export type MediaSource = 'youtube' | 'soundcloud'
+
+/**
+ * Decided by the item alone, since a radio queue mixes the two: an eleven-character
+ * id is YouTube's, and anything else the server let through is a soundcloud.com URL.
+ * The two can't be confused — an id has no `:`.
+ */
+export function mediaSource(media: string): MediaSource {
+  return YOUTUBE_ID.test(media) ? 'youtube' : 'soundcloud'
 }
 
-/** What the pages print for an item: the id for a video, the path for a track. */
-export function mediaLabel(kind: RoomKind, media: string): string {
-  if (kind === 'watch') return media
+/** Watch takes YouTube only; radio tries SoundCloud, then YouTube. */
+export function parseMedia(kind: RoomKind, input: string): string | null {
+  return kind === 'watch' ? parseYouTube(input) : (parseSoundCloud(input) ?? parseYouTube(input))
+}
+
+/**
+ * What the pages print for an item when nothing better is known: the path for a
+ * track, the id for a video, marked as YouTube's so a mixed queue says which is which.
+ */
+export function mediaLabel(media: string): string {
+  if (mediaSource(media) === 'youtube') return `youtube:${media}`
   return media.replace(/^https:\/\/soundcloud\.com\//, '')
+}
+
+/**
+ * The queue with one item moved from `from` to `to`, as a new array — the state route
+ * replaces the whole queue, so a reorder is just this sent back. An index off either
+ * end moves nothing: a click on a list that has since changed under it is a no-op,
+ * not a guess.
+ */
+export function moveItem<T>(list: readonly T[], from: number, to: number): T[] {
+  const next = [...list]
+  if (from < 0 || from >= next.length || to < 0 || to >= next.length) return next
+  const [item] = next.splice(from, 1) as [T]
+  next.splice(to, 0, item)
+  return next
 }
 
 /** Seconds a guest may be out before it seeks. Two: under it, a seek is more

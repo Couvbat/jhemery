@@ -1,0 +1,12 @@
+[38;5;46mgaming[0m
+[2m──────[0m
+Gaming is where I unwind, compete, and explore. I love games that challenge
+both my reflexes and my mind — whether it's optimising a build, speedrunning
+a level, or discovering hidden lore.
+
+[2mgenres[0m
+[38;5;201mRPG · Roguelite · Strategy · Indie · Simulation · FPS[0m
+
+[2mrun `steam` for live activity.[0m
+
+[2mcurl jhemery.xyz/help for the other pages · live in a browser: https://jhemery.xyz/?run=gaming[0m

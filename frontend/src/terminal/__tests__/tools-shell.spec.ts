@@ -41,8 +41,18 @@ describe('sha256sum', () => {
     expect(out).not.toBe(await shell('sha256sum about.tx'))
   })
 
-  it('explains that there are no pipes when given nothing', async () => {
-    expect(await shell('sha256sum')).toContain('no pipes')
+  it('says what it can read when given nothing', async () => {
+    expect(await shell('sha256sum')).toContain('pipe it in')
+  })
+
+  // The pipe form reads what came in as a file's bytes, so both spellings agree.
+  it('hashes what a pipe hands it exactly as it hashes the file', async () => {
+    const { runCommand } = await import('./context')
+    const { resolve } = await import('../registry')
+    const { resolveFileLines } = await import('../commands/files')
+    const t = <T,>(value: { en: T; fr: T }) => value.en
+    const piped = await runCommand(resolve('sha256sum')!, [], { stdin: resolveFileLines('about.txt', t) })
+    expect(piped.text).toBe((await shell('sha256sum about.txt')).replace('about.txt', '-'))
   })
 })
 
