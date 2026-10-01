@@ -119,6 +119,32 @@ export interface Education {
   note?: Localised
 }
 
+/**
+ * A place in the repository's docs: a file, and a heading inside it by its GitHub
+ * anchor (`githubSlug` in `./docs`). The spec stays the authority; whatever links to
+ * it carries a pointer, never a copy.
+ */
+export interface DocRef {
+  /** Repo-relative, e.g. `docs/superpowers/specs/2026-09-22-tools-and-views-design.md`. */
+  doc: string
+  anchor?: string
+}
+
+/** One choice the site made, and what it turned down — what `why <topic>` prints. */
+export interface Decision {
+  id: string
+  topic: Localised
+  chose: Localised
+  /** Each `because` is one sentence: the spec has the long version. */
+  rejected: Array<{ what: Localised; because: Localised }>
+  /** The PR that shipped it. */
+  pr?: number
+  /** Always to a heading: the anchor is what keeps the decision tied to its spec. */
+  source: Required<DocRef>
+  /** What it looks like now, when that is worth saying. */
+  hindsight?: Localised
+}
+
 export type NowCategory = 'building' | 'playing' | 'learning' | 'listening'
 
 export interface NowEntry {
