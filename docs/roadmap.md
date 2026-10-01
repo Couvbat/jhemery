@@ -602,6 +602,9 @@ Recorded as each row ships.
     heading. The case the guard covers, a page changing under an open terminal, is tested with
     Back instead.
   - The tests live in `e2e/views.spec.ts` beside the prism's, not in `navigation.spec.ts`.
+  - Found in review: a change of page off the prism (`/work/a` to `/work/b`, `/now` to the 404)
+    turns no face but still settles, so it is focused and announced. The hero's `<h1>` is named
+    by the whole tagline, since focus can land on it while it is still typing.
 
 ## Build order
 

@@ -203,6 +203,18 @@ describe('installViewSwing', () => {
       expect(settled.value).toBe(before + 1)
     })
 
+    // Found in review: /work/a to /work/b turned nothing, so nothing settled.
+    it('counts a change of page off the prism at once, and a hash change not at all', () => {
+      const { router, push } = fakeRouter('/work/vim')
+      installViewSwing(router)
+      const { settled } = useViewSwing()
+      const before = settled.value
+      void push('/work/qr')
+      expect(settled.value).toBe(before + 1)
+      void push({ path: '/work/qr', hash: '#numbers' })
+      expect(settled.value).toBe(before + 1)
+    })
+
     it('counts an instant swap at once, under reduced motion or calm', () => {
       for (const level of ['paused', 'calm'] as const) {
         setMotion(level)

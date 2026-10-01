@@ -157,9 +157,14 @@ export function installViewSwing(instance: SwingRouter): void {
     if (!from.matched.length) return
 
     // Same face: a hash change on the home page, or a tool opening on the tools page.
+    // Off the prism (`/work/a` to `/work/b`, `/now` to the 404) nothing turns either, but the
+    // page is a new one, so it settles at once to be focused and announced.
     const a = viewIndex(from.path)
     const b = viewIndex(to.path)
-    if (a === b) return
+    if (a === b) {
+      if (!viewFor(to.path) && to.path !== from.path) settled.value++
+      return
+    }
 
     startSwing(b > a ? 1 : -1)
   })

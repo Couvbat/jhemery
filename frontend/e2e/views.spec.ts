@@ -212,6 +212,15 @@ test.describe('page changes, for a keyboard and a screen reader', () => {
     await expect(terminal.input).toBeFocused()
   })
 
+  // Found in review: previous/next between case studies turns no face, so focus stayed on
+  // the link at the bottom of a page that had changed under it.
+  test('next → on a case study moves focus to the next one’s heading', async ({ page }) => {
+    await page.goto('/work/vim')
+    await page.getByRole('link', { name: /next:/i }).click()
+    await expect(page).toHaveURL(/\/work\/qr$/)
+    await expect(page.getByRole('heading', { level: 1, name: /QR/ })).toBeFocused()
+  })
+
   test('under reduced motion, the pages swap and focus still moves', async ({ page }) => {
     await page.emulateMedia({ reducedMotion: 'reduce' })
     await page.goto('/')
