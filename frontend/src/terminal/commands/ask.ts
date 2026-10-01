@@ -1,9 +1,9 @@
-import { prefersReducedMotion } from '@/composables/useCrt'
+import { decorativeMotion } from '@/composables/useMotion'
 import { messages as m } from '@/i18n/messages'
 import { api, ApiError } from '@/lib/api'
 import type { Localised } from '@/content/types'
 import { announce } from '../achievements'
-import { blank, line, wrap } from '../format'
+import { blank, fail, line, wrap } from '../format'
 import type { Command, OutputLine } from '../types'
 
 /** Matches the DTO's `@Length(3, 240)`, so a too-long question never leaves the tab. */
@@ -58,10 +58,10 @@ export const askCommands: Command[] = [
       )
 
       if (question.length < MIN_LENGTH) {
-        return [line('ask: usage — ask <question>', 'error')]
+        return [fail('ask: usage — ask <question>')]
       }
       if (question.length > MAX_LENGTH) {
-        return [line(`ask: keep it under ${MAX_LENGTH} characters`, 'error')]
+        return [fail(`ask: keep it under ${MAX_LENGTH} characters`)]
       }
 
       print([line(t(m.ask.disclaimer), 'muted'), blank])
@@ -70,8 +70,9 @@ export const askCommands: Command[] = [
       draw([line(t(m.ask.thinking), 'muted')])
 
       // Text appearing character by character is motion, and the rule has no
-      // exception for text — buffer the whole thing and print it once instead.
-      const animate = !prefersReducedMotion()
+      // exception for text — with motion paused, buffer the whole thing and print it
+      // once instead. `calm` keeps it: the visitor asked for this answer by name.
+      const animate = decorativeMotion() !== 'paused'
       let answer = ''
 
       try {

@@ -24,6 +24,18 @@ export type ApiPreset =
   /** The backend is unreachable. Requests fail at the transport, as they would with a dead host. */
   | 'down'
 
+/** A watch or radio room's snapshot, as `room()` serves it. */
+export interface RoomFixture {
+  code: string
+  kind: 'watch' | 'radio'
+  state: { media: string | null; position: number; playing: boolean; at: number; title?: string }
+  queue: string[]
+  /** The server's titles, beside the queue. Left out, the room is one from a backend
+   *  that predates them. */
+  titles?: Record<string, string>
+  members: number
+}
+
 export interface RecordedRequest {
   method: string
   /** Pathname only — the origin is always `API_ORIGIN`. */
@@ -208,19 +220,40 @@ export class ApiStub {
   /**
    * One room, as the pages see it: `GET /rooms/:code` answers the snapshot, the
    * event stream sends it once and ends (EventSource reconnects and replays, which is
-   * fine for asserting what renders), `POST /rooms` creates "it" for a host, and the
-   * state route echoes it back. `members` and the state are whatever the test says.
+   * fine for asserting what renders), and `POST /rooms` creates "it" for a host. The
+   * state route applies the host's patch the way the server would and answers the
+   * result, and every later read and reconnect sees it — otherwise the stream's
+   * replay would put back a queue the host had just changed. `members` and the
+   * starting state are whatever the test says.
    */
-  room(snapshot: {
-    code: string
-    kind: 'watch' | 'radio'
-    state: { media: string | null; position: number; playing: boolean; at: number }
-    queue: string[]
-    members: number
-  }): this {
-    this.get(`/rooms/${snapshot.code}`, snapshot)
+  room(snapshot: RoomFixture): this {
+    let current = snapshot
+    const answer = (route: Route) => json(current)(route)
+    this.handlers.push({ method: 'GET', pattern: toPattern(`/rooms/${snapshot.code}`), respond: answer })
     this.post('/rooms', { ...snapshot, hostToken: 'e2e-host-token' }, 201)
-    this.post(`/rooms/${snapshot.code}/state`, snapshot)
+    this.handlers.push({
+      method: 'POST',
+      pattern: toPattern(`/rooms/${snapshot.code}/state`),
+      respond: (route) => {
+        const patch = (route.request().postDataJSON() ?? {}) as Partial<RoomFixture['state']> & {
+          queue?: string[]
+        }
+        const media = patch.media === undefined ? current.state.media : patch.media
+        const title = media === null ? undefined : current.titles?.[media]
+        current = {
+          ...current,
+          state: {
+            media,
+            position: patch.position ?? (media === current.state.media ? current.state.position : 0),
+            playing: patch.playing ?? current.state.playing,
+            at: Date.now(),
+            ...(title ? { title } : {}),
+          },
+          queue: patch.queue ?? current.queue,
+        }
+        return answer(route)
+      },
+    })
     this.handlers.push({
       method: 'GET',
       pattern: toPattern(`/rooms/${snapshot.code}/events`),
@@ -228,7 +261,7 @@ export class ApiStub {
         route.fulfill({
           status: 200,
           contentType: 'text/event-stream',
-          body: `data: ${JSON.stringify(snapshot)}\n\n`,
+          body: `data: ${JSON.stringify(current)}\n\n`,
         }),
     })
     return this

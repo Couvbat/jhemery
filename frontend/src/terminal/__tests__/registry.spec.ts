@@ -220,10 +220,10 @@ describe('what a command writes', () => {
         .sort()
     expect(named((c) => c.writes === 'server')).toEqual(['ask', 'connect4', 'mail', 'sign', 'sudo'])
     expect(named((c) => c.writes === 'local')).toEqual([
-      ':q', 'alias', 'banner', 'clear', 'constellation', 'cowsay', 'crt', 'decrypt', 'echo',
-      'flag', 'gravity', 'jq', 'open', 'play', 'rickroll', 'spawn', 'unalias', 'vim',
+      ':q', 'acid', 'alias', 'banner', 'clear', 'constellation', 'cowsay', 'crt', 'decrypt', 'echo',
+      'flag', 'gravity', 'jq', 'motion', 'open', 'play', 'rickroll', 'spawn', 'unalias', 'vim',
     ])
-    expect(named((c) => typeof c.writes === 'function')).toEqual(['base64', 'hack', 'lang', 'scene', 'theme', 'wordle'])
+    expect(named((c) => typeof c.writes === 'function')).toEqual(['base64', 'hack', 'lang', 'scene', 'strace', 'theme', 'wordle'])
   })
 
   // The arguments that make the function-form ones write, and one reason per line a link
@@ -237,11 +237,13 @@ describe('what a command writes', () => {
     ['echo', ['hi'], 'local'],
     ['banner', ['hi'], 'local'],
     ['theme', ['dracula'], 'local'],
+    ['motion', ['paused'], 'local'],
     ['lang', ['fr'], 'local'],
     ['alias', ["x='ls'"], 'local'],
     ['unalias', ['x'], 'local'],
     ['open', ['github'], 'local'],
     ['play', [], 'local'],
+    ['acid', [], 'local'],
     ['crt', [], 'local'],
     ['vim', [], 'local'],
     [':q', [], 'local'],
@@ -254,6 +256,9 @@ describe('what a command writes', () => {
     ['clear', [], 'local'],
     ['scene', ['reset'], 'local'],
     ['hack', ['mainframe'], 'local'],
+    // strace writes whatever it traces writes.
+    ['strace', ['sign', 'hi'], 'server'],
+    ['strace', ['theme', 'dracula'], 'local'],
   ] as const)('%s %j writes %s', (name, args, expected) => {
     expect(writesOf(resolve(name)!, args)).toBe(expected)
   })
@@ -312,6 +317,9 @@ describe('links (?run=)', () => {
       ['projects', ['--json']],
       ['hardware', ['pc']],
       ['curl', ['jhemery.xyz']],
+      ['curl', ['-I', '/llms.txt']],
+      ['strace', ['weather']],
+      ['strace', ['wordle', 'daily']],
       ['help', ['ls']],
       ['ls', ['about']],
       ['skills', ['--why']],
@@ -328,6 +336,17 @@ describe('links (?run=)', () => {
         expect(writesOf(command, args), command.name).toBe('none')
         expect(command.hidden, `${command.name} is linkable and hidden`).toBeFalsy()
       }
+    }
+  })
+
+  // A page that opens the shell and plays a bassline at whoever clicked is hostile, so
+  // no `?run=acid` link may run, with a code or without one.
+  it('never lets a link start sound', () => {
+    expect(isLinkable(resolve('acid')!)).toBe(false)
+    expect(isLinkable(resolve('acid')!, ['AeEAQ'])).toBe(false)
+    expect(resolveLink('acid')).toMatchObject({ command: { name: 'acid' } })
+    for (const name of ['acid', 'play']) {
+      expect(writesOf(resolve(name)!, []), name).toBe('local')
     }
   })
 

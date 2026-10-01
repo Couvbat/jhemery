@@ -57,11 +57,11 @@ function describe(caught: unknown): string {
   return caught instanceof ApiError ? caught.message : t(m.toolDownload.unreachable)
 }
 
-async function refresh() {
+async function refresh(background = false) {
   const password = adminPassword()
   if (!password) return
   try {
-    const info = await api.jobs(password)
+    const info = await api.jobs(password, { background })
     configured.value = info.configured
     jobs.value = info.jobs
   } catch (caught) {
@@ -132,7 +132,7 @@ onMounted(() => {
   if (isAdmin.value) void refresh()
   // Polling only while something is moving keeps an idle open panel silent.
   timer = setInterval(() => {
-    if (isAdmin.value && moving.value) void refresh()
+    if (isAdmin.value && moving.value) void refresh(true)
   }, 1500)
 })
 onUnmounted(() => clearInterval(timer))

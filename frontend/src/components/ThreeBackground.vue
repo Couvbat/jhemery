@@ -2,6 +2,7 @@
 import { onMounted, onUnmounted, ref, watch } from 'vue'
 import * as THREE from 'three'
 import { useCrt } from '@/composables/useCrt'
+import { useMotion } from '@/composables/useMotion'
 import { activeSection } from '@/composables/useActiveSection'
 import { terminalOpen } from '@/composables/useTerminalShell'
 import { BASE_SHAPE_COUNT, MAX_SHAPE_COUNT, useSceneControl } from '@/composables/useSceneControl'
@@ -23,6 +24,9 @@ const { t, m } = useLocale()
 // clock; the DOM turns the pages by it and this component turns the field by it.
 const { swing, swingDirection, swinging, activeView } = useViewSwing()
 const { theme } = useTheme()
+// `full`, `calm` or `paused` (composables/useMotion.ts). This component only mounts once
+// the level has been something other than `paused`; pausing afterwards stops the loop.
+const { level: motion } = useMotion()
 
 const canvasRef = ref<HTMLCanvasElement | null>(null)
 /** What `click-to-inspect` is currently showing, if anything. */
@@ -118,6 +122,41 @@ const FIELD_DEPTH = -4
 const FIELD_YAW = (40 * Math.PI) / 180
 const DOLLY = 6
 
+/**
+ * The loop runs on elapsed time, not on frames. It used to add a fixed step per frame,
+ * so a 120 Hz screen ran the field at twice the speed it was tuned at. Every rotation
+ * now scales by how many of these reference frames have passed, and every lerp factor
+ * `k` becomes `1 - (1 - k) ** f` (`ease`), the same easing at any rate. A 120 Hz screen
+ * slows to the speed a 60 Hz one always had, which is visible and intended.
+ */
+const REFERENCE_MS = 1000 / 60
+/** The frame governor: at most 60 fps, and 30 under `calm` or while the terminal's
+ *  blurred panel is open, which re-composites its backdrop on every frame drawn. */
+const FULL_FRAME_MS = 1000 / 60
+const SLOW_FRAME_MS = 1000 / 30
+/** Frames arrive a little early or late; one this close to due counts, or a 60 Hz screen
+ *  would drop every other frame against a 60 fps cap. */
+const FRAME_SLACK_MS = 2.5
+/** How far one frame may advance the field, so a tab back from the background resumes
+ *  rather than leaping. */
+const MAX_STEP = 4
+/** `calm`'s share of the field's speed. */
+const CALM_SPEED = 0.35
+
+/** The timestamp of the last frame drawn, or 0 when the loop has just (re)started. */
+let lastFrame = 0
+/**
+ * When the governor next lets a frame through. Kept on a grid rather than counted from
+ * the last frame, so a frame that arrives a little late doesn't push every later one
+ * back with it: jitter never drops a frame, and the long-run rate is still the cap.
+ */
+let nextDue = 0
+
+/** A lerp factor tuned per reference frame, for a frame `f` reference frames long. */
+function ease(k: number, f: number): number {
+  return 1 - (1 - k) ** f
+}
+
 let stopScreensaver: (() => void) | null = null
 
 let mouseX = 0
@@ -125,12 +164,34 @@ let mouseY = 0
 let pointerActive = false
 let pointerIdleTimer: ReturnType<typeof setTimeout> | undefined
 
-/** The four neon hues from the stylesheet — or from the `theme` written over it. */
-const neon: Record<string, THREE.Color> = {}
+/** The four hue slots a palette picks from, by their historical names (§3: under Gruvbox
+ *  `green` is orange). */
+type Hue = 'green' | 'cyan' | 'purple' | 'pink'
+const HUES: readonly Hue[] = ['green', 'cyan', 'purple', 'pink']
+/** What each slot reads when the property is empty, the default's own hex. */
+const HUE_FALLBACKS: Record<Hue, string> = { green: '#00ff41', cyan: '#00ffff', purple: '#bf00ff', pink: '#ff0080' }
+
+function hueColours(): Record<Hue, THREE.Color> {
+  return { green: new THREE.Color(), cyan: new THREE.Color(), purple: new THREE.Color(), pink: new THREE.Color() }
+}
+
+/** The four hues as the wireframes paint them right now — the stylesheet's, or a `theme`'s. */
+const neon = hueColours()
+/**
+ * A scheme switch eases the wireframes from the hues on screen (`neonFrom`) to the new
+ * ones (`neonTo`) over `RECOLOUR_MS`, in the loop. Preallocated, so the lerp allocates
+ * nothing; with no loop running (`paused`) the switch is still the instant recolour.
+ */
+const neonFrom = hueColours()
+const neonTo = hueColours()
+/** Matches the theme circle, so the field and the page land on the new scheme together. */
+const RECOLOUR_MS = 450
+/** How far through the current ease, 0 → 1. At rest it is 1. */
+let recolour = 1
 
 interface Palette {
-  base: string
-  accent: string
+  base: Hue
+  accent: Hue
   /** Multiplies the rotation speed, on top of the CRT boost. */
   speed: number
 }
@@ -189,11 +250,6 @@ function handleMouseMove(event: MouseEvent) {
   }, POINTER_IDLE_MS)
 }
 
-function readNeonColor(varName: string, fallback: string): THREE.Color {
-  const value = getComputedStyle(document.documentElement).getPropertyValue(varName).trim()
-  return new THREE.Color(value || fallback)
-}
-
 /** Half the visible world at the z=0 plane — the frustum maths the spread and the
  *  pointer projection both need. */
 function halfExtents(aspect: number): { x: number; y: number } {
@@ -208,34 +264,45 @@ function currentPalette(): Palette {
   return SECTION_PALETTES[activeSection.value] ?? SECTION_PALETTES.about!
 }
 
+/** The colour half of `applyPalette`: every material takes its hue from `neon` as it
+ *  stands. The loop calls this alone on each frame of a scheme's ease. */
+function applyColours() {
+  const palette = currentPalette()
+  for (const { mesh, accent } of shapes) {
+    ;(mesh.material as THREE.MeshBasicMaterial).color.copy(neon[accent ? palette.accent : palette.base])
+  }
+  for (const shape of visitors) (shape.mesh.material as THREE.MeshBasicMaterial).color.copy(neon[palette.base])
+  if (links) (links.material as THREE.LineBasicMaterial).color.copy(neon[palette.base])
+}
+
 /** Recolours the existing materials in place — cheaper than rebuilding the scene,
  *  and the shapes keep their positions across a section change. */
 function applyPalette() {
-  const palette = currentPalette()
-  sectionSpeed = palette.speed
+  sectionSpeed = currentPalette().speed
+  applyColours()
 
   const mood = weatherMood.value
-  for (const { mesh, accent, baseOpacity } of shapes) {
-    const material = mesh.material as THREE.MeshBasicMaterial
-    const colour = neon[accent ? palette.accent : palette.base]
-    if (colour) material.color.copy(colour)
+  for (const { mesh, baseOpacity } of shapes) {
     // Scaled from `baseOpacity` rather than from the current value, so a run of
     // weather changes can't ratchet every shape down to invisible.
-    material.opacity = Math.min(baseOpacity * mood.opacity, 0.6)
+    ;(mesh.material as THREE.MeshBasicMaterial).opacity = Math.min(baseOpacity * mood.opacity, 0.6)
   }
-  for (const shape of visitors) {
-    const material = shape.mesh.material as THREE.MeshBasicMaterial
-    const colour = neon[palette.base]
-    if (colour) material.color.copy(colour)
-    material.opacity = visitorOpacity(shape)
-  }
-  if (links) {
-    const colour = neon[palette.base]
-    if (colour) (links.material as THREE.LineBasicMaterial).color.copy(colour)
-  }
+  for (const shape of visitors) (shape.mesh.material as THREE.MeshBasicMaterial).opacity = visitorOpacity(shape)
 
-  // Nothing is redrawing on its own in the reduced-motion path.
+  // Nothing is redrawing on its own while motion is paused.
   if (animationFrameId === null && renderer && scene && camera) renderer.render(scene, camera)
+}
+
+/** One frame of a scheme's ease, `dt` milliseconds long. Smoothstepped, so the new
+ *  colour arrives without a jolt at either end. */
+function easeColours(dt: number) {
+  recolour = Math.min(1, recolour + dt / RECOLOUR_MS)
+  const k = recolour * recolour * (3 - 2 * recolour)
+  for (let i = 0; i < HUES.length; i++) {
+    const hue = HUES[i]!
+    neon[hue].copy(neonFrom[hue]).lerp(neonTo[hue], k)
+  }
+  applyColours()
 }
 
 /** A fresh position from the spawn distribution, in the field's own axes — the same
@@ -253,7 +320,7 @@ function addShape(accent: boolean, pool: AnimatedShape[] = shapes) {
   const palette = currentPalette()
   const baseOpacity = 0.15 + Math.random() * 0.25
   const material = new THREE.MeshBasicMaterial({
-    color: neon[accent ? palette.accent : palette.base] ?? 0xffffff,
+    color: neon[accent ? palette.accent : palette.base],
     wireframe: true,
     transparent: true,
     opacity: baseOpacity * weatherMood.value.opacity,
@@ -323,12 +390,12 @@ function syncVisitors() {
   }
 }
 
-/** One frame of the visitors' fades; removes whoever has finished leaving. */
-function fadeVisitors() {
+/** One frame of the visitors' fades, `k` of the way; removes whoever has finished leaving. */
+function fadeVisitors(k: number) {
   for (let i = visitors.length - 1; i >= 0; i--) {
     const shape = visitors[i]!
     const presence = shape.presence!
-    presence.level += ((presence.leaving ? 0 : 1) - presence.level) * VISITOR_FADE
+    presence.level += ((presence.leaving ? 0 : 1) - presence.level) * k
     if (presence.leaving && presence.level < 0.01) {
       disposeShape(visitors.splice(i, 1)[0]!)
       continue
@@ -351,16 +418,22 @@ function syncShapeCount() {
   if (animationFrameId === null && renderer && scene && camera) renderer.render(scene, camera)
 }
 
-/** Called on mount and again on every `theme` switch, which rewrites the properties. */
-function readNeon() {
-  neon.green = readNeonColor('--neon-green', '#00ff41')
-  neon.cyan = readNeonColor('--neon-cyan', '#00ffff')
-  neon.purple = readNeonColor('--neon-purple', '#bf00ff')
-  neon.pink = readNeonColor('--neon-pink', '#ff0080')
+/**
+ * Reads the four hues the stylesheet paints into `into`. Under the default they are
+ * `:root`'s hex (`#00ff41`, …), not the table's `oklch()` primary, accent and secondary,
+ * which are close but not the same colour, and which `THREE.Color` can't parse: reading
+ * the computed property is what keeps an ease starting from the colour actually on screen.
+ */
+function readNeon(into: Record<Hue, THREE.Color>) {
+  const style = getComputedStyle(document.documentElement)
+  for (let i = 0; i < HUES.length; i++) {
+    const hue = HUES[i]!
+    into[hue].set(style.getPropertyValue(`--neon-${hue}`).trim() || HUE_FALLBACKS[hue])
+  }
 }
 
 function createInitialShapes() {
-  readNeon()
+  readNeon(neon)
 
   // Exactly three accents in the opening scene, so "not all of them are the same
   // colour" is a fact rather than a probability.
@@ -387,7 +460,7 @@ function ensureLinks() {
   links = new THREE.LineSegments(
     geometry,
     new THREE.LineBasicMaterial({
-      color: neon.green ?? 0xffffff,
+      color: neon.green,
       transparent: true,
       opacity: 0.12,
     }),
@@ -522,14 +595,24 @@ function bake() {
   field.rotation.y = 0
 }
 
-function animate() {
+function animate(now: number) {
   animationFrameId = requestAnimationFrame(animate)
 
-  const boost = speedMultiplier.value * sectionSpeed * weatherMood.value.speed
+  const calm = motion.value === 'calm'
+  const budget = calm || terminalOpen.value ? SLOW_FRAME_MS : FULL_FRAME_MS
+  if (now < nextDue - FRAME_SLACK_MS) return
+  // Far behind (a tab back from the background), the grid starts again from here
+  // rather than letting frames through back to back to catch up.
+  nextDue = now > nextDue + budget ? now + budget : nextDue + budget
+  const f = lastFrame ? Math.min(MAX_STEP, (now - lastFrame) / REFERENCE_MS) : 1
+  lastFrame = now
+
+  const boost = speedMultiplier.value * sectionSpeed * weatherMood.value.speed * (calm ? CALM_SPEED : 1) * f
   const shaking = glitching.value
   const turning = swinging.value
-  // The well's z=0-plane maths is wrong in a rotated frame; off for the 650 ms.
-  const pulling = pointerActive && gravityOn.value && !turning
+  // The well's z=0-plane maths is wrong in a rotated frame; off for the 650 ms. `calm`
+  // has no pointer pull at all: neither the well nor the camera follows the cursor.
+  const pulling = pointerActive && gravityOn.value && !turning && !calm
 
   if (field) {
     if (turning) {
@@ -549,7 +632,10 @@ function animate() {
     pointerWorld.set(mouseX * half.x, -mouseY * half.y, 0)
   }
 
-  fadeVisitors()
+  fadeVisitors(ease(VISITOR_FADE, f))
+  if (recolour < 1) easeColours(f * REFERENCE_MS)
+  // Snap during a glitch, drift the rest of the time.
+  const drift = ease(shaking ? 0.65 : 0.045, f)
   forEachShape(({ mesh, speed, home, offset }) => {
     mesh.rotation.x += speed.x * boost
     mesh.rotation.y += speed.y * boost
@@ -576,25 +662,25 @@ function animate() {
       target.z += (Math.random() - 0.5) * 0.4
     }
 
-    // Snap during a glitch, drift the rest of the time.
-    offset.lerp(target, shaking ? 0.65 : 0.045)
+    offset.lerp(target, drift)
     mesh.position.copy(home).add(offset)
   })
 
   if (constellationOn.value) updateLinks()
 
   if (camera) {
-    const targetX = mouseX * 0.6
-    const targetY = -mouseY * 0.4
-    camera.position.x += (targetX - camera.position.x) * 0.03
-    camera.position.y += (targetY - camera.position.y) * 0.03
+    const targetX = calm ? 0 : mouseX * 0.6
+    const targetY = calm ? 0 : -mouseY * 0.4
+    const follow = ease(0.03, f)
+    camera.position.x += (targetX - camera.position.x) * follow
+    camera.position.y += (targetY - camera.position.y) * follow
     camera.position.z = cameraBaseZ + (turning ? DOLLY * Math.sin(Math.PI * swing.value) : 0)
 
     // An inspected shape draws the camera's gaze for a couple of seconds, then
     // the origin takes it back — easing both ways, so nothing ever snaps. World
     // position, because a mesh's own position is field-local while the field turns.
     if (focused && performance.now() > focusUntil) focused = null
-    lookTarget.lerp(focused ? focused.mesh.getWorldPosition(worldPosition) : ORIGIN, 0.04)
+    lookTarget.lerp(focused ? focused.mesh.getWorldPosition(worldPosition) : ORIGIN, ease(0.04, f))
     camera.lookAt(lookTarget)
   }
 
@@ -603,6 +689,49 @@ function animate() {
   }
 }
 
+/** Starts the loop, the pointer and the screensaver — on mount, and when motion comes
+ *  back from `paused`. */
+function startLoop() {
+  if (animationFrameId !== null || !renderer) return
+  lastFrame = 0
+  nextDue = 0
+  animationFrameId = requestAnimationFrame(animate)
+  window.addEventListener('mousemove', handleMouseMove)
+  stopScreensaver ??= startScreensaver()
+}
+
+/**
+ * `paused`: the loop stops and one frame is drawn as the scene stands. The screensaver
+ * stops with it — it hands the screen to a field that no longer moves. A swing caught
+ * halfway is finished and baked first, so the still frame is not a field turned askew.
+ */
+function pauseLoop() {
+  if (animationFrameId !== null) cancelAnimationFrame(animationFrameId)
+  animationFrameId = null
+  window.removeEventListener('mousemove', handleMouseMove)
+  pointerActive = false
+  stopScreensaver?.()
+  stopScreensaver = null
+  if (swingArmed && field) {
+    field.rotation.y = -swingDirection.value * FIELD_YAW
+    bake()
+    swingArmed = false
+  }
+  if (camera) camera.position.z = cameraBaseZ
+  // Nor will a scheme's ease: the still frame is in the new colours.
+  if (recolour < 1) easeColours(RECOLOUR_MS)
+  // No fade will finish now: whoever is arriving is here, and whoever is leaving goes
+  // (`syncVisitors` disposes them when nothing loops, and draws the frame).
+  for (const shape of visitors) {
+    if (shape.presence!.leaving) continue
+    shape.presence!.level = 1
+    ;(shape.mesh.material as THREE.MeshBasicMaterial).opacity = visitorOpacity(shape)
+  }
+  syncVisitors()
+}
+
+watch(motion, (level) => (level === 'paused' ? pauseLoop() : startLoop()))
+
 // Both the section and the completionist unlock change how the scene looks; one
 // watcher covers them because `currentPalette()` already knows which wins.
 // The weather rides along on the same watcher: it only ever scales what the
@@ -610,10 +739,17 @@ function animate() {
 watch([activeSection, activeView, unlocked, weatherMood], applyPalette)
 // A scheme changes what the palette's names mean, not which names it picks — so the
 // same recolour, after re-reading the hues. `useTheme` has already written the new
-// properties by the time this runs.
+// properties by the time this runs (inside the view transition's callback, when the
+// circle runs). With the loop running the wireframes ease there; paused, they jump.
 watch(theme, () => {
-  readNeon()
-  applyPalette()
+  if (animationFrameId === null) {
+    readNeon(neon)
+    applyPalette()
+    return
+  }
+  for (let i = 0; i < HUES.length; i++) neonFrom[HUES[i]!].copy(neon[HUES[i]!])
+  readNeon(neonTo)
+  recolour = 0
 })
 watch(shapeCount, syncShapeCount)
 watch(visitorShapes, syncVisitors)
@@ -644,22 +780,17 @@ onMounted(() => {
 
   if (!renderer || !scene || !camera) return
 
-  const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches
-  if (prefersReducedMotion) {
-    renderer.render(scene, camera)
-  } else {
-    animate()
-    window.addEventListener('mousemove', handleMouseMove)
-  }
+  // The screensaver starts with the loop, so only once there is a field to hand the
+  // screen to: a failed WebGL context returns above. The level can have gone back to
+  // `paused` between the idle callback that mounted this and now.
+  if (motion.value === 'paused') renderer.render(scene, camera)
+  else startLoop()
 
   window.addEventListener('resize', handleResize)
   window.addEventListener('click', handleClick)
-  // Only once there is a field to hand the screen to: a failed WebGL context returns
-  // above, and reduced motion never mounts this component at all.
-  stopScreensaver = startScreensaver()
 
   // One request, from the surface that actually reacts to the answer. This
-  // component is not mounted under reduced motion, so the call is never made
+  // component is never mounted while motion is paused, so the call is not made
   // for a scene that would sit still anyway.
   void fetchWeather()
 })
@@ -688,6 +819,8 @@ onUnmounted(() => {
   field = null
   camera = null
   swingArmed = false
+  lastFrame = 0
+  nextDue = 0
 })
 </script>
 

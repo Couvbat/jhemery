@@ -10,7 +10,7 @@ vi.mock('@/composables/useCrt', async (importOriginal) => ({
 import { setLocale } from '@/i18n'
 import { setAlias, clearAliases } from '@/terminal/aliases'
 import { consumeRunParam } from '../useRunLink'
-import { cancel, runLink, useTerminal } from '../useTerminal'
+import { cancel, handleCaptureKeydown, runLink, useTerminal } from '../useTerminal'
 import { pendingLinkCommand, terminalOpen } from '../useTerminalShell'
 
 const { buffer, busy, capturing, clearBuffer, run } = useTerminal()
@@ -98,6 +98,60 @@ describe('runLink', () => {
     cancel()
     await game
     expect(busy.value).toBe(false)
+  })
+
+  it('runs a pipe or a chain only when every stage could run from a link alone', async () => {
+    await runLink('whoami | wc -c')
+    expect(texts().at(-1)).toBe('8')
+
+    clearBuffer()
+    await runLink('whoami ; sign x')
+    expect(buffer.value).toHaveLength(1)
+    expect(buffer.value[0]!.tone).toBe('warning')
+
+    // grep's pattern is free text a link's author chose, so it is refused like any other.
+    clearBuffer()
+    await runLink('help | grep SESSION-EXPIRED')
+    expect(buffer.value[0]!.tone).toBe('warning')
+  })
+
+  // The alias points at something a link could run, so only resolving without aliases refuses it.
+  it('never expands the reader’s aliases in any stage of a linked pipe', async () => {
+    setAlias('mine', 'whoami')
+    await runLink('whoami | mine')
+    expect(buffer.value).toHaveLength(1)
+    expect(buffer.value[0]!.tone).toBe('warning')
+    expect(texts()).not.toContain('couvbat')
+  })
+
+  // Found in review: env words never reached the argument check, so a link could put a
+  // sentence of its author's on the prompt line.
+  it.each([
+    'NOTICE="Your session expired. Sign in again at evil.example/login" whoami',
+    'SESSION=EXPIRED LOGIN_AT=evil.example whoami | wc -c',
+    'LANG=fr whoami',
+    'X=1\u00a0sign\u00a0"pwned"\u00a0whoami',
+  ])('refuses env words in a link: %s', async (link) => {
+    await runLink(link)
+    expect(buffer.value).toHaveLength(1)
+    expect(buffer.value[0]!.tone).toBe('warning')
+    expect(texts()).not.toContain('couvbat')
+  })
+
+  // A page longer than the screen waits in the pager, so each is closed with q.
+  it('runs man for a visible page or jules, and refuses a hidden one in any section', async () => {
+    for (const [link, title] of [['man ls', 'LS(1)'], ['man jules', 'JULES(1)']] as const) {
+      clearBuffer()
+      const done = runLink(link)
+      await vi.waitFor(() => expect(texts().some((l) => l.startsWith(title)), link).toBe(true))
+      handleCaptureKeydown(new KeyboardEvent('keydown', { key: 'q' }))
+      await done
+    }
+    for (const hidden of ['man vim', 'man 6 vim']) {
+      clearBuffer()
+      await runLink(hidden)
+      expect(buffer.value[0]!.tone, hidden).toBe('warning')
+    }
   })
 
   it('strips control characters and caps the length', async () => {

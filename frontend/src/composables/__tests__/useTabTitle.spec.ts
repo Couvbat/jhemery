@@ -9,7 +9,7 @@ vi.hoisted(() => {
 
 import { profile, work } from '@/content'
 import { setLocale } from '@/i18n'
-import { tabTitle, useTabTitle } from '../useTabTitle'
+import { pageLabel, tabTitle, useTabTitle } from '../useTabTitle'
 
 afterEach(() => setLocale('en'))
 
@@ -41,6 +41,23 @@ describe('tabTitle', () => {
   it('follows the locale', () => {
     setLocale('fr')
     expect(tabTitle('/tools')).toBe(`Outils & utilitaires — ${profile.name}`)
+  })
+})
+
+// What a page change announces. The tab keeps the site title on the 404, for the
+// crawlers; the announcement must not call the 404 the home page.
+describe('pageLabel', () => {
+  it('is the tab title wherever the tab names the page', () => {
+    for (const path of ['/', '/tools', '/tools/json', '/watch/ab3de', '/now', '/work/qr', '/work/nope']) {
+      expect(pageLabel(path), path).toBe(tabTitle(path))
+    }
+  })
+
+  it('names the 404 for what it is, in both languages', () => {
+    expect(pageLabel('/definitely-not-a-page')).toBe(`Page not found — ${profile.name}`)
+    expect(pageLabel('/work')).toBe(`Page not found — ${profile.name}`)
+    setLocale('fr')
+    expect(pageLabel('/ctf')).toBe(`Page introuvable — ${profile.name}`)
   })
 })
 

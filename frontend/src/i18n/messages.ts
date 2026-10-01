@@ -7,8 +7,13 @@ import type { Localised } from '@/content/types'
 export const messages = {
   nav: {
     toggleMenu: { en: 'Toggle menu', fr: 'Ouvrir le menu' },
+    // The first thing a keyboard reaches: past the navbar, to the page's heading.
+    skip: { en: 'Skip to content', fr: 'Aller au contenu' },
     language: { en: 'Switch language', fr: 'Changer de langue' },
     theme: { en: 'Colour scheme', fr: 'Thème de couleurs' },
+    // The 🎨 menu's way to `theme forge`: opens the system colour picker.
+    forge: { en: 'make one…', fr: 'en créer un…' },
+    forgeFrom: { en: 'Seed colour for a new scheme', fr: 'Couleur de départ d’un nouveau thème' },
   },
   hero: {
     aboutFile: { en: 'cat about.txt', fr: 'cat about.txt' },
@@ -135,6 +140,26 @@ export const messages = {
     },
     cancelled: { en: '^C cancelled', fr: '^C annulé' },
     // `{command}` is what the link asked for, echoed so the reader sees it.
+    // A command that needs the keyboard, on the left of a `|`.
+    notATty: {
+      en: 'not a tty: it needs the keyboard, so it can’t run inside a pipe',
+      fr: 'pas un tty : il lui faut le clavier, il ne peut pas tourner dans un pipe',
+    },
+    // After an operator, an unknown word is more likely text that wanted quoting.
+    quoteIt: {
+      en: 'to pass all of it on as text, quote it: `{example}`',
+      fr: 'pour tout passer en texte, mettez-le entre guillemets : `{example}`',
+    },
+    // A message to the server, unquoted, on a line with an operator in it.
+    quoteMessage: {
+      en: 'its text shares the line with an operator, so nothing ran',
+      fr: 'son texte partage la ligne avec un opérateur, donc rien n’a été lancé',
+    },
+    // After `!!` expanded to something that writes: zsh's histverify.
+    histverify: {
+      en: 'not run, since it would change something: press ↑ then Enter to send it',
+      fr: 'pas lancé, car il changerait quelque chose : ↑ puis Entrée pour l’envoyer',
+    },
     linkRefused: {
       en: 'a link asked to run `{command}` — that one only runs if you type it yourself.',
       fr: 'un lien a demandé `{command}` — celle-ci ne s’exécute que si vous la tapez vous-même.',
@@ -173,6 +198,9 @@ export const messages = {
     open: { en: 'Command palette', fr: 'Palette de commandes' },
   },
   notFound: {
+    // What the page is announced as, and called in `pageLabel()`: the tab keeps the
+    // site's own title, which is what index.html says and crawlers read.
+    label: { en: 'Page not found', fr: 'Page introuvable' },
     back: { en: 'cd ~', fr: 'cd ~' },
     hint: {
       en: 'Or open the terminal and type `cd about`.',
@@ -220,10 +248,99 @@ export const messages = {
       en: 'That is not an image this browser can decode.',
       fr: "Ce n'est pas une image que ce navigateur sait décoder.",
     },
+    // Claims only what the check under the result proves: the blocks it looks for, in this
+    // browser, on this file.
     privacy: {
-      en: 'Re-encoding through a canvas drops every metadata block — EXIF, GPS, colour profile — by construction, not by option.',
-      fr: 'Repasser par un canvas supprime tous les blocs de métadonnées — EXIF, GPS, profil colorimétrique — par construction, pas par option.',
+      en: "The line under the result is a check, not a promise: the tool reads its own output back with the same inspector, looking for Exif (GPS included), XMP, ICC, IPTC, comments and PNG text. A colour profile the browser's encoder writes itself counts as one field. Anything outside that list is not looked for.",
+      fr: "La ligne sous le résultat est une vérification, pas une promesse : l'outil relit sa propre sortie avec le même inspecteur, à la recherche d'Exif (GPS compris), de XMP, d'ICC, d'IPTC, de commentaires et de texte PNG. Un profil colorimétrique écrit par l'encodeur du navigateur lui-même compte pour un champ. Ce qui sort de cette liste n'est pas cherché.",
     },
+    givesAway: { en: 'what this file gives away', fr: 'ce que ce fichier révèle' },
+    fieldsOne: { en: '1 field', fr: '1 champ' },
+    fieldsMany: { en: '{n} fields', fr: '{n} champs' },
+    nothing: {
+      en: 'Nothing the inspector looks for: no Exif, XMP, ICC, IPTC, comment or PNG text.',
+      fr: "Rien de ce que l'inspecteur cherche : ni Exif, ni XMP, ni ICC, ni IPTC, ni commentaire, ni texte PNG.",
+    },
+    // Never "0 fields": a format the inspector can't read is not a clean one.
+    unreadable: {
+      en: 'The inspector does not read {format} files, so it cannot say what this one gives away.',
+      fr: "L'inspecteur ne lit pas les fichiers {format} : il ne peut pas dire ce que celui-ci révèle.",
+    },
+    unreadableUnknown: {
+      en: 'The inspector does not read this kind of file, so it cannot say what it gives away.',
+      fr: "L'inspecteur ne lit pas ce type de fichier : il ne peut pas dire ce qu'il révèle.",
+    },
+    truncated: {
+      en: 'Only the first 64 MB was read: anything after it is not listed.',
+      fr: "Seuls les 64 premiers Mo ont été lus : ce qui suit n'est pas listé.",
+    },
+    whereYouStood: { en: 'this says where you stood', fr: 'ceci dit où vous vous teniez' },
+    moreOne: { en: '+ 1 more field, not named here', fr: '+ 1 autre champ, non nommé ici' },
+    moreMany: { en: '+ {n} more fields, not named here', fr: '+ {n} autres champs, non nommés ici' },
+    present: { en: 'present', fr: 'présent' },
+    verified: { en: '0 fields — verified', fr: '0 champ — vérifié' },
+    // An output past the read cap: what was read is clean, the rest was never looked at.
+    verifiedHead: {
+      en: '0 fields in the first 64 MB — the rest was not read',
+      fr: "0 champ dans les 64 premiers Mo — le reste n'a pas été lu",
+    },
+    survivedOne: { en: '1 field survived re-encoding', fr: '1 champ a survécu au réencodage' },
+    survivedMany: { en: '{n} fields survived re-encoding', fr: '{n} champs ont survécu au réencodage' },
+    // Which ones, when the inspector can name them.
+    survivors: { en: '{verdict}: {list}', fr: '{verdict} : {list}' },
+    unverified: {
+      en: 'The result could not be read back, so nothing is verified.',
+      fr: "Le résultat n'a pas pu être relu : rien n'est vérifié.",
+    },
+  },
+  toolImageGroups: {
+    where: { en: 'where', fr: 'où' },
+    device: { en: 'device', fr: 'appareil' },
+    people: { en: 'people', fr: 'personnes' },
+    time: { en: 'when', fr: 'quand' },
+    embedded: { en: 'embedded', fr: 'intégré' },
+  },
+  // One per `FieldKey` in tools/image/metadata.ts; a PNG text chunk's own keyword follows `text`.
+  toolImageFields: {
+    gps: { en: 'GPS position', fr: 'position GPS' },
+    make: { en: 'camera maker', fr: 'fabricant' },
+    model: { en: 'camera model', fr: 'modèle' },
+    serial: { en: 'serial number', fr: 'numéro de série' },
+    lensMake: { en: 'lens maker', fr: "fabricant de l'objectif" },
+    lensModel: { en: 'lens', fr: 'objectif' },
+    lensSerial: { en: 'lens serial number', fr: "numéro de série de l'objectif" },
+    makerNote: { en: 'maker note', fr: 'note du fabricant' },
+    orientation: { en: 'orientation', fr: 'orientation' },
+    software: { en: 'software', fr: 'logiciel' },
+    owner: { en: 'camera owner', fr: "propriétaire de l'appareil" },
+    artist: { en: 'artist', fr: 'auteur' },
+    copyright: { en: 'copyright', fr: 'copyright' },
+    taken: { en: 'taken', fr: 'prise' },
+    digitised: { en: 'digitised', fr: 'numérisée' },
+    modified: { en: 'modified', fr: 'modifiée' },
+    pngTime: { en: 'last modified', fr: 'dernière modification' },
+    xmp: { en: 'XMP packet', fr: 'paquet XMP' },
+    icc: { en: 'colour profile', fr: 'profil colorimétrique' },
+    iptc: { en: 'IPTC record', fr: 'fiche IPTC' },
+    comment: { en: 'comment', fr: 'commentaire' },
+    text: { en: 'text', fr: 'texte' },
+  },
+  // TIFF 6.0's Orientation, 1–8: what the stored rows need to be shown upright.
+  toolImageOrientation: {
+    1: { en: 'upright', fr: "à l'endroit" },
+    2: { en: 'shown mirrored', fr: 'affichée en miroir' },
+    3: { en: 'shown turned 180°', fr: 'affichée tournée de 180°' },
+    4: { en: 'shown flipped top to bottom', fr: 'affichée retournée de haut en bas' },
+    5: {
+      en: 'shown mirrored and turned 90° anticlockwise',
+      fr: 'affichée en miroir et tournée de 90° dans le sens antihoraire',
+    },
+    6: { en: 'shown turned 90° clockwise', fr: 'affichée tournée de 90° dans le sens horaire' },
+    7: {
+      en: 'shown mirrored and turned 90° clockwise',
+      fr: 'affichée en miroir et tournée de 90° dans le sens horaire',
+    },
+    8: { en: 'shown turned 90° anticlockwise', fr: 'affichée tournée de 90° dans le sens antihoraire' },
   },
   toolHash: {
     text: { en: 'text', fr: 'texte' },
@@ -434,6 +551,55 @@ export const messages = {
     seconds: { en: '{n} s', fr: '{n} s' },
     minutes: { en: '{n} min', fr: '{n} min' },
   },
+  toolAcid: {
+    play: { en: 'play', fr: 'lecture' },
+    stop: { en: 'stop', fr: 'stop' },
+    playing: { en: 'playing', fr: 'en lecture' },
+    randomise: { en: 'randomise in phrygian', fr: 'aléatoire en phrygien' },
+    copyLink: { en: 'copy link', fr: 'copier le lien' },
+    linkCopied: { en: 'Link copied:', fr: 'Lien copié :' },
+    linkManual: { en: 'Copy this link:', fr: 'Copiez ce lien :' },
+    shell: { en: 'In the terminal, {command} plays it.', fr: 'Dans le terminal, {command} le joue.' },
+    tempo: { en: 'tempo', fr: 'tempo' },
+    wave: { en: 'wave', fr: 'onde' },
+    saw: { en: 'saw', fr: 'scie' },
+    square: { en: 'square', fr: 'carrée' },
+    root: { en: 'root', fr: 'tonique' },
+    steps: { en: 'steps', fr: 'pas' },
+    step: { en: 'step {n}', fr: 'pas {n}' },
+    pitch: { en: 'pitch, step {n}', fr: 'hauteur, pas {n}' },
+    accentShort: { en: 'acc', fr: 'acc' },
+    accentStep: { en: 'accent, step {n}', fr: 'accent, pas {n}' },
+    slideShort: { en: 'slide', fr: 'slide' },
+    slideStep: { en: 'slide, step {n}', fr: 'slide, pas {n}' },
+    knobs: { en: 'knobs', fr: 'réglages' },
+    cutoff: { en: 'cutoff', fr: 'coupure' },
+    resonance: { en: 'resonance', fr: 'résonance' },
+    envMod: { en: 'env mod', fr: 'mod. env.' },
+    decay: { en: 'decay', fr: 'déclin' },
+    accent: { en: 'accent', fr: 'accent' },
+    drive: { en: 'drive', fr: 'saturation' },
+    invalid: {
+      en: 'The pattern in this link could not be read, so this is the default one.',
+      fr: 'Le motif de ce lien est illisible, voici donc celui par défaut.',
+    },
+    noAudio: {
+      en: 'This browser has no Web Audio, so there is nothing to play the pattern on.',
+      fr: "Ce navigateur n'a pas de Web Audio, il n'y a rien pour jouer le motif.",
+    },
+    hidden: {
+      en: 'Stopped: the tab went to the background, where timers stutter.',
+      fr: "Arrêté : l'onglet est passé en arrière-plan, où les minuteries hoquettent.",
+    },
+    replaced: {
+      en: 'Stopped: the terminal started a pattern of its own.',
+      fr: 'Arrêté : le terminal a lancé son propre motif.',
+    },
+    note: {
+      en: 'One oscillator through a resonant low-pass and a tanh drive, scheduled against the audio clock. The link is the save file: the whole pattern fits in its ?p=, and nothing plays until you press play.',
+      fr: "Un oscillateur dans un passe-bas résonant et une saturation tanh, calé sur l'horloge audio. Le lien est la sauvegarde : tout le motif tient dans son ?p=, et rien ne joue avant d'appuyer sur lecture.",
+    },
+  },
   toolFfmpeg: {
     intro: {
       en: 'This is ffmpeg compiled to WebAssembly, running in your browser: the file never leaves this machine. It first needs the ffmpeg core, a one-off download the browser keeps in its cache — and nothing is fetched until you press the button.',
@@ -535,8 +701,8 @@ export const messages = {
       fr: "Une soirée vidéo : un code, une vidéo YouTube, tout le monde à la même seconde. L'hôte appuie sur lecture ; tous les autres lecteurs suivent.",
     },
     introRadio: {
-      en: 'A shared radio: a queue of SoundCloud tracks the host runs, and every listener hears the same one at the same time.',
-      fr: "Une radio partagée : une file de morceaux SoundCloud que l'hôte enchaîne, et chaque auditeur entend le même au même moment.",
+      en: 'A shared radio: a queue of SoundCloud tracks and YouTube videos the host runs, and every listener hears the same one at the same time. A video plays in a small player, never a hidden one.',
+      fr: "Une radio partagée : une file de morceaux SoundCloud et de vidéos YouTube que l'hôte enchaîne, et chaque auditeur entend le même au même moment. Une vidéo passe dans un petit lecteur, jamais dans un lecteur caché.",
     },
     lobby: { en: 'Rooms', fr: 'Salons' },
     host: { en: 'host', fr: 'hôte' },
@@ -578,22 +744,36 @@ export const messages = {
       fr: "L'hôte pilote ; votre lecteur suit. S'il ne démarre pas, appuyez une fois sur lecture.",
     },
     inputWatch: { en: 'YouTube link or video id', fr: 'lien YouTube ou identifiant de vidéo' },
-    inputRadio: { en: 'soundcloud.com track or set link', fr: 'lien soundcloud.com (morceau ou playlist)' },
+    inputRadio: {
+      en: 'soundcloud.com track or set link, or a YouTube link',
+      fr: 'lien soundcloud.com (morceau ou playlist) ou lien YouTube',
+    },
     badLinkWatch: {
       en: 'That is not a YouTube link or video id.',
       fr: "Ce n'est pas un lien YouTube ni un identifiant de vidéo.",
     },
     badLinkRadio: {
-      en: 'That is not a soundcloud.com track or set link.',
-      fr: "Ce n'est pas un lien soundcloud.com de morceau ou de playlist.",
+      en: 'That is neither a soundcloud.com track or set link nor a YouTube link or video id.',
+      fr: "Ce n'est ni un lien soundcloud.com de morceau ou de playlist, ni un lien YouTube ou un identifiant de vidéo.",
     },
     playNow: { en: 'play now', fr: 'lire maintenant' },
     enqueue: { en: 'queue', fr: 'en file' },
     next: { en: 'next', fr: 'suivant' },
     upNext: { en: 'up next', fr: 'à suivre' },
+    nowPlaying: { en: 'now playing', fr: 'en cours' },
+    nothingPlaying: { en: 'Nothing playing.', fr: 'Rien en cours.' },
+    queueEmptyHost: {
+      en: 'Nothing queued. Paste a link and press queue.',
+      fr: 'File vide. Collez un lien et appuyez sur « en file ».',
+    },
+    queueEmptyGuest: { en: 'Nothing queued yet.', fr: "Rien dans la file pour l'instant." },
     play: { en: 'play', fr: 'lecture' },
     pause: { en: 'pause', fr: 'pause' },
-    remove: { en: 'remove', fr: 'retirer' },
+    // `{item}` is the item as the queue shows it, so a screen reader hears which one
+    // each of the three buttons acts on.
+    moveUp: { en: 'move {item} up', fr: 'monter {item}' },
+    moveDown: { en: 'move {item} down', fr: 'descendre {item}' },
+    remove: { en: 'remove {item}', fr: 'retirer {item}' },
     nothing: { en: 'Nothing loaded yet — paste a link below.', fr: 'Rien de chargé — collez un lien ci-dessous.' },
     waiting: { en: 'Waiting for the host…', fr: "En attente de l'hôte…" },
     privacy: {
@@ -631,6 +811,18 @@ export const messages = {
   },
   // The wireframe background: the click-to-inspect label on a visitor's shape, and
   // the one line the screensaver leaves on screen.
+  // Motion control: the 🎨 menu's group and `motion`. The settings themselves (`full`,
+  // `calm`, `paused`) are the command's arguments, so they stay as typed.
+  motion: {
+    label: { en: 'Motion', fr: 'Animations' },
+    full: { en: 'everything moves', fr: 'tout bouge' },
+    calm: { en: 'slower, nothing swings or bursts', fr: 'plus lent, rien ne pivote ni n’éclate' },
+    paused: { en: 'nothing moves', fr: 'rien ne bouge' },
+    os: {
+      en: 'Your system asks for reduced motion, so nothing moves here whatever is picked.',
+      fr: 'Votre système demande moins d’animations : rien ne bouge ici, quel que soit le choix.',
+    },
+  },
   scene: {
     visitor: { en: 'someone else, here now', fr: 'quelqu’un d’autre, ici en ce moment' },
     wake: { en: 'move the mouse or press a key', fr: 'bougez la souris ou appuyez sur une touche' },
@@ -658,6 +850,9 @@ export const messages = {
   },
   boot: {
     skip: { en: 'press any key to skip', fr: 'appuyez sur une touche pour passer' },
+  },
+  matrix: {
+    wake: { en: 'press any key to wake up', fr: 'appuyez sur une touche pour vous réveiller' },
   },
   achievements: {
     title: { en: 'Achievements', fr: 'Succès' },

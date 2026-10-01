@@ -22,13 +22,19 @@ export interface GameState {
  * seek when the two disagree by more than a couple of seconds.
  */
 export interface PlaybackState {
-  /** The current item: a YouTube video id for `watch`, a soundcloud.com URL for `radio`. */
+  /**
+   * The current item: a YouTube video id for `watch`; a soundcloud.com URL or a
+   * YouTube video id for `radio`, whose queue may mix the two.
+   */
   media: string | null;
   /** Seconds into the item, as of `at`. */
   position: number;
   playing: boolean;
   /** Server time in milliseconds when this state was set. */
   at: number;
+  /** The current item's title, once the server has found one. Same as
+   *  `titles[media]`, for a reader that only looks at the state. */
+  title?: string;
 }
 
 /**
@@ -40,8 +46,14 @@ export interface RoomSnapshot {
   code: string;
   kind: RoomKind;
   state: PlaybackState;
-  /** What follows the current item, in order. */
+  /** What follows the current item, in order. Same allowlist as `state.media`. */
   queue: string[];
+  /**
+   * Item → title, for the items the room holds that the server found a title for,
+   * through YouTube's or SoundCloud's oEmbed. Beside the queue rather than in it, so
+   * the queue stays the `string[]` every bundle already reads. Never on a game room.
+   */
+  titles?: Record<string, string>;
   /** Open connections, this one included. */
   members: number;
   /** Only on a game room. */

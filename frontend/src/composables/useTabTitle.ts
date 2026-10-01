@@ -41,6 +41,18 @@ export function tabTitle(path: string, home: string = siteTitle): string {
   return `${name} — ${profile.name}`
 }
 
+/**
+ * What a page is called when a change to it is announced (`usePageFocus`): its tab
+ * title, except for the 404, whose tab keeps the site's own title (see above) but which
+ * must not be announced as the home page.
+ */
+export function pageLabel(path: string): string {
+  const { t, m } = useLocale()
+  const outside = /^\/(now|work\/[^/]+)\/?$/.test(path)
+  if (!outside && !viewFor(path)) return `${t(m.notFound.label)} — ${profile.name}`
+  return tabTitle(path)
+}
+
 /** Binds the title to the route. Called once, from `App.vue`. */
 export function useTabTitle(): void {
   const route = useRoute()

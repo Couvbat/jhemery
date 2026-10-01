@@ -51,6 +51,14 @@ cd frontend && npx playwright test --project=chromium -g 'graceful'
 cd backend && npx jest src/ask/ask.service.spec.ts -t 'rate limit'
 ```
 
+Two kinds of committed output are vitest snapshots, which CI only ever compares: the curl pages
+in `frontend/public/run/` (`curl jhemery.xyz/neofetch`) and the résumé's exact bytes. A change to a
+command's output or to the content fails CI until they are rewritten:
+
+```bash
+cd frontend && npx vitest run src/terminal/__tests__/curl-pages.spec.ts src/content/__tests__/resume.spec.ts -u
+```
+
 ### Two test suites, with a line between them
 
 `src/**/__tests__/` (vitest, jsdom) owns behaviour: the command registry, every
@@ -112,14 +120,24 @@ top level (`registry-load.spec.ts` and `src/__tests__/import-cycles.spec.ts` wil
 command means adding one object — never a special case in the shell. A `Command` declares its own
 `writes` (required: `none`, `local` or `server`, or a function of the arguments — see `Writes` in
 `types.ts`), `hidden` (out of `help` and Tab), `palette` (in Ctrl+K), `linkable` (worth running
-from a `?run=` link, optionally a predicate of the arguments), `group`, and `complete(ctx)` for
-argument completion; the shell handles prefix filtering, common-prefix insertion and ambiguity
+from a `?run=` link, optionally a predicate of the arguments), `group`, `complete(ctx)` for
+argument completion, and `manual` for what its man page adds to the generated one (every flag in
+its `usage` needs OPTIONS text there, which `manual.spec.ts` checks); the shell handles prefix filtering, common-prefix insertion and ambiguity
 listing generically. Anything that runs a command the visitor didn't type must ask
 `isLinkable(command, args)`: opted in, not hidden, writes `none`, and every argument one the
-command offers for Tab. `runLink` does today; `tour`, pipe stages and history expansion must when
-they land. `ctx.run` checks nothing, so only pass it fixed command lines. Read `writes` through
-`writesOf()`; `registry.spec.ts` pins the whole classification, so a new writer or a quiet
+command offers for Tab. `runLink` and `tour` do, and so does every stage of a linked pipe.
+History expansion follows its own rule, read off the same `writes`: a line naming a
+server-writing command (through an alias too) is never expanded, and an expansion that would
+write anything waits in history for the visitor to send it. `ctx.run` checks nothing, so only
+pass it fixed command lines. Read `writes` through `writesOf()`; `registry.spec.ts` pins the whole classification, so a new writer or a quiet
 downgrade fails it.
+
+A line is read by `terminal/parse.ts` (pipes, `;`, `&&`, `||`, `NAME=value`): quotes only group
+(they hide operators), and a stage's words are still its text split on spaces, so commands read
+their own quoting as they always have. On the left of a `|` a command has `tty: false` (`capture`
+and `prompt` throw) and its output becomes the next stage's `stdin`. Report an operand or usage
+error with `fail()` from `format.ts`: it is marked `stderr`, so it reaches the screen from inside
+a pipe and is what stops `&&`. The error *tone* alone means nothing to the shell.
 
 `CommandContext` (in `terminal/types.ts`) is the whole capability surface a command gets: `print`,
 `frame()` for redrawable animation regions, `capture()` for holding the keyboard (how the games
@@ -173,7 +191,9 @@ erroring, and the frontend renders that state. Preserve this when adding integra
 
 Privacy is a design constraint, not an afterthought: `/presence` pushes one integer over SSE with
 no visitor id, `/stats` counts sessions not commands, `/weather` uses server-side coordinates so
-every visitor gets the same answer, and `ask` never logs questions or answers.
+every visitor gets the same answer, and `ask` never logs questions or answers. `strace` shows the
+shape of a request's bodies, never their values, and never a header; anything new fed to the
+request observer in `lib/api.ts` must keep it that way.
 
 ### API base URL
 
@@ -185,8 +205,12 @@ previously-shipped bugs.
 ### Performance constraints worth not breaking
 
 `ThreeBackground.vue` (~520 kB of three.js) is `defineAsyncComponent`'d, loaded on
-`requestIdleCallback`, skipped entirely under `prefers-reduced-motion`, and **excluded from the PWA
-precache** — with a runtime StaleWhileRevalidate rule instead. The API is deliberately absent from
+`requestIdleCallback`, never fetched while motion is `paused` (`composables/useMotion.ts`, which
+`prefers-reduced-motion` holds at `paused`), and **excluded from the PWA precache** — with a
+runtime StaleWhileRevalidate rule instead. Its loop runs on elapsed time, not frames, under a
+60 fps governor (30 under `calm` or with the terminal open): a new term in it scales by `f` or
+eases with `ease(k, f)`, and allocates nothing. Animations read `decorativeMotion()`, not
+`prefersReducedMotion()`, except the games, whose stepped mode is a rule change. The API is deliberately absent from
 `runtimeCaching`: a stale "in game" is worse than an honest "unavailable". `navigateFallbackDenylist`
 protects the real files (`/resume.txt`, `/llms.txt`, `/sitemap.xml`, …) from the SPA fallback.
 The frontend PR check enforces Lighthouse budgets (`lighthouserc.yml`, median of five runs).

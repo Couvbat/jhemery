@@ -4,6 +4,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { profile } from '@/content'
 import { useLocale } from '@/i18n'
 import { openTerminal } from '@/composables/useTerminalShell'
+import WindowDots from '@/components/WindowDots.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -20,9 +21,7 @@ const ctf = computed(() => /^\/ctf\/?$/i.test(route.path))
     <div class="w-full max-w-2xl">
       <div class="rounded border border-destructive/40 bg-card overflow-hidden">
         <div class="flex items-center gap-2 px-4 py-2 bg-muted border-b border-border">
-          <span class="w-3 h-3 rounded-full bg-red-500/80"></span>
-          <span class="w-3 h-3 rounded-full bg-yellow-500/80"></span>
-          <span class="w-3 h-3 rounded-full bg-green-500/80"></span>
+          <WindowDots />
           <span class="ml-3 text-xs text-muted-foreground"
             >{{ profile.handle }}@{{ profile.host }} ~ bash</span
           >
@@ -39,7 +38,7 @@ const ctf = computed(() => /^\/ctf\/?$/i.test(route.path))
             bash: cd: {{ attemptedPath }}: No such file or directory
           </p>
 
-          <p class="text-6xl font-bold text-destructive glow-pink">404</p>
+          <h1 tabindex="-1" class="text-6xl font-bold text-destructive glow-pink rounded-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-4 focus-visible:ring-offset-background">404</h1>
 
           <p v-if="ctf" data-testid="ctf-hint" class="text-accent">{{ t(m.notFound.ctf) }}</p>
 

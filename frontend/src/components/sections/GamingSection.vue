@@ -6,6 +6,7 @@ import SectionHeader from '@/components/SectionHeader.vue'
 import { gaming } from '@/content'
 import { useLocale } from '@/i18n'
 import { useSteam, formatPlaytime } from '@/composables/useSteam'
+import WindowDots from '@/components/WindowDots.vue'
 
 const { t, m } = useLocale()
 const { profile: steamProfile, games: steamGames } = useSteam()
@@ -76,9 +77,7 @@ const displayGames = computed(() => {
         <!-- Game log terminal -->
         <Card class="bg-card border-border overflow-hidden gap-0 py-0">
           <div class="flex items-center gap-2 px-4 py-2 bg-muted border-b border-border">
-            <span class="w-3 h-3 rounded-full bg-red-500/80"></span>
-            <span class="w-3 h-3 rounded-full bg-yellow-500/80"></span>
-            <span class="w-3 h-3 rounded-full bg-green-500/80"></span>
+            <WindowDots />
             <span class="ml-3 text-xs text-muted-foreground">game-log.txt</span>
           </div>
           <CardContent class="p-4 font-mono text-xs space-y-1">

@@ -5,6 +5,8 @@ import HighlightText from '@/components/HighlightText.vue'
 import { isExternal, profile, skills } from '@/content'
 import { useLocale } from '@/i18n'
 import { goTo } from '@/composables/useViewSwing'
+import { decorativeMotion } from '@/composables/useMotion'
+import WindowDots from '@/components/WindowDots.vue'
 
 const { t, m, locale } = useLocale()
 
@@ -25,7 +27,8 @@ function typeTagline() {
   clearInterval(timer)
   const fullText = t(profile.tagline)
 
-  if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+  // Typed under `calm` too; only `paused` (or reduced motion) prints it whole.
+  if (decorativeMotion() === 'paused') {
     displayed.value = fullText
     return
   }
@@ -54,9 +57,7 @@ onUnmounted(() => clearInterval(timer))
       <div class="rounded border border-border bg-card overflow-hidden border-glow">
         <!-- Title bar -->
         <div class="flex items-center gap-2 px-4 py-2 bg-muted border-b border-border">
-          <span class="w-3 h-3 rounded-full bg-red-500/80"></span>
-          <span class="w-3 h-3 rounded-full bg-yellow-500/80"></span>
-          <span class="w-3 h-3 rounded-full bg-green-500/80"></span>
+          <WindowDots />
           <span class="ml-3 text-xs text-muted-foreground">{{ profile.handle }}@{{ profile.host }} ~ bash</span>
         </div>
 
@@ -75,8 +76,14 @@ onUnmounted(() => clearInterval(timer))
 
           <!-- Name + typing effect -->
           <div>
-            <h1 class="text-3xl md:text-5xl font-bold text-primary glow-green tracking-tight">
-              {{ displayed }}<span class="animate-pulse">█</span>
+            <!-- Named by the whole tagline, not by what has been typed so far: focus can land
+                 here mid-animation, and a screen reader would read "full block". -->
+            <h1
+              tabindex="-1"
+              :aria-label="t(profile.tagline)"
+              class="text-3xl md:text-5xl font-bold text-primary glow-green tracking-tight rounded-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-4 focus-visible:ring-offset-background"
+            >
+              <span aria-hidden="true">{{ displayed }}<span class="animate-pulse">█</span></span>
             </h1>
           </div>
 

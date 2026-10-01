@@ -5,7 +5,7 @@ import { readFileSync } from 'node:fs'
 import { fileURLToPath, URL } from 'node:url'
 import { describe, expect, it } from 'vitest'
 import { parseColour } from '@/lib/colour'
-import { checkFloors, liftToFloor, TEXT_FLOOR } from '../themeRules'
+import { checkFloors, liftToFloor, meetsFloors, TEXT_FLOOR } from '../themeRules'
 import { DEFAULT_THEME, findTheme, themes, themeTokens } from '../themes'
 
 /** Every custom property `:root` declares in the stylesheet, with its value. */
@@ -70,6 +70,17 @@ describe('themes', () => {
     }
   })
 
+  // three.js reads the four hue slots off the page, and `THREE.Color` parses no `oklch()`.
+  // So `:root` paints them in hex, while the table holds the default's oklch primary,
+  // accent and secondary for its swatches: close, not equal. The wireframes' ease starts
+  // from the property as painted, which is this hex, not the table's value.
+  it('paints the default hue slots in hex, which three.js can read', () => {
+    const root = rootTokens()
+    for (const slot of ['--neon-green', '--neon-cyan', '--neon-purple', '--neon-pink']) {
+      expect(root.get(slot), slot).toMatch(/^#[0-9a-f]{6}$/)
+    }
+  })
+
   // The default is never written, so main.css is its only definition, and it is the
   // scheme Lighthouse measures. It has to pass as shipped, not because the table lifted
   // a copy of it that nothing paints.
@@ -87,6 +98,7 @@ describe('themes', () => {
   describe.each(themes.map((theme) => [theme.id, theme] as const))('%s', (_, theme) => {
     it('meets every contrast floor', () => {
       expect(checkFloors(theme.colours)).toEqual([])
+      expect(meetsFloors(theme.colours)).toBe(true)
     })
 
     it('says which way it faces', () => {
