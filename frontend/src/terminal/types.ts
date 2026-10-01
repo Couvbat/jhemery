@@ -217,5 +217,16 @@ export interface Command {
    * the shell needs a table of special cases.
    */
   complete?: (ctx: CompleteContext) => string[]
+  /**
+   * What `man <name>` adds to the page generated from this command (`terminal/manual.ts`):
+   * a longer DESCRIPTION, the OPTIONS text for the flags in `usage` (`manual.spec.ts` holds
+   * every flag to one), more EXAMPLES, and SEE ALSO, which may point somewhere oblique.
+   */
+  manual?: {
+    description?: Localised<string[]>
+    options?: Record<string, Localised>
+    examples?: { command: string; text?: Localised }[]
+    seeAlso?: string[]
+  }
   run: (ctx: CommandContext) => OutputLine[] | void | Promise<OutputLine[] | void>
 }

@@ -10,7 +10,7 @@ vi.mock('@/composables/useCrt', async (importOriginal) => ({
 import { setLocale } from '@/i18n'
 import { setAlias, clearAliases } from '@/terminal/aliases'
 import { consumeRunParam } from '../useRunLink'
-import { cancel, runLink, useTerminal } from '../useTerminal'
+import { cancel, handleCaptureKeydown, runLink, useTerminal } from '../useTerminal'
 import { pendingLinkCommand, terminalOpen } from '../useTerminalShell'
 
 const { buffer, busy, capturing, clearBuffer, run } = useTerminal()
@@ -136,6 +136,22 @@ describe('runLink', () => {
     expect(buffer.value).toHaveLength(1)
     expect(buffer.value[0]!.tone).toBe('warning')
     expect(texts()).not.toContain('couvbat')
+  })
+
+  // A page longer than the screen waits in the pager, so each is closed with q.
+  it('runs man for a visible page or jules, and refuses a hidden one in any section', async () => {
+    for (const [link, title] of [['man ls', 'LS(1)'], ['man jules', 'JULES(1)']] as const) {
+      clearBuffer()
+      const done = runLink(link)
+      await vi.waitFor(() => expect(texts().some((l) => l.startsWith(title)), link).toBe(true))
+      handleCaptureKeydown(new KeyboardEvent('keydown', { key: 'q' }))
+      await done
+    }
+    for (const hidden of ['man vim', 'man 6 vim']) {
+      clearBuffer()
+      await runLink(hidden)
+      expect(buffer.value[0]!.tone, hidden).toBe('warning')
+    }
   })
 
   it('strips control characters and caps the length', async () => {

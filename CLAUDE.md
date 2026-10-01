@@ -120,8 +120,9 @@ top level (`registry-load.spec.ts` and `src/__tests__/import-cycles.spec.ts` wil
 command means adding one object — never a special case in the shell. A `Command` declares its own
 `writes` (required: `none`, `local` or `server`, or a function of the arguments — see `Writes` in
 `types.ts`), `hidden` (out of `help` and Tab), `palette` (in Ctrl+K), `linkable` (worth running
-from a `?run=` link, optionally a predicate of the arguments), `group`, and `complete(ctx)` for
-argument completion; the shell handles prefix filtering, common-prefix insertion and ambiguity
+from a `?run=` link, optionally a predicate of the arguments), `group`, `complete(ctx)` for
+argument completion, and `manual` for what its man page adds to the generated one (every flag in
+its `usage` needs OPTIONS text there, which `manual.spec.ts` checks); the shell handles prefix filtering, common-prefix insertion and ambiguity
 listing generically. Anything that runs a command the visitor didn't type must ask
 `isLinkable(command, args)`: opted in, not hidden, writes `none`, and every argument one the
 command offers for Tab. `runLink` does today; `tour`, pipe stages and history expansion must when

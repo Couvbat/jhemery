@@ -86,6 +86,12 @@ export const contentCommands: Command[] = [
     name: 'skills',
     usage: 'skills [--why]',
     description: { en: 'Tech I work with', fr: "Technos que j'utilise" },
+    manual: {
+      options: {
+        '--why': { en: 'Where each skill is used on this site or in its code: the evidence, not the claim.', fr: 'Où chaque compétence sert sur ce site ou dans son code : la preuve, pas l’affirmation.' },
+      },
+      seeAlso: ['projects(1)', 'resume(1)'],
+    },
     group: 'content',
     writes: 'none',
     linkable: true,
@@ -136,6 +142,13 @@ export const contentCommands: Command[] = [
     name: 'projects',
     usage: 'projects [--json] [<part>]',
     description: { en: 'What I have built', fr: "Ce que j'ai construit" },
+    manual: {
+      options: {
+        '--json': { en: 'The projects as JSON, for `jq` or another program; this site’s own entry carries its case studies.', fr: 'Les projets en JSON, pour `jq` ou un autre programme ; l’entrée de ce site porte ses études de cas.' },
+      },
+      examples: [{ command: 'projects qr' }, { command: 'projects --json | jq .' }],
+      seeAlso: ['why(1)', 'skills(1)'],
+    },
     group: 'content',
     writes: 'none',
     linkable: true,
@@ -403,6 +416,13 @@ export const contentCommands: Command[] = [
     description: {
       en: 'Fetch a page of this site, as a real curl would',
       fr: 'Récupérer une page de ce site, comme un vrai curl',
+    },
+    manual: {
+      options: {
+        '-I': { en: 'Ask for the headers only (HEAD), and print the real ones: the CSP and HSTS included.', fr: 'Ne demander que les en-têtes (HEAD), et afficher les vrais : CSP et HSTS compris.' },
+      },
+      examples: [{ command: `curl ${profile.domain}` }, { command: `curl -I ${profile.domain}/llms.txt` }],
+      seeAlso: ['strace(1)', 'resume(1)', 'jules(1)'],
     },
     group: 'content',
     writes: 'none',

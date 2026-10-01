@@ -5,6 +5,7 @@ import { expandAliases } from '@/terminal/aliases'
 import { history, pushHistory } from '@/terminal/history'
 import { pick, type Locale } from '@/content/types'
 import { fail } from '@/terminal/format'
+import { flagsOf, renderUsage } from '@/terminal/manual'
 import { lastStageStart, parseLine, replaceStages, type Link, type Stage } from '@/terminal/parse'
 import {
   commonPrefix,
@@ -398,6 +399,13 @@ async function runPipeline(stages: ResolvedStage[], signal: AbortSignal): Promis
     // Each stage starts with the keyboard free: a stage before it can't leave a handler.
     keyCapture.value = null
     const scope: Scope = { signal, sink, tty: last, locale: localeOf(stage.env) }
+    // `--help` as the very first argument, and only there: `projects --json` and
+    // `echo hi --help` mean what they always meant.
+    if (stage.args[0] === '--help') {
+      sink.print(renderUsage(stage.command, (value) => pick(value, scope.locale ?? currentLocale())))
+      stdin = 'lines' in sink ? (sink as ReturnType<typeof collector>).lines : undefined
+      continue
+    }
     try {
       const result = await stage.command.run(buildContext(stage.args, stage.raw, scope, stdin))
       if (result) sink.print(toLines(result))
@@ -639,16 +647,35 @@ export interface Completion {
   caret: number
 }
 
-/** Candidates for a word past the command name — the command's own to declare. */
+/**
+ * Candidates for a word past the command name — the command's own to declare. A word
+ * starting with `-` is offered the flags its usage names too, whatever its `complete`.
+ */
 function completeArgument(words: string[], index: number, word: string): string[] {
   const owner = ownerOf(words)
-  if (!owner?.command.complete) return []
+  if (!owner) return []
 
   const argIndex = index - owner.argStart
   if (argIndex < 0) return []
 
   const args = words.slice(owner.argStart)
-  return filterByPrefix(owner.command.complete({ args, index: argIndex, word }), word)
+  const own = owner.command.complete?.({ args, index: argIndex, word }) ?? []
+  const flags = word.startsWith('-') ? flagsOf(owner.command) : []
+  return filterByPrefix([...new Set([...own, ...flags])], word)
+}
+
+/** `-<Tab>` with several flags left: each one with what it does, as zsh lists them. */
+function describeFlags(words: string[], candidates: string[]): OutputLine[] | undefined {
+  const owner = ownerOf(words)
+  const options = owner?.command.manual?.options
+  if (!owner || !options || !candidates.every((c) => c.startsWith('-'))) return undefined
+  const width = Math.max(...candidates.map((c) => c.length))
+  const locale = currentLocale()
+  return candidates.map((flag) => ({
+    text: `${flag.padEnd(width)}  ${options[flag] ? pick(options[flag]!, locale) : ''}`.trimEnd(),
+    tone: 'muted' as const,
+    pre: true,
+  }))
 }
 
 /**
@@ -692,7 +719,7 @@ export function completeInput(value: string, caret: number = value.length): Comp
   if (candidates.length === 1) return splice(`${candidates[0]!} `)
 
   const shared = commonPrefix(candidates)
-  append({ text: candidates.join('  '), tone: 'muted', pre: true })
+  append(describeFlags(words, candidates) ?? { text: candidates.join('  '), tone: 'muted', pre: true })
   return shared.length > word.length ? splice(shared) : { value, caret: at }
 }
 

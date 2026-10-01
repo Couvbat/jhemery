@@ -9,6 +9,7 @@ import { durationLabel, periodLabel, yearSpan } from '../src/content/dates'
 import { education, experience } from '../src/content/experience'
 import { sectionIds } from '../src/content/sections'
 import { isExternal, pick, type Locale, type Localised } from '../src/content/types'
+import { julesManual } from '../src/content/manual'
 import { SGR_TONES } from '../src/terminal/ansi'
 
 /**
@@ -448,6 +449,58 @@ export function buildContentJson(at = new Date()): string {
   })
 }
 
+// ---------------------------------------------------------------------------
+// jules.1: the person as a real manual page (`curl -s jhemery.xyz/jules.1 | man -l -`)
+// ---------------------------------------------------------------------------
+
+/**
+ * Text for roff: a backslash is `\e`, a hyphen `\-` (roff's own hyphen is a different glyph,
+ * and options must copy-paste as minus signs), and no line may start with `.` or `'`, which
+ * would make it a request.
+ */
+export function escapeRoff(text: string): string {
+  return text.replace(/\\/g, '\\e').replace(/-/g, '\\-').replace(/^([.'])/gm, '\\&$1')
+}
+
+/** The same page `man jules` shows in the terminal (`content/manual.ts`), in roff. */
+export function buildManRoff(locale: Locale, at = new Date()): string {
+  const page = julesManual(at)
+  const t = <T,>(value: Localised<T>) => pick(value, locale)
+  const r = escapeRoff
+  const head = (text: string) => (/\s/.test(text) ? `.SH "${r(text.toUpperCase())}"` : `.SH ${r(text.toUpperCase())}`)
+  const fr = locale === 'fr'
+  const out: string[] = [
+    `.TH JULES ${page.section} "${at.toISOString().slice(0, 10)}" "${profile.domain}" "${fr ? 'Manuel des personnes' : 'People Manual'}"`,
+    head(fr ? 'Nom' : 'Name'),
+    `${page.name} \\- ${r(t(page.summary))}`,
+    head('Synopsis'),
+    '.nf',
+    ...page.synopsis.map(r),
+    '.fi',
+    head('Description'),
+    ...t(page.description).flatMap((paragraph, i) => [...(i ? ['.PP'] : []), r(paragraph)]),
+  ]
+  if (page.options?.length) {
+    out.push(head('Options'))
+    for (const option of page.options) out.push('.TP', `.B ${r(option.flag)}`, r(t(option.text)))
+  }
+  for (const section of page.sections ?? []) {
+    out.push(head(t(section.heading)), ...t(section.lines).flatMap((text, i) => [...(i ? ['.br'] : []), r(text)]))
+  }
+  if (page.examples?.length) {
+    out.push(head(fr ? 'Exemples' : 'Examples'))
+    for (const example of page.examples) {
+      out.push('.PP', '.nf', r(example.command), '.fi', ...(example.text ? [r(t(example.text))] : []))
+    }
+  }
+  out.push(head(fr ? 'Voir aussi' : 'See also'))
+  page.seeAlso.forEach((ref, i) => {
+    const [, name, section] = /^(.+)\((\d)\)$/.exec(ref) ?? [ref, ref, '1']
+    out.push(`.BR ${r(name!)} (${section})${i < page.seeAlso.length - 1 ? ',' : ''}`)
+  })
+  return `${out.join('\n')}\n`
+}
+
 interface EmittedFile {
   fileName: string
   contentType: string
@@ -460,6 +513,8 @@ const files: EmittedFile[] = [
   { fileName: resumeHtmlFile('fr'), contentType: 'text/html; charset=utf-8', build: () => buildResumeHtml('fr') },
   { fileName: 'resume.css', contentType: 'text/css; charset=utf-8', build: () => RESUME_CSS },
   { fileName: 'content.json', contentType: 'application/json; charset=utf-8', build: () => buildContentJson() },
+  { fileName: 'jules.1', contentType: 'text/plain; charset=utf-8', build: () => buildManRoff('en') },
+  { fileName: 'jules.fr.1', contentType: 'text/plain; charset=utf-8', build: () => buildManRoff('fr') },
 ]
 
 export function resumePlugin(): Plugin {

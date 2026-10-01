@@ -44,6 +44,16 @@ export const navigateCommands: Command[] = [
     name: 'ls',
     usage: 'ls [-a] [path]',
     description: { en: 'List sections, pages and files', fr: 'Lister sections, pages et fichiers' },
+    manual: {
+      options: {
+        '-a': {
+          en: 'Show the files whose names start with a dot. They are hidden for a reason, which is the reason to look.',
+          fr: 'Afficher les fichiers dont le nom commence par un point. Ils sont cachés pour une raison, qui est justement d’aller voir.',
+        },
+      },
+      examples: [{ command: 'ls tools' }, { command: 'ls projects' }],
+      seeAlso: ['cd(1)', 'cat(1)', 'sl(6)'],
+    },
     group: 'navigate',
     writes: 'none',
     // `ls -a` lists the dotfiles, the way into the `secret` and `dotenv` achievements
@@ -140,6 +150,10 @@ export const navigateCommands: Command[] = [
     name: 'cat',
     usage: 'cat <file>',
     description: { en: 'Print a file', fr: 'Afficher un fichier' },
+    manual: {
+      examples: [{ command: 'cat about.txt' }, { command: 'cat projects/qr.md' }, { command: 'help | cat' }],
+      seeAlso: ['ls(1)', 'diff(1)', 'vim(6)'],
+    },
     group: 'navigate',
     writes: 'none',
     // The case studies only once the word reaches into `projects/`, so a bare Tab
