@@ -183,10 +183,28 @@ function buildContext(args: string[], raw: string, signal: AbortSignal): Command
         if (keyCapture.value === handler) keyCapture.value = null
       }
     },
-    run: (input: string) => run(input),
+    run: (input: string) => runNested(input, signal),
     effects,
     signal,
   }
+}
+
+/**
+ * `ctx.run`: another command inside the one running. It shares the parent's signal, so
+ * Ctrl+C stops both, and leaves `busy`, the abort controller and the keyboard alone,
+ * because the parent is still running; going through `run()` reset all three when the
+ * child finished. It never expands the visitor's aliases: the parent may be a link or
+ * `tour`, which the visitor didn't type. Two-word names resolve as typed ones do.
+ */
+async function runNested(input: string, signal: AbortSignal): Promise<void> {
+  const target = resolveLink(input)
+  if (!target) {
+    const [name = ''] = input.trim().split(/\s+/)
+    append({ text: `${name}: ${messages.terminal.notFound[currentLocale()]}`, tone: 'error' })
+    return
+  }
+  const result = await target.command.run(buildContext(target.args, input, signal))
+  if (result) append(result)
 }
 
 export async function run(input: string): Promise<void> {

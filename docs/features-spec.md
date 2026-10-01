@@ -111,8 +111,9 @@ resolver, and the side-effect handles a command may use: `print()`, `clear()`, `
 `frame()` (a redrawable output region — animations and game boards), `navigate(target)` (anything
 `cd` accepts, through `goTo()` — §11), `prompt(question, { mask })` (resolves to the next line the
 user types, rejects on `Ctrl+C`), `capture(handler)` (holds the raw keyboard for the games — §3 —
-and is released unconditionally when the command settles), `run(input)` (runs another command as
-if typed — how `git log` delegates to `gitlog`), a `signal: AbortSignal` so animated commands stop
+and is released unconditionally when the command settles), `run(input)` (runs another command
+*inside* this one: the same signal, keyboard and busy state, and never the visitor's aliases —
+`git log` is a two-word alias of `gitlog`, not a delegation), a `signal: AbortSignal` so animated commands stop
 cleanly when cancelled, and `effects`: `matrix`, `reboot`, `crt`, `vim`/`vimIsDirty`/`vimMessage`
 (§5.1), `glitch` and `playMusic`. `terminal/types.ts` documents each; read it before adding a
 primitive.

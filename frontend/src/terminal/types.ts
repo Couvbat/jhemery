@@ -102,7 +102,11 @@ export interface CommandContext {
    * reach the handler, so `Ctrl+C` and `Ctrl+L` keep working throughout.
    */
   capture: (handler: (key: string) => void) => () => void
-  /** Runs another command as if typed — used by aliases like `git log`. */
+  /**
+   * Runs another command inside this one: the same signal (Ctrl+C stops both), the same
+   * keyboard, and never the visitor's aliases. The shell stays busy until the caller
+   * finishes. A throw, `AbortError` included, propagates to the caller.
+   */
   run: (input: string) => Promise<void>
   effects: TerminalEffects
   signal: AbortSignal
