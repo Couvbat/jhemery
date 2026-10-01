@@ -86,7 +86,20 @@ describe('PresenceService', () => {
       }
     });
 
-    it('sends at most one every few seconds across the site', () => {
+    it('hands each connection its own frame, so the id Nest stamps on one stays off the others', () => {
+      const first = connect();
+      const second = connect();
+
+      service.wave(0);
+
+      expect(first.waves[0]).not.toBe(second.waves[0]);
+      (first.waves[0] as { id?: string }).id = '7';
+      expect(second.waves[0]).toEqual({ type: 'wave', data: {} });
+    });
+
+    it('sends at most one every fifteen seconds across the site', () => {
+      expect(WAVE_EVERY_MS).toBe(15_000);
+
       const { waves } = connect();
 
       service.wave(0);

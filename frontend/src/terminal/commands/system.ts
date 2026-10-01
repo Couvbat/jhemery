@@ -189,7 +189,11 @@ async function who({ t, signal }: CommandContext): Promise<OutputLine[]> {
   }
   const total =
     others === 0
-      ? t({ en: 'just you here. `wall` waves at whoever arrives.', fr: 'vous seul ici. `wall` fait signe à qui arrivera.' })
+      ? // Not "whoever arrives": a wave is a moment, and nobody who comes later hears it.
+        t({
+          en: 'just you here. `wall` waves at whoever is on the site when you send it.',
+          fr: 'vous seul ici. `wall` fait signe à qui est sur le site quand vous l’envoyez.',
+        })
       : t({
           en: `${count} here now, you included. \`wall\` waves at them.`,
           fr: `${count} personnes ici, vous compris. \`wall\` leur fait signe.`,
@@ -200,8 +204,9 @@ async function who({ t, signal }: CommandContext): Promise<OutputLine[]> {
 const WAVE_REPLIES: Record<WaveResult, { text: Localised; tone: Tone }> = {
   sent: {
     text: {
-      en: 'waved. Everyone else’s wireframes ripple, and an open terminal says so.',
-      fr: 'signe envoyé. Les formes de tous les autres ondulent, et un terminal ouvert le dit.',
+      // "May": the server spaces waves site-wide, and a page standing still shows no ripple.
+      en: 'waved. Anyone else here may see their wireframes ripple, or a line in an open terminal.',
+      fr: 'signe envoyé. Les autres ici verront peut-être leurs formes onduler, ou une ligne dans un terminal ouvert.',
     },
     tone: 'success',
   },
@@ -210,7 +215,7 @@ const WAVE_REPLIES: Record<WaveResult, { text: Localised; tone: Tone }> = {
     tone: 'muted',
   },
   limited: {
-    text: { en: 'wall: that is enough waving for a minute.', fr: 'wall : assez de signes pour une minute.' },
+    text: { en: 'wall: that is enough waving for a while.', fr: 'wall : assez de signes pour le moment.' },
     tone: 'warning',
   },
   off: {

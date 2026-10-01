@@ -29,6 +29,8 @@ describe('who', () => {
     const { text } = await runCommand(who)
     expect(rows(text)).toEqual(['you       pts/0'])
     expect(text).toContain('just you here')
+    // A wave is heard by whoever is there when it is sent, never by someone arriving later.
+    expect(text).toContain('when you send it')
   })
 
   it('draws one anonymous tty per other visitor, and nothing about any of them', async () => {

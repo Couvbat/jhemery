@@ -35,12 +35,20 @@ const wave = ref(0)
 const closed = ref(0)
 /**
  * The server can't tell connections apart, so a wave comes back to the tab that sent it
- * too. It is excluded here instead: for this long after sending, waves are ignored.
- * Longer than the server's 3 s coalescing, so the echo of our own can't slip past.
+ * too. It is excluded here instead: for this long after sending, waves are ignored. The
+ * server broadcasts while it handles the POST, so the echo is never later than the reply;
+ * this only has to cover a slow connection.
  */
 export const OWN_ECHO_MS = 3_500
-/** However many arrive, one is shown at most this often: a ripple is a nudge, not a feed. */
+/**
+ * However many arrive, one is shown at most this often: a ripple is a nudge, not a feed.
+ * The server's own site-wide spacing (`WAVE_EVERY_MS`) is the same, so this only
+ * matters to a tab that hears an old backend.
+ */
 export const SHOW_EVERY_MS = 15_000
+
+/** `EventSource.CLOSED`, spelt out so a stand-in without the static still compares. */
+const CLOSED = 2
 
 let source: EventSource | null = null
 let failures = 0
@@ -82,8 +90,10 @@ export function startPresence(): void {
     failures += 1
     // EventSource retries on its own; this only steps in once it is clear
     // nothing is listening, so a missing backend costs three attempts, not a
-    // reconnect loop for as long as the tab is open.
-    if (failures >= MAX_FAILURES) stopPresence()
+    // reconnect loop for as long as the tab is open. An HTTP error (a 502 while the
+    // backend restarts) is different: the browser closes the source itself and never
+    // retries, so it is let go at once, or `who` would wait on it for good.
+    if (failures >= MAX_FAILURES || source?.readyState === CLOSED) stopPresence()
   }
 }
 

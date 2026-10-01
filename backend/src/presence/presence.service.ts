@@ -11,13 +11,12 @@ import { UnitHealth } from '../common/health';
 const HEARTBEAT_MS = 25_000;
 
 /**
- * However many visitors run `wall`, the site ripples at most this often. The
- * route is rate-limited per IP too, but rotated addresses would get round that,
- * so this is the ceiling that holds whoever is sending: one wave every 3 s.
+ * However many visitors run `wall`, the site ripples at most this often: once
+ * every 15 s, the most any visitor's tab shows anyway (`SHOW_EVERY_MS` in the
+ * frontend), so this is the ceiling that holds whoever is sending, from however
+ * many addresses.
  */
-export const WAVE_EVERY_MS = 3_000;
-
-const WAVE: WaveFrame = { type: 'wave', data: {} };
+export const WAVE_EVERY_MS = 15_000;
 
 /**
  * A count of open SSE connections, and nothing else — see `presence.types.ts`
@@ -36,7 +35,7 @@ export class PresenceService {
     return () => clearInterval(timer);
   });
   /** Not replayed: a wave is a moment, and someone arriving after it missed it. */
-  private readonly waves = new Subject<WaveFrame>();
+  private readonly waves = new Subject<void>();
   private lastWave = -Infinity;
 
   /**
@@ -54,7 +53,10 @@ export class PresenceService {
         merge(this.counts, this.heartbeat).pipe(
           map((online): PresenceFrame => ({ data: { online } })),
         ),
-        this.waves,
+        // A fresh frame for each connection, never one shared object: Nest stamps a
+        // connection's own frame counter onto a frame with no id, in place, so a shared
+        // one would carry the first visitor's counter to everybody, for good.
+        this.waves.pipe(map((): WaveFrame => ({ type: 'wave', data: {} }))),
       ).subscribe(subscriber);
 
       return () => {
@@ -77,7 +79,7 @@ export class PresenceService {
   wave(now = Date.now()): void {
     if (now - this.lastWave < WAVE_EVERY_MS) return;
     this.lastWave = now;
-    this.waves.next(WAVE);
+    this.waves.next();
   }
 
   /** Exposed for the test; nothing in the app reads it. */

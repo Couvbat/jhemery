@@ -18,6 +18,8 @@ class FakeSource {
   static opened = 0
   onmessage: ((event: MessageEvent) => void) | null = null
   onerror: (() => void) | null = null
+  /** 0 connecting, 1 open, 2 closed — what the browser's own reads. */
+  readyState = 0
   closed = false
   private named = new Map<string, Array<() => void>>()
 
@@ -43,6 +45,12 @@ class FakeSource {
   }
 
   fail() {
+    this.onerror?.()
+  }
+
+  /** An HTTP error: the browser closes the source itself, fires `error` once, and stops. */
+  refuse() {
+    this.readyState = 2
     this.onerror?.()
   }
 }
@@ -170,6 +178,19 @@ describe('usePresence', () => {
       expect(FakeSource.last!.closed).toBe(false)
       FakeSource.last!.count(2)
       expect(await second).toBe(2)
+    })
+
+    // A 502 while the backend restarts: the browser gives up on its own after one error.
+    it('lets go of a stream the browser closed, so the next ask opens a new one', async () => {
+      const { whenPresent } = await load()
+      const first = whenPresent()
+      FakeSource.last!.refuse()
+      expect(await first).toBeNull()
+
+      const second = whenPresent()
+      expect(FakeSource.opened).toBe(2)
+      FakeSource.last!.count(3)
+      expect(await second).toBe(3)
     })
 
     it('stops waiting on Ctrl+C', async () => {

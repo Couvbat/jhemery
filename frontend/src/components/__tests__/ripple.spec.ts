@@ -11,11 +11,15 @@ describe('rippleOffset', () => {
   })
 
   it('pushes hardest where the ring is, and barely anywhere else', () => {
-    const t = 0.5
+    // Late enough that the ring has a real inside: a disc instead of a ring would keep
+    // pushing what it has passed, and only a radius behind the front can catch that.
+    const t = 1
     const front = RIPPLE_SPEED * t
     const atFront = rippleOffset(front, t)
+    expect(front - 6).toBeGreaterThan(0)
     expect(atFront).toBeGreaterThan(0)
     expect(rippleOffset(front - 6, t)).toBeLessThan(atFront / 100)
+    expect(rippleOffset(0, t)).toBeLessThan(atFront / 100)
     expect(rippleOffset(front + 6, t)).toBeLessThan(atFront / 100)
   })
 

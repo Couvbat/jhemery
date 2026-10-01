@@ -318,7 +318,7 @@ them.
 | [x] | Theme transitions | A new scheme spreads in a circle from the swatch clicked (`document.startViewTransition`, a clip-path on `::view-transition-new(root)`, ~450 ms; skipped for dark → light so the Flashbang plays as today), and the wireframes ease to their new colour with a preallocated lerp. Fixes three things that ignore the scheme: `MatrixRain.vue`'s hard-coded greens and English-only hint, the `.crt-overdrive` fringe, and the SoundCloud colour baked into `content/music.ts`. | `composables/useTheme.ts`, `components/ThreeBackground.vue`, `components/effects/MatrixRain.vue`, `assets/main.css`, `content/music.ts`, `sections/MusicSection.vue` | S |
 | [x] | Motion control | *Full · calm · paused* in the 🎨 menu and a `motion` command, persisted as `couvbat:motion`. Today only the OS setting stops the field (WCAG 2.2.2). The OS setting is a floor the row can't lift. Decorative surfaces read a `decorativeMotion()` (field, confetti, glitch, boot replay, prompt cycling, swing), while the games keep reading `prefersReducedMotion()`. Also a frame governor: 60 fps at most, 30 while the terminal's blurred panel is open. Not linkable, since it writes a setting. | `composables/useMotion.ts` (new), `components/ThemeMenu.vue`, `components/ThreeBackground.vue`, the effect components | S |
 | [x] | Accessible page changes | After the prism swing settles, focus the new view's `<h1 tabindex="-1">` and announce its `tabTitle()` in one `role="status"` node; the leaving face is `inert` for the swing (two `<main>`s overlap today); a skip link comes first. Tested in e2e, because focus after a real transition is what jsdom can't see. | `App.vue`, `composables/useViewSwing.ts`, `composables/useTabTitle.ts`, `e2e/navigation.spec.ts` | M |
-| [x] | `who` and `wall` | `who` lists everyone on the site as anonymous ttys (`somebody pts/3`). `wall` sends a wave with no content: every other visitor's wireframes ripple outward, and an open terminal prints "Broadcast message from somebody@jhemery.xyz". Rides the existing presence stream, so no new connection; the server coalesces waves to one per 3 s. No text, no id, and the count is the one already sent. After the rate-limit fix. | `backend/src/presence/*`, `composables/usePresence.ts`, `components/ThreeBackground.vue`, `commands/system.ts` | S |
+| [x] | `who` and `wall` | `who` lists everyone on the site as anonymous ttys (`somebody pts/3`). `wall` sends a wave with no content: every other visitor's wireframes ripple outward, and an open terminal prints "Broadcast message from somebody@jhemery.xyz". Rides the existing presence stream, so no new connection; the server coalesces waves to one per 15 s. No text, no id, and the count is the one already sent. After the rate-limit fix. | `backend/src/presence/*`, `composables/usePresence.ts`, `components/ThreeBackground.vue`, `commands/system.ts` | S |
 
 ### Departures from the approach column
 
@@ -610,7 +610,14 @@ Recorded as each row ships.
     the rows still add up to the count.
   - `wall` is off unless `WALL_ENABLED` is set: it would be the first unauthenticated route
     that makes other visitors' pages react. Enabled, `POST /presence/wall` is a bare 204 whatever
-    happened; off, `{ configured: false }`; 6/min per IP, coalesced to one wave every 3 s.
+    happened; off, `{ configured: false }`.
+  - Found in review: the limits are 2 per 10 min per IP and one wave every 15 s site-wide,
+    not the 6/min and 3 s first built, under which one client looping `curl` every 15 s kept
+    every visitor's page rippling indefinitely. It takes JSON only, so the CORS preflight stops
+    other sites sending it through their visitors. And each connection gets its own wave
+    object: one shared one carried an SSE id copied from another visitor's connection.
+  - Found in review too: a stream the browser closed itself (a 502 while the backend restarts)
+    is let go at once rather than waited on, so the next `who` opens a new one.
   - "Rides the existing presence stream" holds, but presence no longer only starts on the home
     page: `who` and `wall` start it on demand (`whenPresent`), and it stays open after. It is
     still not started app-wide, which would change what the footer counts.

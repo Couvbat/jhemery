@@ -477,6 +477,8 @@ motion it prints everything at once and shows no scheme.
 | `mail` | `POST /contact` | error line |
 | `ask <question>` | `POST /ask` | "the model is asleep — try `mail`" |
 | `systemctl [status [unit]]` | `GET /health` | every unit `unknown` — the unit list is kept client-side for exactly this |
+| `who` | `GET /presence` (SSE, started on demand by `whenPresent`) | "who: presence is unavailable right now" |
+| `wall` | `POST /presence/wall` | "broadcasts are switched off here" when off; "could not be sent" (a `fail()`) otherwise |
 
 `mail` is interactive: it prompts name → email → subject → message in sequence via
 `ctx.prompt()`, validates the email client-side, echoes a summary, and asks for `y/n` before
@@ -983,7 +985,8 @@ another — not a policy applied afterwards, but the entire data model. A unit t
 payload has exactly one key, so a field creeping in alongside it fails the build.
 
 `usePresence.ts` holds the `EventSource`. It gives up after three failed connections rather than
-reconnecting for as long as the tab is open, and the footer segment stays out of the DOM entirely
+reconnecting for as long as the tab is open, and at once on a source the browser has closed
+itself after an HTTP error, so the next `who` opens a fresh one, and the footer segment stays out of the DOM entirely
 until a first message arrives — an unreachable backend shows nothing rather than a zero. It starts
 where it is wanted: the footer on the home page, and `whenPresent(signal)` for `who` and `wall`
 from anywhere. Starting it app-wide would change what the footer's number counts.
@@ -993,12 +996,16 @@ then `somebody pts/N`, twelve at most — the field's cap — and "… and N mor
 up). `wall` is the one way a visitor reaches the others, so its sending half is a `POST
 /presence/wall`, and it is the first unauthenticated route that makes other visitors' pages react:
 **off unless `WALL_ENABLED` is set**, like every other publicly writable route, rate-limited to
-6/min per IP, and coalesced by `wave()` to one every 3 s across the site, which is what still
-holds with rotated addresses. Enabled, it answers a bare 204 whatever happened; off, `{
-configured: false }`. A wave is a *named* SSE event, `wave`, whose data is `{}`: the count frame
-stays exactly `{ online }`, the privacy test above stays literally true, and an old bundle, which
-only listens to `message`, never sees one. It carries no text, no sender and no time, and is not
-replayed to anyone who arrives after it. The server can't tell connections apart, so the sender
+2 per 10 min per IP, and coalesced by `wave()` to one every 15 s across the site, which is what
+still holds with rotated addresses — and is the same 15 s a tab shows them at, so no one client
+can keep every page rippling. It takes `application/json` only (415 otherwise): a form post is a
+CORS simple request any page could send through its own visitors, a JSON one is preflighted and
+refused. Enabled, it answers a bare 204 whatever happened; off, `{ configured: false }`. A wave
+is a *named* SSE event, `wave`, whose data is `{}`: the count frame stays exactly `{ online }`,
+the privacy test above stays literally true, and an old bundle, which only listens to `message`,
+never sees one. Each connection is handed its own wave object, since Nest stamps a connection's
+message id onto the object it sends, and a shared one would carry another visitor's. It carries
+no text, no sender and no time, and is not replayed to anyone who arrives after it. The server can't tell connections apart, so the sender
 mutes its own echo for 3.5 s from just before its POST; and however many arrive, a tab shows one
 every 15 s at most. Showing one means the field ripples (§5.3) and an open, idle terminal prints
 "Broadcast message from somebody@jhemery.xyz" — a wave that lands while a command runs is printed

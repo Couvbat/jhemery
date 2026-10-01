@@ -592,8 +592,17 @@ export const api = {
       body: JSON.stringify({ day, locale, guesses }),
     }),
   health: () => request<HealthReport>('/health'),
-  /** `wall`'s wave. Enabled, a bare 204 (`undefined` here), whatever became of it. */
-  wall: () => request<WallOff | undefined>('/presence/wall', { method: 'POST' }),
+  /**
+   * `wall`'s wave. Enabled, a bare 204 (`undefined` here), whatever became of it. The
+   * empty JSON body is the point: the server takes nothing else, so the browser's CORS
+   * preflight keeps other sites from sending it through their own visitors.
+   */
+  wall: () =>
+    request<WallOff | undefined>('/presence/wall', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: '{}',
+    }),
   guestbook: (options?: RequestOptions) => request<GuestbookList>('/guestbook', undefined, options),
   sign: (name: string, message: string) =>
     request<GuestbookEntry>('/guestbook', {
