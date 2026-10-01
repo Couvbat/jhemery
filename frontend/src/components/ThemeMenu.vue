@@ -4,7 +4,7 @@ import { onClickOutside } from '@vueuse/core'
 import { useLocale } from '@/i18n'
 import { applyForgedTheme, useTheme, type ThemeOrigin } from '@/composables/useTheme'
 import { MOTION_SETTINGS, useMotion, type MotionSetting } from '@/composables/useMotion'
-import { swatch, type Theme } from '@/lib/themes'
+import { CUSTOM_THEME, swatch, type Theme } from '@/lib/themes'
 import { tryTheme } from '@/terminal/achievements'
 
 /**
@@ -112,9 +112,10 @@ async function forgeFrom(event: Event) {
   const forged = forgeScheme(seed, active.value.mode)
   if (!forged) return
   tryTheme(applyForgedTheme(forged.theme, forgeEl.value ? { origin: centreOf(forgeEl.value) } : {}))
-  // Back on the scheme just made, which the list now holds and checks.
+  // Back on the scheme just made, which the list holds from the next render on. By id, not
+  // by its check: under the circle the pick is only painted a frame or so later.
   await nextTick()
-  menuEl.value?.querySelector<HTMLButtonElement>('[aria-checked="true"]')?.focus()
+  menuEl.value?.querySelector<HTMLButtonElement>(`[data-scheme="${CUSTOM_THEME}"]`)?.focus()
 }
 
 function move(event: KeyboardEvent) {
@@ -180,6 +181,7 @@ function onKeydown(event: KeyboardEvent) {
             type="button"
             role="menuitemradio"
             :aria-checked="theme.id === active.id"
+            :data-scheme="theme.id"
             tabindex="-1"
             class="w-full flex items-center gap-2 rounded px-2 py-1.5 text-left transition-colors hover:bg-muted focus-visible:bg-primary/15 focus-visible:outline-none"
             @click="pick(theme, $event)"

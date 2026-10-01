@@ -30,7 +30,9 @@ const FLASHBANG = {
   fr: 'Flashbang ! `theme cyberpunk` quand vos yeux s’y seront faits.',
 }
 
-function listing(active: Theme): OutputLine[] {
+const FORGED_FROM = { en: 'forged from', fr: 'forgé depuis' }
+
+function listing(active: Theme, t: CommandContext['t']): OutputLine[] {
   const all = allThemes()
   const width = all.reduce((max, theme) => Math.max(max, theme.id.length), 0)
   return all.map((theme) => {
@@ -38,7 +40,9 @@ function listing(active: Theme): OutputLine[] {
     const note =
       theme.id === DEFAULT_THEME
         ? 'default'
-        : [theme.seed ? `forged from ${theme.seed}` : '', theme.mode === 'light' ? 'light' : ''].filter(Boolean).join(', ')
+        : [theme.seed ? `${t(FORGED_FROM)} ${theme.seed}` : '', theme.mode === 'light' ? 'light' : '']
+            .filter(Boolean)
+            .join(', ')
     return segmented([
       // `git branch`'s marker, for the same job.
       { text: on ? '* ' : '  ', tone: 'primary' },
@@ -74,7 +78,7 @@ async function forge(words: string[], t: CommandContext['t']): Promise<OutputLin
   const from = useTheme().theme.value
   const next = applyForgedTheme(forged.theme)
   return [
-    segmented([{ text: `theme: ${next.id} (${t({ en: 'forged from', fr: 'forgé depuis' })} ${next.seed})  `, tone: 'primary' }, ...swatches(next)]),
+    segmented([{ text: `theme: ${next.id} (${t(FORGED_FROM)} ${next.seed})  `, tone: 'primary' }, ...swatches(next)]),
     // Lifting reaches the floors for nearly every seed; when it can't, say which.
     ...forged.unmet.map((miss) => line(`  ⚠ ${miss}`, 'warning')),
     ...(from.mode === 'dark' && next.mode === 'light' ? [line(t(FLASHBANG), 'muted')] : []),
@@ -139,7 +143,7 @@ export const themeCommands: Command[] = [
     async run({ args, t }) {
       const { theme: active, setTheme } = useTheme()
       const [requested] = args
-      if (!requested) return [...listing(active.value), blank, line(t(HINT), 'muted')]
+      if (!requested) return [...listing(active.value, t), blank, line(t(HINT), 'muted')]
       if (requested.toLowerCase() === 'forge') return forge(args.slice(1), t)
       if (requested.toLowerCase() === 'export') return exportTheme(args[1], t)
 

@@ -250,7 +250,6 @@ function handleMouseMove(event: MouseEvent) {
   }, POINTER_IDLE_MS)
 }
 
-
 /** Half the visible world at the z=0 plane — the frustum maths the spread and the
  *  pointer projection both need. */
 function halfExtents(aspect: number): { x: number; y: number } {
