@@ -653,6 +653,21 @@ describe('wordle daily', () => {
     expect(stats.wordleHistogram).toHaveBeenCalledWith(DAY, 'en')
   })
 
+  // Two tabs on the same day: the other one finished and reported while this one sat
+  // open with its own copy of the board. The day is counted once.
+  it('does not report a board another tab already reported', async () => {
+    const { game, finished } = daily()
+    await loaded()
+    recordDaily('en', { day: DAY, guesses: [ANSWER], marks: ['ggggg'], done: true, won: true, reported: true })
+    for (const letter of ANSWER) game.press(letter.toLowerCase())
+    game.press('Enter')
+    await finished
+
+    expect(stats.recordWordle).not.toHaveBeenCalled()
+    expect(stats.wordleHistogram).toHaveBeenCalledWith(DAY, 'en')
+    expect(dailyResult('en', DAY)?.reported).toBe(true)
+  })
+
   it('share has nothing to copy before the daily is finished', async () => {
     const { finished } = daily(['share'])
     const out = await finished

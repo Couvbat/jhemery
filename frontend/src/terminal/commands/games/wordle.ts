@@ -173,7 +173,9 @@ export function histogramLines(histogram: WordleHistogram, mine: number | null, 
  */
 async function everyone(ctx: CommandContext, result: DailyResult, report: boolean): Promise<OutputLine[]> {
   const mine = result.won ? result.guesses.length - 1 : 6
-  const sending = report && !result.reported
+  // Re-read storage: another tab may have finished and reported this day's board while
+  // this one sat open with its own copy, and a day is counted once.
+  const sending = report && !result.reported && !dailyResult(ctx.locale, result.day)?.reported
   try {
     const histogram = sending
       ? await api.recordWordle(result.day, ctx.locale, result.won ? result.guesses.length : 0)
@@ -308,7 +310,8 @@ function daily(ctx: CommandContext) {
             continue
           }
           state = result.state
-          recordDaily(ctx.locale, snapshot(state, day))
+          // Keep a `reported` another tab set: this tab's copy of the board doesn't know it.
+          recordDaily(ctx.locale, { ...snapshot(state, day), reported: dailyResult(ctx.locale, day)?.reported })
           if (state.status === 'won') session.announce('wordle')
           paint(ctx.t(state.status === 'playing' ? HINT : DAILY_DONE))
           continue
