@@ -271,6 +271,11 @@ export const messages = {
     moreMany: { en: '+ {n} more fields, not named here', fr: '+ {n} autres champs, non nommés ici' },
     present: { en: 'present', fr: 'présent' },
     verified: { en: '0 fields — verified', fr: '0 champ — vérifié' },
+    // An output past the read cap: what was read is clean, the rest was never looked at.
+    verifiedHead: {
+      en: '0 fields in the first 64 MB — the rest was not read',
+      fr: "0 champ dans les 64 premiers Mo — le reste n'a pas été lu",
+    },
     survivedOne: { en: '1 field survived re-encoding', fr: '1 champ a survécu au réencodage' },
     survivedMany: { en: '{n} fields survived re-encoding', fr: '{n} champs ont survécu au réencodage' },
     // Which ones, when the inspector can name them.

@@ -206,6 +206,7 @@ const verdict = computed(() => {
   const output = result.value?.report
   if (!output) return null
   if (output.format === 'unsupported') return { ok: false, text: t(m.toolImage.unverified) }
+  if (output.count === 0 && output.truncated) return { ok: false, text: t(m.toolImage.verifiedHead) }
   if (output.count === 0) return { ok: true, text: t(m.toolImage.verified) }
   const survivors = [...new Set(output.fields.map(label))].join(', ')
   const text = plural(output.count, m.toolImage.survivedOne, m.toolImage.survivedMany)
