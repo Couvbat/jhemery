@@ -38,7 +38,7 @@ const ctf = computed(() => /^\/ctf\/?$/i.test(route.path))
             bash: cd: {{ attemptedPath }}: No such file or directory
           </p>
 
-          <p class="text-6xl font-bold text-destructive glow-pink">404</p>
+          <h1 tabindex="-1" class="text-6xl font-bold text-destructive glow-pink rounded-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-4 focus-visible:ring-offset-background">404</h1>
 
           <p v-if="ctf" data-testid="ctf-hint" class="text-accent">{{ t(m.notFound.ctf) }}</p>
 

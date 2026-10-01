@@ -1,4 +1,5 @@
 import { expect, test } from './fixtures'
+import { profile } from '@/content/profile'
 import { views } from '@/content/views'
 import { messages } from '@/i18n/messages'
 
@@ -24,6 +25,10 @@ async function openNav(page: import('@playwright/test').Page) {
 
 /** The navbar's link to the tools page; the projects section's case studies mention tools too. */
 const navToTools = (page: import('@playwright/test').Page) => page.getByRole('banner').getByRole('link', { name: /tools/ })
+
+/** The one `role="status"` node a page change is announced in (`usePageFocus`). */
+const announcement = (page: import('@playwright/test').Page) => page.getByTestId('page-announcement')
+const toolsLabel = `${tools.heading.en} — ${profile.name}`
 
 test.describe('the tools page', () => {
   test('renders at /tools and survives a hard reload', async ({ page, pageErrors }) => {
@@ -78,6 +83,9 @@ test.describe('the prism', () => {
 
     await expect(page).toHaveURL(/\/#contact$/)
     await expect(page.locator('#contact')).toBeInViewport()
+    // With a hash, the section's own heading takes focus, not the page's `<h1>`.
+    await expect(page.locator('#contact h2')).toBeFocused()
+    await expect(page.locator('#contact')).toBeInViewport()
   })
 
   test('never turns under reduced motion', async ({ page }) => {
@@ -112,6 +120,119 @@ test.describe('the prism', () => {
 
     await expect(page).toHaveURL(/\/tools\/hash$/)
     await expect(page.getByRole('region', { name: /hash/i })).toBeVisible()
+  })
+})
+
+/**
+ * Accessible page changes (`usePageFocus`): what jsdom can't see is focus after a real
+ * transition — the swing has to have finished, the leaving face has to be out of reach
+ * for every frame of it, and the heading that takes focus is the arriving page's.
+ */
+test.describe('page changes, for a keyboard and a screen reader', () => {
+  test('the new page’s heading takes focus once the turn is over, and the page is announced', async ({ page }) => {
+    await page.goto('/')
+    await openNav(page)
+    await navToTools(page).click()
+
+    await expect(page.locator('.view-stage')).toHaveClass(/is-swinging/)
+    await expect(page.locator('.view-stage')).not.toHaveClass(/is-swinging/)
+    await expect(page.getByRole('heading', { level: 1, name: heading() })).toBeFocused()
+    await expect(announcement(page)).toHaveText(toolsLabel)
+  })
+
+  test('leaves exactly one face within reach in every frame of the turn', async ({ page }) => {
+    await page.goto('/')
+    // Sampled on every frame from before the click to after the stage unfixes, because
+    // an assertion could only ever look at one moment of it.
+    await page.evaluate(() => {
+      const w = window as unknown as { __faces: Array<[number, number]> }
+      w.__faces = []
+      const sample = () => {
+        w.__faces.push([
+          document.querySelectorAll('.view-stage main').length,
+          document.querySelectorAll('.view-stage main:not([inert])').length,
+        ])
+        requestAnimationFrame(sample)
+      }
+      requestAnimationFrame(sample)
+    })
+
+    await openNav(page)
+    await navToTools(page).click()
+    await expect(page.locator('.view-stage')).toHaveClass(/is-swinging/)
+    await expect(page.locator('.view-stage')).not.toHaveClass(/is-swinging/)
+
+    const faces = await page.evaluate(() => (window as unknown as { __faces: Array<[number, number]> }).__faces)
+    // Two `<main>`s did overlap, so the check below had something to catch…
+    expect(Math.max(...faces.map(([all]) => all))).toBe(2)
+    // …and in no frame could more, or fewer, than one be reached.
+    expect(new Set(faces.map(([, reachable]) => reachable))).toEqual(new Set([1]))
+  })
+
+  test('the skip link is the first Tab, and lands on the heading without a hash', async ({ page }) => {
+    await page.goto('/tools')
+
+    await page.keyboard.press('Tab')
+    const skip = page.getByRole('link', { name: messages.nav.skip.en })
+    await expect(skip).toBeFocused()
+    await expect(skip).toBeInViewport()
+
+    await page.keyboard.press('Enter')
+    await expect(page.getByRole('heading', { level: 1, name: heading() })).toBeFocused()
+    await expect(page).toHaveURL(/\/tools$/)
+  })
+
+  // `cd` closes the terminal, so the page it goes to is the one the keyboard goes to.
+  test('cd tools hands focus to the tools page, once it has turned', async ({ page, terminal }) => {
+    test.skip(test.info().project.name === 'mobile', 'No terminal on a phone.')
+    await page.goto('/')
+    await terminal.open()
+    await terminal.input.fill('cd tools')
+    await terminal.input.press('Enter')
+
+    await expect(terminal.panel).toBeHidden()
+    await expect(page.getByRole('heading', { level: 1, name: heading() })).toBeFocused()
+  })
+
+  // The guard: a page changing behind an open terminal (here, Back) leaves the keyboard
+  // where the visitor is typing.
+  test('a page change under the open terminal keeps focus in the terminal', async ({ page, terminal }) => {
+    test.skip(test.info().project.name === 'mobile', 'No terminal on a phone.')
+    await page.goto('/')
+    await openNav(page)
+    await navToTools(page).click()
+    await expect(page.getByRole('heading', { level: 1, name: heading() })).toBeFocused()
+
+    await terminal.open()
+    await page.goBack()
+    await expect(page.locator('.view-stage')).toHaveClass(/is-swinging/)
+    await expect(page.locator('.view-stage')).not.toHaveClass(/is-swinging/)
+
+    await expect(page).toHaveURL(/\/$/)
+    await expect(terminal.input).toBeFocused()
+  })
+
+  test('under reduced motion, the pages swap and focus still moves', async ({ page }) => {
+    await page.emulateMedia({ reducedMotion: 'reduce' })
+    await page.goto('/')
+    await openNav(page)
+    await navToTools(page).click()
+
+    await expect(page.getByRole('heading', { level: 1, name: heading() })).toBeFocused()
+    await expect(announcement(page)).toHaveText(toolsLabel)
+  })
+
+  test('the 404 has an <h1>, and is announced as a missing page, not the home page', async ({ page }) => {
+    await page.goto('/definitely-not-a-page')
+    await expect(page.getByRole('heading', { level: 1, name: '404' })).toBeVisible()
+
+    // Home and back again: an arrival at the 404 inside the app, as a stale link makes.
+    await page.getByRole('button', { name: `$ ${messages.notFound.back.en}` }).click()
+    await expect(page.locator('#about h1')).toBeFocused()
+    await expect(announcement(page)).not.toHaveText('')
+    await page.goBack()
+    await expect(page.getByRole('heading', { level: 1, name: '404' })).toBeFocused()
+    await expect(announcement(page)).toHaveText(`${messages.notFound.label.en} — ${profile.name}`)
   })
 })
 

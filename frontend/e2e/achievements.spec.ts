@@ -30,7 +30,8 @@ function watchForToast(page: import('@playwright/test').Page) {
   // except here: an auto-retrying assertion cannot catch an element that has already
   // been removed, which is the exact case this helper exists for.
   // eslint-disable-next-line playwright/no-wait-for-selector
-  const handle = page.waitForSelector('[role="status"]')
+  // Not the page's own status line (`usePageFocus`), which is always there, and empty.
+  const handle = page.waitForSelector('[role="status"]:not([data-testid="page-announcement"])')
   return async () => (await (await handle).textContent()) ?? ''
 }
 

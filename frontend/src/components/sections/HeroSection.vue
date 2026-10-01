@@ -76,7 +76,7 @@ onUnmounted(() => clearInterval(timer))
 
           <!-- Name + typing effect -->
           <div>
-            <h1 class="text-3xl md:text-5xl font-bold text-primary glow-green tracking-tight">
+            <h1 tabindex="-1" class="text-3xl md:text-5xl font-bold text-primary glow-green tracking-tight rounded-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-4 focus-visible:ring-offset-background">
               {{ displayed }}<span class="animate-pulse">█</span>
             </h1>
           </div>

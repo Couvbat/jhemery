@@ -7,6 +7,8 @@ import type { Localised } from '@/content/types'
 export const messages = {
   nav: {
     toggleMenu: { en: 'Toggle menu', fr: 'Ouvrir le menu' },
+    // The first thing a keyboard reaches: past the navbar, to the page's heading.
+    skip: { en: 'Skip to content', fr: 'Aller au contenu' },
     language: { en: 'Switch language', fr: 'Changer de langue' },
     theme: { en: 'Colour scheme', fr: 'Thème de couleurs' },
     // The 🎨 menu's way to `theme forge`: opens the system colour picker.
@@ -196,6 +198,9 @@ export const messages = {
     open: { en: 'Command palette', fr: 'Palette de commandes' },
   },
   notFound: {
+    // What the page is announced as, and called in `pageLabel()`: the tab keeps the
+    // site's own title, which is what index.html says and crawlers read.
+    label: { en: 'Page not found', fr: 'Page introuvable' },
     back: { en: 'cd ~', fr: 'cd ~' },
     hint: {
       en: 'Or open the terminal and type `cd about`.',

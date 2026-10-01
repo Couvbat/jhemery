@@ -41,6 +41,13 @@ const swinging = ref(false)
  *  showing what the visitor was looking at while the window scrolls to the top of
  *  the new one. */
 const leaveScroll = ref(0)
+/**
+ * Bumped each time a change of face has finished: when a swing settles, or at once when
+ * the pages simply swap. `usePageFocus` moves focus and announces the page on it. The
+ * first navigation (there was no page before) and a change within one face (a hash on
+ * the home page, a tool inside `/tools`) never bump it.
+ */
+const settled = ref(0)
 
 /** Only the three members this module touches, so a test can hand it a stub. */
 export type SwingRouter = Pick<Router, 'afterEach' | 'currentRoute' | 'push'>
@@ -68,6 +75,7 @@ export function startSwing(dir: 1 | -1): void {
   if (decorativeMotion() !== 'full') {
     swing.value = 1
     rest()
+    settled.value++
     return
   }
 
@@ -100,6 +108,7 @@ export function startSwing(dir: 1 | -1): void {
  *  instead of the window. */
 function settle() {
   rest()
+  settled.value++
   const hash = router?.currentRoute.value.hash
   if (!hash) return
   void nextTick().then(() => scrollToSection(hash.slice(1)))
@@ -241,5 +250,6 @@ export function useViewSwing() {
     swingDirection: computed(() => direction.value),
     swinging: computed(() => swinging.value),
     leaveScroll: computed(() => leaveScroll.value),
+    settled: computed(() => settled.value),
   }
 }
