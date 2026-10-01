@@ -1,7 +1,10 @@
 # Plan — the late-September batch (roadmap §H)
 
-**Status: in progress.** Slice 1 is in #117, slice 2 in #118 and slice 3 on
-`feat/h-show-the-work`; the rest is proposed. Written on 2026-10-01 against `dev` at `c9ef6fb`.
+**Status: implemented, in review.** Slices 1–3 are merged (#117, #118, #119). The rest are open
+as a stack into `dev`, each on the one before, in build order: 4 #120, 7 #121, 8 #122, 9 #123,
+10 #124, 4b #125, 5 #126, 6 #127, 14 #128, 11 #130, 12 #131, 13 #132. What each slice did
+differently is under "Departures from the approach column" in roadmap §H. Written on 2026-10-01
+against `dev` at `c9ef6fb`.
 
 This plan implements [roadmap §H](../../roadmap.md#h-late-september-2026-brainstorm), whose approach
 column is still the brief. Before this was written, each of the 27 rows was checked against the
