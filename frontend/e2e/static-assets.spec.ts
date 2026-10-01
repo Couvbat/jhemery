@@ -38,6 +38,30 @@ test.describe('static files', () => {
   }
 })
 
+test.describe('the design notes', () => {
+  /**
+   * The notes are HTML documents of their own (`vite-plugins/notes.ts`), so the check
+   * above, that the body is not a document, can't tell them from the SPA shell. What
+   * can: the shell's `#app`, which a note never has.
+   */
+  for (const path of ['/notes/', '/notes/ctf-flag-chain']) {
+    test(`${path} is the note, not the app`, async ({ request }) => {
+      const response = await request.get(path)
+      expect(response.status()).toBe(200)
+      expect(response.headers()['content-type']).toMatch(/text\/html/)
+      const html = await response.text()
+      expect(html).not.toContain('id="app"')
+      expect(html).toContain('<link rel="stylesheet" href="/notes.css">')
+    })
+  }
+
+  test('their stylesheet is served as itself', async ({ request }) => {
+    const response = await request.get('/notes.css')
+    expect(response.status()).toBe(200)
+    expect(response.headers()['content-type']).toMatch(/text\/css/)
+  })
+})
+
 test.describe('the résumé', () => {
   /**
    * `/resume.txt` is generated at build time by `vite-plugins/resume.ts` from

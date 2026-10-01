@@ -141,6 +141,7 @@ Each app has its own README for working on its code:
 | **Skills with evidence** | Under the skill badges, `skills --why` links each claim to where it's actually used: SSE to the presence stream and the watch parties, WebAssembly to the ffmpeg tool, GraphQL to the heatmap. Skills with nothing to show stay plain badges. |
 | **`/now`** | What I'm doing at the moment, dated. Past 90 days old, the page says how old it is instead of passing for current. It's also `cat now.txt`, and it's a route outside the prism so the navbar stays at four faces. |
 | **Printable résumé** | `/resume.html` and `/resume.fr.html`: static, script-free, with a print stylesheet, so "Save as PDF" gives a clean CV. Linked from the contact section and `resume`. |
+| **Design notes** | [`/notes/`](https://jhemery.xyz/notes/): the design specs in `docs/superpowers/specs`, published as static, script-free pages by a small hand-written markdown renderer. Each one says which language it is in (one is French). `why` links into them. |
 | **Live presence** | The footer also shows how many people are on the site right now, over SSE. It's a single count and nothing else (see [the API](#the-api)). |
 | **Live cards** | Steam "currently playing", recent GitHub commits, the latest CI runs, a contribution heatmap and pinned repos, a SoundCloud player and the guestbook. |
 | **Guestbook ticker** | A 20 s poll (not SSE; see [the spec](docs/features-spec.md#8-backend-additions)) shows a floating notice when someone signs while you're on the page. Clicking it opens `guestbook`. It pauses while the tab is hidden and stops if the guestbook is off. |
@@ -517,7 +518,7 @@ This is a personal site, but the workflow is written down so it stays consistent
 | [docs/features-spec.md](docs/features-spec.md) | The design reference for the system as built: terminal core, commands, easter eggs, achievements, background, backend routes, accessibility, views and tools. Code comments cite it by section number. |
 | [docs/roadmap.md](docs/roadmap.md) | The feature tracker: what was brainstormed, what shipped in which PR, known issues, and what was dropped. |
 | [docs/deploy.md](docs/deploy.md) | o2switch/cPanel setup, GitHub secrets and variables, the Apache config, analytics, the downloader's server requirements, and troubleshooting notes from production. |
-| [docs/superpowers/](docs/superpowers/) | Per-feature design specs and implementation plans, each with a status line and the PR it shipped in. Kept as a record of the reasoning behind each change. |
+| [docs/superpowers/](docs/superpowers/) | Per-feature design specs and implementation plans, each with a status line and the PR it shipped in. Kept as a record of the reasoning behind each change. The specs are also on the site, at [/notes/](https://jhemery.xyz/notes/). |
 
 ## Word lists and attribution
 

@@ -44,6 +44,25 @@
 - [Text diff](https://jhemery.xyz/tools/diff): Two texts and a unified diff, from the same code as the terminal’s `diff`
 - [Audio & video converter](https://jhemery.xyz/tools/ffmpeg): mp3, m4a, ogg, wav, flac, mp4 or gif; trim; extract audio without re-encoding. ffmpeg in WebAssembly, 32 MB on first use
 
+## Design notes
+
+How the site was thought through, written while building it: what was chosen and what was turned down. In English, except one.
+
+- [All notes](https://jhemery.xyz/notes/)
+- [GitHub recent-commits card for the Projects section](https://jhemery.xyz/notes/github-activity-integration)
+- [SoundCloud embed for the Music section](https://jhemery.xyz/notes/soundcloud-embed)
+- [Steam-backed game-log for the Gaming section](https://jhemery.xyz/notes/steam-game-log-integration)
+- [Fond animé Three.js — formes wireframe](https://jhemery.xyz/notes/threejs-wireframe-background) (in French)
+- [A real vim-style pane for the vim terminal command](https://jhemery.xyz/notes/vim-pane)
+- [Real navigation and insert-mode editing for the vim pane](https://jhemery.xyz/notes/vim-pane-editing)
+- [Achievements modal, nav button, and floating toast](https://jhemery.xyz/notes/achievements)
+- [Ask, a self-hosted LLM in the terminal](https://jhemery.xyz/notes/ask-command)
+- [CTF flag chain](https://jhemery.xyz/notes/ctf-flag-chain)
+- [Terminal games (2048, snake)](https://jhemery.xyz/notes/terminal-games)
+- [Terminal games, vol. 2 (wordle, minesweeper, wpm, tetris, hangman)](https://jhemery.xyz/notes/terminal-games-vol2)
+- [Views, the prism swing, and the tools page](https://jhemery.xyz/notes/tools-and-views)
+- [The September 2026 batch (roadmap §G)](https://jhemery.xyz/notes/september-batch)
+
 ## Optional
 
 - [Watch party](https://jhemery.xyz/watch): Watch a YouTube video in sync with friends — one room code, the host drives, everyone follows

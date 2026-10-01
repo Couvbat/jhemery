@@ -659,6 +659,18 @@ The same plugin emits `resume.html` and `resume.fr.html` (static, script-free, w
 a sibling file so the CSP needs nothing new) and `content.json`, which the MCP endpoint reads (§8).
 All three are on `navigateFallbackDenylist` and served by the plugin's dev middleware too.
 
+The design notes are a second plugin, `vite-plugins/notes.ts`. It publishes each spec in
+`docs/superpowers/specs` as `/notes/<slug>` (the file name without its date and `-design`), plus
+an index at `/notes/` and `notes.css`. They are static, script-free pages with a canonical tag.
+Each says which language it is in, since the site is bilingual and the notes are not: twelve are
+English and one French. The markdown goes through a hand-written renderer
+(`vite-plugins/markdown.ts`) for exactly the subset the specs use. It escapes every text run,
+gives headings GitHub's anchors, and fails the build on anything else. A link to a sibling spec
+becomes a note; any other repo path goes to GitHub at the build's commit. The notes are on the
+SPA fallback's denylist and kept out of the precache (like the résumés now are), and `.htaccess`
+maps `/notes/<slug>` to its file. The specs are build input, so the frontend build and deploy
+workflows watch their folder too.
+
 Every résumé, and the `resume` command, has an experience and an education section read from
 `content/experience.ts`. No duration is typed anywhere: each is worked out from the months, at
 build time for the files and at run time for the command, counting both the first and the last

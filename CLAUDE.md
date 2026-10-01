@@ -87,6 +87,11 @@ mirrored rather than shared (`backend/src/mcp/mcp.types.ts`), with the backend r
 new `version`, and a backend that accepts both the old and the new one: the two apps deploy from
 the same push in no fixed order.
 
+`docs/superpowers/specs/` is build input too: `vite-plugins/notes.ts` publishes each spec as a
+static page at `/notes/<slug>` through a hand-written markdown renderer that fails the build on any
+construct it doesn't know. So a spec edit can break `npm run build`, and the frontend build and
+deploy workflows watch that folder.
+
 `sections.ts` defines the six sections once; the navbar, terminal `ls`/`cd`/`pwd`, command palette
 and every section header consume it.
 

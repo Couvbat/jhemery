@@ -1,3 +1,4 @@
+import { noteSlug } from '@/content/docs'
 import type { DocRef } from '@/content/types'
 
 /**
@@ -21,7 +22,15 @@ export function sourceUrl(path: string, sha?: string): string {
   return `${REPO}/blob/${sourceRef(sha)}/${path.replace(/^\/+/, '')}`
 }
 
-/** A heading in a design doc, on GitHub at the build's commit. */
+const SPECS = 'docs/superpowers/specs/'
+
+/**
+ * A heading in a design doc. A spec is published as a note on the site
+ * (`vite-plugins/notes.ts`), so it links there; any other doc (the roadmap,
+ * features-spec) is GitHub at the build's commit.
+ */
 export function docUrl(ref: DocRef, sha?: string): string {
-  return `${sourceUrl(ref.doc, sha)}${ref.anchor ? `#${ref.anchor}` : ''}`
+  const anchor = ref.anchor ? `#${ref.anchor}` : ''
+  if (ref.doc.startsWith(SPECS)) return `/notes/${noteSlug(ref.doc)}${anchor}`
+  return `${sourceUrl(ref.doc, sha)}${anchor}`
 }
