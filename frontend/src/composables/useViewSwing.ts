@@ -5,7 +5,7 @@ import { findSection, findView, sections, viewFor, viewIndex, views } from '@/co
 import { findTool, type ToolMeta } from '@/tools/registry'
 import { normaliseCode } from '@/rooms/sync'
 import { currentSection, scrollToSection } from './useActiveSection'
-import { prefersReducedMotion } from './useCrt'
+import { decorativeMotion } from './useMotion'
 
 /**
  * The prism swing between views — superpowers/specs/2026-09-22-tools-and-views-design.md §3.
@@ -59,12 +59,13 @@ function cancelFrame() {
   frame = null
 }
 
-/** Turns the prism one face in `dir`. Under reduced motion nothing moves: `swing`
- *  stays at rest, `swinging` never becomes true, and the pages simply swap. */
+/** Turns the prism one face in `dir`. Below `full` motion (`calm` skips it, reduced
+ *  motion forces `paused`) nothing moves: `swing` stays at rest, `swinging` never
+ *  becomes true, and the pages simply swap. */
 export function startSwing(dir: 1 | -1): void {
   direction.value = dir
   cancelFrame()
-  if (prefersReducedMotion()) {
+  if (decorativeMotion() !== 'full') {
     swing.value = 1
     rest()
     return

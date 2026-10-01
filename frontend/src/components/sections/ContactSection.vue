@@ -8,6 +8,7 @@ import SectionHeader from '@/components/SectionHeader.vue'
 import { socials } from '@/content'
 import { useLocale } from '@/i18n'
 import { api, ApiError } from '@/lib/api'
+import WindowDots from '@/components/WindowDots.vue'
 
 const { t, m, locale } = useLocale()
 
@@ -43,9 +44,7 @@ async function submit() {
         <!-- Contact form -->
         <div class="rounded border border-border bg-card overflow-hidden border-glow">
           <div class="flex items-center gap-2 px-4 py-2 bg-muted border-b border-border">
-            <span class="w-3 h-3 rounded-full bg-red-500/80"></span>
-            <span class="w-3 h-3 rounded-full bg-yellow-500/80"></span>
-            <span class="w-3 h-3 rounded-full bg-green-500/80"></span>
+            <WindowDots />
             <span class="ml-3 text-xs text-muted-foreground">send-message.sh</span>
           </div>
 

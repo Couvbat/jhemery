@@ -1,7 +1,7 @@
 // @vitest-environment node
 // The plugin runs at build time, in Node, outside the app; so does this.
 import { describe, expect, it } from 'vitest'
-import { buildContentJson, buildResume, buildResumeHtml, escapeHtml, RESUME_CSS, resumeHtmlFile } from '../../../vite-plugins/resume'
+import { buildContentJson, buildManRoff, buildResume, buildResumeHtml, escapeHtml, escapeRoff, RESUME_CSS, resumeHtmlFile } from '../../../vite-plugins/resume'
 import { durationLabel, periodLabel, yearSpan } from '../dates'
 import { education, experience } from '../experience'
 import { profile } from '../profile'
@@ -75,6 +75,14 @@ describe('resume.txt', () => {
   it('points at the printable version', () => {
     expect(buildResume()).toContain(`https://${profile.domain}/resume.html`)
   })
+
+  // Every byte, escapes included, at a fixed date: the palette is shared with the
+  // terminal (`terminal/ansi.ts`), and only the CTF's concealed run is checked anywhere
+  // else, so a changed colour code would get through without this. Rewrite it with
+  // `npx vitest run src/content/__tests__/resume.spec.ts -u` when the CV really changes.
+  it('keeps its exact bytes, colours included', async () => {
+    await expect(buildResume(new Date('2026-10-01T12:00:00Z'))).toMatchFileSnapshot('./__snapshots__/resume.txt')
+  })
 })
 
 describe('resume.html', () => {
@@ -147,5 +155,24 @@ describe('content.json', () => {
 
   it('never carries a CTF flag — the chain is not something to hand an agent whole', () => {
     expect(buildContentJson()).not.toMatch(/CTF\{/)
+  })
+})
+
+describe('jules.1', () => {
+  it('escapes roff: backslashes, hyphens, and a line that would read as a request', () => {
+    expect(escapeRoff('a\\b')).toBe('a\\eb')
+    expect(escapeRoff('full-stack --hire')).toBe('full\\-stack \\-\\-hire')
+    expect(escapeRoff(".TH x\n'quoted\nfine")).toBe("\\&.TH x\n\\&'quoted\nfine")
+  })
+
+  it.each(['en', 'fr'] as const)('is a manual page in %s whose only requests are its own', (locale) => {
+    const roff = buildManRoff(locale, new Date('2026-10-01T12:00:00Z'))
+    expect(roff.startsWith('.TH JULES 1 "2026-10-01" "jhemery.xyz"')).toBe(true)
+    expect(roff).toContain(locale === 'fr' ? '.SH NOM' : '.SH NAME')
+    expect(roff).toContain(profile.name.split(' ')[0]!)
+    for (const row of roff.split('\n').filter((r) => /^[.']/.test(r))) {
+      expect(row, row).toMatch(/^\.(TH|SH|PP|TP|B|BR|nf|fi|br)( |$)/)
+    }
+    expect(roff).not.toMatch(/CTF\{/)
   })
 })

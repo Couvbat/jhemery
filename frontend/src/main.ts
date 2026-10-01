@@ -6,9 +6,12 @@ import router from './router'
 import { greet } from './console-greeting'
 import { initAnalytics } from './lib/analytics'
 import { restoreTheme } from './composables/useTheme'
+import { restoreMotion } from './composables/useMotion'
 
-// Before mount, so nothing is ever painted in the default colours first.
+// Before mount, so nothing is ever painted in the default colours first, and a visitor
+// who paused the page never sees the first frame of anything moving.
 restoreTheme()
+restoreMotion()
 
 const app = createApp(App)
 

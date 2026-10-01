@@ -29,7 +29,10 @@ things the static page cannot — query live APIs, send mail, mutate the page.
    tab-completion and the command palette are all derived from it — none of them hardcode a list.
 3. **Progressive, never blocking.** Every live-data command degrades to a useful message when the
    backend is unreachable or unconfigured. The site works with the API entirely down.
-4. **Motion is opt-out-able.** Everything animated checks `prefers-reduced-motion`.
+4. **Motion is opt-out-able.** Everything animated reads the motion level (§9): *full*, *calm* or
+   *paused*, chosen in the 🎨 menu or with `motion`, under a floor the OS sets —
+   `prefers-reduced-motion` holds it at *paused*. The games are the exception: they read the OS
+   setting alone, because their stepped mode changes the rules.
 5. **No new runtime dependencies.** i18n, the terminal and the effects are all hand-rolled against
    what is already installed (Vue, Tailwind, Three.js). The one accepted exception is
    `ffmpeg.wasm` for the `ffmpeg` tool (§11), fetched only on an explicit click.
@@ -109,19 +112,30 @@ interface Command {
 }
 ```
 
-`CommandContext` carries the parsed `args`, the `raw` input, the current `locale`, the `t()`
+`CommandContext` carries the parsed `args`, the stage's own `raw` text, `stdin` (what a `|`
+handed it), `tty` (false on the left of a `|`, where `capture` and `prompt` throw), the current
+`locale`, the `t()`
 resolver, and the side-effect handles a command may use: `print()`, `clear()`, `close()`,
 `frame()` (a redrawable output region — animations and game boards), `navigate(target)` (anything
 `cd` accepts, through `goTo()` — §11), `prompt(question, { mask })` (resolves to the next line the
 user types, rejects on `Ctrl+C`), `capture(handler)` (holds the raw keyboard for the games — §3 —
 and is released unconditionally when the command settles), `run(input)` (runs another command
 *inside* this one: the same signal, keyboard and busy state, and never the visitor's aliases —
-`git log` is a two-word alias of `gitlog`, not a delegation), a `signal: AbortSignal` so animated commands stop
+`git log` is a two-word alias of `gitlog`, not a delegation; `tour` and `strace` are built on it), a `signal: AbortSignal` so animated commands stop
 cleanly when cancelled, and `effects`: `matrix`, `reboot`, `crt`, `vim`/`vimIsDirty`/`vimMessage`
 (§5.1), `glitch` and `playMusic`. `terminal/types.ts` documents each; read it before adding a
 primitive.
 
-`OutputLine` is `{ text; tone?; segments?; href?; pre?; prompt? }`, where `Tone` is
+**The request observer.** `lib/api.ts` reports every request to whoever called
+`observeRequests()`: method, path, status, body size, time, and the parsed bodies sent and
+received. Never a header, because `x-admin-password` and `x-room-token` travel in them. It is fed
+by `request()`, `askStream()` (once, at the end), `openEventSource()` (once, when the stream opens),
+`fetchSite()` and `fetchJobFile()`. With nobody watching, `request()` takes exactly the path it took
+before there was an observer. The two pollers the visitor didn't ask for, the guestbook ticker and
+the download tool's interval, mark themselves `background`. `strace` is the only observer, and it
+prints shapes: keys two levels deep, arrays as their length, and query values masked.
+
+`OutputLine` is `{ text; tone?; segments?; href?; pre?; prompt?; stderr? }`, where `Tone` is
 `default|muted|primary|accent|secondary|error|success|warning`. `segments` splits a line into
 differently-toned runs (a game board needs a colour per cell) while `text` stays their plain
 concatenation; `pre` preserves runs of spaces for ASCII art and tables; `prompt` marks an echoed
@@ -147,20 +161,94 @@ page all talk to the same session, so history survives closing the panel).
 
 - `lines`: rendered output buffer, capped at 500 entries.
 - `history`: submitted commands, capped at 100, persisted to `localStorage`.
+- **History expansion** (`terminal/history.ts`, `expandHistory`): `!!`, `!$`, `!N` and `!-N` as
+  `history` numbers them, and a leading `^old^new`, on typed lines only (never a link, a nested
+  run or a prompt's answer). A `!` before a space, the end, `=` or `(` is a letter, and `\!`
+  always is, so `:q!` survives. A line naming a server-writing command (`isServerBound`, read
+  off `writes`) is never expanded. An expansion is echoed, muted; one that would write anything
+  goes into history with "press ↑ then Enter to send", as zsh's `histverify`, and doesn't run.
+- ↑ with text in the input walks only the lines that start with it. Ctrl+R is a reverse search,
+  taken only while the shell owns the keyboard (never in a game, a prompt, a running command or
+  vim), so Cmd+R still reloads. A faded suggestion after the caret (`autosuggest`) comes only
+  from the visitor's own history, never from the command list, and → or End takes it.
 - ↑/↓ walk history, `Tab` completes (common prefix first, then lists candidates),
   `Ctrl+L` clears, `Ctrl+C` cancels an in-flight command or interactive prompt. The input is
   never `disabled` while a command runs, only `readonly` + `aria-disabled`: a disabled input
   drops focus to `<body>`, and Ctrl+C would have nowhere to land.
 
+### The shell language
+
+`terminal/parse.ts` reads a line as a chain of pipelines joined by `;`, `&&` and `||`, each
+pipeline stages joined by `|`, at most 16 stages a line. Leading `NAME=value` words are the
+stage's env: `LANG=fr` (or `LC_ALL`) runs that stage in French and never touches the visitor's
+setting. A single `&` and `>` are literal; an empty stage is `couvsh: syntax error near
+unexpected token '|'`.
+
+**Quotes only group.** French is typed here (`c'est`, `qu'est-ce`, `sign l'un et l'autre`), so a
+quote opens a group only at the start of a word and closes only on the same quote followed by a
+space, the end of the line or an operator; anything else is a letter. Inside a group the
+operators are text (`sign "great site; love it"`). That is all a group does: a stage's words are
+its text split on spaces, quotes and all, as every line was before there were pipes, so a line
+with no operator runs exactly as it did. `useTerminal.quoting.spec.ts` pins that for `echo`,
+`sign` and `ask`.
+
+**Running a line.** Aliases are expanded per stage and the line is read again, since an alias may
+hold a pipe. Then every stage resolves (`registry.resolveStage`, the rule the shell and links share)
+before any runs: an unknown stage runs nothing, and when it follows a command that took free text
+the shell suggests quoting. A command that writes to the server with text of its own (`sign`,
+`ask`) must have that text quoted when the line holds an operator, or nothing runs: otherwise
+`sign love it; why not` would post "love it" and run `why`. `sign` drops one pair of outer
+quotes, as `ask` does. Aliases expand in place, stage by stage and round after round, so an alias
+can pipe into another and env words stay as typed. A link may carry no env words at all. Stages run one after
+another, because commands return arrays rather than streams. A stage's output, minus its
+`stderr` lines, is the next stage's `stdin`, `OutputLine`s and their colours included; its
+`stderr` lines (`fail()`, achievement toasts) go to the screen wherever it stands, so
+`fortune | cowsay` keeps the toast outside the cow. A stage on the left of a `|` has `tty`
+false, and its `capture` and `prompt` throw "not a tty". `&&` and `||` read a pipeline as failed
+when a stage throws or prints a failing `stderr` line, which is what `fail()` makes; the error
+*tone* alone counts for nothing, because `btc`'s red sparkline and `diff`'s removed lines are
+colour. One Ctrl+C stops the whole line, with one `^C`. A link runs a pipe or a chain only if
+every stage, resolved without aliases, passes `isLinkable`.
+
+**The text commands** (`commands/text.ts`) are what a pipe is for: `grep [-i -v -n -c]`, `head`
+and `tail [-n N | -N]`, `wc [-l -w -c]`, `sort [-r -n -u]` and `uniq [-c]`. Each reads the file
+it names, else its stdin, else fails. `grep` matches a literal substring and never builds a
+`RegExp` from input. `sha256sum`, `base64` and `jq` read their stdin as a file's bytes when they
+have no argument, so `cat about.txt | sha256sum` is `sha256sum about.txt`; `cat` passes its stdin
+on, and `cowsay` says it.
+
+### Manual pages
+
+Every command has a page, generated by `terminal/manual.ts` from what it already says about
+itself: NAME from its description, SYNOPSIS and the first EXAMPLE from `usage`, the aliases in
+DESCRIPTION, section 6 for the `fun` group and 1 otherwise. An optional `manual` on the command
+adds a longer DESCRIPTION, more EXAMPLES, a SEE ALSO (some oblique: `ls(1)` points at `sl(6)`),
+and the OPTIONS text for each flag its usage names, which is the part that can't be generated:
+`manual.spec.ts` holds every flag to one, in both languages, and every SEE ALSO to a page that
+exists. `man jules` is `content/manual.ts`'s `julesManual()`, built from the résumé's content, which
+the résumé plugin also writes as roff (§7).
+
+`terminal/pager.ts` shows a page twenty rows at a time through `frame` and `capture`: j/k and the
+arrows move a line, space/f and b a page, g and G to the ends, `/` searches and n/N repeat, `q`
+quits and leaves nothing behind. A page that fits is printed outright, as `less -F` does, and
+with no tty (the left of a `|`) the whole page is the output, so `man ls | grep -i all` works.
+
+`--help` as the very first argument prints the command's usage and flags instead of running it,
+so `projects --json` and `echo hi --help` are untouched. `-<Tab>` completes the flags a usage
+names, and lists them with their OPTIONS text when several are left.
+
 ### Tab completion
 
-One routine handles both halves of a line. It splits on whitespace, works out which word the
+One routine handles both halves of a line, counting words from the stage being typed: after
+`ls | gr`, `gr` is a command again. It splits on whitespace, works out which word the
 cursor is on, collects candidates for that position, then filters by prefix, inserts the single
 match (or the longest common prefix) and prints the list when the choice is still ambiguous.
 Only the *source* of the candidates changes:
 
 - **the first word** — every visible command and alias, plus whatever the visitor named with
-  `alias`. Hidden commands stay out, same as in `help`.
+  `alias`. Hidden commands stay out, same as in `help`. Tab
+  resolves two-word names only once a third word is typed (`git lo<Tab>` is still a command
+  word), which is where it differs from `registry.resolveStage`.
 - **anything after it** — the command's own `complete()`. Keeping it on the command is what keeps
   the registry the API: `cd` knows it takes a section, `unalias` knows it takes an alias name, and
   the shell needs no table of special cases. It receives the arguments, the index of the word being
@@ -176,8 +264,6 @@ join it as soon as `guestbook` has cached them.
 
 An alias in the first position is expanded before the owning command is resolved, so `zz ab`
 completes against whatever `zz` will actually run.
-
-`run(input)` handles `&&`-free single commands only — chaining is out of scope (§10).
 
 ### Chrome
 
@@ -222,16 +308,19 @@ Grouped as they appear in `help`.
 ### core
 | Command | Behaviour |
 |---|---|
-| `help [command]` | Generated from the registry; `help <cmd>` prints usage + description |
+| `help [command]` | Generated from the registry; `help <cmd>` prints usage + description, and points at `man <cmd>` |
+| `man [section] <page>` | The command's manual page (below), in the pager; `man jules` is the person. With no page, "What manual page do you want?"; an unknown one, `fail('No manual entry for …')`. From a link it refuses a hidden command's page |
 | `clear` | Empties the buffer |
 | `history` | Numbered list of past commands |
 | `echo <text>` | Prints its arguments |
 | `date` | Local date/time |
 | `whoami` | Prints the current user |
 | `lang [en\|fr]` | Prints or switches locale |
-| `theme [name\|random]` (alias `colorscheme`) | Lists the colour schemes with a swatch strip each, or applies one |
+| `theme [name\|random]` (alias `colorscheme`) | Lists the colour schemes with a swatch strip each, or applies one. `theme forge <colour> [light]` grows a `custom` scheme from one colour; `theme export <alacritty\|kitty\|base16>` prints the scheme on screen as a config |
+| `motion [full\|calm\|paused]` | Lists the three motion settings with the one in force marked, or sets one (§9). `writes: 'local'`, so never from a link; in the palette |
 | `alias` / `unalias` | Session-persistent command renames, expanded before anything else parses the line |
-| `sha256sum` (aliases `sha1sum`, `sha512sum`) · `base64 [-d]` · `uuidgen` · `jq .` | The shell versions of the hash, encode and JSON tools, each importing the pure module its panel uses. No pipes: a fake-filesystem name is read as that file, anything else as literal text |
+| `sha256sum` (aliases `sha1sum`, `sha512sum`) · `base64 [-d]` · `uuidgen` · `jq .` | The shell versions of the hash, encode and JSON tools, each importing the pure module its panel uses. A fake-filesystem name is read as that file, other text as literal text, and with no argument they read what a `\|` hands them |
+| `strace <command>` | Runs the command inside itself (`ctx.run`, so without the visitor's aliases) and then lists the non-background requests made meanwhile, as `GET /weather = 200 · 1.10 kB · 84 ms` with the shapes of the bodies below, and `+++ exited with 0 +++`. No request, no trailer, so `strace ls` is `ls`. Its `writes` is the traced command's, so `?run=strace sign x` is refused like `sign x`; `strace strace` is refused |
 | `exit` (aliases `quit`, `logout`) | Closes the overlay |
 
 **Colour schemes.** `theme` offers the site's own neon (*cyberpunk*, the default) and the palettes
@@ -271,8 +360,51 @@ shipped, and a spec holds that. Three upstream colours were also adjusted by han
 existed, each noted in the file.
 
 Switching from a dark scheme to a light one whites the page out for 0.9 s (`theme-flash` on
-`<html>`, skipped under reduced motion). That is the joke the `flashbang` achievement is named
-after. Adding `theme` also tightened "did you mean …?": two edits in a five-letter word make a
+`<html>`, only at *full* motion, §9). That is the joke the `flashbang` achievement is named
+after. Every other switch spreads: `setTheme(id, { origin })` paints inside
+`document.startViewTransition`, and the new view grows as a `clip-path` circle on
+`::view-transition-new(root)` over 450 ms, from the click in the 🎨 menu (the item's centre for
+Enter or Space) or the centre of the viewport from the terminal. It runs only where the API
+exists, at *full* motion, not dark to light (the flashbang's switch) and not while the prism
+turns. A new pick cuts one still in flight short, since hit-testing goes to the root while it
+runs, and a transition's callback that lands after a newer pick paints nothing. The circle is
+animated from script, with rounded numbers for its centre and radius, so nothing a visitor typed
+reaches a style; the CSS only turns the default cross-fade off. Meanwhile the wireframes ease
+from the hues on screen to the new ones (`neonFrom` → `neonTo`, preallocated, inside the loop);
+paused, they jump. Under the default the hues on screen are `:root`'s hex `--neon-*`, not the
+table's oklch primary, accent and secondary, which `THREE.Color` can't parse, so the ease reads
+the painted property, never the table.
+
+**The forge.** `theme forge <colour> [light]`, or *make one…* in the 🎨 menu (a hidden
+`<input type="color">`), grows a scheme from one seed in `lib/forge.ts`: a lightness ladder in
+OKLCH for the surfaces and text, tinted towards the seed's hue (not for a grey seed); `primary`
+is the seed; accent turns 150°, secondary −90° and highlight 60° with it, while warning sits at
+85° and destructive at 25° whatever the seed. Every tone with a floor then goes through
+`liftToFloor` against the surfaces `themeRules.ts` checks it on, and anything still short is
+printed as a warning (`checkFloors`' wording). Everything comes out of `toHex`, so the typed seed
+is parsed into numbers and never reaches a style. The result is the one `custom` scheme: a slot
+beside `themes` in `themes.ts` (`allThemes()`, and `findTheme()` searches it), so `themes` stays
+the eleven the specs hold to their floors. `useTheme` stores its finished colours, seed and mode
+under `couvbat:theme:custom` and, on restore before mount, ignores the whole thing unless every
+one is `#rrggbb` — storing colours rather than the seed keeps `forge.ts` out of the entry chunk.
+`random` only draws from the shipped eleven; a forge counts towards `ricer` and, when light,
+`flashbang`, and has no achievement of its own.
+
+`theme export <alacritty|kitty|base16>` prints the scheme on screen (the default from its table,
+converted to hex, not from `:root`, which disagrees with it on the `--neon-*` slots). The mappings
+are documented in `forge.ts`: ANSI red is `destructive` and yellow `warning`; green, cyan, blue
+and magenta take the tone nearest their hue; black and white are `raised` and `foreground`
+(swapped on a light scheme); bright black is `muted`, and the other bright colours step 0.08 of
+OKLCH lightness away from the background. base16 follows its documented slot roles.
+
+The last things that ignored the scheme follow it now: the matrix rain draws in `--neon-green`
+over `--background` (and says "press any key" in both languages), the CRT overdrive's fringe is a
+`color-mix()` of the pink and cyan slots, and the SoundCloud widgets (the music section's and the
+radio rooms') take `--neon-green`, read only when the frame mounts, since a new `src` reloads the
+cross-origin player and stops it. `content/music.ts`'s `soundcloudEmbedSrc(colour, autoplay)` is
+pure and lets only a `#rrggbb` into the URL. The window dots of every title bar are one
+`WindowDots.vue` in `destructive`, `warning` and `primary`, instead of Tailwind's red, yellow and
+green in thirteen copies. Adding `theme` also tightened "did you mean …?": two edits in a five-letter word make a
 different word (`where` is two from `theme`), so names under six letters get one edit, and a
 swapped pair counts as one.
 
@@ -307,9 +439,9 @@ URL), and `neofetch` has a `Status` row from `profile.availability`, the same fl
 both résumés read. `now.txt` is the `/now` list, with the same 90-day staleness rule.
 
 `neofetch` renders an ASCII logo beside a spec block — stack, locale, "uptime" since the first
-commit, and the live Steam status if available. `curl <domain>` re-runs `resume` when pointed at
-this site (or `localhost`), mirroring what a real `curl jhemery.xyz` returns (§7); any other host
-gets `curl: (6) Could not resolve host` and a note that a browser tab cannot open a raw socket.
+commit, and the live Steam status if available. `curl [-I] <domain>[/path]` is a real request to
+this origin, under any name it answers to (§7); any other host gets `curl: (6) Could not resolve
+host` and a note that a browser tab can only reach this site.
 
 `why <topic>` (`commands/work.ts`) prints one entry of `content/decisions.ts`: what was chosen,
 each rejected option with its reason in one sentence, any hindsight, the PR, and a link to the
@@ -469,6 +601,7 @@ It shares the registry, so it needs no separate maintenance.
 | `hack [target]` | Fake nmap/progress output ending in `ACCESS DENIED — nice try` |
 | `coffee` | `HTTP 418: I'm a teapot` |
 | `play` | Scrolls to the music section and starts the SoundCloud embed |
+| `acid [<code>]` | Plays the acid tool's pattern, or a shared code's, with a frame playhead read off the audio clock (§11). `writes: 'local'`, so no link may start it |
 | `cowsay <text>` | ASCII cow |
 | `fortune` | Random dev aphorism |
 | `sl` | ASCII train, animated across the buffer |
@@ -488,7 +621,7 @@ are deliberately *not* hidden: they are signposts rather than secrets.
 `useCrt.ts` rather than each re-reading the media query. `matrix` prints a one-line reply instead
 of opening the canvas, `sl` renders a static train, `top` draws one frame instead of six, the
 boot sequence and the Three.js background are skipped entirely, CRT overdrive resolves without
-animating, and the achievement toast shortens its dwell time.
+animating, `acid` plays without a playhead, and the achievement toast shortens its dwell time.
 
 ### The CTF chain
 
@@ -558,8 +691,8 @@ Three surfaces, one source of truth:
   The canvas is mounted only while particles are alive and the loop stops itself when the last one
   dies — no idle `requestAnimationFrame`, no full-viewport backing store sitting around for the
   visitor who never unlocks anything. Phones get half the particles. `fireConfetti()` is a no-op
-  under `prefers-reduced-motion`, which is also why nothing accumulates in the queue when there is
-  no renderer to drain it.
+  below *full* motion (reduced motion included), which is also why nothing accumulates in the
+  queue when there is no renderer to drain it.
 
 `unlocked` is exported as a `Ref<Set<string>>` so Vue components read live state directly — the
 same pattern `history.ts` already uses — while the terminal command keeps using the plain
@@ -587,6 +720,16 @@ integer, in a pool of its own capped at 12 that fades in and out and turns with 
   entirely. It is the only visual state no amount of scrolling can produce.
 
 One watcher covers the last two inputs, because `currentPalette()` already encodes which wins.
+
+**The loop runs on elapsed time.** It used to add a fixed step per frame, so a 120 Hz screen ran
+the field at twice the speed it was tuned at, and a frame cap would have slowed it. Each frame
+now measures how many 60 Hz frames have passed (`f`, capped at 4 so a tab back from the
+background resumes rather than leaps): rotations scale by `f`, and every lerp factor `k` becomes
+`1 - (1 - k) ** f`, the same easing at any rate. A governor then draws at most 60 frames a
+second, and 30 under *calm* or while the terminal's blurred panel is open. *calm* also runs the
+field at 0.35× and drops the pointer pull, both the gravity well and the camera's parallax.
+*paused* cancels the frame, draws one still frame and stops the screensaver; the component stays
+mounted, so coming back to *full* or *calm* picks the scene up where it stood.
 
 - **Colour scheme** — a palette picks hue *names* (`green`, `cyan`, …), and a `theme` changes what
   those names mean by rewriting the `--neon-*` properties. So a second watcher on
@@ -619,7 +762,8 @@ shapes are the accent colour; clicking one of those is the `cyanSpotter` achieve
 
 - **Boot sequence** (`BootSequence.vue`, `composables/useBoot.ts`) — fake kernel log resolving into
   the page. Shown once, gated on `localStorage['couvbat:booted']`, skippable with any key or click,
-  ~2.2s at most. Skipped entirely under `prefers-reduced-motion`. `reboot` (and the tail of `ssh`)
+  ~2.2s at most. Skipped entirely with motion *paused*, which reduced motion forces; *calm* keeps
+  it, since lines of text appearing are the tagline's kind of motion. `reboot` (and the tail of `ssh`)
   raise a module-level flag the component watches, replaying the same `start()` the first visit
   runs — no `alreadyBooted` gate, and `finish()` clears the flag so it is immediately repeatable.
   The dismiss listeners are armed 300 ms late: the keypress that submitted `reboot` is still
@@ -642,8 +786,8 @@ shapes are the accent colour; clicking one of those is the `cyanSpotter` achieve
   not a page.
 - **Screensaver** (`composables/useIdle.ts`) — three idle minutes with the tab visible fade every
   child of `#app` but the canvas (`[data-screensaver]` in `main.css`). The waking key or press is
-  swallowed. Vetoed by `terminalCapturing` and `roomPlaying`; started by `ThreeBackground`, so
-  reduced motion needs no branch.
+  swallowed. Vetoed by `terminalCapturing` and `roomPlaying`; started and stopped by
+  `ThreeBackground` with its loop, so motion needs no branch of its own.
 - **Console art** — `console.log` in `main.ts`. Costs nothing; the people who open DevTools on a
   developer portfolio are exactly the target audience.
 
@@ -654,8 +798,37 @@ shapes are the accent colour; clicking one of those is the `cyanSpotter` achieve
 **Where:** `frontend/vite-plugins/resume.ts`, `frontend/public/.htaccess`
 
 A Vite plugin imports `src/content/*` and emits `dist/resume.txt` — an ANSI-coloured plain-text
-résumé — at build time. `.htaccess` rewrites requests whose `User-Agent` matches
-`curl|wget|httpie|lynx` to that file.
+résumé — at build time. `.htaccess` rewrites requests for `/` whose `User-Agent` matches the
+command-line clients (`curl`, `wget`, `httpie`, `lynx`, `links`) or the LLM crawlers (GPTBot,
+ClaudeBot, PerplexityBot and the rest listed there) to that file.
+
+The terminal's own `curl` is a real client of this origin (`fetchSite()`): `GET` or `-I`'s `HEAD`,
+`cache: 'no-store'` so the HTTP cache stays out of it, a body read to 256 kB at most, and the
+printable ones (text, JSON, no NUL byte) shown through `terminal/ansi.ts`'s `parseSgr()`. That maps
+the résumé's palette to tones and drops a concealed run, so the CTF's stage 3 still needs a real
+terminal and `cat -v`. The bare host is `/resume.txt` rather than `/`, because the service worker
+answers `/` from its precache with the app's `index.html`, which no header can change. `-I` shows
+the real response headers, CSP and HSTS included, since a same-origin fetch may read all but
+`Set-Cookie`. Any other host is curl's `(6) Could not resolve host`; a network failure is `(7)`.
+A link may only pass it the arguments its Tab offers: the domain, `-I` and the site's plain files.
+
+**The shell over curl.** `curl jhemery.xyz/neofetch` in a real terminal gets that command's output:
+`public/run/<locale>/<name>.txt`, rendered by `terminal/ansi.ts`'s `toAnsi()` (tones and swatch
+colours as SGR, links as OSC 8, prompt lines dropped) with a footer, plus a generated `help.txt`
+index. The pages are vitest snapshots (`curl-pages.spec.ts`), committed and never written by CI,
+so a change to a command or the content fails CI until they are regenerated with `-u`. A page is
+any command a link could run with no arguments that isn't hidden, live, a game or a text command (both by module); the
+spec names a reason for each other exclusion (`curl`, `ctf`, `achievements`, `games`, `tour`,
+`resume`, `help`). Each runs in both locales under two clocks years apart, and any line that
+differs is dropped, which removes the uptimes and durations that would otherwise go stale between
+regenerations; `resume` is excluded for that reason, since its durations are the point and the
+bare host already serves them fresh. A harness option makes `capture` and `prompt` throw, so a
+page can never be half of an interactive command. `.htaccess` serves the pages only to `curl`,
+`wget` and `httpie`, not the crawler list `/` uses (a crawler asking for `/about` wants what a
+browser gets), French when `Accept-Language` starts with `fr`, and only when the file exists.
+They carry `Vary: User-Agent, Accept-Language` and `no-cache`, and `/` now says `Vary: User-Agent`,
+since it was always the résumé to curl and the app to a browser. The résumé plugin takes its
+colours from the same palette, and `resume.spec.ts` pins its bytes.
 
 **Decision:** this is served entirely from the static frontend, with no backend involvement. The
 obvious alternative — a Nest `GET /resume` endpoint — would mean the résumé content lives in the
@@ -664,6 +837,10 @@ the single source at build time is strictly better. The cost is that the résum�
 a frontend deploy, which is fine for a résumé.
 
 `.htaccess` needs `mod_rewrite` only — no `mod_proxy` — so it works on shared hosting.
+
+It also emits `jules.1` and `jules.fr.1`, the person as a roff manual page (`escapeRoff` keeps a
+line from reading as a request), so `curl -s jhemery.xyz/jules.1 | man -l -` works; `.htaccess`
+serves them as UTF-8 text with `no-cache`.
 
 The same plugin emits `resume.html` and `resume.fr.html` (static, script-free, with `resume.css` as
 a sibling file so the CSP needs nothing new) and `content.json`, which the MCP endpoint reads (§8).
@@ -870,12 +1047,25 @@ stay rejected. Rules the code cites:
   in memory with a two-hour idle TTL and a cap of 200. The host token is the only secret: random,
   returned once, compared in constant time, carried in `x-room-token`.
 - **Media is allowlisted per kind, server-side.** A YouTube id (eleven characters from its
-  alphabet) or an https URL on `soundcloud.com`. It becomes an iframe `src` on every guest's page,
-  so the host's page is not trusted to have checked it; the service 400s anything else, queue
-  items included.
+  alphabet) for `watch`; that or an https URL on `soundcloud.com` for `radio`, whose queue may mix
+  the two, since an id and a URL can't be mistaken for each other. It becomes an iframe `src` on
+  every guest's page, so the host's page is not trusted to have checked it; the service 400s
+  anything else, queue items included.
 - **State is anchored to the server clock.** `{ media, position, playing, at }`; guests compute
   `position + (now − at)` and seek when more than two seconds out. A patch without a position
   recomputes it to now, so a bare pause lands where the item actually is.
+- **Titles are the server's, never the host's** (`room-titles.ts`). A title in the host's patch
+  would be any text the host liked, broadcast to every guest; fetching it in the browser would
+  widen `connect-src` for two third parties. So `update()` looks up what it doesn't know through
+  YouTube's or SoundCloud's oEmbed in the background (the add never waits, a failure leaves the
+  bare item), keeps only the `title`, stripped of control and bidi characters and capped at 120,
+  and publishes it only to a room that still exists and still holds the item. One request per
+  lookup (3 s, 16 kB, no redirects), an LRU of 500 shared by every room, misses remembered for
+  10 minutes, and a global budget of 30 a minute and 4 at once: a host posting 50 ids at the
+  state route's limit would otherwise make the server hammer YouTube, which has blocked this host
+  once already. They travel beside the queue as `titles?: Record<item, title>` (plus
+  `state.title`), and the queue stays `string[]`, so a bundle cached before titles existed reads
+  the same snapshot and either app may deploy first.
 
 **Game rooms** (`connect4`). The one change to the rooms' trust model: a game room issues a
 second token, the seat token, on its first `POST /rooms/:code/join`, and refuses a third caller.
@@ -940,7 +1130,28 @@ Retrofitting these is painful, so they are part of the definition of done:
   on open and restored to the nav button on close.
 - Achievement toast: `role="status"` with `aria-live="polite"`, so an unlock is announced without
   stealing focus from whatever the visitor was doing.
-- Every animated feature honours `prefers-reduced-motion`.
+- **Motion control** (WCAG 2.2.2, pause, stop, hide). The wireframes move for as long as the
+  page is open, and before this only the OS setting could stop them. `composables/useMotion.ts`
+  holds *full · calm · paused*, saved under `couvbat:motion`, restored in `main.ts` before mount
+  and written on `<html>` as `data-motion`, which `main.css` reads beside each
+  `prefers-reduced-motion` block (Tailwind's `motion-safe:` only knows the OS, so `.animate-pulse`
+  is stopped there too). The OS setting is a floor: it holds the level at *paused* whatever was
+  chosen, and the 🎨 menu shows *full* and *calm* as `aria-disabled` with a note saying why.
+  - *calm* — the field at 0.35× and 30 fps with no pointer pull; no swing, confetti, glitch,
+    flashbang or theme circle; prompt cycling, the tagline, the boot sequence and the animations
+    of typed commands stay.
+  - *paused* — nothing moves. The three.js chunk isn't fetched until some other level is chosen,
+    and is never unloaded after: pausing stops its loop. Scrolling to a section jumps rather
+    than glides, from a link and from `cd` alike.
+
+  Decorative surfaces read `decorativeMotion()` and take their own threshold: the swing, the
+  confetti, the glitch, the flashbang and the theme circle need *full*; the tagline, the prompt
+  hints and the boot sequence only stop at *paused*. Typed animations (`matrix`, `reboot`, `ssh`,
+  `hack`, `sl`, `top`, `ping`, `ask`'s typewriter, `tour`'s pauses) honour *paused* only, since
+  the visitor asked for them by name; `tour`'s scheme preview is decoration and needs *full*. The
+  games (`snake`, `tetris`) keep reading `prefersReducedMotion()`, because their stepped mode
+  changes the rules.
+- Every other animated feature honours the same level, and so `prefers-reduced-motion`.
 - The launcher is `hidden` below `md`. Mobile virtual keyboards fight fixed-position input panels
   badly enough that a bad terminal is worse than none; mobile users get the full rendered page,
   which carries the same information. `Ctrl+K` remains available for anyone on a tablet with a
@@ -952,7 +1163,6 @@ Retrofitting these is painful, so they are part of the definition of done:
   schemes exist only as opt-in choices, through `theme` or the navbar's scheme menu (§3 core), and the achievement for picking one is
   called Flashbang. That is this entry's position, stated as a joke.
 - **Blog** — infrastructure without content is worse than no infrastructure.
-- **Command chaining / pipes** — `ls | grep` is a lot of parser for a joke nobody will run twice.
 - **Terminal on mobile** — see §9.
 
 ## 11. Views, the prism swing and the tools page
@@ -972,8 +1182,8 @@ this section only fixes the rules the code cites.
 - **The swing is one clock with three readers.** `useViewSwing` eases 0→1 once; `App.vue` binds it
   as CSS custom properties on the stage that rotates the two pages as faces of a prism, and
   `ThreeBackground` yaws the wireframe *field* (not the camera — see the spec for why), re-homes
-  every shape on the first frame and bakes the rotation away on the last. Under reduced motion
-  nothing moves and the pages swap. The transition is complete with no three.js present.
+  every shape on the first frame and bakes the rotation away on the last. Below *full* motion
+  (§9) nothing moves and the pages swap. The transition is complete with no three.js present.
 - **Pages outside the prism.** `/now` and `/work/<id>` are routes but not views: they are reached
   from links, not the navbar, so the prism keeps its four faces, and `viewIndex()` puts them after
   the faces so a swing to one still has a direction. `cd` doesn't reach them, because
@@ -984,6 +1194,22 @@ this section only fixes the rules the code cites.
   `ls tools`, `cd tools/<id>`, the `tools` command and Tab derive from one array. Metas are plain
   data in both locales; each tool's maths lives in a pure `.ts` beside its panel and is tested in
   jsdom. Client-side tools never send a file anywhere; the page says so once.
+- **The image tool checks its own claim** (`tools/image/metadata.ts`). Before converting, it lists
+  what the file gives away; afterwards it runs the same parser on its output and shows "0 fields —
+  verified" or "N fields survived re-encoding", so stripping is a check a browser change would
+  fail on screen, not a promise. The parser is written from TIFF 6.0 and CIPA DC-008 and walks
+  JPEG markers up to SOS, PNG chunks and WebP RIFF chunks. It reads the whole file, up to 64 MB,
+  because WebP's extended format puts Exif and XMP after the image data and PNG text may follow
+  IDAT. Every read is bounds-checked and returns `null` past the end; IFDs are capped at 512
+  entries and walked once each; values are stripped of control and bidi characters and capped at
+  120 characters; a truncated file reads as a subset of the whole one, and `inspectBytes` never
+  throws. **What counts:** each Exif/TIFF tag, each PNG text chunk, the PNG time, and the XMP,
+  ICC, IPTC and comment blocks; JFIF, VP8X, the IFD pointers and the image data are structure.
+  GPS reads four tags and shows one position. So an encoder that writes a colour profile (Chromium
+  does, into JPEG and WebP) honestly shows one field. HEIC, AVIF and GIF are `unsupported`, never
+  "0 fields". The bitmap is decoded with `imageOrientation: 'from-image'`, so dropping the tag
+  never leaves a phone photo on its side. Every string from the file reaches the page through
+  text interpolation only.
 - **Tier `wasm` downloads only on a click** (`tools/ffmpeg/`). The 32 MB core is served from our own
   `/assets/`, so the CSP keeps `'self'` for scripts and connections; `'wasm-unsafe-eval'` is the one
   addition, and it reaches the worker because the worker's own script response carries the header.
@@ -995,8 +1221,12 @@ this section only fixes the rules the code cites.
   it. Inputs are read in place over WORKERFS; stream facts come from `ffprobe` as JSON; `-ss` goes
   before `-i` and the length is `-t`.
 - **Rooms are the third and fourth faces** (`watch`, `radio`; `rooms/*`). One page component for
-  both, one composable for the network, one pure module for the maths; the kind picks the player
-  and the words. **No third-party script**: both embeds are driven over `postMessage` — the wire
+  both, one composable for the network, one pure module for the maths. The kind picks what a host
+  may load and the words; each item's source (`mediaSource()`) picks its player, so a radio queue
+  that mixes SoundCloud and YouTube hands over between the two on `finished`, and a change of
+  source resets the sync loop's readings so the new player's first one isn't taken for a seek. A
+  YouTube item in a radio plays `compact`: small, never hidden, and at least 200×200, as YouTube's
+  embed terms require. **No third-party script**: both embeds are driven over `postMessage` — the wire
   protocol the YouTube IFrame API and the SoundCloud Widget API scripts would speak on the page's
   behalf — so the CSP gains one `frame-src` and no `script-src`, exactly as `MusicSection` decided
   for the SoundCloud widget. The players share one interface (`PlayerHandle`, `PlayerReading`);
@@ -1004,12 +1234,30 @@ this section only fixes the rules the code cites.
   lives in `sessionStorage` keyed by code (a reload keeps hosting, a URL never carries it), and a
   refused token demotes the tab to guest rather than retrying. Guests seek at most once per 1.5 s,
   hosts coalesce changes for 250 ms and re-anchor every 15 s while playing. `cd watch/<code>` joins.
+  The queue is an *up next* `<aside>`: a second column from `lg`, under the player below it. The
+  host skips, reorders and removes with ↑ ↓ × buttons that name their item; guests get none.
+  Each edit replaces the whole queue, so edits run one at a time and the buttons are inert while
+  one is in flight.
 - **Tools, vol. 3** — `jwt` (decode only, never verifies), `regex` (a fresh module Worker per run,
   terminated at one second, so a backtracking pattern cannot freeze the tab), `cron` (own parser,
   Vixie semantics, sentences in both languages, next runs walked with a four-year horizon), `qr`
   (hand-written encoder, verified against ISO/IEC 18004's examples and a reference encoder's
   matrices) and `diff` (`unifiedDiff` in `terminal/diff.ts`, the same code as the command, with a
   trimmed-ends guard for large unrelated texts).
+- **`acid` is the one tool with sound** (`tools/acid/`), so it is the one where a gesture
+  matters. `pattern.ts` is pure: 27 bytes behind a version byte, as base64url in `?p=`, and
+  `decode` clamps every field and refuses a short code or an unknown version. `engine.ts` is one
+  persistent oscillator → low-pass (`Q` at most 18 dB) → `tanh` shaper → amp → master at −12 dB →
+  a limiting compressor, with a 25 ms timer booking 120 ms ahead on `currentTime`. It takes an
+  `AudioContext` and never creates one; `audio.ts` opens it inside the click or keystroke, before
+  the first `await`, which Safari requires and which lets the shell import the engine lazily
+  after. No `AudioWorklet`: one loaded from `blob:` is refused by `script-src`. Playback stops on
+  `visibilitychange`, one sequencer sounds at a time, and a stopped one suspends its context. The
+  panel reads `?p=` on mount and never writes it back, because `router.replace` would trip
+  `scrollBehavior`'s jump to the top on every knob drag; the link is built on *copy link*. The
+  shell's `acid [<code>]` writes `local`, so `isLinkable` keeps every link from starting sound,
+  and it stops on Ctrl+C, a hidden tab, the overlay closing, or after two minutes. Under reduced
+  motion neither draws the playhead.
 - **The admin tier is hidden, not secret** (`download`, `lib/admin.ts`). `visibleTools()` leaves
   it out of the page, `tools`, `ls tools` and Tab until the owner unlocks — `sudo -i` in the
   terminal, or the panel's own field — but `findTool` still resolves it, so `cd tools/download`

@@ -13,6 +13,7 @@ vi.mock('@/composables/useActiveSection', () => ({
   currentSection: () => 'projects',
 }))
 
+import { setMotion } from '../useMotion'
 import {
   SWING_MS,
   activeView,
@@ -77,6 +78,7 @@ function advance(time: number) {
 
 beforeEach(() => {
   motion.reduced = false
+  setMotion('full')
   frames = new Map()
   scrolled.mockClear()
   vi.stubGlobal('requestAnimationFrame', (callback: FrameRequestCallback) => {
@@ -202,6 +204,21 @@ describe('installViewSwing', () => {
     expect(swinging.value).toBe(false)
     expect(swing.value).toBe(1)
     expect(frames.size).toBe(0)
+  })
+
+  // `calm` keeps the field moving but drops the swing, like the confetti and the flash.
+  it('snaps under calm and paused too, for a visitor who chose less motion', () => {
+    for (const level of ['calm', 'paused'] as const) {
+      setMotion(level)
+      const { router, push } = fakeRouter('/')
+      installViewSwing(router)
+      void push('/tools')
+
+      const { swing, swinging } = useViewSwing()
+      expect(swinging.value, level).toBe(false)
+      expect(swing.value, level).toBe(1)
+      expect(frames.size, level).toBe(0)
+    }
   })
 
   it('settles on a timer if the frames never come — a hidden tab must not stay fixed', () => {

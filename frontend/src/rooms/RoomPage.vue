@@ -1,20 +1,33 @@
 <script setup lang="ts">
-import { computed, onUnmounted, ref, watch } from 'vue'
+import { computed, nextTick, onUnmounted, ref, watch } from 'vue'
 import { RouterLink, useRoute, useRouter } from 'vue-router'
 import { findView, profile } from '@/content'
+import type { Localised } from '@/content/types'
 import { useLocale } from '@/i18n'
 import type { RoomKind, RoomPatch } from '@/lib/api'
 import CopyButton from '@/tools/CopyButton.vue'
 import SoundCloudPlayer from './SoundCloudPlayer.vue'
 import YouTubePlayer from './YouTubePlayer.vue'
 import type { PlayerHandle, PlayerReading } from './players'
-import { expectedPosition, formatClock, isSeek, mediaLabel, normaliseCode, parseMedia, reconcile } from './sync'
+import {
+  expectedPosition,
+  formatClock,
+  isSeek,
+  itemLabel,
+  mediaSource,
+  moveItem,
+  normaliseCode,
+  parseMedia,
+  reconcile,
+} from './sync'
 import { useRoom } from './useRoom'
+import WindowDots from '@/components/WindowDots.vue'
 
 /**
- * Both room pages. The `kind` decides the player and the words; everything else —
- * the lobby, the code, the head count, and the loop that keeps a guest's player on
- * the host's second — is the same feature twice (spec §6).
+ * Both room pages. The `kind` decides what a host may load and the words, and each
+ * item's source decides its player; everything else — the lobby, the code, the head
+ * count, and the loop that keeps a guest's player on the host's second — is the same
+ * feature twice (spec §6).
  */
 const props = defineProps<{ kind: RoomKind }>()
 
@@ -35,8 +48,16 @@ const room = useRoom(props.kind, code)
 const { status, snapshot, isHost, error } = room
 const state = computed(() => snapshot.value?.state ?? null)
 const queue = computed(() => snapshot.value?.queue ?? [])
+/** Titles render by interpolation only, never as markup: they are a third party's text. */
+const titles = computed(() => snapshot.value?.titles)
+const label = (media: string) => itemLabel(media, titles.value)
+/** A button's label naming its item. The replacer is a function so a `$&` or `$$` in a
+ *  title is printed as written rather than read as a replacement pattern. */
+const naming = (message: Localised<string>, media: string) => t(message).replace('{item}', () => label(media))
 const members = computed(() => snapshot.value?.members ?? 0)
-const Player = computed(() => (props.kind === 'watch' ? YouTubePlayer : SoundCloudPlayer))
+/** The current item's embed. Per item, not per room: a radio queue mixes the two. */
+const source = computed(() => (state.value?.media ? mediaSource(state.value.media) : null))
+const Player = computed(() => (source.value === 'youtube' ? YouTubePlayer : SoundCloudPlayer))
 const player = ref<PlayerHandle | null>(null)
 /** Whether the item was already rolling when its frame was made; the player then
  *  asks to autoplay, so a guest who just joined mid-video does not open on pause. */
@@ -48,6 +69,16 @@ watch(
     last = null
   },
 )
+/**
+ * A new source is a new player with its own clock, mounted from scratch. Its first
+ * readings must not be weighed against the old one's: the anchor timer starts over,
+ * and a guest's seek cooldown, set against the old player, no longer applies.
+ */
+watch(source, () => {
+  last = null
+  lastAnchor = 0
+  seekCooldownUntil = 0
+})
 
 // ---- lobby ----------------------------------------------------------------------
 
@@ -89,20 +120,79 @@ async function playNow() {
   await room.update({ media, position: 0, playing: true })
 }
 
+/**
+ * True while a queue edit is on its way to the server. The state route replaces the
+ * whole queue, so every edit is built from the last snapshot, and two quick clicks
+ * would both start from the same one: the second would quietly undo the first. So
+ * the sidebar's buttons go inert until the answer lands.
+ */
+const queueBusy = ref(false)
+let queueEdits = 0
+let lastEdit: Promise<void> = Promise.resolve()
+
+/**
+ * Runs one queue edit after any still in flight, building its patch only once those
+ * have landed, from the queue as it stands by then. The buttons are inert meanwhile,
+ * but a track that ends on its own or a link added to the queue must not be dropped,
+ * so those wait their turn instead.
+ */
+function editQueue(build: () => RoomPatch): Promise<void> {
+  queueEdits += 1
+  queueBusy.value = true
+  const run = lastEdit
+    .then(() => room.update(build()))
+    .finally(() => {
+      queueEdits -= 1
+      queueBusy.value = queueEdits > 0
+    })
+  lastEdit = run.catch(() => undefined)
+  return run
+}
+
 async function enqueue() {
   const media = parsed()
   if (!media) return
   mediaInput.value = ''
-  await room.update({ queue: [...queue.value, media] })
+  await editQueue(() => ({ queue: [...queue.value, media] }))
 }
 
-async function next() {
-  const [head, ...rest] = queue.value
-  await room.update({ media: head ?? null, queue: rest, position: 0, playing: head !== undefined })
+function next(): Promise<void> {
+  return editQueue(() => {
+    const [head, ...rest] = queue.value
+    return { media: head ?? null, queue: rest, position: 0, playing: head !== undefined }
+  })
+}
+
+const queueList = ref<HTMLOListElement | null>(null)
+
+/**
+ * Puts focus back on the same button of the item that moved, wherever the list put
+ * it. Without this, a keyboard user would lose their place after every press: the
+ * buttons go inert mid-edit and the rows are re-rendered in their new order.
+ */
+async function refocus(index: number, action: 'up' | 'down' | 'remove') {
+  await nextTick()
+  const rows = queueList.value?.children
+  if (!rows?.length) return
+  const row = rows[Math.min(index, rows.length - 1)]
+  row?.querySelector<HTMLButtonElement>(`[data-action="${action}"]`)?.focus()
+}
+
+async function moveAt(index: number, to: number) {
+  if (queueBusy.value || to < 0 || to >= queue.value.length) return
+  const direction = to < index ? 'up' : 'down'
+  await editQueue(() => ({ queue: moveItem(queue.value, index, to) }))
+  await refocus(to, direction)
 }
 
 async function removeAt(index: number) {
-  await room.update({ queue: queue.value.filter((_, i) => i !== index) })
+  if (queueBusy.value) return
+  await editQueue(() => ({ queue: queue.value.filter((_, i) => i !== index) }))
+  await refocus(index, 'remove')
+}
+
+function skip() {
+  if (!queueBusy.value) void next()
 }
 
 /** The host's play/pause button drives the host's own player; the reading loop
@@ -271,9 +361,7 @@ const badLink = computed(() => t(props.kind === 'watch' ? m.rooms.badLinkWatch :
       <section v-else :aria-label="`${t(view.heading)} ${code}`" class="space-y-4">
         <div class="rounded border border-border bg-card overflow-hidden border-glow">
           <div class="flex flex-wrap items-center gap-2 px-4 py-2 bg-muted border-b border-border">
-            <span class="w-3 h-3 rounded-full bg-red-500/80"></span>
-            <span class="w-3 h-3 rounded-full bg-yellow-500/80"></span>
-            <span class="w-3 h-3 rounded-full bg-green-500/80"></span>
+            <WindowDots />
             <span class="ml-3 font-mono text-sm text-foreground tracking-widest">{{ code }}</span>
             <CopyButton :text="link" />
             <span
@@ -307,94 +395,154 @@ const badLink = computed(() => t(props.kind === 'watch' ? m.rooms.badLinkWatch :
             </template>
 
             <template v-else>
-              <component
-                :is="Player"
-                v-if="state?.media"
-                ref="player"
-                :media="state.media"
-                :host="isHost"
-                :autoplay="autoplay"
-                @reading="onReading"
-                @finished="onFinished"
-              />
-              <div
-                v-else
-                class="aspect-video w-full rounded border border-dashed border-border grid place-items-center text-muted-foreground"
-              >
-                {{ isHost ? t(m.rooms.nothing) : t(m.rooms.waiting) }}
-              </div>
-
-              <div class="flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
-                <span v-if="state?.media" class="font-mono truncate max-w-full">{{ mediaLabel(kind, state.media) }}</span>
-                <span v-if="state?.media" class="tabular-nums">{{ formatClock(position) }}</span>
-                <span v-if="state?.media" :class="state.playing ? 'text-primary' : ''">
-                  {{ state.playing ? '▶' : '❚❚' }}
-                </span>
-                <span class="ml-auto">{{ isHost ? t(m.rooms.youAreHost) : t(m.rooms.youAreGuest) }}</span>
-              </div>
-
-              <template v-if="isHost">
-                <form class="flex flex-wrap gap-2" @submit.prevent="playNow">
-                  <input
-                    v-model="mediaInput"
-                    type="text"
-                    autocomplete="off"
-                    spellcheck="false"
-                    :placeholder="inputLabel"
-                    :aria-label="inputLabel"
-                    class="flex-1 min-w-48 h-9 rounded border border-border bg-transparent px-2 text-sm text-foreground focus:border-primary outline-none"
-                  />
-                  <button
-                    type="submit"
-                    class="px-3 py-1.5 rounded border border-primary/50 text-primary hover:bg-primary/10 transition-colors"
-                  >
-                    {{ t(m.rooms.playNow) }}
-                  </button>
-                  <button
-                    type="button"
-                    class="px-3 py-1.5 rounded border border-border text-muted-foreground hover:text-foreground hover:border-primary/50 transition-colors"
-                    @click="enqueue"
-                  >
-                    {{ t(m.rooms.enqueue) }}
-                  </button>
-                  <button
+              <!--
+                Two columns from `lg` only: inside max-w-5xl, a 17rem sidebar at `md`
+                would leave the video under about 450 px. Below that the sidebar
+                stacks under the player and its controls, in reading order.
+              -->
+              <div class="grid gap-4 lg:grid-cols-[minmax(0,1fr)_17rem]">
+                <div class="min-w-0 space-y-4">
+                  <component
+                    :is="Player"
                     v-if="state?.media"
-                    type="button"
-                    class="px-3 py-1.5 rounded border border-border text-muted-foreground hover:text-foreground hover:border-primary/50 transition-colors"
-                    @click="toggle"
+                    ref="player"
+                    :media="state.media"
+                    :host="isHost"
+                    :autoplay="autoplay"
+                    :compact="kind === 'radio'"
+                    @reading="onReading"
+                    @finished="onFinished"
+                  />
+                  <div
+                    v-else
+                    class="aspect-video w-full rounded border border-dashed border-border grid place-items-center text-muted-foreground"
                   >
-                    {{ state.playing ? t(m.rooms.pause) : t(m.rooms.play) }}
-                  </button>
-                  <button
-                    v-if="queue.length"
-                    type="button"
-                    class="px-3 py-1.5 rounded border border-border text-muted-foreground hover:text-foreground hover:border-primary/50 transition-colors"
-                    @click="next"
-                  >
-                    {{ t(m.rooms.next) }} →
-                  </button>
-                </form>
-                <p v-if="mediaError" class="text-xs text-destructive">{{ badLink }}</p>
-                <p v-else-if="error" class="text-xs text-destructive">{{ error }}</p>
-              </template>
+                    {{ isHost ? t(m.rooms.nothing) : t(m.rooms.waiting) }}
+                  </div>
 
-              <div v-if="queue.length" class="space-y-1">
-                <p class="text-xs text-muted-foreground">--{{ t(m.rooms.upNext) }}</p>
-                <ol class="font-mono text-xs space-y-1">
-                  <li v-for="(item, index) in queue" :key="`${index}-${item}`" class="flex items-center gap-2">
-                    <span class="text-muted-foreground">{{ index + 1 }}.</span>
-                    <span class="truncate">{{ mediaLabel(kind, item) }}</span>
-                    <button
-                      v-if="isHost"
-                      type="button"
-                      class="ml-auto text-muted-foreground hover:text-destructive"
-                      :aria-label="t(m.rooms.remove)"
-                      @click="removeAt(index)"
-                    >
-                      ×
-                    </button>
-                  </li>
-                </ol>
+                  <p class="text-xs text-muted-foreground">
+                    {{ isHost ? t(m.rooms.youAreHost) : t(m.rooms.youAreGuest) }}
+                  </p>
+
+                  <template v-if="isHost">
+                    <form class="flex flex-wrap gap-2" @submit.prevent="playNow">
+                      <input
+                        v-model="mediaInput"
+                        type="text"
+                        autocomplete="off"
+                        spellcheck="false"
+                        :placeholder="inputLabel"
+                        :aria-label="inputLabel"
+                        class="flex-1 min-w-48 h-9 rounded border border-border bg-transparent px-2 text-sm text-foreground focus:border-primary outline-none"
+                      />
+                      <button
+                        type="submit"
+                        class="px-3 py-1.5 rounded border border-primary/50 text-primary hover:bg-primary/10 transition-colors"
+                      >
+                        {{ t(m.rooms.playNow) }}
+                      </button>
+                      <button
+                        type="button"
+                        class="px-3 py-1.5 rounded border border-border text-muted-foreground hover:text-foreground hover:border-primary/50 transition-colors"
+                        @click="enqueue"
+                      >
+                        {{ t(m.rooms.enqueue) }}
+                      </button>
+                      <button
+                        v-if="state?.media"
+                        type="button"
+                        class="px-3 py-1.5 rounded border border-border text-muted-foreground hover:text-foreground hover:border-primary/50 transition-colors"
+                        @click="toggle"
+                      >
+                        {{ state.playing ? t(m.rooms.pause) : t(m.rooms.play) }}
+                      </button>
+                    </form>
+                    <p v-if="mediaError" class="text-xs text-destructive">{{ badLink }}</p>
+                    <p v-else-if="error" class="text-xs text-destructive">{{ error }}</p>
+                  </template>
+                </div>
+
+                <!--
+                  Buttons rather than drag and drop: they work with a keyboard, a screen
+                  reader and a thumb at no extra cost, and the queue holds 50 at most.
+                  They are `aria-disabled` rather than `disabled` while an edit is in
+                  flight, so the focused one keeps focus.
+                -->
+                <aside
+                  :aria-label="t(m.rooms.upNext)"
+                  class="min-w-0 space-y-4 text-xs lg:border-l lg:border-border lg:pl-4"
+                >
+                  <div class="space-y-1">
+                    <h2 class="text-muted-foreground">--{{ t(m.rooms.nowPlaying) }}</h2>
+                    <template v-if="state?.media">
+                      <!-- One item, so a long title wraps here rather than being cut as in the list. -->
+                      <p class="font-mono text-sm text-foreground break-words" :title="state.media">
+                        {{ label(state.media) }}
+                      </p>
+                      <p class="flex items-center gap-2 text-muted-foreground tabular-nums">
+                        <span :class="state.playing ? 'text-primary' : ''">{{ state.playing ? '▶' : '❚❚' }}</span>
+                        <span>{{ formatClock(position) }}</span>
+                      </p>
+                    </template>
+                    <p v-else class="text-muted-foreground">{{ t(m.rooms.nothingPlaying) }}</p>
+                  </div>
+
+                  <div class="space-y-2">
+                    <div class="flex items-center gap-2">
+                      <h2 class="text-muted-foreground">--{{ t(m.rooms.upNext) }}</h2>
+                      <button
+                        v-if="isHost && queue.length"
+                        type="button"
+                        :aria-disabled="queueBusy"
+                        class="ml-auto px-2 py-1 rounded border border-border text-muted-foreground hover:text-foreground hover:border-primary/50 transition-colors aria-disabled:opacity-40 aria-disabled:cursor-not-allowed"
+                        @click="skip"
+                      >
+                        {{ t(m.rooms.next) }} →
+                      </button>
+                    </div>
+                    <ol v-if="queue.length" ref="queueList" class="font-mono space-y-1">
+                      <li v-for="(item, index) in queue" :key="`${index}-${item}`" class="flex items-center gap-1">
+                        <span class="text-muted-foreground tabular-nums">{{ index + 1 }}.</span>
+                        <span class="flex-1 min-w-0 truncate" :title="item">{{ label(item) }}</span>
+                        <template v-if="isHost">
+                          <button
+                            type="button"
+                            data-action="up"
+                            :aria-disabled="queueBusy || index === 0"
+                            :aria-label="naming(m.rooms.moveUp, item)"
+                            class="w-6 h-6 shrink-0 grid place-items-center rounded text-muted-foreground hover:text-foreground aria-disabled:opacity-40 aria-disabled:cursor-not-allowed"
+                            @click="moveAt(index, index - 1)"
+                          >
+                            ↑
+                          </button>
+                          <button
+                            type="button"
+                            data-action="down"
+                            :aria-disabled="queueBusy || index === queue.length - 1"
+                            :aria-label="naming(m.rooms.moveDown, item)"
+                            class="w-6 h-6 shrink-0 grid place-items-center rounded text-muted-foreground hover:text-foreground aria-disabled:opacity-40 aria-disabled:cursor-not-allowed"
+                            @click="moveAt(index, index + 1)"
+                          >
+                            ↓
+                          </button>
+                          <button
+                            type="button"
+                            data-action="remove"
+                            :aria-disabled="queueBusy"
+                            :aria-label="naming(m.rooms.remove, item)"
+                            class="w-6 h-6 shrink-0 grid place-items-center rounded text-muted-foreground hover:text-destructive aria-disabled:opacity-40 aria-disabled:cursor-not-allowed"
+                            @click="removeAt(index)"
+                          >
+                            ×
+                          </button>
+                        </template>
+                      </li>
+                    </ol>
+                    <p v-else class="text-muted-foreground">
+                      {{ isHost ? t(m.rooms.queueEmptyHost) : t(m.rooms.queueEmptyGuest) }}
+                    </p>
+                  </div>
+                </aside>
               </div>
 
               <div class="flex flex-wrap gap-3 pt-2 border-t border-border">

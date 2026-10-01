@@ -7,9 +7,10 @@ import { terminalCapturing } from './useTerminalShell'
  * the wireframe field has the screen to itself; any key or pointer movement brings
  * the page back.
  *
- * `ThreeBackground` starts it and stops it, which is the whole of its reduced-motion
- * handling: that component never mounts under reduced motion, so neither does this —
- * there would be nothing behind the page to show.
+ * `ThreeBackground` starts it and stops it, which is the whole of its motion handling:
+ * that component never mounts while motion is paused (reduced motion included), and
+ * stops this along with its loop when the visitor pauses later — there would be nothing
+ * moving behind the page to show.
  *
  * It never starts while a game holds the keyboard or a room is playing. Both would be
  * worse than no screensaver: a paused tetris board is still a board being played, and

@@ -1,5 +1,5 @@
 import { computed, onScopeDispose, ref, watch, type Ref } from 'vue'
-import { prefersReducedMotion } from './useCrt'
+import { decorativeMotion } from './useMotion'
 
 /** Long enough to read a command name, short enough that the change is noticed. */
 export const CYCLE_MS = 3500
@@ -18,9 +18,10 @@ export function dismissSuggestions(): void {
 
 /**
  * The faded `try: <command>` an empty prompt shows. It cycles through `pool` while
- * `active`; under reduced motion it holds one hint instead of changing under the
- * reader. The start is random so that someone who opens the shell twice does not see
- * the same first suggestion twice.
+ * `active`; with motion `paused` (reduced motion included) it holds one hint instead
+ * of changing under the reader. `calm` keeps the cycle: it is text, not movement. The
+ * start is random so that someone who opens the shell twice does not see the same
+ * first suggestion twice.
  */
 export function usePromptSuggestion(pool: () => string[], active: Ref<boolean>) {
   const candidates = pool()
@@ -33,10 +34,12 @@ export function usePromptSuggestion(pool: () => string[], active: Ref<boolean>) 
   }
 
   watch(
-    [active, dismissed],
-    ([isActive, isDismissed]) => {
+    // A getter rather than `useMotion().level`: it is read afresh by each new watcher,
+    // where the shared computed would hand back whatever it cached first.
+    [active, dismissed, decorativeMotion],
+    ([isActive, isDismissed, motion]) => {
       stop()
-      if (!isActive || isDismissed || prefersReducedMotion() || candidates.length < 2) return
+      if (!isActive || isDismissed || motion === 'paused' || candidates.length < 2) return
       timer = setInterval(() => {
         index.value = (index.value + 1) % candidates.length
       }, CYCLE_MS)

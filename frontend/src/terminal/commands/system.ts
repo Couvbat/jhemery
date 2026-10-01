@@ -1,8 +1,12 @@
 import { profile } from '@/content'
-import { prefersReducedMotion, useCrt } from '@/composables/useCrt'
+import { useCrt } from '@/composables/useCrt'
+import { decorativeMotion } from '@/composables/useMotion'
 import { useMusicPlayer } from '@/composables/useMusicPlayer'
+import { observeRequests, type RequestTrace } from '@/lib/api'
 import { achievementList, announce, isUnlocked, unlockedCount } from '../achievements'
-import { blank, line } from '../format'
+import { blank, fail, line } from '../format'
+import { isLinkable, resolveLink, visibleCommands, writesOf } from '../registry'
+import { traceLines } from '../strace'
 import { sleep } from '../timing'
 import type { Command, OutputLine, Tone } from '../types'
 import { uptime } from './content'
@@ -78,8 +82,83 @@ function table(procs: Proc[]): OutputLine[] {
   ]
 }
 
+/**
+ * The command `strace` wraps, resolved the way a link resolves one: without the visitor's
+ * aliases, so `strace ls` traces `ls` whatever `ls` is aliased to.
+ */
+function traced(args: readonly string[]) {
+  return args.length ? resolveLink(args.join(' ')) : undefined
+}
+
+const strace: Command = {
+  name: 'strace',
+  usage: 'strace <command> [args]',
+  description: {
+    en: 'The requests a command makes, and the shape of what they carry',
+    fr: 'Les requêtes d’une commande, et la forme de ce qu’elles transportent',
+  },
+  group: 'core',
+  // It writes whatever it runs writes, so `?run=strace sign x` is refused like `sign x`.
+  writes: (args) => {
+    const inner = traced(args)
+    return inner && inner.command.name !== 'strace' ? writesOf(inner.command, inner.args) : 'none'
+  },
+  linkable: (args) => {
+    const inner = traced(args)
+    return !!inner && inner.command.name !== 'strace' && isLinkable(inner.command, inner.args)
+  },
+  // The command first, then whatever that command offers: so a link's arguments are held
+  // to the inner command's own list, as they would be without strace.
+  complete: ({ args, index, word }) => {
+    const names = visibleCommands()
+      .flatMap((c) => [c.name, ...(c.aliases ?? [])])
+      .filter((name) => name !== 'strace')
+    // A two-word name (`git log`) is offered a word at a time, as the shell reads it.
+    if (index === 0) return [...new Set(names.map((name) => name.split(' ')[0]!))]
+    const inner = traced(args.slice(0, index))
+    if (!inner && index === 1) return names.filter((name) => name.startsWith(`${args[0]} `)).map((name) => name.split(' ')[1]!)
+    if (!inner) return []
+    const consumed = index - inner.args.length
+    return inner.command.complete?.({ args: args.slice(consumed), index: index - consumed, word }) ?? []
+  },
+  async run(ctx) {
+    const inner = traced(ctx.args)
+    if (!ctx.args.length) return [fail('strace: must have PROG [ARGS] or -p PID')]
+    if (!inner) return [fail(`strace: Can't stat '${ctx.args[0]}': No such file or directory`)]
+    if (inner.command.name === 'strace') return [fail('strace: one at a time: it would only trace itself')]
+
+    // Only what the visitor's command asked for: the two pollers mark themselves.
+    const traces: RequestTrace[] = []
+    const stop = observeRequests((trace) => {
+      if (!trace.background) traces.push(trace)
+    })
+    let exit = 0
+    let killed = false
+    try {
+      await ctx.run(ctx.args.join(' '))
+    } catch (error) {
+      if ((error as Error)?.name !== 'AbortError') {
+        ctx.print(fail(String((error as Error)?.message ?? error)))
+        exit = 1
+      }
+      killed = (error as Error)?.name === 'AbortError'
+    } finally {
+      stop()
+    }
+    // Some commands keep what they had on Ctrl+C rather than rethrowing (`ask`), so the
+    // signal is the truth about whether the run was stopped.
+    killed ||= ctx.signal.aborted
+    // No request, no trailer: `strace ls` looks exactly like `ls`, stopped or not.
+    if (traces.length) {
+      ctx.print([...traces.flatMap(traceLines), line(killed ? '+++ killed by SIGINT +++' : `+++ exited with ${exit} +++`, 'muted')])
+    }
+    if (killed) throw Object.assign(new Error('aborted'), { name: 'AbortError' })
+  },
+}
+
 export const systemCommands: Command[] = [
   systemctl,
+  strace,
   {
     name: 'ps',
     aliases: ['ps aux', 'ps -ef'],
@@ -99,7 +178,9 @@ export const systemCommands: Command[] = [
     writes: 'none',
     hidden: true,
     async run(ctx) {
-      const frames = prefersReducedMotion() ? 1 : 6
+      // One frame with motion paused (reduced motion forces that); `calm` keeps a typed
+      // command's own animation.
+      const frames = decorativeMotion() === 'paused' ? 1 : 6
       // Redraws one table in place. It used to `clear()` between frames, which
       // stopped the frames stacking but took the whole scrollback with them.
       const draw = ctx.frame()
@@ -111,7 +192,7 @@ export const systemCommands: Command[] = [
         const procs = processes()
         // Stage 6 of the CTF chain (terminal/ctf.ts): a process that only exists on
         // the last frame, so only someone who watched `top` to the end sees it —
-        // never `ps`. Under reduced motion there is one frame, which is the last.
+        // never `ps`. With motion paused there is one frame, which is the last.
         if (i === frames - 1) procs.push(GHOST)
         const load = (Math.random() * 1.5).toFixed(2)
         draw([
@@ -148,7 +229,7 @@ export const systemCommands: Command[] = [
       // rather than silently printing the list it was not asked for.
       if (raw.trim().startsWith('export') && args.length > 0) {
         return [
-          line('export: this environment is read-only.', 'error'),
+          fail('export: this environment is read-only.'),
           line(`(it is also entirely made up — see \`cat ${ENV_FILE}\`)`, 'muted'),
         ]
       }

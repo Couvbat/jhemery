@@ -2,6 +2,7 @@
 import { computed } from 'vue'
 import type { ContributionDay } from '@/lib/api'
 import { useLocale } from '@/i18n'
+import WindowDots from '@/components/WindowDots.vue'
 
 const props = defineProps<{
   weeks: ContributionDay[][]
@@ -59,9 +60,7 @@ function titleFor(day: ContributionDay | null): string {
 <template>
   <div class="rounded border border-border bg-card overflow-hidden">
     <div class="flex items-center gap-2 px-4 py-2 bg-muted border-b border-border">
-      <span class="w-3 h-3 rounded-full bg-red-500/80"></span>
-      <span class="w-3 h-3 rounded-full bg-yellow-500/80"></span>
-      <span class="w-3 h-3 rounded-full bg-green-500/80"></span>
+      <WindowDots />
       <span class="ml-3 text-xs text-muted-foreground">{{ t(m.projects.contributions) }}</span>
       <span class="ml-auto text-xs text-primary">{{ total }}</span>
     </div>

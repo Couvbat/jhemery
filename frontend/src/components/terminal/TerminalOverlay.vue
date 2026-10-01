@@ -2,9 +2,11 @@
 import { computed, nextTick, onMounted, ref, watch } from 'vue'
 import { profile } from '@/content'
 import { useLocale } from '@/i18n'
-import { useTerminal } from '@/composables/useTerminal'
+import { resetRecall, useTerminal } from '@/composables/useTerminal'
 import { usePromptSuggestion } from '@/composables/usePromptSuggestion'
+import { autosuggest, searchBackward } from '@/terminal/history'
 import { suggestionPool } from '@/terminal/registry'
+import { WINDOW_DOTS } from '@/components/WindowDots.vue'
 import TerminalOutput from './TerminalOutput.vue'
 import VimPane from './VimPane.vue'
 
@@ -17,6 +19,7 @@ const {
   revision,
   pendingPrompt,
   capturing,
+  captureTakesEscape,
   vimBuffer,
   handleVimKeydown,
   handleCaptureKeydown,
@@ -26,13 +29,18 @@ const {
   cancel,
   recallHistory,
   completeInput,
+  history,
 } = useTerminal()
 
-/** Shared chrome for the three title-bar dots (they only differ by colour). */
+/** Shared chrome for the three title-bar dots (they only differ by colour, which is
+ *  `WindowDots`' — the same three tokens every other window's bar uses). */
 const BUTTON_CLASS =
   'w-3 h-3 rounded-full flex items-center justify-center transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-primary focus-visible:ring-offset-1 focus-visible:ring-offset-muted'
+const [CLOSE_DOT, MINIMISE_DOT, MAXIMISE_DOT] = WINDOW_DOTS.map((dot) => [dot.fill, dot.hover])
+// The page's background on the dot, as text on a filled `primary` is: dark on a dark
+// scheme's bright dots, light on a light scheme's dark ones.
 const GLYPH_CLASS =
-  'text-[8px] leading-none text-black/70 opacity-0 group-hover:opacity-100 transition-opacity'
+  'text-[8px] leading-none text-background/80 opacity-0 group-hover:opacity-100 transition-opacity'
 
 const input = ref('')
 const inputEl = ref<HTMLInputElement | null>(null)
@@ -55,13 +63,93 @@ const { suggestion, dismiss } = usePromptSuggestion(
   ),
 )
 const placeholder = computed(() =>
-  suggestion.value ? t(m.terminal.suggestion).replace('{command}', suggestion.value) : '',
+  suggestion.value && !search.value ? t(m.terminal.suggestion).replace('{command}', suggestion.value) : '',
 )
 watch(input, (value) => {
   if (value) dismiss()
 })
 
+/** Nothing else wants the keyboard: no game, no question, no command running, no vim. */
+const ownsKeyboard = computed(() => !capturing.value && !pendingPrompt.value && !running.value && !vimBuffer.value)
+
+/**
+ * Ctrl+R, reverse-i-search: what has been typed into the search, the match it found and
+ * where (so another Ctrl+R looks further back), and the line it replaced in the input.
+ */
+const search = ref<{ query: string; index: number; found: string | null; saved: string } | null>(null)
+
+function findInSearch(query: string, before?: number) {
+  const current = search.value!
+  const hit = searchBackward(history.value, query, before)
+  search.value = { ...current, query, index: hit?.index ?? current.index, found: hit?.entry ?? (before === undefined ? null : current.found) }
+  input.value = search.value.found ?? search.value.saved
+}
+
+function endSearch(keep: boolean) {
+  const current = search.value
+  if (!current) return
+  search.value = null
+  input.value = keep && current.found ? current.found : current.saved
+}
+
+/** A modifier pressed on its own: the first half of Ctrl+R, Ctrl+C or a capital, not a key. */
+const MODIFIER_KEYS = new Set(['Control', 'Shift', 'Alt', 'AltGraph', 'Meta', 'CapsLock', 'Dead', 'Process'])
+
+/** The keys Ctrl+R's search takes for itself. Returns whether it took this one. */
+function searchKeydown(event: KeyboardEvent): boolean {
+  if (MODIFIER_KEYS.has(event.key)) return true
+  const current = search.value!
+  if ((event.key === 'c' || event.key === 'g') && event.ctrlKey) {
+    endSearch(false)
+  } else if (event.key === 'Enter') {
+    endSearch(true)
+    void onSubmit()
+  } else if (event.key === 'Escape' || event.key === 'ArrowRight' || event.key === 'Tab') {
+    // Escape has to stop here, or the panel's own Escape would close the terminal.
+    event.stopPropagation()
+    endSearch(true)
+  } else if (event.key === 'Backspace') {
+    findInSearch(current.query.slice(0, -1))
+  } else if (event.key.length === 1 && !event.ctrlKey && !event.metaKey && !event.altKey) {
+    findInSearch(current.query + event.key)
+  } else {
+    // Anything else (an arrow, Home) ends the search with the match in hand, then acts.
+    endSearch(true)
+    return false
+  }
+  event.preventDefault()
+  return true
+}
+
+/** Where the caret is and whether the input has scrolled: the ghost only fits at the end of an unscrolled line. */
+const caretAtEnd = ref(true)
+const inputScrolled = ref(false)
+/** Typing starts the next ↑ afresh, from what is now in the input. */
+function onTyped() {
+  resetRecall()
+  measure()
+}
+
+function measure() {
+  const el = inputEl.value
+  if (!el) return
+  caretAtEnd.value = el.selectionStart === el.value.length && el.selectionEnd === el.value.length
+  inputScrolled.value = el.scrollLeft > 0
+}
+
+/** The rest of the newest line in the visitor's own history that starts with what is typed. */
+const ghost = computed(() =>
+  ownsKeyboard.value && !search.value && caretAtEnd.value && !inputScrolled.value ? autosuggest(input.value, history.value) : '',
+)
+
+// A search belongs to the shell's own prompt: a prompt, a game or a command taking the
+// keyboard ends it, and so does closing the panel, which leaves this component mounted.
+watch(ownsKeyboard, (owns) => {
+  if (!owns) endSearch(false)
+})
+
 const promptLabel = computed(() => {
+  if (search.value) return `(reverse-i-search)'${search.value.query}':`
   if (pendingPrompt.value) return pendingPrompt.value.question
   if (capturing.value) return t(m.terminal.playing)
   return `${profile.handle}:~$`
@@ -91,6 +179,7 @@ watch(open, (isOpen) => {
   if (isOpen) {
     void handleOpened()
   } else {
+    endSearch(false)
     previouslyFocused?.focus()
     previouslyFocused = null
   }
@@ -120,7 +209,7 @@ function onKeydown(event: KeyboardEvent) {
   // return synchronously and hold no capture), but the precedence is written
   // down rather than inferred. Escape is deliberately let through to
   // `onPanelKeydown`, which turns it into an abort while a game is running.
-  if (capturing.value && event.key !== 'Escape' && handleCaptureKeydown(event)) {
+  if (capturing.value && (event.key !== 'Escape' || captureTakesEscape.value) && handleCaptureKeydown(event)) {
     event.preventDefault()
     event.stopPropagation()
     return
@@ -152,6 +241,24 @@ function onKeydown(event: KeyboardEvent) {
     return
   }
 
+  // Ctrl+R is the browser's reload everywhere else, and Cmd+R stays it here: only taken
+  // while the shell itself has the keyboard.
+  if (event.key === 'r' && event.ctrlKey && !event.metaKey && !event.altKey && ownsKeyboard.value) {
+    event.preventDefault()
+    if (!search.value) search.value = { query: '', index: history.value.length, found: null, saved: input.value }
+    else if (search.value.query) findInSearch(search.value.query, search.value.index)
+    return
+  }
+  if (search.value && ownsKeyboard.value && searchKeydown(event)) return
+
+  // → or End at the end of the line takes the ghost.
+  if ((event.key === 'ArrowRight' || event.key === 'End') && ghost.value) {
+    event.preventDefault()
+    input.value += ghost.value
+    void nextTick(measure)
+    return
+  }
+
   if (event.key === 'ArrowUp') {
     event.preventDefault()
     input.value = recallHistory(-1, input.value)
@@ -172,6 +279,7 @@ function onKeydown(event: KeyboardEvent) {
   } else if (event.key === 'c' && event.ctrlKey) {
     event.preventDefault()
     input.value = ''
+    resetRecall()
     cancel()
   }
 }
@@ -252,7 +360,7 @@ function onPanelKeydown(event: KeyboardEvent) {
           <div class="group flex items-center gap-2">
             <button
               type="button"
-              :class="[BUTTON_CLASS, 'bg-red-500/80 hover:bg-red-500']"
+              :class="[BUTTON_CLASS, CLOSE_DOT]"
               :aria-label="t(m.terminal.close)"
               :title="t(m.terminal.close)"
               @click="requestClose()"
@@ -261,7 +369,7 @@ function onPanelKeydown(event: KeyboardEvent) {
             </button>
             <button
               type="button"
-              :class="[BUTTON_CLASS, 'bg-yellow-500/80 hover:bg-yellow-500']"
+              :class="[BUTTON_CLASS, MINIMISE_DOT]"
               :aria-label="t(m.terminal.minimise)"
               :title="t(m.terminal.minimise)"
               @click="maximised = false"
@@ -270,7 +378,7 @@ function onPanelKeydown(event: KeyboardEvent) {
             </button>
             <button
               type="button"
-              :class="[BUTTON_CLASS, 'bg-green-500/80 hover:bg-green-500']"
+              :class="[BUTTON_CLASS, MAXIMISE_DOT]"
               :aria-label="t(m.terminal.maximise)"
               :title="t(m.terminal.maximise)"
               @click="maximised = true"
@@ -313,22 +421,37 @@ function onPanelKeydown(event: KeyboardEvent) {
           @submit.prevent="onSubmit"
         >
           <label for="terminal-input" class="sr-only">{{ t(m.terminal.inputLabel) }}</label>
-          <span :class="pendingPrompt ? 'text-accent' : 'text-primary'">{{ promptLabel }}</span>
-          <input
-            id="terminal-input"
-            ref="inputEl"
-            v-model="input"
-            :type="pendingPrompt?.mask ? 'password' : 'text'"
-            autocomplete="off"
-            autocapitalize="off"
-            autocorrect="off"
-            spellcheck="false"
-            :readonly="capturing || running"
-            :aria-disabled="running"
-            :placeholder="placeholder"
-            class="flex-1 bg-transparent outline-none text-foreground caret-primary aria-disabled:opacity-50 placeholder:text-muted-foreground/50"
-            @keydown="onKeydown"
-          />
+          <span :class="pendingPrompt || search ? 'text-accent' : 'text-primary'">{{ promptLabel }}</span>
+          <div class="relative flex-1 min-w-0 flex items-center">
+            <!-- The ghost: what is typed, invisible, then the rest of the history line it
+                 would become, faded. Decoration only, so screen readers skip it. -->
+            <span
+              v-if="ghost"
+              aria-hidden="true"
+              data-testid="terminal-ghost"
+              class="pointer-events-none absolute inset-0 flex items-center whitespace-pre overflow-hidden text-transparent"
+              >{{ input }}<span class="text-muted-foreground/50">{{ ghost }}</span></span
+            >
+            <input
+              id="terminal-input"
+              ref="inputEl"
+              v-model="input"
+              :type="pendingPrompt?.mask ? 'password' : 'text'"
+              autocomplete="off"
+              autocapitalize="off"
+              autocorrect="off"
+              spellcheck="false"
+              :readonly="capturing || running"
+              :aria-disabled="running"
+              :placeholder="placeholder"
+              class="w-full bg-transparent outline-none text-foreground caret-primary aria-disabled:opacity-50 placeholder:text-muted-foreground/50"
+              @keydown="onKeydown"
+              @input="onTyped"
+              @keyup="measure"
+              @click="measure"
+              @scroll="measure"
+            />
+          </div>
         </form>
       </div>
     </div>
