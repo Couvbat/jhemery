@@ -255,7 +255,9 @@ sell anyone on hiring Jules, so this batch leans towards showing the work and pr
 site claims rather than adding toys; §G already called the playground large. Six lenses proposed
 54 ideas, and three reviews (does it already exist, does it fit the site's principles, is it worth
 the effort) cut them to the rows below. What was cut, and why, is under [Dropped](#dropped).
-Nothing here is built yet.
+Nothing here is built yet. The implementation plan, which checks each row against the code and
+corrects several of them, is
+[`superpowers/plans/2026-10-01-late-september-batch.md`](superpowers/plans/2026-10-01-late-september-batch.md).
 
 ### Fixes found on the way
 
@@ -362,7 +364,9 @@ destinations (#87), the swing's end-of-transition twitch (#89).
 6. The backend rows: `systemctl status`, the wordle histogram, the MCP server.
 7. Two-player games last. It's the only L, and it changes the rooms' trust model.
 
-**Phase 7 — the late-September brainstorm (§H):** proposed, not started. One branch per step:
+**Phase 7 — the late-September brainstorm (§H):** proposed, not started. One branch per step
+(the [plan](superpowers/plans/2026-10-01-late-september-batch.md#order) splits steps 3, 5 and 6
+further):
 
 1. **Fixes found on the way**, the rate-limit key first. Each is S and independent, and several
    later rows lean on them: `who`/`wall` on the rate limit, the case studies on experience as
