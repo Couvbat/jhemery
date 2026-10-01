@@ -11,9 +11,11 @@
 ci:
   collect:
     # LHCI serves `dist/` itself, so there is no dev server to start and no port
-    # to coordinate. Only `/` is collected: every other route in this SPA is the
-    # same document with the same bundle, so a second URL would cost a minute of
-    # CI to re-measure identical numbers.
+    # to coordinate. It collects every HTML file it finds there: `/`, plus the two
+    # printable résumés the build emits, which are real documents rather than SPA
+    # routes, so every assertion below applies to them too. Other routes of the SPA
+    # are the same document with the same bundle and would re-measure identical
+    # numbers.
     staticDistDir: ./dist
     # Five, not three, because of what the first CI run actually did: on the
     # GitHub runner run #1 measured 879 ms of blocking time and a 0.61

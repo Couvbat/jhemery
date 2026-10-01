@@ -4,7 +4,8 @@ Status tracker for the feature brainstorm: first three categories (three.js back
 commands, live information), then games vol. 2 (§E), views and tools (§F), the September 2026
 batch (§G) and the late-September brainstorm (§H). Built feature by feature, across sessions.
 
-**Current state: §A–§G are shipped; §H is proposed and not started.** Anything else still open is
+**Current state: §A–§G are shipped; in §H the *Fixes found on the way* have shipped and the rest
+is proposed.** Anything else still open is
 under [Open](#open) and [Known issues](#known-issues).
 
 **How to use:** tick a box when the feature ships, and append the PR number. Design detail for
@@ -255,7 +256,7 @@ sell anyone on hiring Jules, so this batch leans towards showing the work and pr
 site claims rather than adding toys; §G already called the playground large. Six lenses proposed
 54 ideas, and three reviews (does it already exist, does it fit the site's principles, is it worth
 the effort) cut them to the rows below. What was cut, and why, is under [Dropped](#dropped).
-Nothing here is built yet. The implementation plan, which checks each row against the code and
+The *Fixes found on the way* have shipped; the rest is not built yet. The implementation plan, which checks each row against the code and
 corrects several of them, is
 [`superpowers/plans/2026-10-01-late-september-batch.md`](superpowers/plans/2026-10-01-late-september-batch.md).
 
@@ -329,6 +330,9 @@ Recorded as each row ships.
   the origin writes itself. The reasoning is in `backend/src/main.ts`.
 - **Experience as content:**
   - The row grew an **education** list beside the roles, read by the same renderers.
+  - The earlier employer and the training centre are described rather than named, as the site
+    says nothing narrower than "France": their names point at a département and a registry
+    address. A spec fails on a city, a département or a company form.
   - Durations count both the first and the last month, which is LinkedIn's rule, so the CV never
     disagrees with the profile.
   - The date maths moved to `content/dates.ts`, which `now.ts` imports, rather than sitting in
@@ -397,7 +401,7 @@ destinations (#87), the swing's end-of-transition twitch (#89).
 6. The backend rows: `systemctl status`, the wordle histogram, the MCP server.
 7. Two-player games last. It's the only L, and it changes the rooms' trust model.
 
-**Phase 7 — the late-September brainstorm (§H):** proposed, not started. One branch per step
+**Phase 7 — the late-September brainstorm (§H):** step 1 shipped, the rest proposed. One branch per step
 (the [plan](superpowers/plans/2026-10-01-late-september-batch.md#order) splits steps 3, 5 and 6
 further):
 
@@ -417,7 +421,8 @@ further):
 
 ## Open
 
-- Everything in [§H](#h-late-september-2026-brainstorm) is proposed and not started.
+- Everything in [§H](#h-late-september-2026-brainstorm) after *Fixes found on the way* is proposed
+  and not started.
 - A curation pass, which is a judgement call rather than a row: retire or fold the weakest joke
   commands, and record each removal here, the way *Dropped* records what never shipped.
 
