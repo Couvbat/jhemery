@@ -322,8 +322,10 @@ export async function runLink(input: string): Promise<void> {
 
   const target = resolveLink(line)
   if (!target || !isLinkable(target.command, target.args)) {
+    // Quoted short: a refused link's text is the link author's, not the site's.
+    const asked = line.length > 60 ? `${line.slice(0, 59)}…` : line
     append({
-      text: messages.terminal.linkRefused[currentLocale()].replace('{command}', line),
+      text: messages.terminal.linkRefused[currentLocale()].replace('{command}', asked),
       tone: 'warning',
     })
     return

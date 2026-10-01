@@ -412,7 +412,8 @@ export const eggCommands: Command[] = [
     usage: 'hack [target]',
     description: { en: 'Breach the mainframe', fr: 'Pirater le mainframe' },
     group: 'fun',
-    writes: 'none',
+    // It prints its target back as output (`nmap -sS -A <target>`).
+    writes: (args) => (args[0] ? 'local' : 'none'),
     hidden: true,
     async run(ctx) {
       const target = ctx.args[0] ?? 'mainframe'

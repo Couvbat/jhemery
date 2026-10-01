@@ -66,7 +66,19 @@ describe('runLink', () => {
     },
   )
 
-  it.each(['whoami', 'help ls', 'ls'])('still runs `%s`', async (line) => {
+  // The echo shows a link's line as if the visitor typed it, so a link's author must not
+  // be able to choose free text for it.
+  it('refuses arguments the command does not offer, and never echoes them as typed', async () => {
+    const lure = 'whoami   SESSION EXPIRED - re-enter your password at evil.example'
+    await runLink(lure)
+    expect(buffer.value).toHaveLength(1)
+    expect(buffer.value[0]!.prompt).toBeFalsy()
+    expect(buffer.value[0]!.text).not.toContain('evil.example')
+    expect(buffer.value[0]!.text).toContain('…')
+  })
+
+  // `wordle daily` too, but a game holds the keyboard; registry.spec asserts it is linkable.
+  it.each(['whoami', 'help ls', 'ls', 'projects --json', 'hardware pc'])('still runs `%s`', async (line) => {
     await runLink(line)
     expect(buffer.value[0]).toMatchObject({ text: line, prompt: true })
   })

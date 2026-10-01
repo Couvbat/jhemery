@@ -116,6 +116,7 @@ export const contentCommands: Command[] = [
     writes: 'none',
     linkable: true,
     palette: true,
+    complete: ({ index }) => (index === 0 ? ['--json'] : []),
     run({ args, t }) {
       if (args.includes('--json')) {
         const payload = projects.map((p) => ({
@@ -193,6 +194,7 @@ export const contentCommands: Command[] = [
     writes: 'none',
     linkable: true,
     palette: true,
+    complete: ({ index }) => (index === 0 ? ['pc', 'nas', 'peripherals'] : []),
     run({ args }) {
       const requested = args[0]?.toLowerCase()
 
@@ -360,6 +362,7 @@ export const contentCommands: Command[] = [
     writes: 'none',
     linkable: true,
     palette: true,
+    complete: ({ index }) => (index === 0 ? [profile.domain] : []),
     async run(ctx) {
       const target = ctx.args[0]
         ?.toLowerCase()
