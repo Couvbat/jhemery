@@ -204,8 +204,24 @@ async function runNested(input: string, signal: AbortSignal): Promise<void> {
     append({ text: `${name}: ${messages.terminal.notFound[currentLocale()]}`, tone: 'error' })
     return
   }
-  const result = await target.command.run(buildContext(target.args, input, signal))
-  if (result) append(result)
+  // A capture is one slot, not a stack: hand the parent's back once the child is done,
+  // whether the child took the keyboard, released it, or threw.
+  const parentCapture = keyCapture.value
+  try {
+    const result = await target.command.run(buildContext(target.args, input, signal))
+    if (result) append(result)
+  } finally {
+    keyCapture.value = parentCapture
+  }
+}
+
+/**
+ * Whether `name`, read with the word after it, is a command. An alias never shadows
+ * one: run and Tab completion both ask this, so they can't disagree about what a
+ * line will run.
+ */
+function namesCommand(name: string, next?: string): boolean {
+  return resolve(name) !== undefined || (next !== undefined && resolve(`${name} ${next}`) !== undefined)
 }
 
 export async function run(input: string): Promise<void> {
@@ -214,7 +230,7 @@ export async function run(input: string): Promise<void> {
   // the command that will actually run. `alias` itself is never expanded — it
   // reads its own raw line — because it is a real command and aliases cannot
   // shadow those.
-  const raw = expandAliases(input, (name) => resolve(name) !== undefined)
+  const raw = expandAliases(input, namesCommand)
   if (!raw) return
 
   const [name = '', ...args] = raw.split(/\s+/)
@@ -389,7 +405,7 @@ function ownerOf(words: string[]): { command: Command; argStart: number } | unde
 
   // `gl about.txt` where `gl` is the visitor's alias: complete against the
   // command that will actually run, not the name they typed.
-  const expanded = expandAliases(first)
+  const expanded = expandAliases(first, namesCommand)
   if (expanded === first) return undefined
   const viaAlias = resolve(expanded) ?? resolve(expanded.split(/\s+/)[0] ?? '')
   return viaAlias ? { command: viaAlias, argStart: 1 } : undefined

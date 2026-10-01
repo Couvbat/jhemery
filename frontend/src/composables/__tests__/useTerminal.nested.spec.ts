@@ -13,8 +13,10 @@ import type { Command } from '@/terminal/types'
 // factory would deadlock, since the shell imports the registry, which imports this mock.
 const seen = vi.hoisted(() => ({
   busyAfterChild: undefined as boolean | undefined,
+  capturingAfterChild: undefined as boolean | undefined,
   childArgs: [] as string[],
   readBusy: (() => undefined) as () => boolean | undefined,
+  readCapturing: (() => undefined) as () => boolean | undefined,
 }))
 
 // A parent that runs a child and then waits to be cancelled, like a tour between stops.
@@ -42,6 +44,18 @@ vi.mock('@/terminal/commands', async (importOriginal) => {
       seen.childArgs = ctx.args
     },
   }
+  const holding: Command = {
+    name: 'nesthold',
+    description: { en: 'test', fr: 'test' },
+    group: 'core',
+    writes: 'none',
+    async run(ctx) {
+      const release = ctx.capture(() => {})
+      await ctx.run('whoami')
+      seen.capturingAfterChild = seen.readCapturing()
+      release()
+    },
+  }
   const viaAlias: Command = {
     name: 'nestalias',
     description: { en: 'test', fr: 'test' },
@@ -52,7 +66,7 @@ vi.mock('@/terminal/commands', async (importOriginal) => {
       await ctx.run('mine')
     },
   }
-  return { ...actual, collectCommands: () => [...actual.collectCommands(), parent, echo, viaAlias] }
+  return { ...actual, collectCommands: () => [...actual.collectCommands(), parent, echo, holding, viaAlias] }
 })
 
 import { messages } from '@/i18n/messages'
@@ -60,9 +74,10 @@ import { setLocale } from '@/i18n'
 import { clearAliases, setAlias } from '@/terminal/aliases'
 import { cancel, useTerminal } from '../useTerminal'
 
-const { buffer, busy, clearBuffer, run } = useTerminal()
+const { buffer, busy, capturing, clearBuffer, run } = useTerminal()
 const CANCELLED = messages.terminal.cancelled.en
 seen.readBusy = () => busy.value
+seen.readCapturing = () => capturing.value
 
 beforeEach(() => {
   clearBuffer()
@@ -86,6 +101,11 @@ describe('ctx.run', () => {
     await done
     expect(busy.value).toBe(false)
     expect(buffer.value.filter((l) => l.text === CANCELLED)).toHaveLength(1)
+  })
+
+  it('hands a parent holding the keyboard its capture back after the child', async () => {
+    await run('nesthold')
+    expect(seen.capturingAfterChild).toBe(true)
   })
 
   it('passes the child its own arguments, and never expands the visitor’s aliases', async () => {

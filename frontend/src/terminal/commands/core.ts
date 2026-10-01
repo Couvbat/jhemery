@@ -4,7 +4,7 @@ import { profile } from '@/content'
 import { announce } from '../achievements'
 import { aliases, parseDefinition, removeAlias, setAlias } from '../aliases'
 import { history } from '../history'
-import { allCommands, completionNames, resolve, visibleCommands } from '../registry'
+import { allCommands, completionNames, isCommandWord, resolve, visibleCommands } from '../registry'
 import type { Command, CommandGroup, OutputLine } from '../types'
 import { blank, line, pre, segmented } from '../format'
 
@@ -177,7 +177,7 @@ export const coreCommands: Command[] = [
         return entries
           .sort(([a], [b]) => a.localeCompare(b))
           .map(([name, value]) =>
-            resolve(name)
+            isCommandWord(name)
               ? segmented([
                   { text: `${name.padEnd(width)}  →  ${value}`, tone: 'muted' },
                   { text: `  ${shadowed}`, tone: 'warning' },
@@ -198,7 +198,8 @@ export const coreCommands: Command[] = [
       // Shadowing a real command would let someone lock themselves out of their
       // own shell, and it survives a reload — so this one is a refusal, not a
       // faithful reimplementation of bash.
-      if (resolve(name)) {
+      // `git` too, the first word of `git log`: the alias would hide it all the same.
+      if (isCommandWord(name)) {
         return [line(`alias: \`${name}\` is already a command — pick another name.`, 'error')]
       }
 

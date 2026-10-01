@@ -105,6 +105,30 @@ describe('an alias a later command shadows', () => {
     expect(buffer.value.map((l) => l.text).join('\n')).not.toContain('hijacked')
   })
 
+  // `git log` is a two-word command; an alias named `git` would hide it just the same.
+  it('does not hide a two-word command behind its first word', async () => {
+    const { buffer, clearBuffer, run } = useTerminal()
+    clearBuffer()
+    setAlias('git', 'echo hijacked')
+    await run('git log')
+    expect(buffer.value.map((l) => l.text).join('\n')).not.toContain('hijacked')
+  })
+
+  it('refuses to define an alias on the first word of a two-word command', async () => {
+    const alias = coreCommands.find((c) => c.name === 'alias')!
+    const { lines } = await runCommand(alias, ["git='echo", "x'"])
+    expect(lines.map((l) => l.text).join('\n')).toContain('already a command')
+  })
+
+  // Tab completes against what Enter will run.
+  it('completes against the command, not an alias it shadows', () => {
+    const { completeInput } = useTerminal()
+    setAlias('cd', 'theme')
+    setAlias('zz', 'cd')
+    // `zz` → `cd`, which is a command, so the stored `cd` → `theme` alias never applies.
+    expect(completeInput('zz dra').value).not.toContain('dracula')
+  })
+
   it('is marked in the alias listing', async () => {
     setAlias('whoami', 'echo hijacked')
     setAlias('gl', 'git log')

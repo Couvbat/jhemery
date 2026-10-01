@@ -48,8 +48,9 @@ export type CommandGroup = 'core' | 'navigate' | 'content' | 'live' | 'fun'
 
 /**
  * What a command changes, which is what decides whether it may run without the visitor
- * typing it: from a `?run=` link, as a stop of `tour`, as a pipe stage, or from history
- * expansion. One field, read by all of them, so no rule keeps its own list.
+ * typing it. `?run=` links read it today (`isLinkable`), and the roadmap's `tour`, pipe
+ * stages and history expansion are meant to read this same field, so no rule keeps its
+ * own list.
  *
  * - `none`: reads. It may still record the visitor's own progress (achievements, best
  *   scores, the daily board and its one anonymous report), navigate, or play an
@@ -97,15 +98,18 @@ export interface CommandContext {
    * Routes raw keys to `handler` while the command runs — the primitive the games
    * need to hold the keyboard for longer than one line. Returns a release
    * function; the release also happens automatically when the command settles,
-   * so a command that throws cannot wedge the keyboard. Only one capture is
+   * so a command that throws cannot wedge the keyboard. For a command run through
+   * `ctx.run`, "settles" means when it returns: the caller's own capture comes back. Only one capture is
    * active at a time: a second call replaces the first. Modifier combos never
    * reach the handler, so `Ctrl+C` and `Ctrl+L` keep working throughout.
    */
   capture: (handler: (key: string) => void) => () => void
   /**
    * Runs another command inside this one: the same signal (Ctrl+C stops both), the same
-   * keyboard, and never the visitor's aliases. The shell stays busy until the caller
-   * finishes. A throw, `AbortError` included, propagates to the caller.
+   * keyboard (the caller's capture is handed back when the child is done), and never the
+   * visitor's aliases. The shell stays busy until the caller finishes. A throw,
+   * `AbortError` included, propagates to the caller. It checks nothing about the target:
+   * pass a fixed command line, or ask `isLinkable` first if the line came from outside.
    */
   run: (input: string) => Promise<void>
   effects: TerminalEffects
