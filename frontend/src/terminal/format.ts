@@ -10,6 +10,15 @@ export function lines(values: string[], tone: Tone = 'default'): OutputLine[] {
 
 export const blank: OutputLine = { text: '' }
 
+/**
+ * An error a command reports about its own input (`cat: nope: No such file or directory`):
+ * on the screen even from inside a pipeline, and the reason `&&` stops. The error *tone*
+ * alone means neither, because `btc`'s red sparkline and `diff`'s removed lines are colour.
+ */
+export function fail(text: string): OutputLine {
+  return { text, tone: 'error', stderr: true }
+}
+
 export function pre(text: string, tone: Tone = 'default'): OutputLine {
   return { text, tone, pre: true }
 }
