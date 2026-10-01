@@ -32,6 +32,9 @@ const FLAGS = [
 ]
 const ROOT = 'CTF{b66af71fb0859d59}'
 
+// Sealed, so it can't read `profile.availability`: keep the invitation neutral
+// (no hiring pitch), or it goes stale the next time availability flips. ctf.spec.ts
+// fails on one.
 const PAYOFF = {
   flag: ROOT,
   en: [
@@ -41,7 +44,7 @@ const PAYOFF = {
     'Seven flags, from seven places, in order, and a key rebuilt out of all of',
     'them. That stopped being curiosity a few stages ago. That is method.',
     '',
-    'I would like to hear from whoever got this far. Hiring, a project, or just',
+    'I would like to hear from whoever got this far. A question, an idea, or just',
     'to say you did it: write to me, and put "root" in the first line. I will',
     'know exactly what it took.',
   ],
@@ -53,8 +56,8 @@ const PAYOFF = {
     'de tous. Ce n’est plus de la curiosité depuis quelques étapes. C’est de la',
     'méthode.',
     '',
-    'J’aimerais avoir des nouvelles de qui est arrivé jusqu’ici. Un recrutement,',
-    'un projet, ou juste pour dire que vous l’avez fait : écrivez-moi, avec',
+    'J’aimerais avoir des nouvelles de qui est arrivé jusqu’ici. Une question,',
+    'une idée, ou juste pour dire que vous l’avez fait : écrivez-moi, avec',
     '« root » dans la première ligne. Je saurai exactement ce que ça a demandé.',
   ],
 }

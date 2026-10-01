@@ -54,7 +54,7 @@ surface each stage uses and that it already exists.
 |---|---|---|---|
 | 0 | — | `frontend/public/robots.txt` | A `# Disallow: /ctf` comment under the existing llms.txt comment. The on-ramp, and the most authentic possible one |
 | 1 | `secret` | `.secret` (`commands/secret.ts`) | The file already rewards `ls -a`; it gains a closing line with the first flag and points at `ctf` |
-| 2 | `console` | `console-greeting.ts` | A base64 blob logged next to the existing hiring pitch |
+| 2 | `console` | `console-greeting.ts` | A base64 blob logged with the console greeting |
 | 3 | `curl` | `vite-plugins/resume.ts` | Flag emitted into `resume.txt` as an ANSI-invisible run, so it is present in `curl jhemery.xyz \| cat -v` but not in the rendered résumé |
 | 4 | `shadow` | vim pane + `commands/files.ts` | `/etc/shadow` added to the shared fake-filesystem resolver; contents rot13'd. Readable by `cat` too — the resolver is one source of truth and the two commands must not disagree (§5.1) |
 | 5 | `mainframe` | `commands/eggs.ts` `hack` | `hack` currently always ends `ACCESS DENIED`. One target, named by stage 4, succeeds instead |

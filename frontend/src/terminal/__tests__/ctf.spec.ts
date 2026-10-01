@@ -97,6 +97,16 @@ describe('the chain, end to end', () => {
     await expect(unseal([...flags.slice(0, 6), 'CTF{0000000000000000}'])).rejects.toThrow()
   })
 
+  // The payoff is sealed, so it can't follow `profile.availability`: a hiring pitch
+  // in it goes stale the moment availability flips, as it did once already.
+  it('invites contact without a hiring pitch, whatever availability says', async () => {
+    const { unseal } = await load()
+    const payoff = await unseal(await flagsFromSurfaces())
+    for (const text of [payoff.en.join(' '), payoff.fr.join(' ')]) {
+      expect(text).not.toMatch(/\bhir(e|ing)\b|recrut|embauch/i)
+    }
+  })
+
   it('can be played through: seven flags, then decrypt', async () => {
     const flags = await flagsFromSurfaces()
     const { command, solvedCount, currentStage } = await load()
