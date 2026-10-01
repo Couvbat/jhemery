@@ -32,7 +32,7 @@ export const tools: ToolMeta[] = [
       en: 'PNG, JPEG or WebP — resize, recompress, and drop the metadata',
       fr: 'PNG, JPEG ou WebP — redimensionner, recompresser, effacer les métadonnées',
     },
-    keywords: ['png', 'jpeg', 'jpg', 'webp', 'resize', 'exif', 'compress'],
+    keywords: ['png', 'jpeg', 'jpg', 'webp', 'resize', 'exif', 'gps', 'metadata', 'compress'],
     tier: 'client',
     load: () => import('./image/ImageTool.vue'),
   },

@@ -1,6 +1,6 @@
 import type { Localised } from '@/content/types'
 import { api, type HealthReport, type UnitHealth } from '@/lib/api'
-import { blank, line, segmented } from '../format'
+import { blank, fail, line, segmented } from '../format'
 import type { Command, CommandContext, OutputLine, Tone } from '../types'
 
 /**
@@ -158,13 +158,13 @@ export const systemctl: Command = {
     index === 0 ? VERBS : index === 1 && args[0] !== 'list-units' ? UNITS.map((u) => `${u.unit}.service`) : [],
   async run({ args, t, print }) {
     const [verb = 'status', target] = args
-    if (!VERBS.includes(verb)) return [line(`Unknown command verb ${verb}.`, 'error')]
+    if (!VERBS.includes(verb)) return [fail(`Unknown command verb ${verb}.`)]
 
     const unit = target?.replace(/\.service$/, '')
     if (verb !== 'status' && verb !== 'list-units') {
       // Every write verb, refused the way systemd refuses a user without polkit rights.
       return [
-        line(`Failed to ${verb} ${unit ?? '(no unit)'}.service: Access denied`, 'error'),
+        fail(`Failed to ${verb} ${unit ?? '(no unit)'}.service: Access denied`),
         line(t({ en: 'these units belong to someone else. `systemctl status` is all yours.', fr: 'ces unités appartiennent à quelqu’un d’autre. `systemctl status` est à vous.' }), 'muted'),
       ]
     }
@@ -174,7 +174,7 @@ export const systemctl: Command = {
     if (!unit) return list(report, t)
 
     const row = rows(report).find((r) => r.unit === unit)
-    if (!row) return [line(`Unit ${unit}.service could not be found.`, 'error')]
+    if (!row) return [fail(`Unit ${unit}.service could not be found.`)]
     return detail(row, t)
   },
 }

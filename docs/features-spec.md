@@ -109,19 +109,30 @@ interface Command {
 }
 ```
 
-`CommandContext` carries the parsed `args`, the `raw` input, the current `locale`, the `t()`
+`CommandContext` carries the parsed `args`, the stage's own `raw` text, `stdin` (what a `|`
+handed it), `tty` (false on the left of a `|`, where `capture` and `prompt` throw), the current
+`locale`, the `t()`
 resolver, and the side-effect handles a command may use: `print()`, `clear()`, `close()`,
 `frame()` (a redrawable output region — animations and game boards), `navigate(target)` (anything
 `cd` accepts, through `goTo()` — §11), `prompt(question, { mask })` (resolves to the next line the
 user types, rejects on `Ctrl+C`), `capture(handler)` (holds the raw keyboard for the games — §3 —
 and is released unconditionally when the command settles), `run(input)` (runs another command
 *inside* this one: the same signal, keyboard and busy state, and never the visitor's aliases —
-`git log` is a two-word alias of `gitlog`, not a delegation), a `signal: AbortSignal` so animated commands stop
+`git log` is a two-word alias of `gitlog`, not a delegation; `tour` and `strace` are built on it), a `signal: AbortSignal` so animated commands stop
 cleanly when cancelled, and `effects`: `matrix`, `reboot`, `crt`, `vim`/`vimIsDirty`/`vimMessage`
 (§5.1), `glitch` and `playMusic`. `terminal/types.ts` documents each; read it before adding a
 primitive.
 
-`OutputLine` is `{ text; tone?; segments?; href?; pre?; prompt? }`, where `Tone` is
+**The request observer.** `lib/api.ts` reports every request to whoever called
+`observeRequests()`: method, path, status, body size, time, and the parsed bodies sent and
+received. Never a header, because `x-admin-password` and `x-room-token` travel in them. It is fed
+by `request()`, `askStream()` (once, at the end), `openEventSource()` (once, when the stream opens),
+`fetchSite()` and `fetchJobFile()`. With nobody watching, `request()` takes exactly the path it took
+before there was an observer. The two pollers the visitor didn't ask for, the guestbook ticker and
+the download tool's interval, mark themselves `background`. `strace` is the only observer, and it
+prints shapes: keys two levels deep, arrays as their length, and query values masked.
+
+`OutputLine` is `{ text; tone?; segments?; href?; pre?; prompt?; stderr? }`, where `Tone` is
 `default|muted|primary|accent|secondary|error|success|warning`. `segments` splits a line into
 differently-toned runs (a game board needs a colour per cell) while `text` stays their plain
 concatenation; `pre` preserves runs of spaces for ASCII art and tables; `prompt` marks an echoed
@@ -147,20 +158,94 @@ page all talk to the same session, so history survives closing the panel).
 
 - `lines`: rendered output buffer, capped at 500 entries.
 - `history`: submitted commands, capped at 100, persisted to `localStorage`.
+- **History expansion** (`terminal/history.ts`, `expandHistory`): `!!`, `!$`, `!N` and `!-N` as
+  `history` numbers them, and a leading `^old^new`, on typed lines only (never a link, a nested
+  run or a prompt's answer). A `!` before a space, the end, `=` or `(` is a letter, and `\!`
+  always is, so `:q!` survives. A line naming a server-writing command (`isServerBound`, read
+  off `writes`) is never expanded. An expansion is echoed, muted; one that would write anything
+  goes into history with "press ↑ then Enter to send", as zsh's `histverify`, and doesn't run.
+- ↑ with text in the input walks only the lines that start with it. Ctrl+R is a reverse search,
+  taken only while the shell owns the keyboard (never in a game, a prompt, a running command or
+  vim), so Cmd+R still reloads. A faded suggestion after the caret (`autosuggest`) comes only
+  from the visitor's own history, never from the command list, and → or End takes it.
 - ↑/↓ walk history, `Tab` completes (common prefix first, then lists candidates),
   `Ctrl+L` clears, `Ctrl+C` cancels an in-flight command or interactive prompt. The input is
   never `disabled` while a command runs, only `readonly` + `aria-disabled`: a disabled input
   drops focus to `<body>`, and Ctrl+C would have nowhere to land.
 
+### The shell language
+
+`terminal/parse.ts` reads a line as a chain of pipelines joined by `;`, `&&` and `||`, each
+pipeline stages joined by `|`, at most 16 stages a line. Leading `NAME=value` words are the
+stage's env: `LANG=fr` (or `LC_ALL`) runs that stage in French and never touches the visitor's
+setting. A single `&` and `>` are literal; an empty stage is `couvsh: syntax error near
+unexpected token '|'`.
+
+**Quotes only group.** French is typed here (`c'est`, `qu'est-ce`, `sign l'un et l'autre`), so a
+quote opens a group only at the start of a word and closes only on the same quote followed by a
+space, the end of the line or an operator; anything else is a letter. Inside a group the
+operators are text (`sign "great site; love it"`). That is all a group does: a stage's words are
+its text split on spaces, quotes and all, as every line was before there were pipes, so a line
+with no operator runs exactly as it did. `useTerminal.quoting.spec.ts` pins that for `echo`,
+`sign` and `ask`.
+
+**Running a line.** Aliases are expanded per stage and the line is read again, since an alias may
+hold a pipe. Then every stage resolves (`registry.resolveStage`, the rule the shell and links share)
+before any runs: an unknown stage runs nothing, and when it follows a command that took free text
+the shell suggests quoting. A command that writes to the server with text of its own (`sign`,
+`ask`) must have that text quoted when the line holds an operator, or nothing runs: otherwise
+`sign love it; why not` would post "love it" and run `why`. `sign` drops one pair of outer
+quotes, as `ask` does. Aliases expand in place, stage by stage and round after round, so an alias
+can pipe into another and env words stay as typed. A link may carry no env words at all. Stages run one after
+another, because commands return arrays rather than streams. A stage's output, minus its
+`stderr` lines, is the next stage's `stdin`, `OutputLine`s and their colours included; its
+`stderr` lines (`fail()`, achievement toasts) go to the screen wherever it stands, so
+`fortune | cowsay` keeps the toast outside the cow. A stage on the left of a `|` has `tty`
+false, and its `capture` and `prompt` throw "not a tty". `&&` and `||` read a pipeline as failed
+when a stage throws or prints a failing `stderr` line, which is what `fail()` makes; the error
+*tone* alone counts for nothing, because `btc`'s red sparkline and `diff`'s removed lines are
+colour. One Ctrl+C stops the whole line, with one `^C`. A link runs a pipe or a chain only if
+every stage, resolved without aliases, passes `isLinkable`.
+
+**The text commands** (`commands/text.ts`) are what a pipe is for: `grep [-i -v -n -c]`, `head`
+and `tail [-n N | -N]`, `wc [-l -w -c]`, `sort [-r -n -u]` and `uniq [-c]`. Each reads the file
+it names, else its stdin, else fails. `grep` matches a literal substring and never builds a
+`RegExp` from input. `sha256sum`, `base64` and `jq` read their stdin as a file's bytes when they
+have no argument, so `cat about.txt | sha256sum` is `sha256sum about.txt`; `cat` passes its stdin
+on, and `cowsay` says it.
+
+### Manual pages
+
+Every command has a page, generated by `terminal/manual.ts` from what it already says about
+itself: NAME from its description, SYNOPSIS and the first EXAMPLE from `usage`, the aliases in
+DESCRIPTION, section 6 for the `fun` group and 1 otherwise. An optional `manual` on the command
+adds a longer DESCRIPTION, more EXAMPLES, a SEE ALSO (some oblique: `ls(1)` points at `sl(6)`),
+and the OPTIONS text for each flag its usage names, which is the part that can't be generated:
+`manual.spec.ts` holds every flag to one, in both languages, and every SEE ALSO to a page that
+exists. `man jules` is `content/manual.ts`'s `julesManual()`, built from the résumé's content, which
+the résumé plugin also writes as roff (§7).
+
+`terminal/pager.ts` shows a page twenty rows at a time through `frame` and `capture`: j/k and the
+arrows move a line, space/f and b a page, g and G to the ends, `/` searches and n/N repeat, `q`
+quits and leaves nothing behind. A page that fits is printed outright, as `less -F` does, and
+with no tty (the left of a `|`) the whole page is the output, so `man ls | grep -i all` works.
+
+`--help` as the very first argument prints the command's usage and flags instead of running it,
+so `projects --json` and `echo hi --help` are untouched. `-<Tab>` completes the flags a usage
+names, and lists them with their OPTIONS text when several are left.
+
 ### Tab completion
 
-One routine handles both halves of a line. It splits on whitespace, works out which word the
+One routine handles both halves of a line, counting words from the stage being typed: after
+`ls | gr`, `gr` is a command again. It splits on whitespace, works out which word the
 cursor is on, collects candidates for that position, then filters by prefix, inserts the single
 match (or the longest common prefix) and prints the list when the choice is still ambiguous.
 Only the *source* of the candidates changes:
 
 - **the first word** — every visible command and alias, plus whatever the visitor named with
-  `alias`. Hidden commands stay out, same as in `help`.
+  `alias`. Hidden commands stay out, same as in `help`. Tab
+  resolves two-word names only once a third word is typed (`git lo<Tab>` is still a command
+  word), which is where it differs from `registry.resolveStage`.
 - **anything after it** — the command's own `complete()`. Keeping it on the command is what keeps
   the registry the API: `cd` knows it takes a section, `unalias` knows it takes an alias name, and
   the shell needs no table of special cases. It receives the arguments, the index of the word being
@@ -176,8 +261,6 @@ join it as soon as `guestbook` has cached them.
 
 An alias in the first position is expanded before the owning command is resolved, so `zz ab`
 completes against whatever `zz` will actually run.
-
-`run(input)` handles `&&`-free single commands only — chaining is out of scope (§10).
 
 ### Chrome
 
@@ -222,7 +305,8 @@ Grouped as they appear in `help`.
 ### core
 | Command | Behaviour |
 |---|---|
-| `help [command]` | Generated from the registry; `help <cmd>` prints usage + description |
+| `help [command]` | Generated from the registry; `help <cmd>` prints usage + description, and points at `man <cmd>` |
+| `man [section] <page>` | The command's manual page (below), in the pager; `man jules` is the person. With no page, "What manual page do you want?"; an unknown one, `fail('No manual entry for …')`. From a link it refuses a hidden command's page |
 | `clear` | Empties the buffer |
 | `history` | Numbered list of past commands |
 | `echo <text>` | Prints its arguments |
@@ -231,7 +315,8 @@ Grouped as they appear in `help`.
 | `lang [en\|fr]` | Prints or switches locale |
 | `theme [name\|random]` (alias `colorscheme`) | Lists the colour schemes with a swatch strip each, or applies one |
 | `alias` / `unalias` | Session-persistent command renames, expanded before anything else parses the line |
-| `sha256sum` (aliases `sha1sum`, `sha512sum`) · `base64 [-d]` · `uuidgen` · `jq .` | The shell versions of the hash, encode and JSON tools, each importing the pure module its panel uses. No pipes: a fake-filesystem name is read as that file, anything else as literal text |
+| `sha256sum` (aliases `sha1sum`, `sha512sum`) · `base64 [-d]` · `uuidgen` · `jq .` | The shell versions of the hash, encode and JSON tools, each importing the pure module its panel uses. A fake-filesystem name is read as that file, other text as literal text, and with no argument they read what a `\|` hands them |
+| `strace <command>` | Runs the command inside itself (`ctx.run`, so without the visitor's aliases) and then lists the non-background requests made meanwhile, as `GET /weather = 200 · 1.10 kB · 84 ms` with the shapes of the bodies below, and `+++ exited with 0 +++`. No request, no trailer, so `strace ls` is `ls`. Its `writes` is the traced command's, so `?run=strace sign x` is refused like `sign x`; `strace strace` is refused |
 | `exit` (aliases `quit`, `logout`) | Closes the overlay |
 
 **Colour schemes.** `theme` offers the site's own neon (*cyberpunk*, the default) and the palettes
@@ -307,9 +392,9 @@ URL), and `neofetch` has a `Status` row from `profile.availability`, the same fl
 both résumés read. `now.txt` is the `/now` list, with the same 90-day staleness rule.
 
 `neofetch` renders an ASCII logo beside a spec block — stack, locale, "uptime" since the first
-commit, and the live Steam status if available. `curl <domain>` re-runs `resume` when pointed at
-this site (or `localhost`), mirroring what a real `curl jhemery.xyz` returns (§7); any other host
-gets `curl: (6) Could not resolve host` and a note that a browser tab cannot open a raw socket.
+commit, and the live Steam status if available. `curl [-I] <domain>[/path]` is a real request to
+this origin, under any name it answers to (§7); any other host gets `curl: (6) Could not resolve
+host` and a note that a browser tab can only reach this site.
 
 `why <topic>` (`commands/work.ts`) prints one entry of `content/decisions.ts`: what was chosen,
 each rejected option with its reason in one sentence, any hindsight, the PR, and a link to the
@@ -654,8 +739,37 @@ shapes are the accent colour; clicking one of those is the `cyanSpotter` achieve
 **Where:** `frontend/vite-plugins/resume.ts`, `frontend/public/.htaccess`
 
 A Vite plugin imports `src/content/*` and emits `dist/resume.txt` — an ANSI-coloured plain-text
-résumé — at build time. `.htaccess` rewrites requests whose `User-Agent` matches
-`curl|wget|httpie|lynx` to that file.
+résumé — at build time. `.htaccess` rewrites requests for `/` whose `User-Agent` matches the
+command-line clients (`curl`, `wget`, `httpie`, `lynx`, `links`) or the LLM crawlers (GPTBot,
+ClaudeBot, PerplexityBot and the rest listed there) to that file.
+
+The terminal's own `curl` is a real client of this origin (`fetchSite()`): `GET` or `-I`'s `HEAD`,
+`cache: 'no-store'` so the HTTP cache stays out of it, a body read to 256 kB at most, and the
+printable ones (text, JSON, no NUL byte) shown through `terminal/ansi.ts`'s `parseSgr()`. That maps
+the résumé's palette to tones and drops a concealed run, so the CTF's stage 3 still needs a real
+terminal and `cat -v`. The bare host is `/resume.txt` rather than `/`, because the service worker
+answers `/` from its precache with the app's `index.html`, which no header can change. `-I` shows
+the real response headers, CSP and HSTS included, since a same-origin fetch may read all but
+`Set-Cookie`. Any other host is curl's `(6) Could not resolve host`; a network failure is `(7)`.
+A link may only pass it the arguments its Tab offers: the domain, `-I` and the site's plain files.
+
+**The shell over curl.** `curl jhemery.xyz/neofetch` in a real terminal gets that command's output:
+`public/run/<locale>/<name>.txt`, rendered by `terminal/ansi.ts`'s `toAnsi()` (tones and swatch
+colours as SGR, links as OSC 8, prompt lines dropped) with a footer, plus a generated `help.txt`
+index. The pages are vitest snapshots (`curl-pages.spec.ts`), committed and never written by CI,
+so a change to a command or the content fails CI until they are regenerated with `-u`. A page is
+any command a link could run with no arguments that isn't hidden, live, a game or a text command (both by module); the
+spec names a reason for each other exclusion (`curl`, `ctf`, `achievements`, `games`, `tour`,
+`resume`, `help`). Each runs in both locales under two clocks years apart, and any line that
+differs is dropped, which removes the uptimes and durations that would otherwise go stale between
+regenerations; `resume` is excluded for that reason, since its durations are the point and the
+bare host already serves them fresh. A harness option makes `capture` and `prompt` throw, so a
+page can never be half of an interactive command. `.htaccess` serves the pages only to `curl`,
+`wget` and `httpie`, not the crawler list `/` uses (a crawler asking for `/about` wants what a
+browser gets), French when `Accept-Language` starts with `fr`, and only when the file exists.
+They carry `Vary: User-Agent, Accept-Language` and `no-cache`, and `/` now says `Vary: User-Agent`,
+since it was always the résumé to curl and the app to a browser. The résumé plugin takes its
+colours from the same palette, and `resume.spec.ts` pins its bytes.
 
 **Decision:** this is served entirely from the static frontend, with no backend involvement. The
 obvious alternative — a Nest `GET /resume` endpoint — would mean the résumé content lives in the
@@ -664,6 +778,10 @@ the single source at build time is strictly better. The cost is that the résum�
 a frontend deploy, which is fine for a résumé.
 
 `.htaccess` needs `mod_rewrite` only — no `mod_proxy` — so it works on shared hosting.
+
+It also emits `jules.1` and `jules.fr.1`, the person as a roff manual page (`escapeRoff` keeps a
+line from reading as a request), so `curl -s jhemery.xyz/jules.1 | man -l -` works; `.htaccess`
+serves them as UTF-8 text with `no-cache`.
 
 The same plugin emits `resume.html` and `resume.fr.html` (static, script-free, with `resume.css` as
 a sibling file so the CSP needs nothing new) and `content.json`, which the MCP endpoint reads (§8).
@@ -952,7 +1070,6 @@ Retrofitting these is painful, so they are part of the definition of done:
   schemes exist only as opt-in choices, through `theme` or the navbar's scheme menu (§3 core), and the achievement for picking one is
   called Flashbang. That is this entry's position, stated as a joke.
 - **Blog** — infrastructure without content is worse than no infrastructure.
-- **Command chaining / pipes** — `ls | grep` is a lot of parser for a joke nobody will run twice.
 - **Terminal on mobile** — see §9.
 
 ## 11. Views, the prism swing and the tools page
@@ -984,6 +1101,22 @@ this section only fixes the rules the code cites.
   `ls tools`, `cd tools/<id>`, the `tools` command and Tab derive from one array. Metas are plain
   data in both locales; each tool's maths lives in a pure `.ts` beside its panel and is tested in
   jsdom. Client-side tools never send a file anywhere; the page says so once.
+- **The image tool checks its own claim** (`tools/image/metadata.ts`). Before converting, it lists
+  what the file gives away; afterwards it runs the same parser on its output and shows "0 fields —
+  verified" or "N fields survived re-encoding", so stripping is a check a browser change would
+  fail on screen, not a promise. The parser is written from TIFF 6.0 and CIPA DC-008 and walks
+  JPEG markers up to SOS, PNG chunks and WebP RIFF chunks. It reads the whole file, up to 64 MB,
+  because WebP's extended format puts Exif and XMP after the image data and PNG text may follow
+  IDAT. Every read is bounds-checked and returns `null` past the end; IFDs are capped at 512
+  entries and walked once each; values are stripped of control and bidi characters and capped at
+  120 characters; a truncated file reads as a subset of the whole one, and `inspectBytes` never
+  throws. **What counts:** each Exif/TIFF tag, each PNG text chunk, the PNG time, and the XMP,
+  ICC, IPTC and comment blocks; JFIF, VP8X, the IFD pointers and the image data are structure.
+  GPS reads four tags and shows one position. So an encoder that writes a colour profile (Chromium
+  does, into JPEG and WebP) honestly shows one field. HEIC, AVIF and GIF are `unsupported`, never
+  "0 fields". The bitmap is decoded with `imageOrientation: 'from-image'`, so dropping the tag
+  never leaves a phone photo on its side. Every string from the file reaches the page through
+  text interpolation only.
 - **Tier `wasm` downloads only on a click** (`tools/ffmpeg/`). The 32 MB core is served from our own
   `/assets/`, so the CSP keeps `'self'` for scripts and connections; `'wasm-unsafe-eval'` is the one
   addition, and it reaches the worker because the worker's own script response carries the header.

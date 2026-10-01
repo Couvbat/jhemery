@@ -478,8 +478,10 @@ export const eggCommands: Command[] = [
     group: 'fun',
     writes: 'local',
     hidden: true,
-    run({ args, t }) {
-      const text = args.join(' ') || 'moo'
+    run({ args, stdin, t }) {
+      // What came in through a `|`, as one line of speech: `fortune | cowsay`.
+      const piped = stdin?.map((l) => l.text.trim()).filter(Boolean).join(' ')
+      const text = args.join(' ') || piped || 'moo'
       const width = Math.min(text.length, 40)
       const wrapped: string[] = []
       for (let i = 0; i < text.length; i += width) wrapped.push(text.slice(i, i + width))

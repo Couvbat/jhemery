@@ -1,7 +1,7 @@
 import { useTheme } from '@/composables/useTheme'
 import { DEFAULT_THEME, findTheme, swatch, themes, type Theme } from '@/lib/themes'
 import { toast, tryTheme } from '../achievements'
-import { blank, line, segmented } from '../format'
+import { blank, fail, line, segmented } from '../format'
 import type { Command, OutputLine, OutputSegment } from '../types'
 
 /**
@@ -62,7 +62,7 @@ export const themeCommands: Command[] = [
       }
       if (!findTheme(id)) {
         return [
-          line(`theme: unknown theme \`${requested}\``, 'error'),
+          fail(`theme: unknown theme \`${requested}\``),
           line(`available: ${themes.map((theme) => theme.id).join(', ')}`, 'muted'),
         ]
       }
