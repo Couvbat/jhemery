@@ -1,5 +1,5 @@
 import { computed, ref } from 'vue'
-import { apiUrl } from '@/lib/api'
+import { openEventSource } from '@/lib/api'
 
 /**
  * How many people are on the site right now, over the backend's `@Sse()` stream.
@@ -27,7 +27,7 @@ export function startPresence(): void {
   if (source || typeof EventSource === 'undefined') return
 
   try {
-    source = new EventSource(`${apiUrl}/presence`)
+    source = openEventSource('/presence')
   } catch {
     // Blocked or malformed URL — the counter simply never appears.
     return

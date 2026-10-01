@@ -1,0 +1,18 @@
+[38;5;46mprojects[0m
+[2m────────[0m
+
+[38;5;46mjhemery-portfolio  [production][0m
+  This portfolio: a shell in Vue 3 over a three.js wireframe field, with a
+  NestJS API behind it. How its parts were built is below.
+[2m  Vue 3 · NestJS · TypeScript · TailwindCSS · three.js · WebAssembly · SSE[0m
+]8;;https://github.com/Couvbat/jhemery\[38;5;51m  https://github.com/Couvbat/jhemery[0m]8;;\
+
+[38;5;46min-leed / work projects  [production][0m
+  Professional fullstack projects at In-Leed — web apps, REST APIs and
+  internal tools.
+[2m  React · Node.js · Express · MongoDB · MySQL · PHP · Docker[0m
+
+[38;5;46mHow this site is built, part by part:[0m
+[2m  projects <part> — vim, qr, rooms, ffmpeg, prism, mcp, presence, wordlists[0m
+
+[2mcurl jhemery.xyz/help for the other pages · live in a browser: https://jhemery.xyz/?run=projects[0m

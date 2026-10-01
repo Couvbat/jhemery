@@ -6,7 +6,7 @@ import { announce, toast, visitSection } from '../achievements'
 import { diffLines, hasChanges } from '../diff'
 import { sleep } from '../timing'
 import type { Command, OutputLine } from '../types'
-import { blank, line, pre, segmented } from '../format'
+import { blank, fail, line, pre, segmented } from '../format'
 import { FILES, FILE_ACHIEVEMENTS, HIDDEN_FILES, listFiles, resolveFileLines } from './files'
 
 const PING_COUNT = 4
@@ -62,7 +62,7 @@ export const navigateCommands: Command[] = [
       if (target) {
         const resolved = resolvePath(target)
         if (!resolved) {
-          return [line(`ls: cannot access '${target}': No such file or directory`, 'error')]
+          return [fail(`ls: cannot access '${target}': No such file or directory`)]
         }
         if (resolved.kind === 'view' && resolved.view.id === 'tools') {
           const listed = resolved.tool ? [resolved.tool] : visibleTools()
@@ -109,7 +109,7 @@ export const navigateCommands: Command[] = [
       const [target = ''] = args
       const resolved = resolvePath(target)
       if (!resolved || !navigate(target)) {
-        return [line(`cd: ${target}: No such file or directory`, 'error')]
+        return [fail(`cd: ${target}: No such file or directory`)]
       }
 
       if (resolved.kind === 'section') {
@@ -148,12 +148,14 @@ export const navigateCommands: Command[] = [
       index === 0
         ? [...listFiles(), ...(word.startsWith('projects/') ? work.map((part) => `projects/${part.id}.md`) : [])]
         : [],
-    run({ args, t }) {
+    run({ args, stdin, t }) {
       const [file] = args
-      if (!file) return [line('cat: missing operand', 'error')]
+      // `… | cat` passes its input on as it came, colours and all.
+      if (!file && stdin) return stdin
+      if (!file) return [fail('cat: missing operand')]
 
       const lines = resolveFileLines(file, t)
-      if (!lines) return [line(`cat: ${file}: No such file or directory`, 'error')]
+      if (!lines) return [fail(`cat: ${file}: No such file or directory`)]
 
       const achievement = FILE_ACHIEVEMENTS[file]
       return achievement ? [...lines, ...announce(achievement, t)] : lines
@@ -170,13 +172,13 @@ export const navigateCommands: Command[] = [
     run({ args, t }) {
       const [left, right] = args
       if (!left || !right) {
-        return [line('diff: missing operand', 'error'), line('usage: diff <file> <file>', 'muted')]
+        return [fail('diff: missing operand'), line('usage: diff <file> <file>', 'muted')]
       }
 
       const a = resolveFileLines(left, t)
-      if (!a) return [line(`diff: ${left}: No such file or directory`, 'error')]
+      if (!a) return [fail(`diff: ${left}: No such file or directory`)]
       const b = resolveFileLines(right, t)
-      if (!b) return [line(`diff: ${right}: No such file or directory`, 'error')]
+      if (!b) return [fail(`diff: ${right}: No such file or directory`)]
 
       const ops = diffLines(
         a.map((l) => l.text),
@@ -215,12 +217,12 @@ export const navigateCommands: Command[] = [
     async run(ctx) {
       const [target] = ctx.args
       if (!target) {
-        return [line('ping: usage error: Destination address required', 'error')]
+        return [fail('ping: usage error: Destination address required')]
       }
 
       const resolved = resolvePath(target)
       if (!resolved) {
-        return [line(`ping: ${target}: Name or service not known`, 'error')]
+        return [fail(`ping: ${target}: Name or service not known`)]
       }
 
       const name =
@@ -283,13 +285,13 @@ export const navigateCommands: Command[] = [
 
       if (!target) {
         return [
-          line('open: missing target', 'error'),
+          fail('open: missing target'),
           line(`available: ${Object.keys(OPEN_TARGETS).join(', ')}`, 'muted'),
         ]
       }
 
       const href = OPEN_TARGETS[target.toLowerCase()]
-      if (!href) return [line(`open: unknown target \`${target}\``, 'error')]
+      if (!href) return [fail(`open: unknown target \`${target}\``)]
 
       window.open(href, '_blank', 'noopener,noreferrer')
       return [line(`opening ${href}`, 'success')]

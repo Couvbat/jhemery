@@ -199,6 +199,16 @@ Push a commit touching `frontend/` or `backend/` to `master`, or go to **Actions
 
 ### 3. Verify
 
+After a deploy that touches `frontend/public/.htaccess`, check the rewrites by hand, since
+`vite preview` doesn't run Apache's:
+
+```bash
+curl -sI https://jhemery.xyz/neofetch        # text/plain, Vary: User-Agent, Accept-Language
+curl -s -H 'Accept-Language: fr' https://jhemery.xyz/neofetch   # the French page
+curl -sI -A 'Mozilla/5.0' https://jhemery.xyz/about             # text/html: a browser still gets the SPA
+curl -sI https://jhemery.xyz/ | grep -i vary   # Vary: User-Agent, since / is the résumé to curl
+```
+
 **Actions** tab → open the run → expand each step. Failures are almost always a wrong or missing secret rather than a workflow bug:
 
 | Symptom | Cause |

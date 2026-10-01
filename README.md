@@ -66,8 +66,10 @@ tools, watch-party and radio rooms, and 38 hidden achievements. English and Fren
   a guestbook and a self-hosted LLM behind `ask`. Every integration degrades gracefully when it's
   switched off.
 - 🔒 **Privacy by construction.** Presence is one anonymous integer, stats count sessions rather
-  than commands, `ask` logs nothing, analytics are self-hosted and cookieless.
-- 📄 **One source for the CV.** `curl jhemery.xyz` returns an ANSI-coloured résumé, and
+  than commands, `ask` logs nothing, analytics are self-hosted and cookieless. `strace <cmd>`
+  shows every request a command makes and the shape of what it carries, never a value.
+- 📄 **One source for the CV.** `curl jhemery.xyz` returns an ANSI-coloured résumé (and
+  `curl jhemery.xyz/help` the shell's other pages), and
   `/resume.html` a printable one in either language, both generated at build time from the same
   content the page renders. So is `content.json`, which a read-only MCP endpoint serves to agents.
   Experience and education are dated, never typed as durations: every résumé works out "3 years"
@@ -150,7 +152,7 @@ Each app has its own README for working on its code:
 | **Matrix rain** | `matrix` follows the white rabbit. The effect component is lazy-loaded on demand. |
 | **i18n** | English and French. The language comes from `navigator.language` and can be changed with the navbar toggle or `lang en\|fr`. It's saved in `localStorage`. All content and every terminal string is `Localised<T>`. |
 | **PWA** | Installable, with an `autoUpdate` service worker, maskable icons and an offline navigation fallback. |
-| **`curl jhemery.xyz`** | A Vite plugin generates an ANSI-coloured `resume.txt` from `src/content` at build time, so the résumé has exactly one source. LLM crawlers get the same file. |
+| **`curl jhemery.xyz`** | A Vite plugin generates an ANSI-coloured `resume.txt` from `src/content` at build time, so the résumé has exactly one source. LLM crawlers get the same file, and so does the terminal's own `curl`, which fetches it for real and turns its colours into the scheme's. `curl jhemery.xyz/help` lists the other pages a real terminal can read, one per command (`/neofetch`, `/skills`, `/why`…), in English or, with `Accept-Language: fr`, French. |
 
 ## The terminal
 
@@ -160,6 +162,7 @@ work badly with mobile virtual keyboards, and the page itself shows the same con
 
 | Key | Does |
 |---|---|
+| `\|` `;` `&&` `\|\|` | Pipes and chains: `fortune \| cowsay`, `history \| grep theme`, `cat about.txt \| sha256sum`, `projects --json \| jq .`, `cat nope && pwd`. A stage keeps its colours across a pipe. Quote text that holds an operator (`sign "great site; love it"`): an apostrophe inside a word is a letter, so `c'est` needs nothing. `LANG=fr neofetch` runs one command in French |
 | <kbd>Tab</kbd> | Completes to the longest common prefix. First commands and your own aliases, then their arguments: filenames for `cat`/`vim`/`diff`, sections and pages for `cd`/`ping`, tool names, scheme names for `theme`, `on`/`off` for the background toggles |
 | <kbd>↑</kbd> / <kbd>↓</kbd> | Command history (saved between visits) |
 | <kbd>Ctrl</kbd>+<kbd>L</kbd> | Clear |
@@ -210,6 +213,11 @@ never show two different contents.
 | `base64` | | `base64 [-d] <file\|text>`: encode or decode, as the encode tool does |
 | `uuidgen` | | A random v4 UUID |
 | `jq` | | `jq . <json>`: pretty-print, pointing at the error when it isn't JSON |
+| `grep` | | `grep [-i -v -n -c] <text> [file]`: the lines containing some text, matched literally |
+| `head` · `tail` | | `head [-n N \| -N] [file]`: the first (or last) ten lines, or N |
+| `wc` | | `wc [-l -w -c] [file]`: lines, words and bytes |
+| `sort` · `uniq` | | `sort [-r -n -u]`, `uniq [-c]`: sort lines; fold neighbouring repeats |
+| `strace` | | `strace <command>`: run a command and list the requests it made (`GET /weather = 200 · 1.10 kB · 84 ms`), with the keys of each body and never their values. `strace ls` prints just what `ls` does |
 | `exit` | `quit`, `logout` | Close the terminal |
 
 </details>
@@ -244,7 +252,7 @@ never show two different contents.
 | `contact` | `links` | How to reach me |
 | `neofetch` | `fetch` | System summary with an ASCII logo, an "uptime" counted from the first commit and whether I'm open to work |
 | `resume` | `cv` | Condensed résumé (experience, education, stack, links), with a link to the printable one |
-| `curl` | | `curl jhemery.xyz` fetches the résumé the way a real curl would |
+| `curl` | | `curl [-I] jhemery.xyz[/path]`: a real request to this site. The bare host is `resume.txt`, coloured, with the hidden parts left hidden; `-I` prints the real response headers. Any other host can't be resolved from a browser tab |
 | `why` | | `why <topic>`: what the site chose, what it turned down and why, the PR, and a link to the design note. `why` alone lists the fifteen topics (`why mcp-sdk`, `why polling`, `why battleship`…) |
 | `tour` | | A one-minute walk through the site: `neofetch`, a colour scheme shown for a moment and put back, the games, the `curl` hint, and how many achievements you've found. `?run=tour` is the link to share |
 
