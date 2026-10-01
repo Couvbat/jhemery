@@ -35,6 +35,15 @@ describe('liftToFloor', () => {
     expect(Math.abs(after.h - before.h)).toBeLessThan(3)
   })
 
+  // Against #767676 a tinted near-white tops out at ~4.4:1 while plain white reaches 4.54.
+  it('reaches the end of the scale when keeping the tint cannot', () => {
+    for (const colour of ['#7a8a7a', 'oklch(0.6 0.1 145)']) {
+      expect(ratio(liftToFloor(colour, ['#767676'], 4.5, 'dark'), '#767676')).toBeGreaterThanOrEqual(4.5)
+    }
+    // On #555555 even black only reaches 2.8:1, so the end of the scale is all there is.
+    expect(liftToFloor('#666666', ['#555555'], 4.5, 'light')).toBe('#000000')
+  })
+
   it('does not move by more than it has to', () => {
     // One step (0.005) less would still be short of the floor.
     const lifted = liftToFloor(MUTED, DARK, 4.5, 'dark')

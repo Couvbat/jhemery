@@ -50,12 +50,16 @@ export function liftToFloor(colour: string, against: string[], floor: number, mo
 
   const lch = rgbToOklch(rgb)
   const step = mode === 'dark' ? 0.005 : -0.005
-  let candidate: RGB = rgb
-  for (let l = lch.l + step; l >= 0 && l <= 1; l += step) {
-    candidate = { ...oklchToRgb({ ...lch, l }).rgb, a: 1 }
-    if (lowestRatio(candidate, backs) >= floor) break
+  for (let i = 1; ; i++) {
+    // Clamped, so the last step lands on the end of the scale rather than a float short of it.
+    const l = Math.min(1, Math.max(0, lch.l + i * step))
+    const candidate: RGB = { ...oklchToRgb({ ...lch, l }).rgb, a: 1 }
+    if (lowestRatio(candidate, backs) >= floor) return toHex(candidate)
+    if (l === 0 || l === 1) break
   }
-  return toHex(candidate)
+  // Keeping the chroma can stop short: a vivid tone clips to a tinted white or black that
+  // contrasts less than the plain one. So the last resort is the end of the scale itself.
+  return toHex(mode === 'dark' ? { r: 255, g: 255, b: 255, a: 1 } : { r: 0, g: 0, b: 0, a: 1 })
 }
 
 /** Every floor a scheme misses, as `muted on raised 4.04 < 4.5`; empty when it meets them all. */
