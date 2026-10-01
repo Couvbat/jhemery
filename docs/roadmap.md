@@ -295,7 +295,7 @@ them.
 
 | ✔ | Feature | Approach | Files | Effort |
 |---|---|---|---|---|
-| [ ] | Queue as a sidebar | The queue exists (50 items, visible to guests) but sits under the host's controls, listed by raw video id or track path, so nobody can see what's coming. On wide screens the room becomes two columns, the player and an *up next* sidebar with the current item on top and the queue numbered under it; on a phone the sidebar stacks under the player. The host removes and reorders from the sidebar, and "next" moves there too; guests read it. Reordering needs no backend: a queue update already replaces the whole array. | `rooms/RoomPage.vue`, `i18n/messages.ts` | S |
+| [x] | Queue as a sidebar | The queue exists (50 items, visible to guests) but sits under the host's controls, listed by raw video id or track path, so nobody can see what's coming. On wide screens the room becomes two columns, the player and an *up next* sidebar with the current item on top and the queue numbered under it; on a phone the sidebar stacks under the player. The host removes and reorders from the sidebar, and "next" moves there too; guests read it. Reordering needs no backend: a queue update already replaces the whole array. | `rooms/RoomPage.vue`, `i18n/messages.ts` | S |
 | [ ] | YouTube in radio | A YouTube id (eleven characters) and a SoundCloud item (an https URL) can't be mistaken for each other, so the queue stays `string[]`. `validMedia()` accepts either for `radio` (watch stays YouTube-only), `parseMedia()` tries both, and the page picks the player per *item* rather than per room. The sync logic already drives both through one `PlayerHandle` and both emit `finished`, so a mixed queue hands over between them with no new sync code. YouTube's embed terms don't allow hiding the video to keep the audio, so a YouTube item in radio plays in a small but visible player. What keeps the two rooms distinct: watch is a big video player, radio a mixed playlist. | `backend/src/rooms/rooms.service.ts`, `rooms/sync.ts`, `rooms/RoomPage.vue`, `i18n/messages.ts` | S–M |
 | [ ] | Titles in the queue (follow-up) | "Artist — Track" instead of an id. The backend resolves a title once, when the host adds the item, through YouTube's and SoundCloud's oEmbed endpoints, and keeps it beside the item. Fetching from the browser would mean widening `connect-src`, which is the reason not to. The queue becomes `{ media, title? }[]`, a change to the shape both apps read, so they deploy together; a failed lookup keeps the id, never blocks the add. | `backend/src/rooms/*`, `lib/api.ts`, `rooms/RoomPage.vue` | M |
 
@@ -476,6 +476,19 @@ Recorded as each row ships.
   - `inspectBytes` has no catch-all. It never throws because nothing in it can, so the slicing
     and fuzzing specs see a bounds bug rather than a swallowed one. `inspectFile` is the catch,
     at the I/O edge, and it answers "can't read" rather than "clean".
+- **Queue as a sidebar:**
+  - The two columns start at `lg`, not on any wide screen: at `md`, inside the page's
+    `max-w-5xl`, a 17rem sidebar would leave the video under about 450 px.
+  - The sidebar opens with a new *now playing* block, which takes the current item's label,
+    clock and play state out of the status row.
+  - Reordering is ↑ and ↓ buttons, not drag and drop: they work with a keyboard, a screen reader
+    and a thumb at no extra cost, and the queue holds 50 items at most. Each names its item in
+    its `aria-label`, and focus follows the item that moved.
+  - Shipped with the row: a fix for the queue race on quick edits. Every edit is built from the
+    last snapshot, so two quick clicks used to lose one. The buttons are now inert while an edit
+    is in flight (`aria-disabled` rather than `disabled`, so the pressed one keeps focus), and the
+    edits that can't be refused, a track ending on its own and a link added to the queue, wait
+    their turn instead.
 
 ## Build order
 

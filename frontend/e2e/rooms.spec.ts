@@ -1,4 +1,6 @@
+import type { Page } from '@playwright/test'
 import { expect, test } from './fixtures'
+import type { ApiStub } from './fixtures/api'
 
 /**
  * What jsdom cannot see about the rooms: that `/watch` and `/radio` are real routes
@@ -84,6 +86,57 @@ test.describe('rooms', () => {
 
     await expect(page).toHaveURL(/\/radio\/AB3DE$/)
     await expect(page.getByRole('region', { name: /radio AB3DE/i }).getByText(/waiting for the host/i)).toBeVisible()
+  })
+
+  test.describe('the up-next sidebar, as a guest', () => {
+    /** The player and the sidebar, once the stream has filled both. */
+    async function layout(page: Page, api: ApiStub) {
+      api.room(ROOM)
+      await page.goto('/watch/AB3DE')
+      const region = page.getByRole('region', { name: /watch party AB3DE/i })
+      const frame = region.locator('iframe')
+      const aside = region.getByRole('complementary', { name: /up next/i })
+      await expect(frame).toBeVisible()
+      await expect(aside.getByRole('listitem')).toHaveText([/zyxwvutsrq9/])
+      await expect(aside.getByText(/now playing/i)).toBeVisible()
+      // No token in this tab: no next, no reorder, no remove.
+      await expect(aside.getByRole('button')).toHaveCount(0)
+      return { player: (await frame.boundingBox())!, side: (await aside.boundingBox())! }
+    }
+
+    test('sits right of the player on a wide screen', async ({ page, api, pageErrors }) => {
+      test.skip(test.info().project.name === 'mobile', 'Two columns start at lg.')
+      const { player, side } = await layout(page, api)
+      expect(side.x).toBeGreaterThanOrEqual(player.x + player.width)
+      expect(side.y).toBeLessThan(player.y + player.height)
+      expect(pageErrors).toEqual([])
+    })
+
+    test('stacks under the player on a phone', async ({ page, api, pageErrors }) => {
+      test.skip(test.info().project.name !== 'mobile', 'One column below lg.')
+      const { player, side } = await layout(page, api)
+      expect(side.y).toBeGreaterThanOrEqual(player.y + player.height)
+      expect(pageErrors).toEqual([])
+    })
+  })
+
+  test('the host reorders and removes from the sidebar, each button naming its item', async ({ page, api }) => {
+    const [a, b, c] = ['aaaaaaaaaaa', 'bbbbbbbbbbb', 'ccccccccccc']
+    const button = (verb: string, item: string, tail = '') => new RegExp(`^${verb} .*${item}${tail}$`, 'i')
+    api.room({ ...ROOM, state: { media: null, position: 0, playing: false, at: Date.now() }, queue: [a, b, c], members: 1 })
+    await page.goto('/watch')
+    await page.getByRole('button', { name: /start a room/i }).click()
+
+    const aside = page.getByRole('complementary', { name: /up next/i })
+    await expect(aside.getByRole('button', { name: button('move', a, ' up') })).toHaveAttribute('aria-disabled', 'true')
+    await aside.getByRole('button', { name: button('move', b, ' up') }).click()
+    await expect(aside.getByRole('listitem')).toHaveText([new RegExp(b), new RegExp(a), new RegExp(c)])
+    // Focus follows the item, so a keyboard user's next press acts on the same one.
+    await expect(aside.getByRole('button', { name: button('move', b, ' up') })).toBeFocused()
+
+    await aside.getByRole('button', { name: button('remove', c) }).click()
+    await expect(aside.getByRole('listitem')).toHaveText([new RegExp(b), new RegExp(a)])
+    expect(api.sent('POST', '/rooms/AB3DE/state').map((r) => r.body)).toEqual([{ queue: [b, a, c] }, { queue: [b, a] }])
   })
 
   test('a code nobody has is reported as such', async ({ page, api }) => {

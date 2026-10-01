@@ -6,6 +6,7 @@ import {
   formatClock,
   isSeek,
   mediaLabel,
+  moveItem,
   normaliseCode,
   parseMedia,
   parseSoundCloud,
@@ -88,6 +89,36 @@ describe('rooms sync', () => {
       expect(parseMedia('radio', 'https://soundcloud.com/couvbat/abysses')).toBe('https://soundcloud.com/couvbat/abysses')
       expect(mediaLabel('radio', 'https://soundcloud.com/couvbat/abysses')).toBe('couvbat/abysses')
       expect(mediaLabel('watch', 'aqz-KE-bpKQ')).toBe('aqz-KE-bpKQ')
+    })
+  })
+
+  describe('moveItem', () => {
+    const queue = ['a', 'b', 'c', 'd'] as const
+
+    it('moves one item up or down and leaves the rest in order', () => {
+      expect(moveItem(queue, 2, 1)).toEqual(['a', 'c', 'b', 'd'])
+      expect(moveItem(queue, 0, 1)).toEqual(['b', 'a', 'c', 'd'])
+      expect(moveItem(queue, 3, 0)).toEqual(['d', 'a', 'b', 'c'])
+      expect(moveItem(queue, 1, 3)).toEqual(['a', 'c', 'd', 'b'])
+    })
+
+    it('returns a new array and never touches the one it was given', () => {
+      const list = ['a', 'b']
+      const moved = moveItem(list, 0, 1)
+      expect(moved).not.toBe(list)
+      expect(list).toEqual(['a', 'b'])
+      expect(moveItem(list, 1, 1)).toEqual(['a', 'b'])
+    })
+
+    it('moves nothing when either index is off the end', () => {
+      expect(moveItem(queue, 0, -1)).toEqual([...queue])
+      expect(moveItem(queue, 3, 4)).toEqual([...queue])
+      expect(moveItem(queue, 7, 0)).toEqual([...queue])
+      expect(moveItem([], 0, 0)).toEqual([])
+    })
+
+    it('keeps duplicates apart, moving only the one at the index', () => {
+      expect(moveItem(['x', 'y', 'x'], 2, 1)).toEqual(['x', 'x', 'y'])
     })
   })
 

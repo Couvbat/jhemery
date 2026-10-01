@@ -700,9 +700,20 @@ export const messages = {
     enqueue: { en: 'queue', fr: 'en file' },
     next: { en: 'next', fr: 'suivant' },
     upNext: { en: 'up next', fr: 'à suivre' },
+    nowPlaying: { en: 'now playing', fr: 'en cours' },
+    nothingPlaying: { en: 'Nothing playing.', fr: 'Rien en cours.' },
+    queueEmptyHost: {
+      en: 'Nothing queued. Paste a link and press queue.',
+      fr: 'File vide. Collez un lien et appuyez sur « en file ».',
+    },
+    queueEmptyGuest: { en: 'Nothing queued yet.', fr: "Rien dans la file pour l'instant." },
     play: { en: 'play', fr: 'lecture' },
     pause: { en: 'pause', fr: 'pause' },
-    remove: { en: 'remove', fr: 'retirer' },
+    // `{item}` is the item as the queue shows it, so a screen reader hears which one
+    // each of the three buttons acts on.
+    moveUp: { en: 'move {item} up', fr: 'monter {item}' },
+    moveDown: { en: 'move {item} down', fr: 'descendre {item}' },
+    remove: { en: 'remove {item}', fr: 'retirer {item}' },
     nothing: { en: 'Nothing loaded yet — paste a link below.', fr: 'Rien de chargé — collez un lien ci-dessous.' },
     waiting: { en: 'Waiting for the host…', fr: "En attente de l'hôte…" },
     privacy: {

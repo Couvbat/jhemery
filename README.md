@@ -364,7 +364,9 @@ means adding one object there, plus the tool's folder.
 **Rooms.** `/watch` and `/radio` are the third and fourth faces of the prism. A room is a
 five-character code. The host pastes a YouTube link (watch) or queues SoundCloud tracks and sets
 (radio), and every guest's player follows the host's play, pause and seeks to within two seconds,
-correcting for drift against the server's clock. Both embeds are controlled over `postMessage`, so
+correcting for drift against the server's clock. An *up next* sidebar, beside the player on a wide
+screen and under it on a phone, shows what is playing and the numbered queue: the host skips,
+reorders and removes from it with buttons, and guests only read it. Both embeds are controlled over `postMessage`, so
 no YouTube or SoundCloud script runs on the page, and the CSP only needs one extra `frame-src`.
 Rooms are off unless the API sets `ROOMS_ENABLED`.
 

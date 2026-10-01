@@ -1137,6 +1137,10 @@ this section only fixes the rules the code cites.
   lives in `sessionStorage` keyed by code (a reload keeps hosting, a URL never carries it), and a
   refused token demotes the tab to guest rather than retrying. Guests seek at most once per 1.5 s,
   hosts coalesce changes for 250 ms and re-anchor every 15 s while playing. `cd watch/<code>` joins.
+  The queue is an *up next* `<aside>`: a second column from `lg`, under the player below it. The
+  host skips, reorders and removes with ↑ ↓ × buttons that name their item; guests get none.
+  Each edit replaces the whole queue, so edits run one at a time and the buttons are inert while
+  one is in flight.
 - **Tools, vol. 3** — `jwt` (decode only, never verifies), `regex` (a fresh module Worker per run,
   terminated at one second, so a backtracking pattern cannot freeze the tab), `cron` (own parser,
   Vixie semantics, sentences in both languages, next runs walked with a four-year horizon), `qr`

@@ -66,6 +66,20 @@ export function mediaLabel(kind: RoomKind, media: string): string {
   return media.replace(/^https:\/\/soundcloud\.com\//, '')
 }
 
+/**
+ * The queue with one item moved from `from` to `to`, as a new array — the state route
+ * replaces the whole queue, so a reorder is just this sent back. An index off either
+ * end moves nothing: a click on a list that has since changed under it is a no-op,
+ * not a guess.
+ */
+export function moveItem<T>(list: readonly T[], from: number, to: number): T[] {
+  const next = [...list]
+  if (from < 0 || from >= next.length || to < 0 || to >= next.length) return next
+  const [item] = next.splice(from, 1) as [T]
+  next.splice(to, 0, item)
+  return next
+}
+
 /** Seconds a guest may be out before it seeks. Two: under it, a seek is more
  *  disruptive than the drift; over it, laughs land at different times. */
 export const DRIFT_SECONDS = 2
