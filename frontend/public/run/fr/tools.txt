@@ -1,0 +1,19 @@
+[2m~/tools[0m
+[38;5;46mimage     [0m[2mPNG, JPEG ou WebP — redimensionner, recompresser, effacer les métadonnées[0m
+[38;5;46mhash      [0m[2mSHA-1, SHA-256 ou SHA-512 d'un texte ou d'un fichier[0m
+[38;5;46mencode    [0m[2mBase64, encodage URL et hexadécimal, dans les deux sens[0m
+[38;5;46mjson      [0m[2mIndenter ou minifier, et pointer l'erreur quand ce n'est pas du JSON[0m
+[38;5;46mcolour    [0m[2mhex, rgb, hsl et oklch, plus le contraste WCAG contre la palette du site[0m
+[38;5;46mtime      [0m[2mEpoch, ISO 8601, votre fuseau et huit autres, temps relatif, semaine ISO[0m
+[38;5;46mpassword  [0m[2mMots de passe aléatoires, ou phrases secrètes tirées des listes des jeux, entropie affichée[0m
+[38;5;46mtext      [0m[2mComptage de mots, caractères et lignes, temps de lecture, et toutes les casses[0m
+[38;5;46mjwt       [0m[2mEn-tête, charge utile et expiration en dates — décodé, jamais vérifié, ne demande aucun secret[0m
+[38;5;46mregex     [0m[2mCorrespondances et groupes surlignés à la frappe, dans un worker qui abandonne après une seconde[0m
+[38;5;46mcron      [0m[2mUne expression cron en une phrase, et ses cinq prochaines exécutions dans votre fuseau[0m
+[38;5;46mqr        [0m[2mDu texte ou une URL en QR code, en PNG ou SVG — encodé ici, d’après la norme[0m
+[38;5;46mdiff      [0m[2mDeux textes et un diff unifié, avec le même code que le `diff` du terminal[0m
+[38;5;46mffmpeg    [0m[2mmp3, m4a, ogg, wav, flac, mp4 ou gif ; découper ; extraire l'audio sans ré-encoder. ffmpeg en WebAssembly, 32 Mo au premier usage[0m
+
+[2mtools <nom> ou cd tools/<nom> en ouvre un ; cd tools ouvre la page.[0m
+
+[2mcurl jhemery.xyz/help pour les autres pages · en direct dans un navigateur : https://jhemery.xyz/?run=tools[0m

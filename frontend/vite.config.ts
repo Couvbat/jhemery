@@ -96,6 +96,9 @@ export default defineConfig({
           /^\/resume(\.fr)?\.html$/,
           // Read by the backend's MCP endpoint (vite-plugins/resume.ts), not by the app.
           /^\/content\.json$/,
+          // The curl pages (`curl jhemery.xyz/neofetch`), served to terminals rather than
+          // navigated to, but a browser opening one should get the file.
+          /^\/run\//,
           /^\/llms\.txt$/,
           /^\/robots\.txt$/,
           /^\/sitemap\.xml$/,

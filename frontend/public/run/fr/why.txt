@@ -1,0 +1,21 @@
+[38;5;46mPourquoi le site est fait ainsi :[0m
+
+  prism-turn            Comment on passe d'une page à l'autre
+  swing-not-fade        Pourquoi un pivot plutôt qu'un fondu
+  tools-page            Pourquoi les outils ont leur propre page
+  rooms-sse             Comment les salons restent synchronisés
+  ffmpeg-single-thread  Pourquoi ffmpeg tourne sur un seul thread
+  ask-no-rag            Comment ask connaît le site
+  mcp-sdk               Pourquoi le serveur MCP est écrit à la main
+  polling               Pourquoi le ticker du livre d'or fait du polling
+  steam-proxy           D'où vient le journal de jeux Steam
+  soundcloud-widget     Comment le lecteur de musique est intégré
+  ctf-client-side       Où les flags du CTF sont vérifiés
+  battleship            Pourquoi le jeu à deux est un puissance 4
+  tetris                Pourquoi tetris a fini par exister
+  minesweeper-score     Comment un score plus bas peut être le record
+  word-lists            D'où viennent les listes de mots
+
+[2mwhy <sujet> — ce qui a été choisi, et ce qui a été écarté[0m
+
+[2mcurl jhemery.xyz/help pour les autres pages · en direct dans un navigateur : https://jhemery.xyz/?run=why[0m

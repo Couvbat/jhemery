@@ -377,6 +377,7 @@ export const contentCommands: Command[] = [
           tone: 'accent',
         },
         line(`tip: curl ${profile.domain}`, 'muted'),
+        line(`tip: curl ${profile.domain}/help`, 'muted'),
       ]
     },
   },

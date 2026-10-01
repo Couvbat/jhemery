@@ -1,0 +1,46 @@
+[38;5;46mhardware[0m
+[2m────────[0m
+
+[38;5;46mdragonfly@pc — Tiny 11 25H2[0m
+[2mMotherboard  →  Gigabyte B850 GAMING X WIFI6E[0m
+[2mCPU          →  AMD Ryzen 7 9800X3D (4.7 / 5.2 GHz)[0m
+[2mCooling      →  MSI MAG CORELIQUID A13 360 Black[0m
+[2mGPU          →  MSI GeForce RTX 5080 16G VENTUS 3X OC[0m
+[2mRAM          →  32 GB DDR5 6000 MHz CL30 (2×16 GB)[0m
+[2mSSD          →  Samsung 990 EVO Plus 2TB NVMe[0m
+[2mPSU          →  Corsair RM1000x Gold[0m
+[2mCase         →  Corsair 3000D Airflow (Black)[0m
+
+[38;5;46mhephaistos@pc — Arch Linux[0m
+[2mModel  →  ASUS ROG Strix G16 (2020)[0m
+[2mCPU    →  Intel i7-9750H (2.6 / 4.5 GHz)[0m
+[2mGPU    →  GeForce GTX 1650 4G[0m
+[2mRAM    →  32 GB DDR4 2666 MHz[0m
+[2mSSD    →  1 TB NVMe[0m
+[2mCase   →  Laptop[0m
+
+[38;5;46mposeidon@nas — TrueNAS CE[0m
+[2mModel        →  MSI MEG Trident X 10th[0m
+[2mMotherboard  →  MSI MEG Z490I UNIFY[0m
+[2mCPU          →  Intel i7-10700K (3.8 / 5.1 GHz)[0m
+[2mGPU          →  MSI RTX 3080 GAMING X TRIO 10G[0m
+[2mRAM          →  16 GB DDR4 2933 MHz[0m
+[2mSSD          →  WD SN730 1TB NVMe[0m
+[2mHDD          →  Seagate Barracuda 1TB[0m
+[2mPSU          →  Modular 650W 80+ Gold[0m
+
+[38;5;46moptimus@nas — TrueNAS CE[0m
+[2mModel  →  Dell Optiplex 990 SFF[0m
+[2mCPU    →  Intel i7-2600 (3.6 GHz)[0m
+[2mRAM    →  16 GB DDR3 1333 MHz (4×4 GB)[0m
+[2mSSD    →  Crucial M500 480 GB[0m
+
+[38;5;46mazazel@nas — TrueNAS CE[0m
+[2mMotherboard  →  Z97 MPOWER MAX AC[0m
+[2mCPU          →  Intel i7-4770K (3.5 GHz)[0m
+[2mGPU          →  GeForce GTX 1060 3G[0m
+[2mRAM          →  16 GB DDR3 1866 MHz (2×8 GB)[0m
+[2mSSD          →  Crucial M500 480 GB[0m
+
+
+[2mcurl jhemery.xyz/help for the other pages · live in a browser: https://jhemery.xyz/?run=hardware[0m

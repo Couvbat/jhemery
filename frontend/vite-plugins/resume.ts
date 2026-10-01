@@ -9,6 +9,7 @@ import { durationLabel, periodLabel, yearSpan } from '../src/content/dates'
 import { education, experience } from '../src/content/experience'
 import { sectionIds } from '../src/content/sections'
 import { isExternal, pick, type Locale, type Localised } from '../src/content/types'
+import { SGR_TONES } from '../src/terminal/ansi'
 
 /**
  * Emits the résumés generated from `src/content` at build time:
@@ -25,11 +26,14 @@ import { isExternal, pick, type Locale, type Localised } from '../src/content/ty
  * cost is that it only refreshes on a frontend deploy, which is fine for a résumé.
  */
 
+// The colours are the terminal's palette (`src/terminal/ansi.ts`), so `curl` in a real
+// terminal and the site's own `curl` agree on what green means. Bold and the concealed
+// run below are this file's alone.
 const ESC = '\u001b['
 const RESET = `${ESC}0m`
-const GREEN = `${ESC}38;5;46m`
-const CYAN = `${ESC}38;5;51m`
-const DIM = `${ESC}2m`
+const GREEN = `${ESC}${SGR_TONES.primary}m`
+const CYAN = `${ESC}${SGR_TONES.accent}m`
+const DIM = `${ESC}${SGR_TONES.muted}m`
 const BOLD = `${ESC}1m`
 /** SGR 8/28: text a terminal is told not to draw. `cat -v` draws it anyway. */
 const CONCEAL = `${ESC}8m`
@@ -128,6 +132,7 @@ export function buildResume(at = new Date()): string {
     `${DIM}  You are reading the curl version. The full site is at https://${profile.domain}${RESET}`,
   )
   lines.push(`${DIM}  A printable one is at https://${profile.domain}/resume.html${RESET}`)
+  lines.push(`${DIM}  tip: curl ${profile.domain}/help lists the other pages a terminal can read${RESET}`)
   // Stage 3 of the CTF chain (src/terminal/ctf.ts): present in every byte `curl`
   // receives, invisible in any terminal that honours SGR 8. The terminal's own `curl`
   // fetches this file too, and `terminal/ansi.ts`'s parseSgr is what keeps the line

@@ -68,7 +68,8 @@ tools, watch-party and radio rooms, and 38 hidden achievements. English and Fren
 - 🔒 **Privacy by construction.** Presence is one anonymous integer, stats count sessions rather
   than commands, `ask` logs nothing, analytics are self-hosted and cookieless. `strace <cmd>`
   shows every request a command makes and the shape of what it carries, never a value.
-- 📄 **One source for the CV.** `curl jhemery.xyz` returns an ANSI-coloured résumé, and
+- 📄 **One source for the CV.** `curl jhemery.xyz` returns an ANSI-coloured résumé (and
+  `curl jhemery.xyz/help` the shell's other pages), and
   `/resume.html` a printable one in either language, both generated at build time from the same
   content the page renders. So is `content.json`, which a read-only MCP endpoint serves to agents.
   Experience and education are dated, never typed as durations: every résumé works out "3 years"
@@ -151,7 +152,7 @@ Each app has its own README for working on its code:
 | **Matrix rain** | `matrix` follows the white rabbit. The effect component is lazy-loaded on demand. |
 | **i18n** | English and French. The language comes from `navigator.language` and can be changed with the navbar toggle or `lang en\|fr`. It's saved in `localStorage`. All content and every terminal string is `Localised<T>`. |
 | **PWA** | Installable, with an `autoUpdate` service worker, maskable icons and an offline navigation fallback. |
-| **`curl jhemery.xyz`** | A Vite plugin generates an ANSI-coloured `resume.txt` from `src/content` at build time, so the résumé has exactly one source. LLM crawlers get the same file, and so does the terminal's own `curl`, which fetches it for real and turns its colours into the scheme's. |
+| **`curl jhemery.xyz`** | A Vite plugin generates an ANSI-coloured `resume.txt` from `src/content` at build time, so the résumé has exactly one source. LLM crawlers get the same file, and so does the terminal's own `curl`, which fetches it for real and turns its colours into the scheme's. `curl jhemery.xyz/help` lists the other pages a real terminal can read, one per command (`/neofetch`, `/skills`, `/why`…), in English or, with `Accept-Language: fr`, French. |
 
 ## The terminal
 
