@@ -56,6 +56,9 @@ export function startPresence(): void {
     // Blocked or malformed URL — the counter simply never appears.
     return
   }
+  // A stream that gave up earlier gets its three tries again: `who` typed after it is
+  // the visitor asking for exactly that.
+  failures = 0
 
   source.onmessage = (event) => {
     failures = 0

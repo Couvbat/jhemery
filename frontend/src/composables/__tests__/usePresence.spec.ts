@@ -156,6 +156,22 @@ describe('usePresence', () => {
       expect(source.closed).toBe(true)
     })
 
+    // `who` typed after the stream gave up is the visitor asking it to try again.
+    it('tries afresh, three times, when asked again after giving up', async () => {
+      const { whenPresent } = await load()
+      const first = whenPresent()
+      for (let i = 0; i < 3; i++) FakeSource.last!.fail()
+      expect(await first).toBeNull()
+
+      const second = whenPresent()
+      expect(FakeSource.opened).toBe(2)
+      FakeSource.last!.fail()
+      FakeSource.last!.fail()
+      expect(FakeSource.last!.closed).toBe(false)
+      FakeSource.last!.count(2)
+      expect(await second).toBe(2)
+    })
+
     it('stops waiting on Ctrl+C', async () => {
       const { whenPresent } = await load()
       const controller = new AbortController()
