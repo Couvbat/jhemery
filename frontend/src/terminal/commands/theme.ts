@@ -64,14 +64,14 @@ async function forge(words: string[], t: CommandContext['t']): Promise<OutputLin
   const mode = parts.at(-1)?.toLowerCase() === 'light' ? 'light' : 'dark'
   if (['light', 'dark'].includes(parts.at(-1)?.toLowerCase() ?? '')) parts.pop()
   const seed = parts.join(' ')
-  if (!seed) return [line('usage: theme forge <colour> [light]', 'error')]
+  if (!seed) return [fail('usage: theme forge <colour> [light]')]
 
   const { forgeScheme } = await import('@/lib/forge')
   const forged = forgeScheme(seed, mode)
   if (!forged) {
     return [
       // Quoted short: it is whatever was typed, and only ever printed as text.
-      line(`theme forge: \`${seed.slice(0, 40)}\` is not a colour`, 'error'),
+      fail(`theme forge: \`${seed.slice(0, 40)}\` is not a colour`),
       line(t({ en: 'try `theme forge #d65d0e`, or `theme forge oklch(0.7 0.15 40) light`.', fr: 'essayez `theme forge #d65d0e`, ou `theme forge oklch(0.7 0.15 40) light`.' }), 'muted'),
     ]
   }
@@ -92,7 +92,7 @@ async function exportTheme(format: string | undefined, t: CommandContext['t']): 
   const wanted = format?.toLowerCase()
   if (!wanted || !(FORMATS as readonly string[]).includes(wanted)) {
     return [
-      line(wanted ? `theme export: unknown format \`${format}\`` : 'usage: theme export <alacritty|kitty|base16>', 'error'),
+      fail(wanted ? `theme export: unknown format \`${format}\`` : 'usage: theme export <alacritty|kitty|base16>'),
       line(`formats: ${FORMATS.join(', ')}`, 'muted'),
     ]
   }
@@ -192,7 +192,7 @@ export const themeCommands: Command[] = [
       const id = requested.toLowerCase()
       if (!isMotionSetting(id)) {
         return [
-          line(`motion: unknown setting \`${requested}\``, 'error'),
+          fail(`motion: unknown setting \`${requested}\``),
           line('usage: motion [full|calm|paused]', 'muted'),
         ]
       }
