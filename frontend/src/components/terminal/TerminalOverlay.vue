@@ -4,6 +4,7 @@ import { profile } from '@/content'
 import { useLocale } from '@/i18n'
 import { useTerminal } from '@/composables/useTerminal'
 import { usePromptSuggestion } from '@/composables/usePromptSuggestion'
+import { autosuggest, searchBackward } from '@/terminal/history'
 import { suggestionPool } from '@/terminal/registry'
 import TerminalOutput from './TerminalOutput.vue'
 import VimPane from './VimPane.vue'
@@ -27,6 +28,7 @@ const {
   cancel,
   recallHistory,
   completeInput,
+  history,
 } = useTerminal()
 
 /** Shared chrome for the three title-bar dots (they only differ by colour). */
@@ -56,13 +58,77 @@ const { suggestion, dismiss } = usePromptSuggestion(
   ),
 )
 const placeholder = computed(() =>
-  suggestion.value ? t(m.terminal.suggestion).replace('{command}', suggestion.value) : '',
+  suggestion.value && !search.value ? t(m.terminal.suggestion).replace('{command}', suggestion.value) : '',
 )
 watch(input, (value) => {
   if (value) dismiss()
 })
 
+/** Nothing else wants the keyboard: no game, no question, no command running, no vim. */
+const ownsKeyboard = computed(() => !capturing.value && !pendingPrompt.value && !running.value && !vimBuffer.value)
+
+/**
+ * Ctrl+R, reverse-i-search: what has been typed into the search, the match it found and
+ * where (so another Ctrl+R looks further back), and the line it replaced in the input.
+ */
+const search = ref<{ query: string; index: number; found: string | null; saved: string } | null>(null)
+
+function findInSearch(query: string, before?: number) {
+  const current = search.value!
+  const hit = searchBackward(history.value, query, before)
+  search.value = { ...current, query, index: hit?.index ?? current.index, found: hit?.entry ?? (before === undefined ? null : current.found) }
+  input.value = search.value.found ?? search.value.saved
+}
+
+function endSearch(keep: boolean) {
+  const current = search.value
+  if (!current) return
+  search.value = null
+  input.value = keep && current.found ? current.found : current.saved
+}
+
+/** The keys Ctrl+R's search takes for itself. Returns whether it took this one. */
+function searchKeydown(event: KeyboardEvent): boolean {
+  const current = search.value!
+  if ((event.key === 'c' || event.key === 'g') && event.ctrlKey) {
+    endSearch(false)
+  } else if (event.key === 'Enter') {
+    endSearch(true)
+    void onSubmit()
+  } else if (event.key === 'Escape' || event.key === 'ArrowRight' || event.key === 'Tab') {
+    // Escape has to stop here, or the panel's own Escape would close the terminal.
+    event.stopPropagation()
+    endSearch(true)
+  } else if (event.key === 'Backspace') {
+    findInSearch(current.query.slice(0, -1))
+  } else if (event.key.length === 1 && !event.ctrlKey && !event.metaKey && !event.altKey) {
+    findInSearch(current.query + event.key)
+  } else {
+    // Anything else (an arrow, Home) ends the search with the match in hand, then acts.
+    endSearch(true)
+    return false
+  }
+  event.preventDefault()
+  return true
+}
+
+/** Where the caret is and whether the input has scrolled: the ghost only fits at the end of an unscrolled line. */
+const caretAtEnd = ref(true)
+const inputScrolled = ref(false)
+function measure() {
+  const el = inputEl.value
+  if (!el) return
+  caretAtEnd.value = el.selectionStart === el.value.length && el.selectionEnd === el.value.length
+  inputScrolled.value = el.scrollLeft > 0
+}
+
+/** The rest of the newest line in the visitor's own history that starts with what is typed. */
+const ghost = computed(() =>
+  ownsKeyboard.value && !search.value && caretAtEnd.value && !inputScrolled.value ? autosuggest(input.value, history.value) : '',
+)
+
 const promptLabel = computed(() => {
+  if (search.value) return `(reverse-i-search)'${search.value.query}':`
   if (pendingPrompt.value) return pendingPrompt.value.question
   if (capturing.value) return t(m.terminal.playing)
   return `${profile.handle}:~$`
@@ -150,6 +216,24 @@ function onKeydown(event: KeyboardEvent) {
       event.preventDefault()
       event.stopPropagation()
     }
+    return
+  }
+
+  // Ctrl+R is the browser's reload everywhere else, and Cmd+R stays it here: only taken
+  // while the shell itself has the keyboard.
+  if (event.key === 'r' && event.ctrlKey && !event.metaKey && !event.altKey && ownsKeyboard.value) {
+    event.preventDefault()
+    if (!search.value) search.value = { query: '', index: history.value.length, found: null, saved: input.value }
+    else if (search.value.query) findInSearch(search.value.query, search.value.index)
+    return
+  }
+  if (search.value && searchKeydown(event)) return
+
+  // → or End at the end of the line takes the ghost.
+  if ((event.key === 'ArrowRight' || event.key === 'End') && ghost.value) {
+    event.preventDefault()
+    input.value += ghost.value
+    void nextTick(measure)
     return
   }
 
@@ -314,22 +398,37 @@ function onPanelKeydown(event: KeyboardEvent) {
           @submit.prevent="onSubmit"
         >
           <label for="terminal-input" class="sr-only">{{ t(m.terminal.inputLabel) }}</label>
-          <span :class="pendingPrompt ? 'text-accent' : 'text-primary'">{{ promptLabel }}</span>
-          <input
-            id="terminal-input"
-            ref="inputEl"
-            v-model="input"
-            :type="pendingPrompt?.mask ? 'password' : 'text'"
-            autocomplete="off"
-            autocapitalize="off"
-            autocorrect="off"
-            spellcheck="false"
-            :readonly="capturing || running"
-            :aria-disabled="running"
-            :placeholder="placeholder"
-            class="flex-1 bg-transparent outline-none text-foreground caret-primary aria-disabled:opacity-50 placeholder:text-muted-foreground/50"
-            @keydown="onKeydown"
-          />
+          <span :class="pendingPrompt || search ? 'text-accent' : 'text-primary'">{{ promptLabel }}</span>
+          <div class="relative flex-1 min-w-0 flex items-center">
+            <!-- The ghost: what is typed, invisible, then the rest of the history line it
+                 would become, faded. Decoration only, so screen readers skip it. -->
+            <span
+              v-if="ghost"
+              aria-hidden="true"
+              data-testid="terminal-ghost"
+              class="pointer-events-none absolute inset-0 flex items-center whitespace-pre overflow-hidden text-transparent"
+              >{{ input }}<span class="text-muted-foreground/50">{{ ghost }}</span></span
+            >
+            <input
+              id="terminal-input"
+              ref="inputEl"
+              v-model="input"
+              :type="pendingPrompt?.mask ? 'password' : 'text'"
+              autocomplete="off"
+              autocapitalize="off"
+              autocorrect="off"
+              spellcheck="false"
+              :readonly="capturing || running"
+              :aria-disabled="running"
+              :placeholder="placeholder"
+              class="w-full bg-transparent outline-none text-foreground caret-primary aria-disabled:opacity-50 placeholder:text-muted-foreground/50"
+              @keydown="onKeydown"
+              @input="measure"
+              @keyup="measure"
+              @click="measure"
+              @scroll="measure"
+            />
+          </div>
         </form>
       </div>
     </div>

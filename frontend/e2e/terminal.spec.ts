@@ -83,6 +83,32 @@ test.describe('terminal', () => {
       await terminal.input.press('q')
       await expect(status).toBeHidden()
       await expect(terminal.output).not.toContainText('cancelled')
+
+  // What jsdom can't show: that the browser's own Ctrl+R never fires, and that the ghost
+  // lines up with real text in a real input.
+  test.describe('history', () => {
+    test('Ctrl+R searches instead of reloading, and → takes the ghost', async ({ page, terminal }) => {
+      await terminal.open()
+      await terminal.run('theme nord')
+      await terminal.run('whoami')
+      const navigations: string[] = []
+      page.on('framenavigated', (frame) => {
+        if (frame === page.mainFrame()) navigations.push(frame.url())
+      })
+
+      await terminal.input.press('Control+r')
+      await terminal.input.pressSequentially('nor')
+      await expect(page.getByText("(reverse-i-search)'nor':")).toBeVisible()
+      await expect(terminal.input).toHaveValue('theme nord')
+      await terminal.input.press('Escape')
+      await expect(terminal.input).toHaveValue('theme nord')
+      expect(navigations).toEqual([])
+
+      await terminal.input.fill('')
+      await terminal.input.pressSequentially('who')
+      await expect(page.getByTestId('terminal-ghost')).toHaveText('whoami')
+      await terminal.input.press('ArrowRight')
+      await expect(terminal.input).toHaveValue('whoami')
     })
   })
 

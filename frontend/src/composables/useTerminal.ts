@@ -2,7 +2,7 @@ import { computed, nextTick, ref, shallowRef, watch } from 'vue'
 import { currentLocale } from '@/i18n'
 import { messages } from '@/i18n/messages'
 import { expandAliases } from '@/terminal/aliases'
-import { history, pushHistory } from '@/terminal/history'
+import { expandHistory, history, pushHistory } from '@/terminal/history'
 import { pick, type Locale } from '@/content/types'
 import { fail } from '@/terminal/format'
 import { completableFlags, renderUsage } from '@/terminal/manual'
@@ -13,6 +13,7 @@ import {
   filterByPrefix,
   argsOffered,
   isLinkable,
+  isServerBound,
   resolve,
   resolveLink,
   resolveStage,
@@ -544,9 +545,33 @@ export async function submit(value: string): Promise<void> {
 
   append({ text: value, prompt: true })
   historyIndex.value = -1
+  recallPrefix = null
+
+  // `!!`, `!$`, `!N`, `^a^b`: typed lines only, never a link, a nested run or an answer.
+  const expansion = expandHistory(value, history.value, isServerBound)
+  if ('error' in expansion) return void append(fail(`couvsh: ${expansion.error}`))
+  const line = expansion.line
+  if (expansion.expanded) {
+    append({ text: line, tone: 'muted' })
+    // What `!!` turned into is the visitor's to check before it writes anything, as
+    // zsh's `histverify` has it: into history, one ↑ and Enter away, not run.
+    if (writesAnything(line)) {
+      pushHistory(line)
+      append({ text: messages.terminal.histverify[currentLocale()], tone: 'muted' })
+      return
+    }
+  }
   // Into history once it has run, so `history | grep …` lists what came before it.
-  await run(value)
-  pushHistory(value)
+  await run(line)
+  pushHistory(line)
+}
+
+/** Whether any stage of a line would write, by the same `writes` links and pipes read. */
+function writesAnything(line: string): boolean {
+  const parsed = parseLine(line)
+  if (!parsed.ok) return false
+  const resolved = resolveChain(parsed.chain)
+  return 'links' in resolved && resolved.links.some((link) => link.stages.some((s) => writesOf(s.command, s.args) !== 'none'))
 }
 
 /** A link's command can never be longer than this, or carry control characters. */
@@ -608,25 +633,37 @@ export function cancel() {
   if (!running) append({ text: messages.terminal.cancelled[currentLocale()], tone: 'muted' })
 }
 
-/** ↑/↓ through submitted commands. Returns the value the input should show. */
+/** What ↑ was pressed on, when there was text: the walk only stops on lines starting with it. */
+let recallPrefix: string | null = null
+
+/**
+ * ↑/↓ through submitted commands. Returns the value the input should show. With text in
+ * the input, ↑ is a prefix search, as zsh's up-line-or-beginning-search is: only the
+ * lines that start with what was typed.
+ */
 export function recallHistory(direction: -1 | 1, current: string): string {
-  if (history.value.length === 0) return current
+  const entries = history.value
+  if (entries.length === 0) return current
 
   if (historyIndex.value === -1) {
     if (direction === 1) return current
     draft.value = current
-    historyIndex.value = history.value.length - 1
-    return history.value[historyIndex.value]!
+    recallPrefix = current.trim() ? current : null
   }
+  const fits = (i: number) => recallPrefix === null || entries[i]!.startsWith(recallPrefix)
 
-  const next = historyIndex.value + direction
-  if (next < 0) return history.value[0]!
-  if (next >= history.value.length) {
+  let i = historyIndex.value === -1 ? entries.length : historyIndex.value
+  for (i += direction; i >= 0 && i < entries.length; i += direction) if (fits(i)) break
+
+  if (i >= entries.length) {
     historyIndex.value = -1
+    recallPrefix = null
     return draft.value
   }
-  historyIndex.value = next
-  return history.value[next]!
+  // Past the oldest match: stay on it (or on the text, if nothing ever matched).
+  if (i < 0) return historyIndex.value === -1 ? current : entries[historyIndex.value]!
+  historyIndex.value = i
+  return entries[i]!
 }
 
 /** Resolves which command owns a half-typed line, and where its arguments start. */

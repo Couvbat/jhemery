@@ -76,6 +76,16 @@ export function isLinkable(command: Command, args: readonly string[] = []): bool
 }
 
 /**
+ * Whether `word` names a command that writes to the server: the line it is on is never
+ * history-expanded (`sign Great site!!` posts what was typed). The same `writes` field
+ * links and pipes read, so there is no second list.
+ */
+export function isServerBound(word: string): boolean {
+  const command = resolve(word)
+  return command !== undefined && writesOf(command, []) === 'server'
+}
+
+/**
  * Whether `name` is a command, or the first word of a two-word one (`git` of `git log`),
  * which an alias of that name would hide just the same.
  */
