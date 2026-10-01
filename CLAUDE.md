@@ -101,7 +101,9 @@ content strings in `src/content/`. Facts (tech names, URLs, specs) stay plain st
 ### Terminal: the registry is the API
 
 `src/terminal/commands/*.ts` each export an array of `Command` objects; `commands/index.ts`
-concatenates them and `registry.ts` builds the name/alias map. Adding a command means adding one
+concatenates them and `registry.ts` builds the name/alias map — on first use, because the registry
+and the command modules import each other: never call a registry function at a command module's
+top level (`registry-load.spec.ts` and `src/__tests__/import-cycles.spec.ts` will fail). Adding a command means adding one
 object — never a special case in the shell. A `Command` declares its own `hidden` (out of `help`
 and Tab), `palette` (in Ctrl+K), `linkable` (may run from a `?run=` link), `group`, and
 `complete(ctx)` for argument completion; the shell handles prefix filtering, common-prefix

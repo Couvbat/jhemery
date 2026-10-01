@@ -128,6 +128,12 @@ guestbook entry cannot inject markup.
 `visibleCommands()`. `help` renders straight from `visibleCommands()` grouped by `group`, so a new
 command documents itself.
 
+The lookup table is built on first use, not at import. `registry.ts`, `commands/index.ts` (which
+exports `collectCommands()`, a function, for the same reason) and `commands/core.ts` import each
+other, and an HMR reload that entered `core.ts` first once threw on an eager spread. So no module
+in that cycle may call a registry function at module scope. `registry-load.spec.ts` enters through
+every one; `src/__tests__/import-cycles.spec.ts` fails on any cycle outside the allowlist.
+
 ### Session state
 
 `useTerminal()` is a module-level singleton (the launcher, the overlay, the palette and the 404
