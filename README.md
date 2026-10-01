@@ -284,7 +284,8 @@ never show two different contents.
 `unalias`, `gravity`, `spawn`, `constellation`, `scene`, and the CTF's `flag` and `decrypt`.
 
 `alias gl='git log'` names your own commands, saved in `localStorage`. `unalias <name>` removes
-one.
+one. An alias can't take a command's name, and if a later version of the site adds a command with
+the name of one you saved, the command wins and `alias` marks yours as shadowed.
 
 Two files never appear in a plain `ls`: `.secret`, and a `.env` full of credentials that are as
 fake as they look. `ls -a` lists both, and `cat` and `vim` can read them.

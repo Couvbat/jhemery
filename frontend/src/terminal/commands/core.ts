@@ -6,7 +6,7 @@ import { aliases, parseDefinition, removeAlias, setAlias } from '../aliases'
 import { history } from '../history'
 import { allCommands, completionNames, resolve, visibleCommands } from '../registry'
 import type { Command, CommandGroup, OutputLine } from '../types'
-import { blank, line, pre } from '../format'
+import { blank, line, pre, segmented } from '../format'
 
 const GROUP_LABELS: Record<CommandGroup, { en: string; fr: string }> = {
   core: { en: 'shell', fr: 'shell' },
@@ -171,9 +171,19 @@ export const coreCommands: Command[] = [
           ]
         }
         const width = entries.reduce((max, [name]) => Math.max(max, name.length), 0)
+        // An alias stored before a command of the same name existed no longer runs;
+        // say so here rather than interrupting the command when it does.
+        const shadowed = t({ en: '(shadowed by a command)', fr: '(masqué par une commande)' })
         return entries
           .sort(([a], [b]) => a.localeCompare(b))
-          .map(([name, value]) => pre(`${name.padEnd(width)}  →  ${value}`, 'primary'))
+          .map(([name, value]) =>
+            resolve(name)
+              ? segmented([
+                  { text: `${name.padEnd(width)}  →  ${value}`, tone: 'muted' },
+                  { text: `  ${shadowed}`, tone: 'warning' },
+                ])
+              : pre(`${name.padEnd(width)}  →  ${value}`, 'primary'),
+          )
       }
 
       const parsed = parseDefinition(definition)

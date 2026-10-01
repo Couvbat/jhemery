@@ -213,7 +213,7 @@ export async function run(input: string): Promise<void> {
   // the command that will actually run. `alias` itself is never expanded — it
   // reads its own raw line — because it is a real command and aliases cannot
   // shadow those.
-  const raw = expandAliases(input)
+  const raw = expandAliases(input, (name) => resolve(name) !== undefined)
   if (!raw) return
 
   const [name = '', ...args] = raw.split(/\s+/)
