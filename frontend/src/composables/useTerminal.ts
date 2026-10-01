@@ -113,6 +113,7 @@ const effects: TerminalEffects = {
         : null
   },
   vimIsDirty: () => vimBuffer.value?.dirty ?? false,
+  vimIsOpen: () => vimBuffer.value !== null,
   vimMessage: (text: string) => {
     if (vimBuffer.value) vimBuffer.value.statusMessage = text
   },

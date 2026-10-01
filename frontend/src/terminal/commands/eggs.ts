@@ -370,6 +370,20 @@ export const eggCommands: Command[] = [
     run({ effects, raw, t }) {
       const cmd = raw.trim()
 
+      // Escaping vim is the achievement, so there has to be a vim to escape: typed at
+      // the prompt, `:q` is only a reflex.
+      if (!effects.vimIsOpen()) {
+        return [
+          line(
+            t({
+              en: `${cmd}: you're not in vim. The reflex is noted.`,
+              fr: `${cmd} : vous n'êtes pas dans vim. Le réflexe est noté.`,
+            }),
+            'muted',
+          ),
+        ]
+      }
+
       if (cmd === ':q' || cmd === ':quit') {
         if (effects.vimIsDirty()) {
           const message = 'E37: No write since last change (add ! to override)'

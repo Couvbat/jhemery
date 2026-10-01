@@ -142,6 +142,8 @@ export interface TerminalEffects {
   crt: (enabled?: boolean) => boolean
   vim: (enabled: boolean, file?: VimFile) => void
   vimIsDirty: () => boolean
+  /** Whether the vim pane is showing: `:q` only means something there. */
+  vimIsOpen: () => boolean
   /** Shows a status-line message in the vim pane (e.g. a refused `:q`). */
   vimMessage: (text: string) => void
   glitch: (durationMs: number) => Promise<void>
