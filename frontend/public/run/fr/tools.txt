@@ -12,6 +12,7 @@
 [38;5;46mcron      [0m[2mUne expression cron en une phrase, et ses cinq prochaines exécutions dans votre fuseau[0m
 [38;5;46mqr        [0m[2mDu texte ou une URL en QR code, en PNG ou SVG — encodé ici, d’après la norme[0m
 [38;5;46mdiff      [0m[2mDeux textes et un diff unifié, avec le même code que le `diff` du terminal[0m
+[38;5;46macid      [0m[2mUne ligne de basse façon TB-303 en 16 pas, en Web Audio pur, enregistrée dans son propre lien[0m
 [38;5;46mffmpeg    [0m[2mmp3, m4a, ogg, wav, flac, mp4 ou gif ; découper ; extraire l'audio sans ré-encoder. ffmpeg en WebAssembly, 32 Mo au premier usage[0m
 
 [2mtools <nom> ou cd tools/<nom> en ouvre un ; cd tools ouvre la page.[0m
