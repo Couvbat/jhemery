@@ -20,6 +20,8 @@ export interface SeedState {
   theme?: string
   /** `calm` or `paused`, as `useMotion` saves it; `full` is the absence of the key. */
   motion?: 'full' | 'calm' | 'paused'
+  /** A forged scheme as `useTheme` saves it — pair it with `theme: 'custom'` to wear it. */
+  customTheme?: { seed: string; mode: 'dark' | 'light'; colours: Record<string, string> }
 }
 
 // Only the keys the suite actually seeds or reads. The app persists more of them —
@@ -33,6 +35,7 @@ const KEYS = {
   history: 'couvbat:history',
   theme: 'couvbat:theme',
   motion: 'couvbat:motion',
+  customTheme: 'couvbat:theme:custom',
 } as const
 
 /**
@@ -68,6 +71,7 @@ export class AppState {
     if (state.history) entries.push([KEYS.history, JSON.stringify(state.history)])
     if (state.theme !== undefined) entries.push([KEYS.theme, state.theme])
     if (state.motion !== undefined) entries.push([KEYS.motion, state.motion === 'full' ? null : state.motion])
+    if (state.customTheme) entries.push([KEYS.customTheme, JSON.stringify(state.customTheme)])
 
     await this.page.addInitScript((pairs: [string, string | null][]) => {
       for (const [key, value] of pairs) {

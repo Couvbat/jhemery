@@ -1,5 +1,6 @@
 import { expect, test } from './fixtures'
 import { messages } from '@/i18n/messages'
+import { forgeScheme } from '@/lib/forge'
 import { findTheme } from '@/lib/themes'
 
 /**
@@ -29,6 +30,31 @@ test('a saved scheme is painted on load', async ({ page, app }) => {
   // `text-primary` is a Tailwind utility over `--color-primary` over `--primary` — the
   // whole chain has to resolve for this to be orange.
   await expect(page.locator('#about h1').first()).toHaveCSS('color', rgb(gruvbox.colours.primary))
+})
+
+// A forge comes back from its stored colours before mount, with no `forge.ts` in the entry.
+test('a forged scheme is painted on load', async ({ page, app }) => {
+  const forged = forgeScheme('#1e66f5', 'light')!.theme
+  await app.seed({ theme: 'custom', customTheme: { seed: forged.seed!, mode: forged.mode, colours: { ...forged.colours } } })
+  await page.goto('/')
+
+  await expect(page.locator('html')).toHaveAttribute('data-theme', 'custom')
+  await expect(page.locator('html')).toHaveAttribute('data-mode', 'light')
+  await expect(page.locator('body')).toHaveCSS('background-color', rgb(forged.colours.background))
+  await expect(page.locator('#about h1').first()).toHaveCSS('color', rgb(forged.colours.primary))
+})
+
+// "make one…" loads the forge chunk only once a colour comes back from the picker.
+test('the menu forges a scheme from the colour picker', async ({ page, app }) => {
+  await page.goto('/')
+  await page.getByRole('button', { name: messages.nav.theme.en }).click()
+  await page.getByRole('menuitem', { name: messages.nav.forge.en }).click()
+  // The native picker is the browser's; the input behind it is what the page reads.
+  await page.getByLabel(messages.nav.forgeFrom.en).fill('#2ea043')
+
+  await expect(page.locator('html')).toHaveAttribute('data-theme', 'custom')
+  await expect(page.getByRole('menuitemradio', { name: 'custom' })).toHaveAttribute('aria-checked', 'true')
+  expect(JSON.parse((await app.read('customTheme'))!)).toMatchObject({ seed: '#2ea043', mode: 'dark' })
 })
 
 test('a light scheme repaints the page and drops the glows', async ({ page, app, terminal }) => {

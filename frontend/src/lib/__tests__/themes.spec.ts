@@ -5,7 +5,7 @@ import { readFileSync } from 'node:fs'
 import { fileURLToPath, URL } from 'node:url'
 import { describe, expect, it } from 'vitest'
 import { parseColour } from '@/lib/colour'
-import { checkFloors, liftToFloor, TEXT_FLOOR } from '../themeRules'
+import { checkFloors, liftToFloor, meetsFloors, TEXT_FLOOR } from '../themeRules'
 import { DEFAULT_THEME, findTheme, themes, themeTokens } from '../themes'
 
 /** Every custom property `:root` declares in the stylesheet, with its value. */
@@ -98,6 +98,7 @@ describe('themes', () => {
   describe.each(themes.map((theme) => [theme.id, theme] as const))('%s', (_, theme) => {
     it('meets every contrast floor', () => {
       expect(checkFloors(theme.colours)).toEqual([])
+      expect(meetsFloors(theme.colours)).toBe(true)
     })
 
     it('says which way it faces', () => {

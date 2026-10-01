@@ -316,7 +316,7 @@ Grouped as they appear in `help`.
 | `date` | Local date/time |
 | `whoami` | Prints the current user |
 | `lang [en\|fr]` | Prints or switches locale |
-| `theme [name\|random]` (alias `colorscheme`) | Lists the colour schemes with a swatch strip each, or applies one |
+| `theme [name\|random]` (alias `colorscheme`) | Lists the colour schemes with a swatch strip each, or applies one. `theme forge <colour> [light]` grows a `custom` scheme from one colour; `theme export <alacritty\|kitty\|base16>` prints the scheme on screen as a config |
 | `motion [full\|calm\|paused]` | Lists the three motion settings with the one in force marked, or sets one (§9). `writes: 'local'`, so never from a link; in the palette |
 | `alias` / `unalias` | Session-persistent command renames, expanded before anything else parses the line |
 | `sha256sum` (aliases `sha1sum`, `sha512sum`) · `base64 [-d]` · `uuidgen` · `jq .` | The shell versions of the hash, encode and JSON tools, each importing the pure module its panel uses. A fake-filesystem name is read as that file, other text as literal text, and with no argument they read what a `\|` hands them |
@@ -374,6 +374,28 @@ from the hues on screen to the new ones (`neonFrom` → `neonTo`, preallocated, 
 paused, they jump. Under the default the hues on screen are `:root`'s hex `--neon-*`, not the
 table's oklch primary, accent and secondary, which `THREE.Color` can't parse, so the ease reads
 the painted property, never the table.
+
+**The forge.** `theme forge <colour> [light]`, or *make one…* in the 🎨 menu (a hidden
+`<input type="color">`), grows a scheme from one seed in `lib/forge.ts`: a lightness ladder in
+OKLCH for the surfaces and text, tinted towards the seed's hue (not for a grey seed); `primary`
+is the seed; accent turns 150°, secondary −90° and highlight 60° with it, while warning sits at
+85° and destructive at 25° whatever the seed. Every tone with a floor then goes through
+`liftToFloor` against the surfaces `themeRules.ts` checks it on, and anything still short is
+printed as a warning (`checkFloors`' wording). Everything comes out of `toHex`, so the typed seed
+is parsed into numbers and never reaches a style. The result is the one `custom` scheme: a slot
+beside `themes` in `themes.ts` (`allThemes()`, and `findTheme()` searches it), so `themes` stays
+the eleven the specs hold to their floors. `useTheme` stores its finished colours, seed and mode
+under `couvbat:theme:custom` and, on restore before mount, ignores the whole thing unless every
+one is `#rrggbb` — storing colours rather than the seed keeps `forge.ts` out of the entry chunk.
+`random` only draws from the shipped eleven; a forge counts towards `ricer` and, when light,
+`flashbang`, and has no achievement of its own.
+
+`theme export <alacritty|kitty|base16>` prints the scheme on screen (the default from its table,
+converted to hex, not from `:root`, which disagrees with it on the `--neon-*` slots). The mappings
+are documented in `forge.ts`: ANSI red is `destructive` and yellow `warning`; green, cyan, blue
+and magenta take the tone nearest their hue; black and white are `raised` and `foreground`
+(swapped on a light scheme); bright black is `muted`, and the other bright colours step 0.08 of
+OKLCH lightness away from the background. base16 follows its documented slot roles.
 
 The last things that ignored the scheme follow it now: the matrix rain draws in `--neon-green`
 over `--background` (and says "press any key" in both languages), the CRT overdrive's fringe is a

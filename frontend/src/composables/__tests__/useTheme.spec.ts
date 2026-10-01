@@ -99,6 +99,68 @@ describe('useTheme', () => {
     expect(root.getAttribute('style')).toBeNull()
   })
 
+  // A forge is stored as its finished colours, so a reload needs no `forge.ts`; and it is
+  // the one stored value written into the inline style, so it has to be exactly hex.
+  describe('a forged scheme', () => {
+    const COLOURS = {
+      background: '#17100c',
+      surface: '#1f1611',
+      raised: '#2c211c',
+      border: '#4e3b32',
+      foreground: '#f0d8ce',
+      muted: '#bb9d90',
+      primary: '#d65d0e',
+      accent: '#00d0d4',
+      secondary: '#da8cfa',
+      highlight: '#c1b600',
+      warning: '#e2a600',
+      destructive: '#ff8078',
+    }
+    const stored = (overrides: Record<string, unknown> = {}) =>
+      JSON.stringify({ seed: '#d65d0e', mode: 'dark', colours: COLOURS, ...overrides })
+
+    it('is saved by its colours and comes back before mount', async () => {
+      const first = await load()
+      first.applyForgedTheme({ id: 'whatever', name: 'Custom', mode: 'dark', colours: COLOURS, seed: '#d65d0e' })
+      expect(JSON.parse(window.localStorage.getItem('couvbat:theme:custom')!)).toEqual({ seed: '#d65d0e', mode: 'dark', colours: COLOURS })
+      expect(window.localStorage.getItem(STORAGE_KEY)).toBe('custom')
+
+      root.removeAttribute('style')
+      const { restoreTheme, useTheme } = await load()
+      restoreTheme()
+
+      expect(useTheme().theme.value).toMatchObject({ id: 'custom', seed: '#d65d0e' })
+      expect(root.style.getPropertyValue('--background')).toBe('#17100c')
+      expect(useTheme().themes.value.map((theme) => theme.id)).toContain('custom')
+    })
+
+    it.each([
+      ['a colour that is not hex', { colours: { ...COLOURS, primary: 'red; background: url(x)' } }],
+      ['a short hex', { colours: { ...COLOURS, muted: '#bbb' } }],
+      ['a missing colour', { colours: { ...COLOURS, warning: undefined } }],
+      ['a seed that is not hex', { seed: 'javascript:' }],
+      ['a mode that is neither', { mode: 'dim' }],
+    ])('ignores a stored forge with %s', async (_, overrides) => {
+      window.localStorage.setItem('couvbat:theme:custom', stored(overrides))
+      window.localStorage.setItem(STORAGE_KEY, 'custom')
+      const { restoreTheme, useTheme } = await load()
+
+      restoreTheme()
+
+      expect(useTheme().theme.value.id).toBe('cyberpunk')
+      expect(root.getAttribute('style')).toBeNull()
+      expect(useTheme().themes.value.map((theme) => theme.id)).not.toContain('custom')
+    })
+
+    it('ignores one that is not JSON at all', async () => {
+      window.localStorage.setItem('couvbat:theme:custom', '{"seed":')
+      window.localStorage.setItem(STORAGE_KEY, 'custom')
+      const { restoreTheme, useTheme } = await load()
+      restoreTheme()
+      expect(useTheme().theme.value.id).toBe('cyberpunk')
+    })
+  })
+
   describe('the flashbang', () => {
     it('whites the page out on a switch from dark to light, then clears', async () => {
       vi.useFakeTimers()

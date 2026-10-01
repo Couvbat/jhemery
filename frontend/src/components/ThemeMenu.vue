@@ -2,7 +2,7 @@
 import { nextTick, ref } from 'vue'
 import { onClickOutside } from '@vueuse/core'
 import { useLocale } from '@/i18n'
-import { useTheme, type ThemeOrigin } from '@/composables/useTheme'
+import { applyForgedTheme, useTheme, type ThemeOrigin } from '@/composables/useTheme'
 import { MOTION_SETTINGS, useMotion, type MotionSetting } from '@/composables/useMotion'
 import { swatch, type Theme } from '@/lib/themes'
 import { tryTheme } from '@/terminal/achievements'
@@ -46,12 +46,14 @@ const open = ref(false)
 const rootEl = ref<HTMLElement | null>(null)
 const triggerEl = ref<HTMLButtonElement | null>(null)
 const menuEl = ref<HTMLElement | null>(null)
+const pickerEl = ref<HTMLInputElement | null>(null)
+const forgeEl = ref<HTMLButtonElement | null>(null)
 
 onClickOutside(rootEl, () => (open.value = false))
 
 /** From the DOM, not a `v-for` ref array: Vue doesn't promise those keep the list's order. */
 function items(): HTMLButtonElement[] {
-  return [...(menuEl.value?.querySelectorAll<HTMLButtonElement>('[role="menuitemradio"]') ?? [])]
+  return [...(menuEl.value?.querySelectorAll<HTMLButtonElement>('[role="menuitemradio"], [role="menuitem"]') ?? [])]
 }
 
 async function show() {
@@ -79,8 +81,40 @@ function pick(theme: Theme, event: MouseEvent) {
  */
 function originOf(event: MouseEvent): ThemeOrigin {
   if (event.detail > 0) return { x: event.clientX, y: event.clientY }
-  const box = (event.currentTarget as HTMLElement).getBoundingClientRect()
+  return centreOf(event.currentTarget as HTMLElement)
+}
+
+function centreOf(element: HTMLElement): ThemeOrigin {
+  const box = element.getBoundingClientRect()
   return { x: box.left + box.width / 2, y: box.top + box.height / 2 }
+}
+
+/**
+ * "make one…": the system colour picker, on a hidden `<input type="color">`, standing in
+ * for `theme forge <colour>`. The forge module is loaded only once a colour comes back,
+ * the scheme faces the way the visitor's current one does, and it spreads from the item.
+ */
+function openPicker() {
+  const picker = pickerEl.value
+  if (!picker) return
+  picker.value = active.value.seed ?? '#d65d0e'
+  try {
+    picker.showPicker()
+  } catch {
+    // No `showPicker` (older engines) or no user activation left: a click still opens it.
+    picker.click()
+  }
+}
+
+async function forgeFrom(event: Event) {
+  const seed = (event.target as HTMLInputElement).value
+  const { forgeScheme } = await import('@/lib/forge')
+  const forged = forgeScheme(seed, active.value.mode)
+  if (!forged) return
+  tryTheme(applyForgedTheme(forged.theme, forgeEl.value ? { origin: centreOf(forgeEl.value) } : {}))
+  // Back on the scheme just made, which the list now holds and checks.
+  await nextTick()
+  menuEl.value?.querySelector<HTMLButtonElement>('[aria-checked="true"]')?.focus()
 }
 
 function move(event: KeyboardEvent) {
@@ -170,6 +204,17 @@ function onKeydown(event: KeyboardEvent) {
               />
             </span>
           </button>
+          <button
+            ref="forgeEl"
+            type="button"
+            role="menuitem"
+            tabindex="-1"
+            class="w-full flex items-center gap-2 rounded px-2 py-1.5 text-left transition-colors hover:bg-muted focus-visible:bg-primary/15 focus-visible:outline-none"
+            @click="openPicker"
+          >
+            <span class="w-2 text-primary" aria-hidden="true">+</span>
+            <span class="flex-1 truncate text-foreground">{{ t(m.nav.forge) }}</span>
+          </button>
         </div>
 
         <div role="separator" class="my-1 border-t border-border"></div>
@@ -201,6 +246,16 @@ function onKeydown(event: KeyboardEvent) {
       <p v-if="osReduced" id="motion-held" class="px-2 pt-1 pb-1.5 text-muted-foreground">
         {{ t(m.motion.os) }}
       </p>
+      <!-- Out of sight and out of the tab order: "make one…" is the way in. Labelled all
+           the same, since a screen reader can still land on a native picker. -->
+      <input
+        ref="pickerEl"
+        type="color"
+        class="sr-only"
+        tabindex="-1"
+        :aria-label="t(m.nav.forgeFrom)"
+        @change="forgeFrom"
+      />
     </div>
   </div>
 </template>

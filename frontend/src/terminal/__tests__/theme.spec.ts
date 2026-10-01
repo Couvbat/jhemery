@@ -102,19 +102,104 @@ describe('theme', () => {
     }
   })
 
-  it('completes scheme names and `random`, and only for the first argument', async () => {
+  it('completes scheme names, `random`, `forge` and `export`, then export’s formats', async () => {
     const { theme, themes } = await reload()
 
     expect(theme.complete!({ args: [''], index: 0, word: '' })).toEqual([
       ...themes.map((scheme) => scheme.id),
       'random',
+      'forge',
+      'export',
     ])
     expect(theme.complete!({ args: ['nord', ''], index: 1, word: '' })).toEqual([])
+    expect(theme.complete!({ args: ['export', ''], index: 1, word: '' })).toEqual(['alacritty', 'kitty', 'base16'])
+    expect(theme.complete!({ args: ['forge', ''], index: 1, word: '' })).toEqual([])
   })
 
   it('answers to vim’s name for it too', async () => {
     const { theme } = await reload()
     expect(theme.aliases).toContain('colorscheme')
+  })
+
+  describe('forge', () => {
+    it('grows a scheme from one colour, applies it as `custom`, and keeps it', async () => {
+      const { run, current } = await reload()
+
+      const out = await run('forge', '#d65d0e')
+
+      expect(current().id).toBe('custom')
+      expect(current().seed).toBe('#d65d0e')
+      expect(text(out)).toContain('theme: custom (forged from #d65d0e)')
+      expect(out.some((l) => l.tone === 'warning')).toBe(false)
+      expect(JSON.parse(window.localStorage.getItem('couvbat:theme:custom')!)).toMatchObject({ seed: '#d65d0e', mode: 'dark' })
+      expect(window.localStorage.getItem('couvbat:theme')).toBe('custom')
+      for (const value of Object.values(current().colours)) expect(value).toMatch(/^#[0-9a-f]{6}$/)
+    })
+
+    it('takes a colour of several words, and a light mode after it', async () => {
+      const { run, current } = await reload()
+
+      await run('forge', 'oklch(0.6', '0.15', '250)', 'light')
+
+      expect(current()).toMatchObject({ id: 'custom', mode: 'light' })
+    })
+
+    it('says what it could not read, and changes nothing', async () => {
+      const { run, current } = await reload()
+
+      const out = await run('forge', 'chartreuse-ish')
+
+      expect(out[0]).toMatchObject({ tone: 'error', text: 'theme forge: `chartreuse-ish` is not a colour' })
+      expect(current().id).toBe('cyberpunk')
+      expect(text(await run('forge'))).toContain('usage: theme forge')
+    })
+
+    it('lists the forge with the others, and `random` never lands on it', async () => {
+      const { run, current } = await reload()
+      await run('forge', '#1e66f5')
+
+      expect((await run()).find((l) => l.text.includes('custom'))?.text).toContain('forged from #1e66f5')
+      for (const roll of [0, 0.5, 0.9999]) {
+        vi.spyOn(Math, 'random').mockReturnValue(roll)
+        await run('random')
+        expect(current().id).not.toBe('custom')
+      }
+    })
+
+    // No new achievement: the forge is one more scheme to the two that already count them.
+    it('counts towards Ricer, and towards Flashbang when it is light', async () => {
+      const { run, achievements } = await reload()
+      for (const id of ['gruvbox', 'nord', 'dracula', 'catppuccin']) await run(id)
+
+      const out = await run('forge', '#d65d0e', 'light')
+
+      expect(achievements.isUnlocked('ricer')).toBe(true)
+      expect(achievements.isUnlocked('flashbang')).toBe(true)
+      expect(text(out)).toContain('achievement unlocked: Ricer')
+    })
+  })
+
+  describe('export', () => {
+    it('prints the scheme on screen as a config, and saves nothing', async () => {
+      const { run } = await reload()
+      await run('gruvbox')
+      const before = { ...window.localStorage }
+
+      const out = await run('export', 'kitty')
+
+      expect(text(out)).toMatch(/^background +#282828$/m)
+      expect(text(out)).toContain('color15')
+      expect({ ...window.localStorage }).toEqual(before)
+    })
+
+    it('names the formats it knows when asked for another', async () => {
+      const { run } = await reload()
+
+      const out = await run('export', 'iterm')
+
+      expect(out[0]).toMatchObject({ tone: 'error', text: 'theme export: unknown format `iterm`' })
+      expect(out[1]!.text).toBe('formats: alacritty, kitty, base16')
+    })
   })
 
   describe('ricer', () => {

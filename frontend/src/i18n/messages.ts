@@ -9,6 +9,9 @@ export const messages = {
     toggleMenu: { en: 'Toggle menu', fr: 'Ouvrir le menu' },
     language: { en: 'Switch language', fr: 'Changer de langue' },
     theme: { en: 'Colour scheme', fr: 'Thème de couleurs' },
+    // The 🎨 menu's way to `theme forge`: opens the system colour picker.
+    forge: { en: 'make one…', fr: 'en créer un…' },
+    forgeFrom: { en: 'Seed colour for a new scheme', fr: 'Couleur de départ d’un nouveau thème' },
   },
   hero: {
     aboutFile: { en: 'cat about.txt', fr: 'cat about.txt' },

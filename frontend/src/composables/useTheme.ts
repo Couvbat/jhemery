@@ -1,9 +1,26 @@
 import { computed, ref, shallowRef } from 'vue'
-import { DEFAULT_THEME, findTheme, themes, themeTokens, type Theme } from '@/lib/themes'
+import {
+  CUSTOM_THEME,
+  DEFAULT_THEME,
+  findTheme,
+  setCustomTheme,
+  themes,
+  themeTokens,
+  type Theme,
+  type ThemeColours,
+} from '@/lib/themes'
 import { decorativeMotion } from './useMotion'
 import { useViewSwing } from './useViewSwing'
 
 const STORAGE_KEY = 'couvbat:theme'
+/**
+ * A forged scheme's finished colours, with the seed and mode it was grown from. The
+ * colours rather than the seed, so restoring one before mount never needs `forge.ts`
+ * in the entry chunk; and every one of them is checked to be `#rrggbb` on the way back
+ * in, because this is the one stored value that reaches the inline style verbatim.
+ */
+const CUSTOM_KEY = 'couvbat:theme:custom'
+const HEX = /^#[0-9a-f]{6}$/
 /** Matches the `theme-flash` keyframes in main.css. */
 const FLASH_MS = 900
 /** How long a new scheme takes to spread across the page from where it was picked. */
@@ -18,6 +35,8 @@ export interface ThemeOrigin {
 const defaultTheme = findTheme(DEFAULT_THEME)!
 /** Every property any scheme writes — all schemes derive the same set. */
 const TOKEN_NAMES = Object.keys(themeTokens(defaultTheme))
+/** The dozen colours a scheme names, which a stored forge has to carry every one of. */
+const COLOUR_NAMES = Object.keys(defaultTheme.colours) as (keyof ThemeColours)[]
 
 // Module-level, like the locale: one scheme for the whole page, not one per caller.
 const current = ref<Theme>(defaultTheme)
@@ -27,6 +46,8 @@ const current = ref<Theme>(defaultTheme)
  * identity, and a deep ref would hand back a proxy that never matches.
  */
 const shown = shallowRef<Theme | null>(null)
+/** The visitor's forged scheme, mirrored from `lib/themes.ts`'s slot so the menu can list it. */
+const custom = shallowRef<Theme | null>(null)
 
 /** `index.html`'s own `theme-color`, captured before the first override so the
  *  default can put back exactly what shipped. */
@@ -185,19 +206,71 @@ export function previewTheme(id: string): (() => void) | null {
   }
 }
 
+function installCustom(theme: Theme) {
+  setCustomTheme(theme)
+  custom.value = theme
+}
+
+/**
+ * Makes a forged scheme (`forge.ts`) the visitor's `custom` one, saves it, and applies it
+ * like any pick. A second forge replaces the first: there is one slot.
+ */
+export function applyForgedTheme(theme: Theme, options: { origin?: ThemeOrigin } = {}): Theme {
+  const forged: Theme = { ...theme, id: CUSTOM_THEME }
+  installCustom(forged)
+  try {
+    window.localStorage.setItem(
+      CUSTOM_KEY,
+      JSON.stringify({ seed: forged.seed, mode: forged.mode, colours: forged.colours }),
+    )
+  } catch {
+    // As for the choice itself: the forge just won't survive a reload.
+  }
+  return setTheme(CUSTOM_THEME, options)!
+}
+
+/** A stored forge, or null for anything that isn't exactly one: every colour and the
+ *  seed `#rrggbb`, the mode one of the two. Anything tampered with is ignored whole. */
+function readCustom(raw: string | null): Theme | null {
+  if (!raw) return null
+  let data: unknown
+  try {
+    data = JSON.parse(raw)
+  } catch {
+    return null
+  }
+  if (!data || typeof data !== 'object') return null
+  const { seed, mode, colours } = data as Record<string, unknown>
+  if (mode !== 'dark' && mode !== 'light') return null
+  if (typeof seed !== 'string' || !HEX.test(seed)) return null
+  if (!colours || typeof colours !== 'object') return null
+  const checked = {} as ThemeColours
+  for (const name of COLOUR_NAMES) {
+    const value = (colours as Record<string, unknown>)[name]
+    if (typeof value !== 'string' || !HEX.test(value)) return null
+    checked[name] = value
+  }
+  return { id: CUSTOM_THEME, name: 'Custom', mode, colours: checked, seed }
+}
+
 /**
  * Re-applies a saved scheme. Called from `main.ts` before the app mounts, so a
  * returning visitor's first painted frame is already in their colours — and without
- * the flash, which is for the switch, not for every page load after it.
+ * the flash, which is for the switch, not for every page load after it. A forged
+ * scheme is put back in its slot first, so `custom` resolves like any other id.
  */
 export function restoreTheme() {
   if (typeof window === 'undefined') return
   let stored: string | null
+  let forged: string | null
   try {
     stored = window.localStorage.getItem(STORAGE_KEY)
+    forged = window.localStorage.getItem(CUSTOM_KEY)
   } catch {
     return
   }
+  const restored = readCustom(forged)
+  if (restored) installCustom(restored)
   const theme = stored ? findTheme(stored) : undefined
   if (!theme) return
   paint(theme)
@@ -210,7 +283,8 @@ export function useTheme() {
     theme: computed(() => shown.value ?? current.value),
     /** What the visitor picked, whatever a preview is painting over it. */
     chosen: computed(() => current.value),
-    themes,
+    /** Every scheme that can be picked: the eleven that ship, then the visitor's forge. */
+    themes: computed(() => (custom.value ? [...themes, custom.value] : themes)),
     setTheme,
   }
 }
