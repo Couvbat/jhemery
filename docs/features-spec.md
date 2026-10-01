@@ -308,6 +308,13 @@ commit, and the live Steam status if available. `curl <domain>` re-runs `resume`
 this site (or `localhost`), mirroring what a real `curl jhemery.xyz` returns (§7); any other host
 gets `curl: (6) Could not resolve host` and a note that a browser tab cannot open a raw socket.
 
+`why <topic>` (`commands/work.ts`) prints one entry of `content/decisions.ts`: what was chosen,
+each rejected option with its reason in one sentence, any hindsight, the PR, and a link to the
+heading of the doc it came from. A spec is linked as its note on the site, and anything else on
+GitHub at the build's commit (`lib/source.ts`). The doc stays the authority: `decisions.spec.ts`
+fails if an anchor stops matching a heading. An unknown topic gets a "did you mean" from
+`terminal/fuzzy.ts`.
+
 `tour` (`commands/work.ts`) is a paced walk through `TOUR_STOPS`, each a caption and either a
 command run inside it through `ctx.run` or one of three stops that are not commands. Those are a
 scheme shown for three seconds with `previewTheme()`, which saves nothing and is put back however

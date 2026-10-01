@@ -243,6 +243,7 @@ never show two different contents.
 | `neofetch` | `fetch` | System summary with an ASCII logo, an "uptime" counted from the first commit and whether I'm open to work |
 | `resume` | `cv` | Condensed résumé (experience, education, stack, links), with a link to the printable one |
 | `curl` | | `curl jhemery.xyz` fetches the résumé the way a real curl would |
+| `why` | | `why <topic>`: what the site chose, what it turned down and why, the PR, and a link to the design note. `why` alone lists the fifteen topics (`why mcp-sdk`, `why polling`, `why battleship`…) |
 | `tour` | | A one-minute walk through the site: `neofetch`, a colour scheme shown for a moment and put back, the games, the `curl` hint, and how many achievements you've found. `?run=tour` is the link to share |
 
 </details>
