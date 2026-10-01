@@ -23,7 +23,10 @@ export const coreCommands: Command[] = [
     usage: 'help [command] [--all]',
     description: { en: 'List commands, or explain one', fr: 'Lister les commandes' },
     group: 'core',
-    linkable: true,
+    writes: 'none',
+    // Typed, `help --all` and `help vim` are fine. From a link they would hand out the
+    // hidden commands, which is what the link rule exists to stop.
+    linkable: (args) => !args.some((a) => a === '--all' || resolve(a)?.hidden === true),
     palette: true,
     // `completionNames()` and not `allCommands()`: `help vi<Tab>` must not hand
     // out `vim`, for the same reason the command word itself doesn't.
@@ -77,6 +80,7 @@ export const coreCommands: Command[] = [
     aliases: ['cls'],
     description: { en: 'Clear the screen', fr: "Effacer l'écran" },
     group: 'core',
+    writes: 'local',
     run({ clear }) {
       clear()
     },
@@ -85,6 +89,7 @@ export const coreCommands: Command[] = [
     name: 'history',
     description: { en: 'Show command history', fr: "Afficher l'historique" },
     group: 'core',
+    writes: 'none',
     run() {
       const entries = history.value
       if (!entries.length) return [line('(empty)', 'muted')]
@@ -99,6 +104,7 @@ export const coreCommands: Command[] = [
     usage: 'echo <text>',
     description: { en: 'Print a line of text', fr: 'Afficher du texte' },
     group: 'core',
+    writes: 'local',
     run({ args }) {
       return [line(args.join(' '))]
     },
@@ -107,6 +113,7 @@ export const coreCommands: Command[] = [
     name: 'date',
     description: { en: 'Show the current date', fr: 'Afficher la date' },
     group: 'core',
+    writes: 'none',
     run({ locale }) {
       return [line(new Date().toLocaleString(locale === 'fr' ? 'fr-FR' : 'en-GB'))]
     },
@@ -115,6 +122,7 @@ export const coreCommands: Command[] = [
     name: 'whoami',
     description: { en: 'Print the current user', fr: "Afficher l'utilisateur" },
     group: 'core',
+    writes: 'none',
     linkable: true,
     run() {
       return [line(profile.handle, 'primary')]
@@ -125,6 +133,7 @@ export const coreCommands: Command[] = [
     usage: 'lang [en|fr]',
     description: { en: 'Show or switch language', fr: 'Afficher ou changer la langue' },
     group: 'core',
+    writes: (args) => (args[0] ? 'local' : 'none'),
     palette: true,
     complete: ({ index }) => (index === 0 ? ['en', 'fr'] : []),
     run({ args, locale, t }) {
@@ -148,6 +157,7 @@ export const coreCommands: Command[] = [
     usage: "alias [name='command']",
     description: { en: 'Name your own commands', fr: 'Nommer vos propres commandes' },
     group: 'core',
+    writes: 'local',
     hidden: true,
     run({ args, raw, t }) {
       const definition = raw.trim().slice('alias'.length).trim()
@@ -194,6 +204,7 @@ export const coreCommands: Command[] = [
     usage: 'unalias <name>',
     description: { en: 'Remove an alias', fr: 'Supprimer un alias' },
     group: 'core',
+    writes: 'local',
     hidden: true,
     complete: ({ index }) => (index === 0 ? Object.keys(aliases.value) : []),
     run({ args }) {
@@ -209,6 +220,7 @@ export const coreCommands: Command[] = [
     aliases: ['quit', 'logout'],
     description: { en: 'Close the terminal', fr: 'Fermer le terminal' },
     group: 'core',
+    writes: 'none',
     run({ close }) {
       close()
     },

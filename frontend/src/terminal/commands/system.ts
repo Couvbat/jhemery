@@ -85,6 +85,7 @@ export const systemCommands: Command[] = [
     aliases: ['ps aux', 'ps -ef'],
     description: { en: 'Snapshot of running processes', fr: 'Instantané des processus' },
     group: 'fun',
+    writes: 'none',
     hidden: true,
     run() {
       return [line(`USER: ${profile.handle}`, 'muted'), ...table(processes())]
@@ -95,6 +96,7 @@ export const systemCommands: Command[] = [
     aliases: ['htop'],
     description: { en: 'Live-ish process monitor', fr: 'Moniteur de processus en direct' },
     group: 'fun',
+    writes: 'none',
     hidden: true,
     async run(ctx) {
       const frames = prefersReducedMotion() ? 1 : 6
@@ -139,6 +141,7 @@ export const systemCommands: Command[] = [
     aliases: ['printenv', 'export'],
     description: { en: 'Print the environment', fr: "Afficher l'environnement" },
     group: 'fun',
+    writes: 'none',
     hidden: true,
     run({ raw, args, t }) {
       // `export FOO=bar` looks like it should work, so it gets a real answer
@@ -169,6 +172,7 @@ export const systemCommands: Command[] = [
     usage: 'achievements',
     description: { en: 'Your progress finding secrets', fr: 'Votre progression' },
     group: 'fun',
+    writes: 'none',
     linkable: true,
     palette: true,
     run({ t }) {

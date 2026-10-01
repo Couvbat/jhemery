@@ -49,11 +49,26 @@ describe('runLink', () => {
   })
 
   it('never expands the reader’s aliases', async () => {
-    // The reader named something `whoami`-shaped; the link must not reach it.
-    setAlias('who', 'sudo rm -rf /')
-    await runLink('who')
+    // The reader named something; the link must not reach what it expands to.
+    setAlias('gimme', 'sudo rm -rf /')
+    await runLink('gimme')
     expect(texts().join('\n')).not.toContain('rm -rf')
-    expect(buffer.value[0]!.text).toContain('a link asked to run `who`')
+    expect(buffer.value[0]!.text).toContain('a link asked to run `gimme`')
+  })
+
+  // `isLinkable` is checked with the link's arguments, not just the command's flag.
+  it.each(['theme dracula', 'lang fr', 'help vim', 'help --all', 'ls -a', 'wordle share'])(
+    'refuses `%s`, which writes or hands out something hidden',
+    async (line) => {
+      await runLink(line)
+      expect(buffer.value).toHaveLength(1)
+      expect(buffer.value[0]!.text).toContain(`a link asked to run \`${line}\``)
+    },
+  )
+
+  it.each(['whoami', 'help ls', 'ls'])('still runs `%s`', async (line) => {
+    await runLink(line)
+    expect(buffer.value[0]).toMatchObject({ text: line, prompt: true })
   })
 
   it('strips control characters and caps the length', async () => {

@@ -4,12 +4,14 @@ import {
   commonPrefix,
   complete,
   completionNames,
+  isLinkable,
   paletteCommands,
   resolve,
   resolveLink,
   suggest,
   suggestionPool,
   visibleCommands,
+  writesOf,
 } from '../registry'
 
 /**
@@ -195,28 +197,87 @@ describe('suggest', () => {
   })
 })
 
-describe('links (?run=)', () => {
-  /**
-   * A link is written by someone other than the person who clicks it. Anything
-   * that writes on the reader's behalf — to the server, to their settings, to their
-   * shell — must only ever run when they type it.
-   */
-  const WRITERS = ['mail', 'sign', 'sudo', 'alias', 'unalias', 'theme', 'lang', 'flag', 'ask', 'open', 'echo', 'connect4']
+describe('what a command writes', () => {
+  const VALUES = ['none', 'local', 'server']
 
-  it.each(WRITERS)('never lets a link run `%s`', (name) => {
-    const command = resolve(name)
-    expect(command, `${name} is not registered`).toBeDefined()
-    expect(command!.linkable, `${name} is linkable`).toBeFalsy()
-  })
-
-  it('never lets a link run a hidden command — that would hand out an easter egg', () => {
-    for (const command of allCommands().filter((c) => c.linkable)) {
-      expect(command.hidden, `${command.name} is linkable and hidden`).toBeFalsy()
+  it('is declared by every command, as one of the three values', () => {
+    for (const command of allCommands()) {
+      for (const args of [[], ['x'], ['reset'], ['share'], ['-d']]) {
+        expect(VALUES, `${command.name} ${args.join(' ')}`).toContain(writesOf(command, args))
+      }
     }
   })
 
+  // Pinned, so a writer quietly downgraded to `none` fails here rather than becoming
+  // linkable. Each line is a reason a link must not run the command.
+  it.each([
+    ['sign', ['hi'], 'server'],
+    ['mail', [], 'server'],
+    ['ask', ['who'], 'server'],
+    ['sudo', [], 'server'],
+    ['connect4', [], 'server'],
+    ['echo', ['hi'], 'local'],
+    ['banner', ['hi'], 'local'],
+    ['theme', ['dracula'], 'local'],
+    ['lang', ['fr'], 'local'],
+    ['alias', ["x='ls'"], 'local'],
+    ['unalias', ['x'], 'local'],
+    ['open', ['github'], 'local'],
+    ['play', [], 'local'],
+    ['crt', [], 'local'],
+    ['vim', [], 'local'],
+    [':q', [], 'local'],
+    ['flag', ['CTF{x}'], 'local'],
+    ['decrypt', [], 'local'],
+    ['wordle', ['share'], 'local'],
+    ['base64', ['-d', 'aGk='], 'local'],
+    ['base64', ['--decode', 'aGk='], 'local'],
+    ['jq', ['.', '{}'], 'local'],
+    ['clear', [], 'local'],
+    ['scene', ['reset'], 'local'],
+  ] as const)('%s %j writes %s', (name, args, expected) => {
+    expect(writesOf(resolve(name)!, args)).toBe(expected)
+  })
+
+  it.each([
+    ['theme', []],
+    ['lang', []],
+    ['wordle', []],
+    ['wordle', ['daily']],
+    ['base64', ['hi']],
+    ['scene', []],
+  ] as const)('%s %j only reads', (name, args) => {
+    expect(writesOf(resolve(name)!, args)).toBe('none')
+  })
+})
+
+describe('links (?run=)', () => {
+  /**
+   * A link is written by someone other than the person who clicks it. `isLinkable` is
+   * the one test: opted in, not hidden, and writing nothing, for these arguments.
+   */
+  it('never lets a link run anything that writes, or anything hidden', () => {
+    for (const command of allCommands()) {
+      for (const args of [[], ['x']]) {
+        if (!isLinkable(command, args)) continue
+        expect(writesOf(command, args), command.name).toBe('none')
+        expect(command.hidden, `${command.name} is linkable and hidden`).toBeFalsy()
+      }
+    }
+  })
+
+  it('refuses the arguments that would hand out something hidden', () => {
+    expect(isLinkable(resolve('help')!, [])).toBe(true)
+    expect(isLinkable(resolve('help')!, ['ls'])).toBe(true)
+    expect(isLinkable(resolve('help')!, ['vim'])).toBe(false)
+    expect(isLinkable(resolve('help')!, ['--all'])).toBe(false)
+    expect(isLinkable(resolve('ls')!, [])).toBe(true)
+    expect(isLinkable(resolve('ls')!, ['-a'])).toBe(false)
+    expect(isLinkable(resolve('ls')!, ['-la', 'about'])).toBe(false)
+  })
+
   it('has something worth linking to', () => {
-    expect(allCommands().filter((c) => c.linkable).map((c) => c.name)).toEqual(
+    expect(allCommands().filter((c) => isLinkable(c)).map((c) => c.name)).toEqual(
       expect.arrayContaining(['neofetch', 'projects', 'wordle', 'ctf']),
     )
   })

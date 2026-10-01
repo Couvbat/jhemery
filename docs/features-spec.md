@@ -97,8 +97,10 @@ interface Command {
   usage?: string
   description: Localised<string>
   group: 'core' | 'navigate' | 'content' | 'live' | 'fun'
+  writes: Writes | ((args) => Writes)   // 'none' | 'local' | 'server' — see below
   hidden?: boolean       // excluded from help + completion, still runnable
   palette?: boolean      // surfaced in the Ctrl+K palette
+  linkable?: boolean | ((args) => boolean)   // worth running from a ?run= link
   complete?(ctx: CompleteContext): string[]   // Tab candidates for its arguments
   run(ctx: CommandContext): OutputLine[] | void | Promise<OutputLine[] | void>
 }
@@ -195,9 +197,17 @@ submitted or copied. The first keystroke stops it for the session; reduced motio
 `?run=<command>` is read once the router is ready, at the launcher's `md` breakpoint only, removed
 with `router.replace`, and handed to the lazy chunk through `pendingLinkCommand` — kept apart from
 `pendingInitialCommand`, which only this site's own buttons set. The command must opt in with
-`linkable` on `Command`; it is resolved with `resolveLink()`, which never expands the reader's
-aliases, and executed directly rather than through `run()`. A refused link prints what it asked
-for. `registry.spec.ts` holds that nothing that writes and nothing hidden is linkable.
+`linkable` on `Command`, and then pass `isLinkable(command, args)`: not hidden, and `writes` is
+`none` *for those arguments*. `writes` is required on every command. `none` reads, though it may
+record the visitor's own progress (achievements, scores, the daily board and its one report).
+`local` changes something the visitor would have to put back (a setting, the scene, the shell, a
+CTF capture), acts outside the page (a tab, the clipboard, sound), or prints link-supplied text as
+its output. `server` sends anything but a GET. It can be a function of the arguments: `theme`
+lists, `theme dracula` writes. `linkable` can be a predicate too, for arguments that would hand
+out something hidden: `help vim`, `help --all`, `ls -a`. The command is resolved with
+`resolveLink()`, which never expands the reader's aliases, and executed directly rather than
+through `run()`. A refused link prints what it asked for. `registry.spec.ts` pins which commands
+write what, so a writer can't be downgraded to `none` without a test noticing.
 
 ---
 

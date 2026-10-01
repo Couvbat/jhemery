@@ -7,6 +7,7 @@ import {
   commonPrefix,
   completeCommand,
   filterByPrefix,
+  isLinkable,
   resolve,
   resolveLink,
   suggest,
@@ -288,8 +289,8 @@ export async function submit(value: string): Promise<void> {
 const LINK_MAX = 200
 
 /**
- * Runs a command a `?run=` link asked for — once, and only if the command opted in
- * (`linkable`). It is echoed as if typed, so the reader sees exactly what ran, and
+ * Runs a command a `?run=` link asked for — once, and only if `isLinkable()` says so
+ * for these arguments: opted in, not hidden, writes nothing. It is echoed as if typed, so the reader sees exactly what ran, and
  * executed directly rather than through `run()`: that would expand the reader's own
  * aliases, which a link's author must not be able to reach.
  */
@@ -301,7 +302,7 @@ export async function runLink(input: string): Promise<void> {
   if (!line) return
 
   const target = resolveLink(line)
-  if (!target?.command.linkable) {
+  if (!target || !isLinkable(target.command, target.args)) {
     append({
       text: messages.terminal.linkRefused[currentLocale()].replace('{command}', line),
       tone: 'warning',

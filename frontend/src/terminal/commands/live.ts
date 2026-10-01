@@ -107,6 +107,7 @@ export const liveCommands: Command[] = [
     aliases: ['playing'],
     description: { en: 'Live Steam activity', fr: 'Activité Steam en direct' },
     group: 'live',
+    writes: 'none',
     linkable: true,
     palette: true,
     async run({ print, t }) {
@@ -148,6 +149,7 @@ export const liveCommands: Command[] = [
     aliases: ['git log', 'commits'],
     description: { en: 'Recent public commits', fr: 'Commits publics récents' },
     group: 'live',
+    writes: 'none',
     linkable: true,
     palette: true,
     async run({ print }) {
@@ -171,6 +173,7 @@ export const liveCommands: Command[] = [
     aliases: ['wttr'],
     description: { en: 'Current conditions where I am', fr: 'La météo là où je suis' },
     group: 'live',
+    writes: 'none',
     linkable: true,
     palette: true,
     async run({ print, t }) {
@@ -194,6 +197,7 @@ export const liveCommands: Command[] = [
     aliases: ['stonks', 'crypto'],
     description: { en: 'Crypto prices, 7-day trend', fr: 'Cours crypto, tendance 7 jours' },
     group: 'live',
+    writes: 'none',
     linkable: true,
     palette: true,
     async run({ print, t }) {
@@ -235,6 +239,7 @@ export const liveCommands: Command[] = [
     aliases: ['gb'],
     description: { en: 'Read what visitors left', fr: 'Lire les messages des visiteurs' },
     group: 'live',
+    writes: 'none',
     linkable: true,
     palette: true,
     async run({ print }) {
@@ -272,6 +277,7 @@ export const liveCommands: Command[] = [
     usage: 'sign <message>',
     description: { en: 'Leave a message in the guestbook', fr: 'Laisser un message' },
     group: 'live',
+    writes: 'server',
     async run({ args, prompt, print, t }) {
       const message = args.join(' ').trim()
       if (!message) return [line('sign: usage — sign <message>', 'error')]
@@ -294,6 +300,7 @@ export const liveCommands: Command[] = [
     aliases: ['sendmail', 'write'],
     description: { en: 'Send me a message', fr: 'M’envoyer un message' },
     group: 'live',
+    writes: 'server',
     palette: true,
     async run({ prompt, print, t }) {
       print([

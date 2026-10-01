@@ -83,6 +83,7 @@ export const command: Command = {
   aliases: ['typing'],
   description: { en: 'Typing test', fr: 'Test de frappe' },
   group: 'fun',
+  writes: 'none',
   linkable: true,
   run: (ctx: CommandContext) =>
     play(ctx, 'wpm', async (session) => {

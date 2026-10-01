@@ -156,6 +156,7 @@ export const eggCommands: Command[] = [
     usage: 'sudo <command>',
     description: { en: 'Execute as superuser', fr: 'Exécuter en superutilisateur' },
     group: 'fun',
+    writes: 'server',
     hidden: true,
     async run(ctx) {
       const rest = ctx.args.join(' ')
@@ -206,6 +207,7 @@ export const eggCommands: Command[] = [
     name: 'matrix',
     description: { en: 'Follow the white rabbit', fr: 'Suivre le lapin blanc' },
     group: 'fun',
+    writes: 'none',
     hidden: true,
     run({ effects, close, t }) {
       const toast = announce('matrix', t)
@@ -221,6 +223,7 @@ export const eggCommands: Command[] = [
     aliases: ['restart'],
     description: { en: 'Replay the boot sequence', fr: 'Rejouer la séquence de démarrage' },
     group: 'fun',
+    writes: 'none',
     hidden: true,
     run({ effects, close, t }) {
       const toast = announce('reboot', t)
@@ -236,6 +239,7 @@ export const eggCommands: Command[] = [
     usage: `ssh ${profile.handle}@${profile.domain}`,
     description: { en: 'Connect to the host', fr: "Se connecter à l'hôte" },
     group: 'fun',
+    writes: 'none',
     hidden: true,
     complete: ({ index }) =>
       index === 0
@@ -290,6 +294,7 @@ export const eggCommands: Command[] = [
     usage: `whois ${profile.domain}`,
     description: { en: 'Look up a domain record', fr: 'Consulter un enregistrement de domaine' },
     group: 'fun',
+    writes: 'none',
     hidden: true,
     complete: ({ index }) => (index === 0 ? [profile.domain, profile.handle] : []),
     run({ args }) {
@@ -316,6 +321,7 @@ export const eggCommands: Command[] = [
     name: 'crt',
     description: { en: 'Toggle CRT overdrive', fr: 'Basculer le mode CRT' },
     group: 'fun',
+    writes: 'local',
     hidden: true,
     run({ effects, t }) {
       const enabled = effects.crt()
@@ -330,6 +336,7 @@ export const eggCommands: Command[] = [
     aliases: ['vi', 'nvim', 'emacs'],
     description: { en: 'Open the editor', fr: "Ouvrir l'éditeur" },
     group: 'fun',
+    writes: 'local',
     hidden: true,
     complete: ({ index }) => (index === 0 ? listFiles() : []),
     run(ctx) {
@@ -358,6 +365,7 @@ export const eggCommands: Command[] = [
     aliases: [':q!', ':quit', ':quit!', ':wq', ':wq!', ':x'],
     description: { en: 'Escape', fr: 'Sortir' },
     group: 'fun',
+    writes: 'local',
     hidden: true,
     run({ effects, raw, t }) {
       const cmd = raw.trim()
@@ -390,6 +398,7 @@ export const eggCommands: Command[] = [
     usage: 'hack [target]',
     description: { en: 'Breach the mainframe', fr: 'Pirater le mainframe' },
     group: 'fun',
+    writes: 'none',
     hidden: true,
     async run(ctx) {
       const target = ctx.args[0] ?? 'mainframe'
@@ -426,6 +435,7 @@ export const eggCommands: Command[] = [
     aliases: ['brew'],
     description: { en: 'Brew a coffee', fr: 'Préparer un café' },
     group: 'fun',
+    writes: 'none',
     hidden: true,
     run({ t }) {
       return [
@@ -439,6 +449,7 @@ export const eggCommands: Command[] = [
     name: 'play',
     description: { en: 'Play my music', fr: 'Lancer ma musique' },
     group: 'fun',
+    writes: 'local',
     palette: true,
     run({ effects, close }) {
       effects.playMusic()
@@ -450,6 +461,7 @@ export const eggCommands: Command[] = [
     usage: 'cowsay <text>',
     description: { en: 'A cow says something', fr: 'Une vache parle' },
     group: 'fun',
+    writes: 'local',
     hidden: true,
     run({ args, t }) {
       const text = args.join(' ') || 'moo'
@@ -478,6 +490,7 @@ export const eggCommands: Command[] = [
     name: 'fortune',
     description: { en: 'A dubious aphorism', fr: 'Un aphorisme douteux' },
     group: 'fun',
+    writes: 'none',
     hidden: true,
     run({ t }) {
       return [
@@ -490,6 +503,7 @@ export const eggCommands: Command[] = [
     name: 'sl',
     description: { en: 'You meant ls', fr: 'Vous vouliez dire ls' },
     group: 'fun',
+    writes: 'none',
     hidden: true,
     async run(ctx) {
       const rows = TRAIN.split('\n')
@@ -511,6 +525,7 @@ export const eggCommands: Command[] = [
     name: 'rickroll',
     description: { en: 'Do not', fr: 'Ne faites pas ça' },
     group: 'fun',
+    writes: 'local',
     hidden: true,
     async run({ prompt, t }) {
       const answer = (await prompt('this will open a video. are you sure? [y/N]')).toLowerCase()
@@ -526,6 +541,7 @@ export const eggCommands: Command[] = [
     usage: 'banner <text>',
     description: { en: 'Say it in block letters', fr: 'Le dire en grosses lettres' },
     group: 'fun',
+    writes: 'local',
     hidden: true,
     run({ args, t }) {
       const text = args.join(' ')
@@ -548,6 +564,7 @@ export const eggCommands: Command[] = [
     usage: 'gravity [on|off]',
     description: { en: 'Toggle the background pull', fr: "Basculer l'attraction du fond" },
     group: 'fun',
+    writes: 'local',
     hidden: true,
     complete: ({ index }) => (index === 0 ? ['on', 'off'] : []),
     run({ args, t }) {
@@ -569,6 +586,7 @@ export const eggCommands: Command[] = [
     usage: 'spawn [count]',
     description: { en: 'Add shapes to the background', fr: 'Ajouter des formes au fond' },
     group: 'fun',
+    writes: 'local',
     hidden: true,
     run({ args }) {
       const requested = args[0] ? Number(args[0]) : 1
@@ -597,6 +615,7 @@ export const eggCommands: Command[] = [
     usage: 'constellation [on|off]',
     description: { en: 'Connect the dots', fr: 'Relier les points' },
     group: 'fun',
+    writes: 'local',
     hidden: true,
     complete: ({ index }) => (index === 0 ? ['on', 'off'] : []),
     run({ args, t }) {
@@ -617,6 +636,7 @@ export const eggCommands: Command[] = [
     usage: 'scene [reset]',
     description: { en: 'Inspect or reset the background', fr: 'Inspecter ou réinitialiser le fond' },
     group: 'fun',
+    writes: (args) => (args[0]?.toLowerCase() === 'reset' ? 'local' : 'none'),
     hidden: true,
     complete: ({ index }) => (index === 0 ? ['reset'] : []),
     run({ args }) {
@@ -641,6 +661,7 @@ export const eggCommands: Command[] = [
     name: 'uname',
     description: { en: 'System name', fr: 'Nom du système' },
     group: 'fun',
+    writes: 'none',
     hidden: true,
     run() {
       return [line(`couvsh 1.0 ${profile.domain} x86_64 GNU/Portfolio`, 'muted')]

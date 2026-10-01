@@ -169,9 +169,11 @@ An empty prompt suggests a command in faded text (`try: neofetch`), cycling ever
 until you type anything, and then not again that session. Under reduced motion it shows one.
 
 **Links that run a command.** `https://jhemery.xyz/?run=neofetch` opens the shell and runs
-`neofetch` once, then drops the parameter from the URL. A command has to opt in (`linkable` in the
-registry), and anything that writes (`mail`, `sign`, `theme`, `alias`, `connect4`…) or is hidden
-never does; a refused link says what it asked for. It ignores your own aliases, and on a phone
+`neofetch` once, then drops the parameter from the URL. A command has to opt in (`linkable`), and
+even then a link only runs it if, with those arguments, it writes nothing and isn't hidden. Every
+command declares what it writes (`none`, `local` or `server`), so `?run=theme dracula`,
+`?run=sign hi`, `?run=help vim` and `?run=ls -a` are all refused; a refused link says what it
+asked for. It ignores your own aliases, and on a phone
 the parameter is simply ignored.
 
 An unknown command gets a "did you mean …?" suggestion when it is one edit away (a swapped pair of

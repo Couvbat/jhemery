@@ -336,6 +336,7 @@ export const command: Command = {
   usage: 'wordle [daily|share]',
   description: { en: 'Guess the five-letter word', fr: 'Devinez le mot de cinq lettres' },
   group: 'fun',
+  writes: (args) => (args[0]?.toLowerCase() === 'share' ? 'local' : 'none'),
   linkable: true,
   complete: ({ index }) => (index === 0 ? ['daily', 'share'] : []),
   run: (ctx: CommandContext) => {

@@ -1,4 +1,4 @@
-import type { Command } from './types'
+import type { Command, Writes } from './types'
 import { aliases } from './aliases'
 import { collectCommands } from './commands'
 
@@ -39,6 +39,22 @@ export function paletteCommands(): Command[] {
 
 export function resolve(name: string): Command | undefined {
   return registry().byName.get(name.toLowerCase())
+}
+
+/** What `command` changes when run with `args`. */
+export function writesOf(command: Command, args: readonly string[] = []): Writes {
+  return typeof command.writes === 'function' ? command.writes(args) : command.writes
+}
+
+/**
+ * Whether `command`, with these arguments, may run without the visitor typing it: it
+ * opted in, it isn't hidden, and it writes nothing. The one test `runLink`, `tour`, pipe
+ * stages and `strace` all use, so none of them keeps its own list of writers.
+ */
+export function isLinkable(command: Command, args: readonly string[] = []): boolean {
+  if (command.hidden) return false
+  const opted = typeof command.linkable === 'function' ? command.linkable(args) : command.linkable === true
+  return opted && writesOf(command, args) === 'none'
 }
 
 /**

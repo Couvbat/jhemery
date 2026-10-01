@@ -103,13 +103,16 @@ content strings in `src/content/`. Facts (tech names, URLs, specs) stay plain st
 `src/terminal/commands/*.ts` each export an array of `Command` objects; `commands/index.ts`
 concatenates them and `registry.ts` builds the name/alias map — on first use, because the registry
 and the command modules import each other: never call a registry function at a command module's
-top level (`registry-load.spec.ts` and `src/__tests__/import-cycles.spec.ts` will fail). Adding a command means adding one
-object — never a special case in the shell. A `Command` declares its own `hidden` (out of `help`
-and Tab), `palette` (in Ctrl+K), `linkable` (may run from a `?run=` link), `group`, and
-`complete(ctx)` for argument completion; the shell handles prefix filtering, common-prefix
-insertion and ambiguity listing generically. `linkable` is opt-in because a link's author is not
-the person clicking it: `registry.spec.ts` fails if anything that writes (to the server, settings
-or the shell) or anything hidden sets it.
+top level (`registry-load.spec.ts` and `src/__tests__/import-cycles.spec.ts` will fail). Adding a
+command means adding one object — never a special case in the shell. A `Command` declares its own
+`writes` (required: `none`, `local` or `server`, or a function of the arguments — see `Writes` in
+`types.ts`), `hidden` (out of `help` and Tab), `palette` (in Ctrl+K), `linkable` (worth running
+from a `?run=` link, optionally a predicate of the arguments), `group`, and `complete(ctx)` for
+argument completion; the shell handles prefix filtering, common-prefix insertion and ambiguity
+listing generically. Anything that runs a command the visitor didn't type — a link, `tour`, a
+pipe stage — asks `isLinkable(command, args)`: opted in, not hidden, writes `none`. Read `writes`
+through `writesOf()`; `registry.spec.ts` pins the classification so a writer can't be quietly
+downgraded.
 
 `CommandContext` (in `terminal/types.ts`) is the whole capability surface a command gets: `print`,
 `frame()` for redrawable animation regions, `capture()` for holding the keyboard (how the games

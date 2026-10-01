@@ -42,6 +42,7 @@ export const contentCommands: Command[] = [
     aliases: ['bio'],
     description: { en: 'Who I am', fr: 'Qui je suis' },
     group: 'content',
+    writes: 'none',
     linkable: true,
     palette: true,
     run({ t }) {
@@ -62,6 +63,7 @@ export const contentCommands: Command[] = [
     usage: 'skills [--why]',
     description: { en: 'Tech I work with', fr: "Technos que j'utilise" },
     group: 'content',
+    writes: 'none',
     linkable: true,
     palette: true,
     complete: ({ index }) => (index === 0 ? ['--why'] : []),
@@ -111,6 +113,7 @@ export const contentCommands: Command[] = [
     usage: 'projects [--json]',
     description: { en: 'What I have built', fr: "Ce que j'ai construit" },
     group: 'content',
+    writes: 'none',
     linkable: true,
     palette: true,
     run({ args, t }) {
@@ -142,6 +145,7 @@ export const contentCommands: Command[] = [
     name: 'music',
     description: { en: 'What I produce', fr: 'Ce que je produis' },
     group: 'content',
+    writes: 'none',
     linkable: true,
     palette: true,
     run({ t }) {
@@ -166,6 +170,7 @@ export const contentCommands: Command[] = [
     // terminal that has games in it should answer. The listing points back here.
     description: { en: 'What I play', fr: 'Ce que je joue' },
     group: 'content',
+    writes: 'none',
     linkable: true,
     palette: true,
     run({ t }) {
@@ -185,6 +190,7 @@ export const contentCommands: Command[] = [
     usage: 'hardware [pc|nas|peripherals]',
     description: { en: 'My machines', fr: 'Mes machines' },
     group: 'content',
+    writes: 'none',
     linkable: true,
     palette: true,
     run({ args }) {
@@ -216,6 +222,7 @@ export const contentCommands: Command[] = [
     aliases: ['links'],
     description: { en: 'How to reach me', fr: 'Comment me joindre' },
     group: 'content',
+    writes: 'none',
     linkable: true,
     palette: true,
     run({ t }) {
@@ -237,6 +244,7 @@ export const contentCommands: Command[] = [
     aliases: ['fetch'],
     description: { en: 'System summary', fr: 'Résumé système' },
     group: 'content',
+    writes: 'none',
     linkable: true,
     palette: true,
     run({ t, locale }) {
@@ -305,6 +313,7 @@ export const contentCommands: Command[] = [
     aliases: ['cv'],
     description: { en: 'Condensed résumé', fr: 'CV condensé' },
     group: 'content',
+    writes: 'none',
     linkable: true,
     palette: true,
     run({ t, locale }) {
@@ -348,6 +357,7 @@ export const contentCommands: Command[] = [
       fr: 'Récupérer le CV (comme un vrai curl)',
     },
     group: 'content',
+    writes: 'none',
     linkable: true,
     palette: true,
     async run(ctx) {
