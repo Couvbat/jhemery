@@ -8,8 +8,12 @@
 
 ## Profile
 
+- [Home](https://jhemery.xyz/): The site itself, with a terminal on every page
 - [About](https://jhemery.xyz/#about): Bio, languages spoken, background
 - [Plain-text résumé](https://jhemery.xyz/resume.txt): Full CV as plain text — also what `curl jhemery.xyz` returns
+- [Printable résumé](https://jhemery.xyz/resume.html): The CV as a static page, also in [French](https://jhemery.xyz/resume.fr.html)
+- [Now](https://jhemery.xyz/now): What Jules is doing at the moment, dated
+- [Site content as JSON](https://jhemery.xyz/content.json): Profile, experience, education, skills and projects as data
 - [Contact](https://jhemery.xyz/#contact): Contact form and direct email/social links
 
 ## Projects
@@ -22,9 +26,26 @@
 - [LinkedIn](https://www.linkedin.com/in/jules-h%C3%A9mery-338134195/)
 - [SoundCloud](https://soundcloud.com/couvbat): Music production — hardcore, techno, acidcore
 
+## Tools
+
+- [Tools](https://jhemery.xyz/tools): Small utilities that run in the browser
+- [Image converter](https://jhemery.xyz/tools/image): PNG, JPEG or WebP — resize, recompress, and drop the metadata
+- [Hash & checksum](https://jhemery.xyz/tools/hash): SHA-1, SHA-256 or SHA-512 of a text or a file
+- [Encode & decode](https://jhemery.xyz/tools/encode): Base64, URL encoding and hex, both ways
+- [JSON formatter](https://jhemery.xyz/tools/json): Pretty-print or minify, and point at the error when it is not JSON
+- [Colour converter](https://jhemery.xyz/tools/colour): hex, rgb, hsl and oklch, plus WCAG contrast against the site palette
+- [Time converter](https://jhemery.xyz/tools/time): Epoch, ISO 8601, your zone and eight others, relative time, ISO week
+- [Password generator](https://jhemery.xyz/tools/password): Random passwords, or passphrases from the word games’ lists, with the entropy shown
+- [Text tools](https://jhemery.xyz/tools/text): Word, character and line counts, reading time, and every case conversion
+- [JWT decoder](https://jhemery.xyz/tools/jwt): Header, payload and the expiry as dates — decoded, never verified, never asks for a secret
+- [Regex tester](https://jhemery.xyz/tools/regex): Matches and groups highlighted as you type, in a worker that gives up after a second
+- [Cron explainer](https://jhemery.xyz/tools/cron): A cron expression as a sentence, and its next five runs in your time zone
+- [QR code](https://jhemery.xyz/tools/qr): Text or a URL as a QR code, as PNG or SVG — encoded here, from the standard
+- [Text diff](https://jhemery.xyz/tools/diff): Two texts and a unified diff, from the same code as the terminal’s `diff`
+- [Audio & video converter](https://jhemery.xyz/tools/ffmpeg): mp3, m4a, ogg, wav, flac, mp4 or gif; trim; extract audio without re-encoding. ffmpeg in WebAssembly, 32 MB on first use
+
 ## Optional
 
-- [Tools](https://jhemery.xyz/tools): Small utilities that run in the browser — image conversion, hashes, encoders, a JSON formatter
 - [Watch party](https://jhemery.xyz/watch): Watch a YouTube video in sync with friends — one room code, the host drives, everyone follows
 - [Radio](https://jhemery.xyz/radio): A shared SoundCloud queue, one track at a time, everyone hearing the same second
 - [Hardware](https://jhemery.xyz/#hardware): PCs, NAS and peripherals
