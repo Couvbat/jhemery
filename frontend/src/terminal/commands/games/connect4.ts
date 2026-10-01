@@ -164,6 +164,7 @@ export const command: Command = {
     fr: 'Puissance 4 contre un autre visiteur, avec un code de salle',
   },
   group: 'fun',
+  writes: 'server',
   run: (ctx: CommandContext) =>
     play(ctx, 'connect4', async (session) => {
       const { t } = ctx

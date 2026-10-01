@@ -141,6 +141,8 @@ Each app has its own README for working on its code:
 | **Skills with evidence** | Under the skill badges, `skills --why` links each claim to where it's actually used: SSE to the presence stream and the watch parties, WebAssembly to the ffmpeg tool, GraphQL to the heatmap. Skills with nothing to show stay plain badges. |
 | **`/now`** | What I'm doing at the moment, dated. Past 90 days old, the page says how old it is instead of passing for current. It's also `cat now.txt`, and it's a route outside the prism so the navbar stays at four faces. |
 | **Printable résumé** | `/resume.html` and `/resume.fr.html`: static, script-free, with a print stylesheet, so "Save as PDF" gives a clean CV. Linked from the contact section and `resume`. |
+| **Case studies** | `/work/<part>`: eight parts of this site, from the vim pane and the QR encoder to the rooms and the word lists. Each has what was hard, its numbers, the code at the build's commit and its design, and most have a *try it* link and the `why` behind them. They're linked from a "How this site is built" grid in the projects section, and say the same as `projects <part>`. A test holds every number to the line of code it comes from, or marks it as measured. |
+| **Design notes** | [`/notes/`](https://jhemery.xyz/notes/): the design specs in `docs/superpowers/specs`, published as static, script-free pages by a small hand-written markdown renderer. Each one says which language it is in (one is French). `why` links into them. |
 | **Live presence** | The footer also shows how many people are on the site right now, over SSE. It's a single count and nothing else (see [the API](#the-api)). |
 | **Live cards** | Steam "currently playing", recent GitHub commits, the latest CI runs, a contribution heatmap and pinned repos, a SoundCloud player and the guestbook. |
 | **Guestbook ticker** | A 20 s poll (not SSE; see [the spec](docs/features-spec.md#8-backend-additions)) shows a floating notice when someone signs while you're on the page. Clicking it opens `guestbook`. It pauses while the tab is hidden and stops if the guestbook is off. |
@@ -169,9 +171,12 @@ An empty prompt suggests a command in faded text (`try: neofetch`), cycling ever
 until you type anything, and then not again that session. Under reduced motion it shows one.
 
 **Links that run a command.** `https://jhemery.xyz/?run=neofetch` opens the shell and runs
-`neofetch` once, then drops the parameter from the URL. A command has to opt in (`linkable` in the
-registry), and anything that writes (`mail`, `sign`, `theme`, `alias`, `connect4`…) or is hidden
-never does; a refused link says what it asked for. It ignores your own aliases, and on a phone
+`neofetch` once (`?run=tour` is the one to put in a bio), then drops the parameter from the URL. A command has to opt in (`linkable`), and
+even then a link only runs it if, with those arguments, it writes nothing and isn't hidden. Every
+command declares what it writes (`none`, `local` or `server`), so `?run=theme dracula`,
+`?run=sign hi`, `?run=help vim` and `?run=ls -a` are all refused. A link's arguments must be ones
+the command offers for Tab (`?run=wordle daily`, `?run=projects --json`), so a link can't put
+free text on the screen as if you'd typed it. A refused link says what it asked for. It ignores your own aliases, and on a phone
 the parameter is simply ignored.
 
 An unknown command gets a "did you mean …?" suggestion when it is one edit away (a swapped pair of
@@ -181,7 +186,8 @@ listed here". `help --all` reveals the hidden ones.
 
 **vim.** `vim` (or `vi`, `nvim`, `emacs`) opens a real modal editor pane with normal and insert
 modes, `hjkl` and the arrows, `i`/`a`/`A`/`o`, `x` and `dd`. And yes, `:q!` gets you out. `:q`
-refuses once you've typed something, just like the real thing. The red title-bar dot always works
+refuses once you've typed something, just like the real thing (and at the prompt, with no vim
+open, it only notes the reflex). The red title-bar dot always works
 if you'd rather not play along. `cat` and `vim` read from the same fake filesystem, so a file can
 never show two different contents.
 
@@ -213,11 +219,11 @@ never show two different contents.
 
 | Command | Usage |
 |---|---|
-| `ls` | `ls [-a] [path]`: list sections, pages and files (`-a` shows more than you were meant to see). `ls tools` lists the tools |
+| `ls` | `ls [-a] [path]`: list sections, pages and files (`-a` shows more than you were meant to see). `ls tools` lists the tools, and `ls projects` the case studies |
 | `cd` | `cd <section>` scrolls there, routing home first if you're on another page. `cd tools` and `cd tools/<tool>` open the tools page or a single tool. `cd watch/<code>` and `cd radio/<code>` join a room. `cd`, `cd ~` and `cd /` go home |
 | `pwd` | Print where you are: `/home/couvbat/projects` on the page, `/home/couvbat/tools/image` with a tool open, `/home/couvbat/watch/AB3DE` in a room |
 | `tools` | `tools [<tool>]`: list the tools with their descriptions, or open one |
-| `cat` | `cat <file>`: `about.txt`, `skills.txt`, `contact.txt`, `now.txt`, guestbook entries, … |
+| `cat` | `cat <file>`: `about.txt`, `skills.txt`, `contact.txt`, `now.txt`, `projects/<part>.md`, guestbook entries, … |
 | `diff` | `diff <file> <file>`: unified line diff of any two files in the fake filesystem |
 | `ping` | `ping <section\|page>`: four fake round trips, then it actually goes there |
 | `open` | `open <github\|linkedin\|soundcloud\|steam\|email>` |
@@ -231,7 +237,7 @@ never show two different contents.
 |---|---|---|
 | `about` | `bio` | Who I am |
 | `skills` | | Tech I work with. `skills --why` shows where each one is used |
-| `projects` | | What I've built. `projects --json` gives a machine-readable version |
+| `projects` | | What I've built. `projects <part>` reads one case study of the site (`projects qr`, `projects rooms`…), and `projects --json` gives a machine-readable version |
 | `music` | | What I produce |
 | `gaming` | | What I play |
 | `hardware` | | `hardware [pc\|nas\|peripherals]` |
@@ -239,6 +245,8 @@ never show two different contents.
 | `neofetch` | `fetch` | System summary with an ASCII logo, an "uptime" counted from the first commit and whether I'm open to work |
 | `resume` | `cv` | Condensed résumé (experience, education, stack, links), with a link to the printable one |
 | `curl` | | `curl jhemery.xyz` fetches the résumé the way a real curl would |
+| `why` | | `why <topic>`: what the site chose, what it turned down and why, the PR, and a link to the design note. `why` alone lists the fifteen topics (`why mcp-sdk`, `why polling`, `why battleship`…) |
+| `tour` | | A one-minute walk through the site: `neofetch`, a colour scheme shown for a moment and put back, the games, the `curl` hint, and how many achievements you've found. `?run=tour` is the link to share |
 
 </details>
 
@@ -282,7 +290,8 @@ never show two different contents.
 `unalias`, `gravity`, `spawn`, `constellation`, `scene`, and the CTF's `flag` and `decrypt`.
 
 `alias gl='git log'` names your own commands, saved in `localStorage`. `unalias <name>` removes
-one.
+one. An alias can't take a command's name, and if a later version of the site adds a command with
+the name of one you saved, the command wins and `alias` marks yours as shadowed.
 
 Two files never appear in a plain `ls`: `.secret`, and a `.env` full of credentials that are as
 fake as they look. `ls -a` lists both, and `cat` and `vim` can read them.
@@ -510,7 +519,7 @@ This is a personal site, but the workflow is written down so it stays consistent
 | [docs/features-spec.md](docs/features-spec.md) | The design reference for the system as built: terminal core, commands, easter eggs, achievements, background, backend routes, accessibility, views and tools. Code comments cite it by section number. |
 | [docs/roadmap.md](docs/roadmap.md) | The feature tracker: what was brainstormed, what shipped in which PR, known issues, and what was dropped. |
 | [docs/deploy.md](docs/deploy.md) | o2switch/cPanel setup, GitHub secrets and variables, the Apache config, analytics, the downloader's server requirements, and troubleshooting notes from production. |
-| [docs/superpowers/](docs/superpowers/) | Per-feature design specs and implementation plans, each with a status line and the PR it shipped in. Kept as a record of the reasoning behind each change. |
+| [docs/superpowers/](docs/superpowers/) | Per-feature design specs and implementation plans, each with a status line and the PR it shipped in. Kept as a record of the reasoning behind each change. The specs are also on the site, at [/notes/](https://jhemery.xyz/notes/). |
 
 ## Word lists and attribution
 

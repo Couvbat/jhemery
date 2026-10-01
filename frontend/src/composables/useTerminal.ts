@@ -7,6 +7,7 @@ import {
   commonPrefix,
   completeCommand,
   filterByPrefix,
+  isLinkable,
   resolve,
   resolveLink,
   suggest,
@@ -112,6 +113,7 @@ const effects: TerminalEffects = {
         : null
   },
   vimIsDirty: () => vimBuffer.value?.dirty ?? false,
+  vimIsOpen: () => vimBuffer.value !== null,
   vimMessage: (text: string) => {
     if (vimBuffer.value) vimBuffer.value.statusMessage = text
   },
@@ -182,10 +184,44 @@ function buildContext(args: string[], raw: string, signal: AbortSignal): Command
         if (keyCapture.value === handler) keyCapture.value = null
       }
     },
-    run: (input: string) => run(input),
+    run: (input: string) => runNested(input, signal),
     effects,
     signal,
   }
+}
+
+/**
+ * `ctx.run`: another command inside the one running. It shares the parent's signal, so
+ * Ctrl+C stops both, and leaves `busy`, the abort controller and the keyboard alone,
+ * because the parent is still running; going through `run()` reset all three when the
+ * child finished. It never expands the visitor's aliases: the parent may be a link or
+ * `tour`, which the visitor didn't type. Two-word names resolve as typed ones do.
+ */
+async function runNested(input: string, signal: AbortSignal): Promise<void> {
+  const target = resolveLink(input)
+  if (!target) {
+    const [name = ''] = input.trim().split(/\s+/)
+    append({ text: `${name}: ${messages.terminal.notFound[currentLocale()]}`, tone: 'error' })
+    return
+  }
+  // A capture is one slot, not a stack: hand the parent's back once the child is done,
+  // whether the child took the keyboard, released it, or threw.
+  const parentCapture = keyCapture.value
+  try {
+    const result = await target.command.run(buildContext(target.args, input, signal))
+    if (result) append(result)
+  } finally {
+    keyCapture.value = parentCapture
+  }
+}
+
+/**
+ * Whether `name`, read with the word after it, is a command. An alias never shadows
+ * one: run and Tab completion both ask this, so they can't disagree about what a
+ * line will run.
+ */
+function namesCommand(name: string, next?: string): boolean {
+  return resolve(name) !== undefined || (next !== undefined && resolve(`${name} ${next}`) !== undefined)
 }
 
 export async function run(input: string): Promise<void> {
@@ -194,7 +230,7 @@ export async function run(input: string): Promise<void> {
   // the command that will actually run. `alias` itself is never expanded — it
   // reads its own raw line — because it is a real command and aliases cannot
   // shadow those.
-  const raw = expandAliases(input)
+  const raw = expandAliases(input, namesCommand)
   if (!raw) return
 
   const [name = '', ...args] = raw.split(/\s+/)
@@ -288,8 +324,8 @@ export async function submit(value: string): Promise<void> {
 const LINK_MAX = 200
 
 /**
- * Runs a command a `?run=` link asked for — once, and only if the command opted in
- * (`linkable`). It is echoed as if typed, so the reader sees exactly what ran, and
+ * Runs a command a `?run=` link asked for — once, and only if `isLinkable()` says so
+ * for these arguments: opted in, not hidden, writes nothing. It is echoed as if typed, so the reader sees exactly what ran, and
  * executed directly rather than through `run()`: that would expand the reader's own
  * aliases, which a link's author must not be able to reach.
  */
@@ -299,11 +335,17 @@ export async function runLink(input: string): Promise<void> {
     .trim()
     .slice(0, LINK_MAX)
   if (!line) return
+  // A link in the scrollback stays clickable while a command runs, and `execute()` would
+  // take the shell from under it: the running command would lose its keyboard, its ^C
+  // and its busy flag, and never settle. Enter is blocked then; so is a click.
+  if (busy.value || pendingPrompt.value) return
 
   const target = resolveLink(line)
-  if (!target?.command.linkable) {
+  if (!target || !isLinkable(target.command, target.args)) {
+    // Quoted short: a refused link's text is the link author's, not the site's.
+    const asked = line.length > 60 ? `${line.slice(0, 59)}…` : line
     append({
-      text: messages.terminal.linkRefused[currentLocale()].replace('{command}', line),
+      text: messages.terminal.linkRefused[currentLocale()].replace('{command}', asked),
       tone: 'warning',
     })
     return
@@ -367,7 +409,7 @@ function ownerOf(words: string[]): { command: Command; argStart: number } | unde
 
   // `gl about.txt` where `gl` is the visitor's alias: complete against the
   // command that will actually run, not the name they typed.
-  const expanded = expandAliases(first)
+  const expanded = expandAliases(first, namesCommand)
   if (expanded === first) return undefined
   const viaAlias = resolve(expanded) ?? resolve(expanded.split(/\s+/)[0] ?? '')
   return viaAlias ? { command: viaAlias, argStart: 1 } : undefined

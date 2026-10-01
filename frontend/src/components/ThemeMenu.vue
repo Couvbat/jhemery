@@ -21,7 +21,9 @@ import { tryTheme } from '@/terminal/achievements'
 defineOptions({ inheritAttrs: false })
 
 const { t, m } = useLocale()
-const { theme: active, themes, setTheme } = useTheme()
+// The menu shows and compares the visitor's choice, not a scheme `tour` is previewing:
+// picking the scheme on show has to keep it, and the check mark has to stay theirs.
+const { chosen: active, theme: painted, themes, setTheme } = useTheme()
 
 const open = ref(false)
 const rootEl = ref<HTMLElement | null>(null)
@@ -50,7 +52,7 @@ function hide() {
 /** Stays open on a pick: the page repaints behind the menu, so it is a live preview, and
  *  `ricer` wants five of them. */
 function pick(theme: Theme) {
-  if (theme.id === active.value.id) return
+  if (theme.id === active.value.id && theme.id === painted.value.id) return
   tryTheme(setTheme(theme.id)!)
 }
 

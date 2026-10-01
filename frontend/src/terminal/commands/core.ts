@@ -4,9 +4,9 @@ import { profile } from '@/content'
 import { announce } from '../achievements'
 import { aliases, parseDefinition, removeAlias, setAlias } from '../aliases'
 import { history } from '../history'
-import { allCommands, completionNames, resolve, visibleCommands } from '../registry'
+import { allCommands, completionNames, isCommandWord, resolve, visibleCommands } from '../registry'
 import type { Command, CommandGroup, OutputLine } from '../types'
-import { blank, line, pre } from '../format'
+import { blank, line, pre, segmented } from '../format'
 
 const GROUP_LABELS: Record<CommandGroup, { en: string; fr: string }> = {
   core: { en: 'shell', fr: 'shell' },
@@ -23,7 +23,10 @@ export const coreCommands: Command[] = [
     usage: 'help [command] [--all]',
     description: { en: 'List commands, or explain one', fr: 'Lister les commandes' },
     group: 'core',
-    linkable: true,
+    writes: 'none',
+    // Typed, `help --all` and `help vim` are fine. From a link they would hand out the
+    // hidden commands, which is what the link rule exists to stop.
+    linkable: (args) => !args.some((a) => a === '--all' || resolve(a)?.hidden === true),
     palette: true,
     // `completionNames()` and not `allCommands()`: `help vi<Tab>` must not hand
     // out `vim`, for the same reason the command word itself doesn't.
@@ -77,6 +80,7 @@ export const coreCommands: Command[] = [
     aliases: ['cls'],
     description: { en: 'Clear the screen', fr: "Effacer l'écran" },
     group: 'core',
+    writes: 'local',
     run({ clear }) {
       clear()
     },
@@ -85,6 +89,7 @@ export const coreCommands: Command[] = [
     name: 'history',
     description: { en: 'Show command history', fr: "Afficher l'historique" },
     group: 'core',
+    writes: 'none',
     run() {
       const entries = history.value
       if (!entries.length) return [line('(empty)', 'muted')]
@@ -99,6 +104,7 @@ export const coreCommands: Command[] = [
     usage: 'echo <text>',
     description: { en: 'Print a line of text', fr: 'Afficher du texte' },
     group: 'core',
+    writes: 'local',
     run({ args }) {
       return [line(args.join(' '))]
     },
@@ -107,6 +113,7 @@ export const coreCommands: Command[] = [
     name: 'date',
     description: { en: 'Show the current date', fr: 'Afficher la date' },
     group: 'core',
+    writes: 'none',
     run({ locale }) {
       return [line(new Date().toLocaleString(locale === 'fr' ? 'fr-FR' : 'en-GB'))]
     },
@@ -115,6 +122,7 @@ export const coreCommands: Command[] = [
     name: 'whoami',
     description: { en: 'Print the current user', fr: "Afficher l'utilisateur" },
     group: 'core',
+    writes: 'none',
     linkable: true,
     run() {
       return [line(profile.handle, 'primary')]
@@ -125,6 +133,7 @@ export const coreCommands: Command[] = [
     usage: 'lang [en|fr]',
     description: { en: 'Show or switch language', fr: 'Afficher ou changer la langue' },
     group: 'core',
+    writes: (args) => (args[0] ? 'local' : 'none'),
     palette: true,
     complete: ({ index }) => (index === 0 ? ['en', 'fr'] : []),
     run({ args, locale, t }) {
@@ -148,6 +157,7 @@ export const coreCommands: Command[] = [
     usage: "alias [name='command']",
     description: { en: 'Name your own commands', fr: 'Nommer vos propres commandes' },
     group: 'core',
+    writes: 'local',
     hidden: true,
     run({ args, raw, t }) {
       const definition = raw.trim().slice('alias'.length).trim()
@@ -161,9 +171,19 @@ export const coreCommands: Command[] = [
           ]
         }
         const width = entries.reduce((max, [name]) => Math.max(max, name.length), 0)
+        // An alias stored before a command of the same name existed no longer runs;
+        // say so here rather than interrupting the command when it does.
+        const shadowed = t({ en: '(shadowed by a command)', fr: '(masqué par une commande)' })
         return entries
           .sort(([a], [b]) => a.localeCompare(b))
-          .map(([name, value]) => pre(`${name.padEnd(width)}  →  ${value}`, 'primary'))
+          .map(([name, value]) =>
+            isCommandWord(name)
+              ? segmented([
+                  { text: `${name.padEnd(width)}  →  ${value}`, tone: 'muted' },
+                  { text: `  ${shadowed}`, tone: 'warning' },
+                ])
+              : pre(`${name.padEnd(width)}  →  ${value}`, 'primary'),
+          )
       }
 
       const parsed = parseDefinition(definition)
@@ -178,7 +198,8 @@ export const coreCommands: Command[] = [
       // Shadowing a real command would let someone lock themselves out of their
       // own shell, and it survives a reload — so this one is a refusal, not a
       // faithful reimplementation of bash.
-      if (resolve(name)) {
+      // `git` too, the first word of `git log`: the alias would hide it all the same.
+      if (isCommandWord(name)) {
         return [line(`alias: \`${name}\` is already a command — pick another name.`, 'error')]
       }
 
@@ -194,6 +215,7 @@ export const coreCommands: Command[] = [
     usage: 'unalias <name>',
     description: { en: 'Remove an alias', fr: 'Supprimer un alias' },
     group: 'core',
+    writes: 'local',
     hidden: true,
     complete: ({ index }) => (index === 0 ? Object.keys(aliases.value) : []),
     run({ args }) {
@@ -209,6 +231,7 @@ export const coreCommands: Command[] = [
     aliases: ['quit', 'logout'],
     description: { en: 'Close the terminal', fr: 'Fermer le terminal' },
     group: 'core',
+    writes: 'none',
     run({ close }) {
       close()
     },

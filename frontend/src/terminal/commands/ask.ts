@@ -48,6 +48,7 @@ export const askCommands: Command[] = [
       fr: 'Poser une question à un modèle local',
     },
     group: 'live',
+    writes: 'server',
     palette: true,
     async run({ args, prompt, print, t, locale, frame, signal }) {
       // With no arguments this prompts, the same way `mail` does — which is what

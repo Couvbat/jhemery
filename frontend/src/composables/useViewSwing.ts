@@ -205,6 +205,11 @@ function push(to: RouteLocationRaw): boolean {
   return true
 }
 
+/** Routes to a path of the app as it is (`/now`, `/work/vim`), for a link to one. */
+export function routeTo(path: string): boolean {
+  return push(path)
+}
+
 /**
  * Goes wherever `target` names. A section on the page currently showing scrolls; a
  * section on another view routes home with a hash, and `settle()` scrolls to it once

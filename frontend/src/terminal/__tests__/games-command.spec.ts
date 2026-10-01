@@ -622,7 +622,7 @@ describe('wordle daily', () => {
     expect(stats.wordleHistogram).toHaveBeenCalledWith(DAY, 'en')
   })
 
-  it('leaves the board alone when the API does not answer, and tries again next time', async () => {
+  it('leaves the board alone when the API does not answer', async () => {
     stats.recordWordle.mockRejectedValue(new Error('down'))
     const { game, finished } = daily()
     await loaded()
@@ -632,6 +632,40 @@ describe('wordle daily', () => {
 
     expect(game.printed().some((l) => l.text.includes('everyone today'))).toBe(false)
     expect(dailyResult('en', DAY)?.reported).toBeFalsy()
+  })
+
+  // Reopening a finished board needs no keystroke, and `?run=wordle daily` is a link,
+  // so only the Enter that finishes a board may post its report. An unreported board
+  // stays uncounted rather than reported by whoever opens a link to it.
+  it('never posts from a board it only reopens, even an unreported one', async () => {
+    stats.recordWordle.mockRejectedValue(new Error('down'))
+    const first = daily()
+    await loaded()
+    for (const letter of ANSWER) first.game.press(letter.toLowerCase())
+    first.game.press('Enter')
+    await first.finished
+    expect(stats.recordWordle).toHaveBeenCalledTimes(1)
+
+    const again = daily()
+    await loaded()
+    await again.finished
+    expect(stats.recordWordle).toHaveBeenCalledTimes(1)
+    expect(stats.wordleHistogram).toHaveBeenCalledWith(DAY, 'en')
+  })
+
+  // Two tabs on the same day: the other one finished and reported while this one sat
+  // open with its own copy of the board. The day is counted once.
+  it('does not report a board another tab already reported', async () => {
+    const { game, finished } = daily()
+    await loaded()
+    recordDaily('en', { day: DAY, guesses: [ANSWER], marks: ['ggggg'], done: true, won: true, reported: true })
+    for (const letter of ANSWER) game.press(letter.toLowerCase())
+    game.press('Enter')
+    await finished
+
+    expect(stats.recordWordle).not.toHaveBeenCalled()
+    expect(stats.wordleHistogram).toHaveBeenCalledWith(DAY, 'en')
+    expect(dailyResult('en', DAY)?.reported).toBe(true)
   })
 
   it('share has nothing to copy before the daily is finished', async () => {

@@ -1,6 +1,7 @@
-import type { Command } from './types'
+import type { Command, Writes } from './types'
 import { aliases } from './aliases'
 import { collectCommands } from './commands'
+import { closest } from './fuzzy'
 
 /**
  * Built on first use, not at import. This module, `commands/index.ts` and
@@ -39,6 +40,50 @@ export function paletteCommands(): Command[] {
 
 export function resolve(name: string): Command | undefined {
   return registry().byName.get(name.toLowerCase())
+}
+
+/** What `command` changes when run with `args`. */
+export function writesOf(command: Command, args: readonly string[] = []): Writes {
+  return typeof command.writes === 'function' ? command.writes(args) : command.writes
+}
+
+/**
+ * Whether every argument is one the command itself offers for Tab at that position.
+ * A link's author chooses its arguments, and anything after the name is echoed at the
+ * prompt as if the visitor had typed it, so free text must not pass: otherwise
+ * `?run=whoami your session expired, sign in at …` would print that line on the page.
+ * A command that takes arguments from links declares them in `complete()`.
+ */
+function argsOffered(command: Command, args: readonly string[]): boolean {
+  return args.every((arg, index) => {
+    const offered = command.complete?.({ args: [...args], index, word: arg }) ?? []
+    return offered.some((candidate) => candidate.toLowerCase() === arg.toLowerCase())
+  })
+}
+
+/**
+ * Whether `command`, with these arguments, may run without the visitor typing it: it
+ * opted in, it isn't hidden, it writes nothing, and its arguments are ones it offers.
+ * `runLink` is the caller today. The roadmap's `tour`, pipe stages and `strace` are meant
+ * to ask the same question, so none of them keeps its own list of writers. `ctx.run`
+ * does not: its callers pass fixed command lines.
+ */
+export function isLinkable(command: Command, args: readonly string[] = []): boolean {
+  if (command.hidden) return false
+  const opted = typeof command.linkable === 'function' ? command.linkable(args) : command.linkable === true
+  return opted && writesOf(command, args) === 'none' && argsOffered(command, args)
+}
+
+/**
+ * Whether `name` is a command, or the first word of a two-word one (`git` of `git log`),
+ * which an alias of that name would hide just the same.
+ */
+export function isCommandWord(name: string): boolean {
+  const word = name.toLowerCase()
+  if (resolve(word)) return true
+  return allCommands().some((command) =>
+    [command.name, ...(command.aliases ?? [])].some((n) => n.startsWith(`${word} `)),
+  )
 }
 
 /**
@@ -106,50 +151,7 @@ export function commonPrefix(candidates: string[]): string {
   return prefix
 }
 
-/**
- * How far a miss may be before it stops being a typo. A flat two let `where` — two
- * substitutions from `theme` — read as a misspelt command, which buried the `ask` hint
- * for anyone typing `where does he work`: in a word that short, two edits make a
- * different word. Longer names keep the slack.
- */
-function allowedEdits(needle: string): number {
-  return needle.length >= 6 ? 2 : 1
-}
-
 /** Edit-distance suggestion for "command not found — did you mean …?". */
 export function suggest(name: string): string | undefined {
-  const needle = name.toLowerCase()
-  let best: { name: string; distance: number } | undefined
-
-  for (const candidate of completionNames()) {
-    const distance = editDistance(needle, candidate)
-    if (distance <= allowedEdits(needle) && (!best || distance < best.distance)) {
-      best = { name: candidate, distance }
-    }
-  }
-  return best?.name
-}
-
-/** Levenshtein plus adjacent swaps at a cost of one (optimal string alignment):
- *  `hlep` is one slip of the fingers, and a one-edit budget has to see it as one. */
-function editDistance(a: string, b: string): number {
-  if (a === b) return 0
-  if (Math.abs(a.length - b.length) > 2) return 99
-
-  let beforePrevious: number[] = []
-  let previous = Array.from({ length: b.length + 1 }, (_, i) => i)
-
-  for (let i = 1; i <= a.length; i++) {
-    const current = [i]
-    for (let j = 1; j <= b.length; j++) {
-      const cost = a[i - 1] === b[j - 1] ? 0 : 1
-      current[j] = Math.min(current[j - 1]! + 1, previous[j]! + 1, previous[j - 1]! + cost)
-      if (i > 1 && j > 1 && a[i - 1] === b[j - 2] && a[i - 2] === b[j - 1]) {
-        current[j] = Math.min(current[j]!, beforePrevious[j - 2]! + 1)
-      }
-    }
-    beforePrevious = previous
-    previous = current
-  }
-  return previous[b.length]!
+  return closest(name, completionNames())
 }

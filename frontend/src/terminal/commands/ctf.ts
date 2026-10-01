@@ -60,6 +60,7 @@ export const ctfCommands: Command[] = [
     aliases: ['flags'],
     description: { en: 'The capture-the-flag chain', fr: 'La chaîne de capture de flags' },
     group: 'fun',
+    writes: 'none',
     palette: true,
     linkable: true,
     run({ t }) {
@@ -103,6 +104,7 @@ export const ctfCommands: Command[] = [
     usage: 'flag CTF{…}',
     description: { en: 'Submit a CTF flag', fr: 'Soumettre un flag' },
     group: 'fun',
+    writes: 'local',
     hidden: true,
     async run({ args, t }) {
       if (!args[0]) return [line(t(m.usage), 'error')]
@@ -113,6 +115,7 @@ export const ctfCommands: Command[] = [
     name: 'decrypt',
     description: { en: 'Open the last stage', fr: 'Ouvrir la dernière étape' },
     group: 'fun',
+    writes: 'local',
     hidden: true,
     async run({ t, locale }) {
       const result = await decryptFinale()

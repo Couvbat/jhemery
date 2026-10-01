@@ -97,6 +97,7 @@ export const command: Command = {
   name: 'tetris',
   description: { en: 'Play tetris', fr: 'Jouer à tetris' },
   group: 'fun',
+  writes: 'none',
   linkable: true,
   run: (ctx: CommandContext) =>
     play(ctx, 'tetris', async (session) => {

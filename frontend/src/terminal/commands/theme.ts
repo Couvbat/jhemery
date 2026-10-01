@@ -46,6 +46,7 @@ export const themeCommands: Command[] = [
     usage: 'theme [name|random]',
     description: { en: 'Show or switch colour scheme', fr: 'Afficher ou changer le thème' },
     group: 'core',
+    writes: (args) => (args[0] ? 'local' : 'none'),
     palette: true,
     complete: ({ index }) => (index === 0 ? [...themes.map((theme) => theme.id), 'random'] : []),
     run({ args, t }) {

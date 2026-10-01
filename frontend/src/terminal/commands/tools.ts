@@ -68,6 +68,7 @@ export const toolCommands: Command[] = [
       fr: "Lister la page outils, ou ouvrir l'un de ses outils",
     },
     group: 'navigate',
+    writes: 'none',
     linkable: true,
     palette: true,
     complete: ({ index }) => (index === 0 ? visibleTools().map((tool) => tool.id) : []),
@@ -112,6 +113,7 @@ export const toolCommands: Command[] = [
       fr: "Hacher un fichier ou du texte, comme l'outil hash",
     },
     group: 'core',
+    writes: 'none',
     complete: ({ index }) => (index === 0 ? listFiles() : []),
     async run({ raw, t }) {
       const invoked = raw.trim().split(/\s+/)[0]!.toLowerCase()
@@ -134,6 +136,7 @@ export const toolCommands: Command[] = [
       fr: "Encoder ou décoder du base64, comme l'outil encode",
     },
     group: 'core',
+    writes: (args) => (args[0] === '-d' || args[0] === '--decode' ? 'local' : 'none'),
     complete: ({ index, args }) =>
       index === 0 ? ['-d', ...listFiles()] : index === 1 && args[0] === '-d' ? listFiles() : [],
     run({ raw, args, t }) {
@@ -156,6 +159,7 @@ export const toolCommands: Command[] = [
     name: 'uuidgen',
     description: { en: 'A random UUID (v4)', fr: 'Un UUID aléatoire (v4)' },
     group: 'core',
+    writes: 'none',
     run() {
       return [pre(uuid())]
     },
@@ -168,6 +172,7 @@ export const toolCommands: Command[] = [
       fr: "Indenter du JSON, comme l'outil JSON",
     },
     group: 'core',
+    writes: 'local',
     complete: ({ index }) => (index === 0 ? ['.'] : []),
     run({ raw, args, t }) {
       if (args[0] !== '.') {

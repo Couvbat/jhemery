@@ -65,17 +65,27 @@ export function parseDefinition(raw: string): { name: string; value: string } | 
  * `a`→`b`→`ls -a` resolves in one call. Anything after the first word is kept
  * and appended, which is what makes `gl --oneline` work when `gl` is `git log`.
  *
+ * A word `isCommand` recognises is left alone, given the word after it too, so an
+ * alias named `git` can't hide `git log`. `alias` refuses a command's name, but
+ * that check runs once, when the alias is defined: a command added in a later release
+ * (`tour`, `why`, `grep`…) can share the name of an alias someone stored before it
+ * existed, and the command wins. The predicate comes from the shell because this module
+ * importing the registry would join the registry's import cycle.
+ *
  * Bails out rather than looping forever: a definition that expands back to
  * itself is a user error, not a reason to hang the tab.
  */
-export function expandAliases(input: string): string {
+export function expandAliases(
+  input: string,
+  isCommand: (name: string, next?: string) => boolean = () => false,
+): string {
   let current = input.trim()
   const seen = new Set<string>()
 
   for (let i = 0; i < MAX_EXPANSIONS; i++) {
     const [head = '', ...rest] = current.split(/\s+/)
     const replacement = aliases.value[head.toLowerCase()]
-    if (replacement === undefined || seen.has(head.toLowerCase())) return current
+    if (replacement === undefined || seen.has(head.toLowerCase()) || isCommand(head, rest[0])) return current
 
     seen.add(head.toLowerCase())
     current = [replacement, ...rest].join(' ').trim()

@@ -151,6 +151,7 @@ export const systemctl: Command = {
   usage: 'systemctl [status [<unit>]]',
   description: { en: 'What the API behind this site is running', fr: 'Ce que fait tourner l’API de ce site' },
   group: 'live',
+  writes: 'none',
   palette: true,
   linkable: true,
   complete: ({ index, args }) =>

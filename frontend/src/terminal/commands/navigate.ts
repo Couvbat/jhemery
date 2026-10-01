@@ -1,4 +1,4 @@
-import { profile, sectionIds, sections, socials, viewIds, views } from '@/content'
+import { profile, sectionIds, sections, socials, viewIds, views, work } from '@/content'
 import { currentPath, resolvePath } from '@/composables/useViewSwing'
 import { prefersReducedMotion } from '@/composables/useCrt'
 import { visibleTools } from '@/tools/registry'
@@ -34,13 +34,21 @@ function destinations(): string[] {
   ]
 }
 
+
+/** `-a`, as `ls` reads it. Shared with its link rule, so the two can't disagree. */
+function showsHidden(args: readonly string[]): boolean {
+  return args.some((a) => a === '-a' || a === '-la' || a === '-al')
+}
 export const navigateCommands: Command[] = [
   {
     name: 'ls',
     usage: 'ls [-a] [path]',
     description: { en: 'List sections, pages and files', fr: 'Lister sections, pages et fichiers' },
     group: 'navigate',
-    linkable: true,
+    writes: 'none',
+    // `ls -a` lists the dotfiles, the way into the `secret` and `dotenv` achievements
+    // and the CTF, which a link must not hand to whoever clicks it.
+    linkable: (args) => !showsHidden(args),
     complete: ({ index, args }) =>
       index === 0 && !args[0]?.startsWith('-')
         ? ['-a', ...destinations()]
@@ -48,7 +56,7 @@ export const navigateCommands: Command[] = [
           ? destinations()
           : [],
     run({ args, t }) {
-      const showHidden = args.some((a) => a === '-a' || a === '-la' || a === '-al')
+      const showHidden = showsHidden(args)
       const target = args.find((a) => !a.startsWith('-'))
 
       if (target) {
@@ -65,7 +73,16 @@ export const navigateCommands: Command[] = [
             ]),
           )
         }
-        // A section is an empty directory; `ls /` and `ls ~` fall through to the root.
+        // The projects section holds the case studies, one `.md` each.
+        if (resolved.kind === 'section' && resolved.section.id === 'projects' && work.length) {
+          return work.map((part) =>
+            segmented([
+              { text: `${part.id}.md`.padEnd(16), tone: 'primary' },
+              { text: t(part.name), tone: 'muted' },
+            ]),
+          )
+        }
+        // Any other section is an empty directory; `ls /` and `ls ~` fall through to the root.
         if (resolved.kind === 'section' || resolved.view.id !== 'home') return undefined
       }
 
@@ -86,6 +103,7 @@ export const navigateCommands: Command[] = [
     usage: 'cd <section|tools[/<tool>]|watch|radio[/<code>]>',
     description: { en: 'Jump to a section or a page', fr: 'Aller à une section ou une page' },
     group: 'navigate',
+    writes: 'none',
     complete: ({ index }) => (index === 0 ? destinations() : []),
     run({ args, navigate, t }) {
       const [target = ''] = args
@@ -113,6 +131,7 @@ export const navigateCommands: Command[] = [
     name: 'pwd',
     description: { en: 'Print where you are', fr: 'Afficher où vous êtes' },
     group: 'navigate',
+    writes: 'none',
     run() {
       return [line(`/home/${profile.handle}/${currentPath()}`, 'muted')]
     },
@@ -122,7 +141,13 @@ export const navigateCommands: Command[] = [
     usage: 'cat <file>',
     description: { en: 'Print a file', fr: 'Afficher un fichier' },
     group: 'navigate',
-    complete: ({ index }) => (index === 0 ? listFiles() : []),
+    writes: 'none',
+    // The case studies only once the word reaches into `projects/`, so a bare Tab
+    // doesn't list eight more files.
+    complete: ({ index, word }) =>
+      index === 0
+        ? [...listFiles(), ...(word.startsWith('projects/') ? work.map((part) => `projects/${part.id}.md`) : [])]
+        : [],
     run({ args, t }) {
       const [file] = args
       if (!file) return [line('cat: missing operand', 'error')]
@@ -139,6 +164,7 @@ export const navigateCommands: Command[] = [
     usage: 'diff <file> <file>',
     description: { en: 'Compare two files', fr: 'Comparer deux fichiers' },
     group: 'navigate',
+    writes: 'none',
     // Both operands are filenames, so this one doesn't care which word it's on.
     complete: ({ index }) => (index < 2 ? listFiles() : []),
     run({ args, t }) {
@@ -184,6 +210,7 @@ export const navigateCommands: Command[] = [
       fr: 'Pinguer une section ou une page, puis y aller',
     },
     group: 'navigate',
+    writes: 'none',
     complete: ({ index }) => (index === 0 ? destinations() : []),
     async run(ctx) {
       const [target] = ctx.args
@@ -249,6 +276,7 @@ export const navigateCommands: Command[] = [
     usage: 'open <github|linkedin|soundcloud|steam|email>',
     description: { en: 'Open an external link', fr: 'Ouvrir un lien externe' },
     group: 'navigate',
+    writes: 'local',
     complete: ({ index }) => (index === 0 ? Object.keys(OPEN_TARGETS) : []),
     run({ args }) {
       const [target] = args

@@ -46,6 +46,28 @@ export interface OutputLine {
 
 export type CommandGroup = 'core' | 'navigate' | 'content' | 'live' | 'fun'
 
+/**
+ * What a command changes, which is what decides whether it may run without the visitor
+ * typing it. `?run=` links read it today (`isLinkable`), and the roadmap's `tour`, pipe
+ * stages and history expansion are meant to read this same field, so no rule keeps its
+ * own list.
+ *
+ * - `none`: reads. It may still record the visitor's own progress (achievements, best
+ *   scores, the daily board and its one anonymous report), navigate, or play an
+ *   animation that leaves nothing behind.
+ * - `local`: changes something the visitor would have to put back: a setting, the
+ *   scene, the shell (aliases, the scrollback, the vim trap), a CTF capture. Also
+ *   anything that acts outside the page (a new tab, the clipboard, sound), and printing
+ *   link-supplied text as the command's output (`echo`, `banner`), which a link could
+ *   use to put words in the site's mouth. Quoting an argument back in an error line
+ *   doesn't count.
+ * - `server`: sends anything but a GET to the API, the daily board's report aside.
+ *
+ * Progress has to be carved out: counting it would make every game unlinkable,
+ * `?run=wordle daily` included, which `wordle share` itself hands out.
+ */
+export type Writes = 'none' | 'local' | 'server'
+
 export interface CommandContext {
   /** Arguments after the command name, already split on whitespace. */
   args: string[]
@@ -76,12 +98,19 @@ export interface CommandContext {
    * Routes raw keys to `handler` while the command runs — the primitive the games
    * need to hold the keyboard for longer than one line. Returns a release
    * function; the release also happens automatically when the command settles,
-   * so a command that throws cannot wedge the keyboard. Only one capture is
+   * so a command that throws cannot wedge the keyboard. For a command run through
+   * `ctx.run`, "settles" means when it returns: the caller's own capture comes back. Only one capture is
    * active at a time: a second call replaces the first. Modifier combos never
    * reach the handler, so `Ctrl+C` and `Ctrl+L` keep working throughout.
    */
   capture: (handler: (key: string) => void) => () => void
-  /** Runs another command as if typed — used by aliases like `git log`. */
+  /**
+   * Runs another command inside this one: the same signal (Ctrl+C stops both), the same
+   * keyboard (the caller's capture is handed back when the child is done), and never the
+   * visitor's aliases. The shell stays busy until the caller finishes. A throw,
+   * `AbortError` included, propagates to the caller. It checks nothing about the target:
+   * pass a fixed command line, or ask `isLinkable` first if the line came from outside.
+   */
   run: (input: string) => Promise<void>
   effects: TerminalEffects
   signal: AbortSignal
@@ -117,6 +146,8 @@ export interface TerminalEffects {
   crt: (enabled?: boolean) => boolean
   vim: (enabled: boolean, file?: VimFile) => void
   vimIsDirty: () => boolean
+  /** Whether the vim pane is showing: `:q` only means something there. */
+  vimIsOpen: () => boolean
   /** Shows a status-line message in the vim pane (e.g. a refused `:q`). */
   vimMessage: (text: string) => void
   glitch: (durationMs: number) => Promise<void>
@@ -144,12 +175,19 @@ export interface Command {
   /** Surfaced in the Ctrl+K command palette. */
   palette?: boolean
   /**
-   * May be run from a link: `?run=<command>` opens the shell and runs it once. Opt-in,
-   * because a link is written by someone other than the person clicking it — so
-   * nothing that writes (`mail`, `sign`, `alias`, `theme`…) and nothing hidden may set
-   * it. `registry.spec.ts` holds both lines.
+   * What running it changes; see `Writes`. A function when that depends on the
+   * arguments: `theme` lists the schemes, `theme dracula` switches. Read it through
+   * `writesOf()`, never directly.
    */
-  linkable?: boolean
+  writes: Writes | ((args: readonly string[]) => Writes)
+  /**
+   * Worth running from a link: `?run=<command>` opens the shell and runs it once. Opt-in,
+   * because a link is written by someone other than the person clicking it, and only
+   * honoured where `writes` is `none` and the command isn't hidden (`isLinkable()`
+   * checks all three). A function when some arguments must not be linked: `help vim`
+   * would hand out a hidden command, as `ls -a` would the dotfiles.
+   */
+  linkable?: boolean | ((args: readonly string[]) => boolean)
   /**
    * Tab-completion candidates for the argument being typed. Return everything
    * valid at that position — the shell filters by prefix, inserts the common

@@ -79,6 +79,7 @@ export const command: Command = {
   aliases: ['pendu'],
   description: { en: 'Guess the word before the drawing finishes', fr: 'Devinez le mot avant la fin du dessin' },
   group: 'fun',
+  writes: 'none',
   linkable: true,
   run: (ctx: CommandContext) =>
     play(ctx, 'hangman', async (session) => {

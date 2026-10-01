@@ -58,6 +58,9 @@ src/content/
   experience.ts  dated roles and courses, newest first; the current role names profile.employer
   dates.ts       the date maths: daysSince, monthsBetween (both ends count), durationLabel, periodLabel
   now.ts         the /now list and its staleness rule
+  docs.ts        githubSlug and headingSlugs, so a link to a doc's heading can be checked
+  decisions.ts   Decision[], what the site chose and turned down; read by `why` (§3)
+  work.ts        WorkPart[], the case studies at /work/<id>, `projects <id>` and projects/<id>.md
   sections.ts    section ids, nav labels, per-section shell prompt lines
   views.ts       the routes (home, tools, watch, radio) in prism order — §11
   index.ts       re-exports
@@ -97,8 +100,10 @@ interface Command {
   usage?: string
   description: Localised<string>
   group: 'core' | 'navigate' | 'content' | 'live' | 'fun'
+  writes: Writes | ((args) => Writes)   // 'none' | 'local' | 'server' — see below
   hidden?: boolean       // excluded from help + completion, still runnable
   palette?: boolean      // surfaced in the Ctrl+K palette
+  linkable?: boolean | ((args) => boolean)   // worth running from a ?run= link
   complete?(ctx: CompleteContext): string[]   // Tab candidates for its arguments
   run(ctx: CommandContext): OutputLine[] | void | Promise<OutputLine[] | void>
 }
@@ -109,8 +114,9 @@ resolver, and the side-effect handles a command may use: `print()`, `clear()`, `
 `frame()` (a redrawable output region — animations and game boards), `navigate(target)` (anything
 `cd` accepts, through `goTo()` — §11), `prompt(question, { mask })` (resolves to the next line the
 user types, rejects on `Ctrl+C`), `capture(handler)` (holds the raw keyboard for the games — §3 —
-and is released unconditionally when the command settles), `run(input)` (runs another command as
-if typed — how `git log` delegates to `gitlog`), a `signal: AbortSignal` so animated commands stop
+and is released unconditionally when the command settles), `run(input)` (runs another command
+*inside* this one: the same signal, keyboard and busy state, and never the visitor's aliases —
+`git log` is a two-word alias of `gitlog`, not a delegation), a `signal: AbortSignal` so animated commands stop
 cleanly when cancelled, and `effects`: `matrix`, `reboot`, `crt`, `vim`/`vimIsDirty`/`vimMessage`
 (§5.1), `glitch` and `playMusic`. `terminal/types.ts` documents each; read it before adding a
 primitive.
@@ -195,9 +201,17 @@ submitted or copied. The first keystroke stops it for the session; reduced motio
 `?run=<command>` is read once the router is ready, at the launcher's `md` breakpoint only, removed
 with `router.replace`, and handed to the lazy chunk through `pendingLinkCommand` — kept apart from
 `pendingInitialCommand`, which only this site's own buttons set. The command must opt in with
-`linkable` on `Command`; it is resolved with `resolveLink()`, which never expands the reader's
-aliases, and executed directly rather than through `run()`. A refused link prints what it asked
-for. `registry.spec.ts` holds that nothing that writes and nothing hidden is linkable.
+`linkable` on `Command`, and then pass `isLinkable(command, args)`: not hidden, and `writes` is
+`none` *for those arguments*. `writes` is required on every command. `none` reads, though it may
+record the visitor's own progress (achievements, scores, the daily board and its one report).
+`local` changes something the visitor would have to put back (a setting, the scene, the shell, a
+CTF capture), acts outside the page (a tab, the clipboard, sound), or prints link-supplied text as
+its output. `server` sends anything but a GET. It can be a function of the arguments: `theme`
+lists, `theme dracula` writes. `linkable` can be a predicate too, for arguments that would hand
+out something hidden: `help vim`, `help --all`, `ls -a`. The command is resolved with
+`resolveLink()`, which never expands the reader's aliases, and executed directly rather than
+through `run()`. A refused link prints what it asked for. `registry.spec.ts` pins which commands
+write what, so a writer can't be downgraded to `none` without a test noticing.
 
 ---
 
@@ -272,11 +286,11 @@ refused: it survives a reload, so `alias ls=rickroll` would be a lockout rather 
 ### navigate
 | Command | Behaviour |
 |---|---|
-| `ls [-a] [path]` | Lists sections and views as directories; `ls tools` lists the tools. `-a` also reveals `.secret` and `.env` (§5) |
+| `ls [-a] [path]` | Lists sections and views as directories; `ls tools` lists the tools and `ls projects` the case studies, the one section that isn't empty. `-a` also reveals `.secret` and `.env` (§5) |
 | `cd <path>` | A section scrolls there and closes the overlay, routing home first from another view; `tools`, `tools/<id>`, `watch/<code>` and `radio/<code>` go through `goTo()` (§11) |
 | `pwd` | The view plus the current section — `/home/couvbat/projects`, `/home/couvbat/tools/image` |
 | `tools [<id>]` | Lists the tools from `tools/registry.ts`, or opens one |
-| `cat <file>` | `about.txt`, `skills.txt`, `contact.txt`, `.secret`, `.env` |
+| `cat <file>` | `about.txt`, `skills.txt`, `contact.txt`, `now.txt`, `projects/<id>.md`, `.secret`, `.env` |
 | `diff <a> <b>` | Line diff of any two files the fake filesystem resolves |
 | `ping <section\|view>` | Four paced fake replies and an rtt summary, then `cd`s there |
 | `open <target>` | `github`, `linkedin`, `soundcloud`, `steam`, `email` — opens in a new tab |
@@ -287,7 +301,7 @@ dozen lines each, so the O(n·m) table is cheaper than a diffing library.
 
 ### content
 Reads from §1, so it can never contradict the page: `about`, `skills [--why]`,
-`projects [--json]`, `music`, `gaming`, `hardware [pc|nas|peripherals]`, `contact`, `resume`,
+`projects [--json] [<part>]`, `music`, `gaming`, `hardware [pc|nas|peripherals]`, `contact`, `resume`,
 `neofetch`, `curl`. `skills --why` prints each skill's `usedIn` evidence (a `goTo` path or a repo
 URL), and `neofetch` has a `Status` row from `profile.availability`, the same flag the footer and
 both résumés read. `now.txt` is the `/now` list, with the same 90-day staleness rule.
@@ -296,6 +310,28 @@ both résumés read. `now.txt` is the `/now` list, with the same 90-day stalenes
 commit, and the live Steam status if available. `curl <domain>` re-runs `resume` when pointed at
 this site (or `localhost`), mirroring what a real `curl jhemery.xyz` returns (§7); any other host
 gets `curl: (6) Could not resolve host` and a note that a browser tab cannot open a raw socket.
+
+`why <topic>` (`commands/work.ts`) prints one entry of `content/decisions.ts`: what was chosen,
+each rejected option with its reason in one sentence, any hindsight, the PR, and a link to the
+heading of the doc it came from. A spec is linked as its note on the site, and anything else on
+GitHub at the build's commit (`lib/source.ts`). The doc stays the authority: `decisions.spec.ts`
+fails if an anchor stops matching a heading. An unknown topic gets a "did you mean" from
+`terminal/fuzzy.ts`.
+
+`projects <part>` prints one case study from `content/work.ts` (what was hard, its numbers, a
+*try it* link, the code, the design note and the decisions behind it), through `terminal/work.ts`
+`workLines()`, the one renderer `cat projects/<id>.md` also uses. Code links go through
+`lib/source.ts`, pinned to the build's commit; *try it* is a place on the site or a `?run=` link,
+and `work.spec.ts` holds every command-form one to `isLinkable`. `projects --json` keeps its array,
+with the parts on this site's own entry.
+
+`tour` (`commands/work.ts`) is a paced walk through `TOUR_STOPS`, each a caption and either a
+command run inside it through `ctx.run` or one of three stops that are not commands. Those are a
+scheme shown for three seconds with `previewTheme()`, which saves nothing and is put back however
+the tour ends; the `curl` hint; and the achievement count. It is linkable, so every command it
+runs must be too (`tour.spec.ts`). It runs no game, which would hold the keyboard and switch the
+output's announcements off for the rest of the walk, and names no hidden command. Under reduced
+motion it prints everything at once and shows no scheme.
 
 ### live
 | Command | Endpoint | Fallback |
@@ -343,7 +379,9 @@ drop a visitor into a keyboard-captured surface they did not ask for.
 language shares one word a day. The board is saved after every guess under
 `couvbat:games:wordle:daily`, so a closed tab resumes rather than restarts, and a finished board is
 shown again instead of replayed. It is reported once to `POST /stats/wordle` and everyone's
-distribution is drawn under it. `wordle share` copies an emoji grid ending in a `?run=wordle daily`
+distribution is drawn under it. Only the keystroke that finishes the board reports it: reopening
+a finished board, from a `?run=wordle daily` link or another tab, only reads the tallies, and a
+report that failed at the time is not retried. That is what keeps `wordle` at `writes: 'none'`. `wordle share` copies an emoji grid ending in a `?run=wordle daily`
 link, to the clipboard only.
 
 `connect4` is the only game with a second person. The rules are `games/connect4.ts`, a pure
@@ -630,6 +668,18 @@ a frontend deploy, which is fine for a résumé.
 The same plugin emits `resume.html` and `resume.fr.html` (static, script-free, with `resume.css` as
 a sibling file so the CSP needs nothing new) and `content.json`, which the MCP endpoint reads (§8).
 All three are on `navigateFallbackDenylist` and served by the plugin's dev middleware too.
+
+The design notes are a second plugin, `vite-plugins/notes.ts`. It publishes each spec in
+`docs/superpowers/specs` as `/notes/<slug>` (the file name without its date and `-design`), plus
+an index at `/notes/` and `notes.css`. They are static, script-free pages with a canonical tag.
+Each says which language it is in, since the site is bilingual and the notes are not: twelve are
+English and one French. The markdown goes through a hand-written renderer
+(`vite-plugins/markdown.ts`) for exactly the subset the specs use. It escapes every text run,
+gives headings GitHub's anchors, and fails the build on anything else. A link to a sibling spec
+becomes a note; any other repo path goes to GitHub at the build's commit. The notes are on the
+SPA fallback's denylist and kept out of the precache (like the résumés now are), and `.htaccess`
+maps `/notes/<slug>` to its file. The specs are build input, so the frontend build and deploy
+workflows watch their folder too.
 
 Every résumé, and the `resume` command, has an experience and an education section read from
 `content/experience.ts`. No duration is typed anywhere: each is worked out from the months, at
@@ -924,6 +974,10 @@ this section only fixes the rules the code cites.
   `ThreeBackground` yaws the wireframe *field* (not the camera — see the spec for why), re-homes
   every shape on the first frame and bakes the rotation away on the last. Under reduced motion
   nothing moves and the pages swap. The transition is complete with no three.js present.
+- **Pages outside the prism.** `/now` and `/work/<id>` are routes but not views: they are reached
+  from links, not the navbar, so the prism keeps its four faces, and `viewIndex()` puts them after
+  the faces so a swing to one still has a direction. `cd` doesn't reach them, because
+  `resolvePath` is shared by four callers. Each names itself in `tabTitle()`.
 - **Nothing inside a view may be `position: fixed`** — the stage is a transformed ancestor for the
   duration of a swing. Fixed chrome lives in `App.vue`, beside `RouterView`.
 - **The tool registry is the API** (`tools/registry.ts`), exactly as §2 says of commands: the page,

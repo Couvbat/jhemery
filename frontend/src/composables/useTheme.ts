@@ -1,4 +1,4 @@
-import { computed, ref } from 'vue'
+import { computed, ref, shallowRef } from 'vue'
 import { DEFAULT_THEME, findTheme, themes, themeTokens, type Theme } from '@/lib/themes'
 import { prefersReducedMotion } from './useCrt'
 
@@ -12,6 +12,12 @@ const TOKEN_NAMES = Object.keys(themeTokens(defaultTheme))
 
 // Module-level, like the locale: one scheme for the whole page, not one per caller.
 const current = ref<Theme>(defaultTheme)
+/**
+ * A scheme painted for a moment without being chosen (`previewTheme`), or null.
+ * Shallow, so it holds the object itself: the restore recognises its own preview by
+ * identity, and a deep ref would hand back a proxy that never matches.
+ */
+const shown = shallowRef<Theme | null>(null)
 
 /** `index.html`'s own `theme-color`, captured before the first override so the
  *  default can put back exactly what shipped. */
@@ -62,6 +68,7 @@ function flash() {
 export function setTheme(id: string): Theme | null {
   const next = findTheme(id)
   if (!next) return null
+  shown.value = null
 
   const from = current.value
   paint(next)
@@ -75,6 +82,24 @@ export function setTheme(id: string): Theme | null {
     // Private browsing or a full quota — the scheme just won't survive a reload.
   }
   return next
+}
+
+/**
+ * Paints a scheme for a moment without choosing it: nothing is saved, no achievement
+ * counts it, there is no flash, and the scheme the visitor picked stays theirs. `tour`
+ * shows one this way. Returns the restore, which repaints whatever is chosen by then
+ * (so a pick made from the 🎨 menu meanwhile wins), or null for an unknown id.
+ */
+export function previewTheme(id: string): (() => void) | null {
+  const next = findTheme(id)
+  if (!next) return null
+  paint(next)
+  shown.value = next
+  return () => {
+    if (shown.value !== next) return
+    shown.value = null
+    paint(current.value)
+  }
 }
 
 /**
@@ -98,7 +123,10 @@ export function restoreTheme() {
 
 export function useTheme() {
   return {
-    theme: computed(() => current.value),
+    /** What is painted: a preview while one is showing, the chosen scheme otherwise. */
+    theme: computed(() => shown.value ?? current.value),
+    /** What the visitor picked, whatever a preview is painting over it. */
+    chosen: computed(() => current.value),
     themes,
     setTheme,
   }

@@ -23,9 +23,14 @@ const files = readdirSync(contentDir)
   .filter((name) => name.endsWith('.ts'))
   .sort()
 
-/** Every module specifier in an `import`/`export … from` statement. */
+/**
+ * Every module specifier in an `import`/`export … from` statement. Nothing before the
+ * `from` may be a quote: otherwise `export const decisions = [` runs on to the first
+ * string that ends in "from" (`'Where the word lists come from'`) and reads the next
+ * one as a specifier.
+ */
 function importSpecifiers(source: string): string[] {
-  const pattern = /(?:^|\n)\s*(?:import|export)[\s\S]*?from\s*['"]([^'"]+)['"]/g
+  const pattern = /(?:^|\n)\s*(?:import|export)\b[^'"]*?\bfrom\s*['"]([^'"]+)['"]/g
   return [...source.matchAll(pattern)].map((match) => match[1]!)
 }
 

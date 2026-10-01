@@ -13,6 +13,13 @@
   RewriteCond %{REQUEST_URI} ^/?$
   RewriteRule ^ /resume.txt [L]
 
+  # The design notes (vite-plugins/notes.ts) are real files: /notes/<slug> is
+  # notes/<slug>.html and /notes/ is notes/index.html. An unknown slug has no file,
+  # so it falls through to the SPA's own 404 page below.
+  RewriteRule ^notes/?$ /notes/index.html [L]
+  RewriteCond %{DOCUMENT_ROOT}/notes/$1.html -f
+  RewriteRule ^notes/([a-z0-9-]+)/?$ /notes/$1.html [L]
+
   # SPA fallback: hand every non-file request to index.html so Vue Router owns
   # routing. Without this, a hard refresh on any path other than / 404s.
   RewriteCond %{REQUEST_FILENAME} !-f
@@ -124,9 +131,15 @@
     Header set Cache-Control "public, max-age=0, must-revalidate"
   </FilesMatch>
 
-  <FilesMatch "^(index\.html|resume\.txt|resume(\.fr)?\.html|resume\.css|content\.json)$">
+  <FilesMatch "^(index\.html|resume\.txt|resume(\.fr)?\.html|resume\.css|content\.json|notes\.css)$">
     Header set Cache-Control "no-cache"
   </FilesMatch>
+
+  # The notes' file names vary, so they are matched by path rather than by name.
+  <IfModule mod_setenvif.c>
+    SetEnvIf Request_URI "^/notes/" DESIGN_NOTE=1
+    Header set Cache-Control "no-cache" env=DESIGN_NOTE
+  </IfModule>
 
   # Unhashed root assets: cached, but not so long that fixing one is impossible.
   <FilesMatch "^(favicon\.ico|icon\.svg|apple-touch-icon\.png|pwa-.*\.png|og-image\.(png|svg))$">

@@ -1,8 +1,10 @@
 import { describe, expect, it } from 'vitest'
+import { work } from '@/content'
 import type { Localised } from '@/content/types'
 import { resolveFileLines } from '../commands/files'
 import { ENV_FILE, fakeEnv } from '../commands/env-file'
 import { SECRET_FILE } from '../commands/secret'
+import { workLines } from '../work'
 
 const t = <T,>(value: Localised<T>): T => value.en
 
@@ -20,6 +22,15 @@ describe('resolveFileLines', () => {
 
   it('returns undefined for an unknown name', () => {
     expect(resolveFileLines('passwd', t)).toBeUndefined()
+    expect(resolveFileLines('projects/nope.md', t)).toBeUndefined()
+  })
+
+  // The same lines as `projects <id>`, so the two can't show a part differently.
+  it('reads a case study as projects/<id>.md, from ~ or not', () => {
+    for (const part of work) {
+      expect(resolveFileLines(`projects/${part.id}.md`, t)).toEqual(workLines(part, t))
+      expect(resolveFileLines(`~/projects/${part.id}.md`, t)).toEqual(workLines(part, t))
+    }
   })
 
   it('renders every fake variable into .env, so the file and `env` cannot drift', () => {

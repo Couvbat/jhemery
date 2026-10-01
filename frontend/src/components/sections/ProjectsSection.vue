@@ -13,7 +13,9 @@ import { Button } from '@/components/ui/button'
 import SectionHeader from '@/components/SectionHeader.vue'
 import ContributionHeatmap from '@/components/ContributionHeatmap.vue'
 import BuildStatusCard from '@/components/BuildStatusCard.vue'
-import { projects, type ProjectStatus } from '@/content'
+import { RouterLink } from 'vue-router'
+import { projects, work, type ProjectStatus } from '@/content'
+import CodeText from '@/components/CodeText.vue'
 import { useLocale } from '@/i18n'
 import { useGithub, relativeTime, shortRepo } from '@/composables/useGithub'
 
@@ -160,6 +162,23 @@ const extraPinnedRepos = computed(() =>
             </Button>
           </CardFooter>
         </Card>
+      </div>
+
+      <!-- The site's own parts, each a short study at /work/<id> (content/work.ts). -->
+      <div v-if="work.length" class="mt-8">
+        <h3 class="font-mono text-sm text-primary">## {{ t(m.projects.work) }}</h3>
+        <p class="text-xs text-muted-foreground mt-1 mb-3">{{ t(m.projects.workHint) }}</p>
+        <ul class="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+          <li v-for="part in work" :key="part.id">
+            <RouterLink
+              :to="`/work/${part.id}`"
+              class="block h-full rounded border border-border bg-card p-3 hover:border-primary/50 transition-colors"
+            >
+              <span class="block font-mono text-sm text-primary">{{ t(part.name) }}</span>
+              <span class="text-xs text-muted-foreground mt-1 line-clamp-3"><CodeText :text="t(part.summary)" /></span>
+            </RouterLink>
+          </li>
+        </ul>
       </div>
 
       <!-- Recent GitHub activity -->

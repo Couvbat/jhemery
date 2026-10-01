@@ -279,10 +279,10 @@ them.
 
 | ✔ | Feature | Approach | Files | Effort |
 |---|---|---|---|---|
-| [ ] | Case studies of the site's own parts | The one portfolio card, whose blurb still reads "shadcn-vue and a cyberpunk terminal aesthetic", opens into eight to ten short studies: the modal vim, the ISO 18004 QR encoder, room sync, the ffmpeg.wasm tier, the prism swing, MCP, presence, and the word-list licensing. `content/work.ts` holds `WorkPart { id, name, summary, hard, numbers, try?, code, spec?, decisions? }`, and every surface reads that one array. `try` is a `goTo()` path or a command line, and a spec asserts every command-form `try` resolves through `resolveLink()`, so *try it* is an ordinary `?run=` link. Code and spec links are pinned to `__BUILD_SHA__`, not `tree/master`. Surfaces: a grid under the portfolio card, a lazy `/work/:id` route outside the prism like `/now`, `ls projects` and `cat`, and `projects <id>`. Most of the cost is writing, about 150 bilingual words a part; wherever a number can come from the build, it should, because typed ones go stale. | `content/work.ts` (new), `sections/ProjectsSection.vue`, `router/index.ts`, `views/WorkView.vue` (new), `commands/content.ts`, `commands/navigate.ts`, `commands/files.ts` | M |
-| [ ] | `why <topic>` | `why battleship`, `why polling`, `why mcp-sdk`: what was chosen, what was rejected and why, the PR, and an honest `hindsight` (the registry cycle is a good first one). `why` alone lists them. `content/decisions.ts` is seeded from the ~15 "Rejected alternative" lines already in the specs, and shares its `Decision` type with the case studies. Keep each `because` to one sentence and always link the spec's anchor, so the spec stays the authority and the two can't drift far. `complete()` offers ids; "did you mean" comes from exporting the registry's `editDistance`. Linkable. | `content/decisions.ts` (new), `commands/work.ts` (new), `terminal/registry.ts` | S |
-| [ ] | `tour` | A linkable walk of about a minute through `ctx.run`: `neofetch`, a colour scheme shown but not saved, one game, `vim`, the `curl` hint, and the achievements count. With this much on the site, finding things is the bottleneck, not the number of them, and `?run=tour` is the one link to put in a bio. It may only run what a link could run itself, which `effects` below makes checkable. | `commands/work.ts` | S |
-| [ ] | Design specs as pages | `docs/superpowers/specs` as static, script-free pages at `/notes/<slug>`, built like `resume.html`, in English with a line saying so. They are the best evidence of how the site was thought through, and today they are only on GitHub; the case studies' *read the design* links point here. Needs markdown to HTML at build time: write a small one or take a dependency, and say which in the design. | `vite-plugins/notes.ts` (new), `vite.config.ts` (`navigateFallbackDenylist`) | M |
+| [x] | Case studies of the site's own parts | The one portfolio card, whose blurb still reads "shadcn-vue and a cyberpunk terminal aesthetic", opens into eight to ten short studies: the modal vim, the ISO 18004 QR encoder, room sync, the ffmpeg.wasm tier, the prism swing, MCP, presence, and the word-list licensing. `content/work.ts` holds `WorkPart { id, name, summary, hard, numbers, try?, code, spec?, decisions? }`, and every surface reads that one array. `try` is a `goTo()` path or a command line, and a spec asserts every command-form `try` resolves through `resolveLink()`, so *try it* is an ordinary `?run=` link. Code and spec links are pinned to `__BUILD_SHA__`, not `tree/master`. Surfaces: a grid under the portfolio card, a lazy `/work/:id` route outside the prism like `/now`, `ls projects` and `cat`, and `projects <id>`. Most of the cost is writing, about 150 bilingual words a part; wherever a number can come from the build, it should, because typed ones go stale. | `content/work.ts` (new), `sections/ProjectsSection.vue`, `router/index.ts`, `views/WorkView.vue` (new), `commands/content.ts`, `commands/navigate.ts`, `commands/files.ts` | M |
+| [x] | `why <topic>` | `why battleship`, `why polling`, `why mcp-sdk`: what was chosen, what was rejected and why, the PR, and an honest `hindsight` (the registry cycle is a good first one). `why` alone lists them. `content/decisions.ts` is seeded from the ~15 "Rejected alternative" lines already in the specs, and shares its `Decision` type with the case studies. Keep each `because` to one sentence and always link the spec's anchor, so the spec stays the authority and the two can't drift far. `complete()` offers ids; "did you mean" comes from exporting the registry's `editDistance`. Linkable. | `content/decisions.ts` (new), `commands/work.ts` (new), `terminal/registry.ts` | S |
+| [x] | `tour` | A linkable walk of about a minute through `ctx.run`: `neofetch`, a colour scheme shown but not saved, one game, `vim`, the `curl` hint, and the achievements count. With this much on the site, finding things is the bottleneck, not the number of them, and `?run=tour` is the one link to put in a bio. It may only run what a link could run itself, which `writes` (the *effects on `Command`* row) makes checkable. | `commands/work.ts` | S |
+| [x] | Design specs as pages | `docs/superpowers/specs` as static, script-free pages at `/notes/<slug>`, built like `resume.html`, in English with a line saying so. They are the best evidence of how the site was thought through, and today they are only on GitHub; the case studies' *read the design* links point here. Needs markdown to HTML at build time: write a small one or take a dependency, and say which in the design. | `vite-plugins/notes.ts` (new), `vite.config.ts` (`navigateFallbackDenylist`) | M |
 
 ### Prove the claims
 
@@ -303,7 +303,7 @@ them.
 
 | ✔ | Feature | Approach | Files | Effort |
 |---|---|---|---|---|
-| [ ] | `effects` on `Command` | A required `effects: 'none' \| 'local' \| 'server'` replaces the hand-kept list of commands that write. Every "may this run without the visitor typing it?" rule then derives from one field: `linkable`, `tour`, pipeline and chain stages, and bang expansion. Build before those rows; each would otherwise make its own judgement, and a hand-kept list is where the next writer slips through. | `terminal/types.ts`, every `commands/*.ts`, `__tests__/registry.spec.ts` | S |
+| [x] | `effects` on `Command` (shipped as `writes`) | A required `effects: 'none' \| 'local' \| 'server'` replaces the hand-kept list of commands that write. Every "may this run without the visitor typing it?" rule then derives from one field: `linkable`, `tour`, pipeline and chain stages, and bang expansion. Build before those rows; each would otherwise make its own judgement, and a hand-kept list is where the next writer slips through. | `terminal/types.ts`, every `commands/*.ts`, `__tests__/registry.spec.ts` | S |
 | [ ] | The shell over curl | `curl jhemery.xyz/neofetch`, `curl jhemery.xyz/projects` and `curl -H 'Accept-Language: fr' jhemery.xyz/about` print the read-only commands, in colour, in a real terminal; `curl jhemery.xyz/help` lists which answer. It works because output is `OutputLine[]` and never HTML. A pure `terminal/ansi.ts` maps tones to SGR codes from a palette shared with the résumé plugin, and links to OSC 8. The files are generated by a vitest spec, not the build: every linkable, non-live, non-game command runs through `recordingContext` in both locales into `toMatchFileSnapshot('public/run/<locale>/<name>.txt')`, so command code never runs inside `vite.config.ts` and CI fails on a stale file. Clock-dependent rows are left out. `.htaccess` rewrites `/<name>` for curl, wget and httpie only, with `Vary: User-Agent, Accept-Language`. | `terminal/ansi.ts` (new), `vite-plugins/resume.ts`, `public/run/**` (generated), `public/.htaccess`, `vite.config.ts` | M |
 | [ ] | Pipes, `;` and `&&` | Reverses [features-spec §10](features-spec.md): `fortune \| cowsay`, `history \| grep theme`, `cat about.txt \| sha256sum`, `projects --json \| jq .`, and `LANG=fr neofetch`. The pipe carries `OutputLine[]`, not bytes, so colour survives and the no-HTML rule holds end to end; `cat f \| sha256sum` matches `sha256sum f` through the existing `fileText()`. `CommandContext` gains exactly `stdin?` and `tty`; a non-final stage prints into a collector and its `capture`/`prompt` throw "not a tty". A quote-aware tokeniser replaces `split(/\s+/)`, **treating quotes as grouping only when they balance**, because French elisions (`sign c'est top`, `ask qu'est-ce que…`) must not open a quote; specs pin those. It must keep the multi-word aliases (`ps aux`, `git log`). A chain or pipe is linkable only if every stage is. | `composables/useTerminal.ts`, `terminal/types.ts`, `commands/text.ts` (new: grep, head, tail, wc, sort, uniq), `terminal/registry.ts` | M |
 | [ ] | `man` pages and `jules(1)` | `man ls` opens a real page (NAME, SYNOPSIS, OPTIONS, EXAMPLES, SEE ALSO) in a `less`-style pager with `/search`; every command answers `--help`; `-<Tab>` completes flags with their descriptions. `Command` gains an optional `manual`, and a generator fills one in from `usage`, `description` and `aliases`, so every command has a page on day one. SEE ALSO carries oblique hints (`ls(1)` → `sl(6)`). `man jules` is the résumé as a man page, and the plugin emits `/jules.1` and `/jules.fr.1` as real roff, so `curl -s jhemery.xyz/jules.1 \| man -l -` works. From a link, `man` refuses a hidden command's page, and `--help` matches exactly so `projects --json` is untouched. | `terminal/types.ts`, `terminal/pager.ts` (new), `commands/core.ts`, `composables/useTerminal.ts`, `vite-plugins/resume.ts`, `vite.config.ts`, `public/.htaccess` | M |
@@ -355,6 +355,58 @@ Recorded as each row ships.
   - The language toggle shows the language a click switches to, named by its content, rather
     than `EN · FR`. `EN·FR` fitted the navbar with only ~0.7% of slack, against the 3.5% that a
     wider monospace font has already needed.
+- **`effects` on `Command`:**
+  - It is called `writes`, because `ctx.effects` already exists inside `run()`.
+  - It can be a function of the arguments: `theme`, `lang`, `scene`, `base64`, `hack` and
+    `wordle share` write only with some.
+  - Achievements, scores and the daily board's one report count as the visitor's own progress,
+    not writes; otherwise every game, and `?run=wordle daily`, would stop being linkable.
+  - `isLinkable(command, args)` is the test: opted in, not hidden, writes `none`, and every
+    argument one the command offers for Tab. That last condition stops a link's author putting
+    free text after the name, which the shell echoes as if typed.
+  - `linkable` can be a predicate, which closed `?run=help vim`, `?run=help --all` and
+    `?run=ls -a`.
+  - Shipped with the row: a nested `ctx.run` now runs inside its parent (it used to reset the
+    parent's state), a stored alias never shadows a command added later, the daily wordle only
+    reports from the keystroke that finishes the board, and `:q` only escapes when vim is open.
+- **`why <topic>`:**
+  - "Did you mean" comes from a new leaf module, `terminal/fuzzy.ts`, rather than exporting the
+    registry's `editDistance`: a command importing the registry would join its import cycle.
+  - It is seeded with fifteen decisions, from the specs' rejected alternatives and, for
+    `polling`, from features-spec's. Each was drafted from its doc and the code, then
+    fact-checked against both.
+- **Design specs as pages:**
+  - The markdown renderer is hand-written (`vite-plugins/markdown.ts`), for exactly the subset
+    the specs use, and it fails the build on anything else. A dependency would have meant
+    configuring the two things that matter here, escaping and GitHub's heading ids.
+  - "In English with a line saying so" became a line naming each page's language, because one
+    spec is in French.
+  - The printable résumés left the precache with the notes, since both are documents few
+    visitors open.
+- **`tour`:**
+  - No `vim`: it is hidden, so a link may not run it, and naming it hands out an easter egg.
+  - No game, which would hold the keyboard and turn the output's announcements off for the
+    rest of the walk. The tour shows the `games` listing and points at `wordle daily` instead.
+  - "A colour scheme shown but not saved" is a new `previewTheme()`: it paints for three
+    seconds, saves nothing, fires no achievement, and is put back however the tour ends.
+- **Case studies:**
+  - Eight parts, each drafted from its spec and the code and then fact-checked against both, as
+    `why` was. The copy is a first draft for the owner to edit.
+  - No number is a count the build has to hand (commands, achievements, tools, schemes), so
+    `WorkNumber.value` is a string, or a `Localised` one where it carries a word or a thousands
+    separator. Each figure is instead pinned in `work.spec.ts` to the line of code it was read
+    from, so changing the constant fails the test until the copy follows. The one with no code
+    behind it, ffmpeg's deflated size, is marked as measured.
+  - Below the terminal's breakpoint a case study names its command rather than linking it, and
+    its decisions link their design notes, since a `?run=` link has no shell to open there.
+  - `spec` is required rather than optional: every part has a design note to link.
+  - `projects --json` stays an array. The parts hang off this site's own entry as `parts`, so
+    nothing that already reads the array breaks.
+  - The `vim` part has no *try it*: the command is hidden, so a link may not run it.
+  - `work.ts` stays in the eager chunk, as planned, but it costs about 14 kB gzipped, not the 6–8
+    estimated. The projects grid and the tab title read it. The home page measured 278 KiB of the
+    300 KiB budget (median of five), so nothing was split. The decisions, the other half of the
+    copy, ride in the lazy terminal chunk.
 
 ## Build order
 
@@ -401,15 +453,15 @@ destinations (#87), the swing's end-of-transition twitch (#89).
 6. The backend rows: `systemctl status`, the wordle histogram, the MCP server.
 7. Two-player games last. It's the only L, and it changes the rooms' trust model.
 
-**Phase 7 — the late-September brainstorm (§H):** step 1 shipped, the rest proposed. One branch per step
+**Phase 7 — the late-September brainstorm (§H):** steps 1 and 2 shipped, the rest proposed. One branch per step
 (the [plan](superpowers/plans/2026-10-01-late-september-batch.md#order) splits steps 3, 5 and 6
 further):
 
 1. **Fixes found on the way.** The rate-limit key already shipped in #104. The rest are each S
    and independent, and later rows lean on them: the case studies on experience as content,
    generated `llms.txt` on `ask` reading its own origin.
-2. **`effects` on `Command`**, before anything that decides whether a command may run without
-   the visitor typing it: `tour`, pipes and chains, history expansion.
+2. **`effects` on `Command`** (shipped as `writes`), before anything that decides whether a
+   command may run without the visitor typing it: `tour`, pipes and chains, history expansion.
 3. **Show the work** and **prove the claims**. The case studies and `why` share one `Decision`
    type, so build `why` first; `tour` comes after `effects`. `strace` and the image inspector are
    independent of both.

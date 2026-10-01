@@ -29,13 +29,14 @@ function buffer(overrides: Partial<VimBufferState> = {}): VimBufferState {
 
 /** Drives the real `:q` command against a stub of the vim effects, returning
  *  whether the pane was closed and what the status line ended up saying. */
-function run(raw: string, state: VimBufferState) {
-  let open = true
+function run(raw: string, state: VimBufferState, opened = true) {
+  let open = opened
   const effects = {
     vim: (enabled: boolean) => {
       open = enabled
     },
     vimIsDirty: () => state.dirty,
+    vimIsOpen: () => open,
     vimMessage: (text: string) => {
       state.statusMessage = text
     },
@@ -58,11 +59,21 @@ function run(raw: string, state: VimBufferState) {
     signal: new AbortController().signal,
   } as unknown as CommandContext
 
-  quit.run(ctx)
-  return { open, message: state.statusMessage }
+  const lines = quit.run(ctx) as Array<{ text: string }> | undefined
+  return { open, message: state.statusMessage, lines: lines ?? [] }
 }
 
 describe(':q', () => {
+  // The achievement is for escaping vim; typed at the prompt there is nothing to escape.
+  it.each([':q', ':q!', ':wq'])('`%s` with no vim open unlocks nothing', (raw) => {
+    const { lines, open } = run(raw, buffer(), false)
+    const text = lines.map((l) => l.text).join('\n')
+    expect(text).toContain('not in vim')
+    expect(text).not.toContain('you are free')
+    expect(text).not.toContain('🏆')
+    expect(open).toBe(false)
+  })
+
   it('claims every spelling the muscle memory reaches for', () => {
     expect(quit.aliases).toEqual(
       expect.arrayContaining([':q!', ':quit', ':quit!', ':wq', ':wq!', ':x']),

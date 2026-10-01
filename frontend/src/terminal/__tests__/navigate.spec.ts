@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it } from 'vitest'
 import type { Localised } from '@/content/types'
+import { work } from '@/content'
 import { activeView } from '@/composables/useViewSwing'
 import { tools, visibleTools } from '@/tools/registry'
 import { navigateCommands } from '../commands/navigate'
@@ -116,9 +117,20 @@ describe('ls', () => {
     expect((await run('ls', 'tools/json')).text).toHaveLength(1)
   })
 
-  it('treats a section as an empty directory and an unknown path as an error', async () => {
-    expect((await run('ls', 'projects')).out).toEqual([])
+  it('lists the case studies under projects, treats any other section as empty, and an unknown path as an error', async () => {
+    const { text } = await run('ls', 'projects')
+    expect(text).toHaveLength(work.length)
+    for (const part of work) expect(text.some((t) => t.startsWith(`${part.id}.md`))).toBe(true)
+    expect((await run('ls', 'about')).out).toEqual([])
     expect((await run('ls', 'nope')).out[0]).toMatchObject({ tone: 'error' })
+  })
+
+  it('lets cat complete the case studies only once the word reaches into projects/', () => {
+    const cat = navigateCommands.find((c) => c.name === 'cat')!
+    expect(cat.complete!({ args: [''], index: 0, word: '' }).some((f) => f.startsWith('projects/'))).toBe(false)
+    expect(cat.complete!({ args: ['projects/'], index: 0, word: 'projects/' })).toEqual(
+      expect.arrayContaining(work.map((p) => `projects/${p.id}.md`)),
+    )
   })
 
   it('still honours -a with a path', async () => {

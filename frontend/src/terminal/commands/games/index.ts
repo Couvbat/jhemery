@@ -61,6 +61,7 @@ const listing: Command = {
   aliases: ['arcade'],
   description: { en: 'List the playable games', fr: 'Lister les jeux jouables' },
   group: 'fun',
+  writes: 'none',
   linkable: true,
   // The one game entry in the palette: launching a game from Ctrl+K would drop
   // a visitor into a keyboard-captured surface they did not ask for.
