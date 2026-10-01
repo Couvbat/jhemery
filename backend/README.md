@@ -86,8 +86,12 @@ coordinates so everyone gets the same answer, and `ask` never logs questions or 
 allows the `x-admin-password` and `x-room-token` headers — without which the guestbook DELETE and
 the rooms' host and seat routes fail their preflight in the browser.
 
-**`trust proxy`** is on: Apache fronts the app, so `req.ip` must come from `X-Forwarded-For` or the
-rate limiter would see one client (the proxy) for the whole internet.
+**`trust proxy`** is set to one hop. Apache fronts the app through Passenger, which appends its own
+`X-Forwarded-For` line carrying Apache's peer, so at 1 `req.ip` is that peer: the one entry no
+client can write. Without it the rate limiter would see one client (the proxy) for the whole
+internet; at 2 it would read an entry a direct-to-origin request writes itself. Visitors behind
+Cloudflare are told apart by `CF-Connecting-IP`, honoured only when the peer is in Cloudflare's
+published ranges (`clientIp()` in `common/rate-limit.guard.ts`).
 
 **Validation** is a global `ValidationPipe({ whitelist: true })`; DTOs use `class-validator`.
 

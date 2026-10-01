@@ -146,7 +146,8 @@ the overrides, so `main.css` stays its only definition. The consequences for new
 `app.module.ts` wires ~13 feature modules, each `{controller, service, dto, spec}`. `main.ts`
 carries the cross-cutting decisions and explains each in comments: helmet with a `default-src
 'none'` CSP (JSON API, never a document), CORS locked to `FRONTEND_URL` + localhost,
-`trust proxy` so the per-IP `common/rate-limit.guard.ts` sees real clients behind Apache, and a
+`trust proxy` at one hop so the per-IP `common/rate-limit.guard.ts` sees real clients behind Apache
+(`CF-Connecting-IP` only from Cloudflare's ranges — don't "fix" the hop count to 2), and a
 whitelisting `ValidationPipe`.
 
 **Everything optional degrades gracefully.** No Steam key → live activity hidden; no GitHub token

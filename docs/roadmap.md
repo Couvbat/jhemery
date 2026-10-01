@@ -266,7 +266,7 @@ them.
 
 | ✔ | Feature | Approach | Files | Effort |
 |---|---|---|---|---|
-| [ ] | Rate-limit key | `clientIp()` keys on the leftmost `X-Forwarded-For` entry, which is the one the client writes; Cloudflare and Apache append theirs after it. Key on `CF-Connecting-IP` when present, else on `req.ip` with the trust-proxy hop count that matches Cloudflare → Apache, and cap the size of the `hits` Map. The spec that matters: a client-sent `X-Forwarded-For` must not open a new bucket. `who`/`wall` below waits for this. | `backend/src/common/rate-limit.guard.ts`, `backend/src/main.ts`, a guard spec (new) | S |
+| [x] | Rate-limit key | Shipped in #104, before this row was written. `clientIp()` keys on `req.ip` with `trust proxy` at one hop, the one entry no client can write. It switches to `CF-Connecting-IP` only when that peer is in Cloudflare's published ranges, because the origin also answers direct connections, where the header is anyone's to write. The `hits` Map is capped at 10 000 buckets, dropping the oldest. `rate-limit.guard.spec.ts` holds that a client-sent `X-Forwarded-For` never opens a new bucket. | `backend/src/common/rate-limit.guard.ts`, `backend/src/main.ts`, `rate-limit.guard.spec.ts` | S |
 | [ ] | Re-seal the CTF payoff | `PAYOFF` still says "Hiring, a project…" while `availability.open` is false. Re-running the seal changes only `SEALED`, so `STAGE_HASHES` and everyone's stored flags survive. | `frontend/scripts/ctf-seal.mjs`, `terminal/ctf.ts` | S |
 | [ ] | `ask` reads its own origin | `CORPUS_URL` is hard-coded to production's `llms.txt`, so local and staging `ask` answer from production's corpus. Read `${FRONTEND_URL}/llms.txt`, as MCP already does. Its comment also calls the file generated; it's hand-written (see *generated llms.txt* below). | `backend/src/ask/ask.service.ts` | S |
 | [ ] | Experience as content | The `resume` command hard-codes an experience block, and "2 years" is typed in three places, so `resume.txt`, both printable résumés and `content.json` have no experience section: the README's "one source for the CV" no longer holds. `content/experience.ts` holds dated `Role`s with a pure `durationLabel()` beside `daysSince`, every renderer reads it, and a résumé spec asserts they list the same roles in the same order. `content.json` gaining `experience` is a shape change, so it needs a new `version` and the matching backend change, deployed together. | `content/experience.ts` (new), `commands/content.ts`, `content/profile.ts`, `content/projects.ts`, `vite-plugins/resume.ts`, `backend/src/mcp/*` | S |
@@ -319,6 +319,15 @@ them.
 | [ ] | Accessible page changes | After the prism swing settles, focus the new view's `<h1 tabindex="-1">` and announce its `tabTitle()` in one `role="status"` node; the leaving face is `inert` for the swing (two `<main>`s overlap today); a skip link comes first. Tested in e2e, because focus after a real transition is what jsdom can't see. | `App.vue`, `composables/useViewSwing.ts`, `composables/useTabTitle.ts`, `e2e/navigation.spec.ts` | M |
 | [ ] | `who` and `wall` | `who` lists everyone on the site as anonymous ttys (`somebody pts/3`). `wall` sends a wave with no content: every other visitor's wireframes ripple outward, and an open terminal prints "Broadcast message from somebody@jhemery.xyz". Rides the existing presence stream, so no new connection; the server coalesces waves to one per 3 s. No text, no id, and the count is the one already sent. After the rate-limit fix. | `backend/src/presence/*`, `composables/usePresence.ts`, `components/ThreeBackground.vue`, `commands/system.ts` | S |
 
+### Departures from the approach column
+
+Recorded as each row ships.
+
+- **Rate-limit key:** `trust proxy` stays at **1**, not the two hops "Cloudflare → Apache" suggests.
+  Passenger forwards the header it was given, then appends its own line carrying Apache's peer, so
+  at 1 `req.ip` is that peer. At 2 it would be the entry before it, which a request sent straight to
+  the origin writes itself. The reasoning is in `backend/src/main.ts`.
+
 ## Build order
 
 **Phase 1 — quick wins, no backend (S):** ✅ shipped on `feat/phase-1` → `dev`.
@@ -368,9 +377,9 @@ destinations (#87), the swing's end-of-transition twitch (#89).
 (the [plan](superpowers/plans/2026-10-01-late-september-batch.md#order) splits steps 3, 5 and 6
 further):
 
-1. **Fixes found on the way**, the rate-limit key first. Each is S and independent, and several
-   later rows lean on them: `who`/`wall` on the rate limit, the case studies on experience as
-   content, generated `llms.txt` on `ask` reading its own origin.
+1. **Fixes found on the way.** The rate-limit key already shipped in #104. The rest are each S
+   and independent, and later rows lean on them: the case studies on experience as content,
+   generated `llms.txt` on `ask` reading its own origin.
 2. **`effects` on `Command`**, before anything that decides whether a command may run without
    the visitor typing it: `tour`, pipes and chains, history expansion.
 3. **Show the work** and **prove the claims**. The case studies and `why` share one `Decision`
