@@ -5,7 +5,7 @@ import { expandAliases } from '@/terminal/aliases'
 import { history, pushHistory } from '@/terminal/history'
 import { pick, type Locale } from '@/content/types'
 import { fail } from '@/terminal/format'
-import { flagsOf, renderUsage } from '@/terminal/manual'
+import { completableFlags, renderUsage } from '@/terminal/manual'
 import { lastStageStart, parseLine, replaceStages, type Link, type Stage } from '@/terminal/parse'
 import {
   commonPrefix,
@@ -61,6 +61,10 @@ const pendingPrompt = shallowRef<{
   resolve: (value: string) => void
   reject: (reason?: unknown) => void
 } | null>(null)
+
+/** Marks a capture that wants Escape itself (`ctx.capture(handler, { escape: true })`). */
+const TAKES_ESCAPE = Symbol('takes escape')
+type EscapeTaker = ((key: string) => void) & { [TAKES_ESCAPE]?: boolean }
 
 /** Set while a running command holds the keyboard via `ctx.capture()`. */
 const keyCapture = shallowRef<((key: string) => void) | null>(null)
@@ -277,11 +281,12 @@ function buildContext(args: string[], raw: string, scope: Scope, stdin?: OutputL
         }
       })
     },
-    capture: (handler: (key: string) => void) => {
+    capture: (handler: (key: string) => void, options?: { escape?: boolean }) => {
       // Nobody is reading a stage on the left of a `|`, so nobody is typing at it either.
       if (!tty) throw notATty(raw)
       // Only one capture at a time — commands don't nest, so a second call
       // replaces the first rather than stacking.
+      if (options?.escape) (handler as EscapeTaker)[TAKES_ESCAPE] = true
       keyCapture.value = handler
       return () => {
         if (keyCapture.value === handler) keyCapture.value = null
@@ -305,6 +310,12 @@ async function runNested(input: string, scope: Scope, stdin?: OutputLine[]): Pro
   if (!target) {
     const [name = ''] = input.trim().split(/\s+/)
     scope.sink.print([fail(`${name}: ${messages.terminal.notFound[currentLocale()]}`)])
+    return
+  }
+  // `--help` means the same inside another command: `strace sign --help` prints the usage,
+  // it doesn't post "--help".
+  if (target.args[0] === '--help') {
+    scope.sink.print(renderUsage(target.command, (value) => pick(value, scope.locale ?? currentLocale())))
     return
   }
   // A capture is one slot, not a stack: hand the parent's back once the child is done,
@@ -660,7 +671,7 @@ function completeArgument(words: string[], index: number, word: string): string[
 
   const args = words.slice(owner.argStart)
   const own = owner.command.complete?.({ args, index: argIndex, word }) ?? []
-  const flags = word.startsWith('-') ? flagsOf(owner.command) : []
+  const flags = word.startsWith('-') ? completableFlags(owner.command) : []
   return filterByPrefix([...new Set([...own, ...flags])], word)
 }
 
@@ -760,6 +771,7 @@ export function useTerminal() {
     busy: computed(() => busy.value),
     trapped: computed(() => trapped.value),
     capturing: computed(() => keyCapture.value !== null),
+    captureTakesEscape: computed(() => (keyCapture.value as EscapeTaker | null)?.[TAKES_ESCAPE] === true),
     vimBuffer: computed(() => vimBuffer.value),
     handleVimKeydown,
     handleCaptureKeydown,

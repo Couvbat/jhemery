@@ -113,5 +113,14 @@ describe('--help and -<Tab>', () => {
     expect(listed).toContainEqual(expect.stringMatching(/^-i\s+Ignore case\.$/))
     expect(listed).toHaveLength(4)
     expect(completeInput('curl -').value).toBe('curl -I ')
+    // `-N` is head's placeholder for `-3`, not a flag to type.
+    expect(completeInput('head -n').value).toBe('head -n ')
+  })
+
+  it('prints the usage for --help inside another command too, and runs nothing', async () => {
+    clearBuffer()
+    await run('strace sign --help')
+    expect(buffer.value.some((l) => l.text.startsWith('usage: sign'))).toBe(true)
+    expect(buffer.value.some((l) => l.text.includes('your name'))).toBe(false)
   })
 })

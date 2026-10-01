@@ -28,6 +28,15 @@ export function flagsOf(command: Command): string[] {
   return [...new Set([...usage.matchAll(/(?<=^|[\s[|])(--?[A-Za-z][\w-]*)(?=$|[\s\]|])/g)].map((m) => m[1]!))]
 }
 
+/**
+ * The flags Tab can offer: not a placeholder like `head`'s `-N` (a number, written `-3`),
+ * whose letter stands alone elsewhere in the usage as the thing it means.
+ */
+export function completableFlags(command: Command): string[] {
+  const usage = command.usage ?? ''
+  return flagsOf(command).filter((flag) => !(/^-[A-Z]$/.test(flag) && new RegExp(`(?:^|[\\s[|])${flag[1]}(?=$|[\\s\\]|])`).test(usage)))
+}
+
 export function manualFor(command: Command): ManPage {
   const extra = command.manual ?? {}
   const aliases = command.aliases?.length ? command.aliases : undefined

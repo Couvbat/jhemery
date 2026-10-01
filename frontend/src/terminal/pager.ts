@@ -18,6 +18,8 @@ export const PAGE_ROWS = 20
 export interface PagerState {
   lines: OutputLine[]
   top: number
+  /** The line the last search landed on, so `n` moves on from it even when the page can't scroll further. */
+  match: number
   /** Non-null while `/` is reading a search. */
   typing: string | null
   query: string
@@ -26,7 +28,7 @@ export interface PagerState {
 }
 
 export function openPager(lines: OutputLine[]): PagerState {
-  return { lines, top: 0, typing: null, query: '', message: null }
+  return { lines, top: 0, match: -1, typing: null, query: '', message: null }
 }
 
 const lastTop = (state: PagerState) => Math.max(0, state.lines.length - PAGE_ROWS)
@@ -42,10 +44,15 @@ function find(state: PagerState, from: number, step: 1 | -1): number {
   return -1
 }
 
-function jump(state: PagerState, from: number, step: 1 | -1): void {
+function jump(state: PagerState, step: 1 | -1): void {
+  const from = state.match < 0 ? (step === 1 ? state.top : state.top - 1) : state.match + step
   const at = find(state, from, step)
-  if (at < 0) state.message = 'Pattern not found'
-  else state.top = clampTop(state, at)
+  if (at < 0) {
+    state.message = 'Pattern not found'
+    return
+  }
+  state.match = at
+  state.top = clampTop(state, at)
 }
 
 /** One key: whether the pager is done, and the state changed in place otherwise. */
@@ -55,7 +62,8 @@ export function pagerKey(state: PagerState, key: string): 'quit' | 'stay' {
     if (key === 'Enter') {
       state.query = state.typing || state.query
       state.typing = null
-      jump(state, state.top + 1, 1)
+      state.match = -1
+      jump(state, 1)
     } else if (key === 'Escape') state.typing = null
     else if (key === 'Backspace') state.typing = state.typing.slice(0, -1)
     else if (key.length === 1) state.typing += key
@@ -96,12 +104,14 @@ export function pagerKey(state: PagerState, key: string): 'quit' | 'stay' {
       state.typing = ''
       break
     case 'n':
-      jump(state, state.top + 1, 1)
-      break
+      jump(state, 1)
+      return 'stay'
     case 'N':
-      jump(state, state.top - 1, -1)
-      break
+      jump(state, -1)
+      return 'stay'
   }
+  // Scrolling by hand forgets the match: the next `n` searches from what is on screen.
+  state.match = -1
   return 'stay'
 }
 
@@ -132,7 +142,7 @@ export function page(ctx: CommandContext, lines: OutputLine[], title: string): P
         release()
         resolve()
       } else draw(pagerView(state, title))
-    })
+    }, { escape: true })
     ctx.signal.addEventListener(
       'abort',
       () => {

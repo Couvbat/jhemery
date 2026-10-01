@@ -47,6 +47,22 @@ describe('pagerKey', () => {
     expect(state.typing).toBeNull()
   })
 
+  // Found in review: on the last page `n` kept finding the same match.
+  it('moves on from a match even when the page can no longer scroll', () => {
+    const lines = rows(45)
+    lines[29] = { text: 'x one' }
+    lines[39] = { text: 'x two' }
+    const state = openPager(lines)
+    for (const key of ['/', 'x', 'Enter']) pagerKey(state, key)
+    expect(state.match).toBe(29)
+    pagerKey(state, 'n')
+    expect(state.match).toBe(39)
+    pagerKey(state, 'n')
+    expect(state.message).toBe('Pattern not found')
+    pagerKey(state, 'N')
+    expect(state.match).toBe(29)
+  })
+
   it('quits on q', () => {
     expect(pagerKey(openPager(rows(40)), 'q')).toBe('quit')
   })
