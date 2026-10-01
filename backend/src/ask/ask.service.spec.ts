@@ -20,6 +20,8 @@ describe('AskService', () => {
     ASK_ENABLED: 'true',
     LLM_BASE_URL: 'http://box.local:8080/v1',
     LLM_MODEL: 'a-model',
+    // A trailing slash on purpose: the corpus URL must not come out as `//llms.txt`.
+    FRONTEND_URL: 'http://site.test/',
   };
 
   let fetchMock: jest.Mock;
@@ -606,6 +608,33 @@ describe('AskService', () => {
         String(url).includes('llms.txt'),
       );
       expect(corpusCalls).toHaveLength(1);
+    });
+
+    it('reads llms.txt from its own site, not production', async () => {
+      respond(() => completion('data: [DONE]\n\n'));
+      await warmed();
+
+      const corpusCalls = fetchMock.mock.calls.filter(([url]) =>
+        String(url).includes('llms.txt'),
+      );
+      expect(corpusCalls.map(([url]) => String(url))).toEqual([
+        'http://site.test/llms.txt',
+      ]);
+    });
+
+    it('answers from the fallback, dialling nothing, when FRONTEND_URL is unset', async () => {
+      const env: Record<string, string> = { ...configured };
+      delete env.FRONTEND_URL;
+      respond(() => completion('data: [DONE]\n\n'));
+      const instance = service(env);
+      const { onDelta } = collect();
+
+      await instance.answer(dto, onDelta);
+      await instance.answer(dto, onDelta);
+
+      const urls = fetchMock.mock.calls.map(([url]) => String(url));
+      expect(urls.some((url) => url.includes('llms.txt'))).toBe(false);
+      expect(promptAt(0)).toContain('jhemery.xyz');
     });
 
     it('backs off instead of re-dialling a broken host every question', async () => {
