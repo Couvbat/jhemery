@@ -281,7 +281,7 @@ them.
 |---|---|---|---|---|
 | [ ] | Case studies of the site's own parts | The one portfolio card, whose blurb still reads "shadcn-vue and a cyberpunk terminal aesthetic", opens into eight to ten short studies: the modal vim, the ISO 18004 QR encoder, room sync, the ffmpeg.wasm tier, the prism swing, MCP, presence, and the word-list licensing. `content/work.ts` holds `WorkPart { id, name, summary, hard, numbers, try?, code, spec?, decisions? }`, and every surface reads that one array. `try` is a `goTo()` path or a command line, and a spec asserts every command-form `try` resolves through `resolveLink()`, so *try it* is an ordinary `?run=` link. Code and spec links are pinned to `__BUILD_SHA__`, not `tree/master`. Surfaces: a grid under the portfolio card, a lazy `/work/:id` route outside the prism like `/now`, `ls projects` and `cat`, and `projects <id>`. Most of the cost is writing, about 150 bilingual words a part; wherever a number can come from the build, it should, because typed ones go stale. | `content/work.ts` (new), `sections/ProjectsSection.vue`, `router/index.ts`, `views/WorkView.vue` (new), `commands/content.ts`, `commands/navigate.ts`, `commands/files.ts` | M |
 | [ ] | `why <topic>` | `why battleship`, `why polling`, `why mcp-sdk`: what was chosen, what was rejected and why, the PR, and an honest `hindsight` (the registry cycle is a good first one). `why` alone lists them. `content/decisions.ts` is seeded from the ~15 "Rejected alternative" lines already in the specs, and shares its `Decision` type with the case studies. Keep each `because` to one sentence and always link the spec's anchor, so the spec stays the authority and the two can't drift far. `complete()` offers ids; "did you mean" comes from exporting the registry's `editDistance`. Linkable. | `content/decisions.ts` (new), `commands/work.ts` (new), `terminal/registry.ts` | S |
-| [ ] | `tour` | A linkable walk of about a minute through `ctx.run`: `neofetch`, a colour scheme shown but not saved, one game, `vim`, the `curl` hint, and the achievements count. With this much on the site, finding things is the bottleneck, not the number of them, and `?run=tour` is the one link to put in a bio. It may only run what a link could run itself, which `writes` (the *effects on `Command`* row) makes checkable. | `commands/work.ts` | S |
+| [x] | `tour` | A linkable walk of about a minute through `ctx.run`: `neofetch`, a colour scheme shown but not saved, one game, `vim`, the `curl` hint, and the achievements count. With this much on the site, finding things is the bottleneck, not the number of them, and `?run=tour` is the one link to put in a bio. It may only run what a link could run itself, which `writes` (the *effects on `Command`* row) makes checkable. | `commands/work.ts` | S |
 | [ ] | Design specs as pages | `docs/superpowers/specs` as static, script-free pages at `/notes/<slug>`, built like `resume.html`, in English with a line saying so. They are the best evidence of how the site was thought through, and today they are only on GitHub; the case studies' *read the design* links point here. Needs markdown to HTML at build time: write a small one or take a dependency, and say which in the design. | `vite-plugins/notes.ts` (new), `vite.config.ts` (`navigateFallbackDenylist`) | M |
 
 ### Prove the claims
@@ -369,6 +369,12 @@ Recorded as each row ships.
   - Shipped with the row: a nested `ctx.run` now runs inside its parent (it used to reset the
     parent's state), a stored alias never shadows a command added later, the daily wordle only
     reports from the keystroke that finishes the board, and `:q` only escapes when vim is open.
+- **`tour`:**
+  - No `vim`: it is hidden, so a link may not run it, and naming it hands out an easter egg.
+  - No game, which would hold the keyboard and turn the output's announcements off for the
+    rest of the walk. The tour shows the `games` listing and points at `wordle daily` instead.
+  - "A colour scheme shown but not saved" is a new `previewTheme()`: it paints for three
+    seconds, saves nothing, fires no achievement, and is put back however the tour ends.
 
 ## Build order
 

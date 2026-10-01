@@ -169,7 +169,7 @@ An empty prompt suggests a command in faded text (`try: neofetch`), cycling ever
 until you type anything, and then not again that session. Under reduced motion it shows one.
 
 **Links that run a command.** `https://jhemery.xyz/?run=neofetch` opens the shell and runs
-`neofetch` once, then drops the parameter from the URL. A command has to opt in (`linkable`), and
+`neofetch` once (`?run=tour` is the one to put in a bio), then drops the parameter from the URL. A command has to opt in (`linkable`), and
 even then a link only runs it if, with those arguments, it writes nothing and isn't hidden. Every
 command declares what it writes (`none`, `local` or `server`), so `?run=theme dracula`,
 `?run=sign hi`, `?run=help vim` and `?run=ls -a` are all refused. A link's arguments must be ones
@@ -243,6 +243,7 @@ never show two different contents.
 | `neofetch` | `fetch` | System summary with an ASCII logo, an "uptime" counted from the first commit and whether I'm open to work |
 | `resume` | `cv` | Condensed résumé (experience, education, stack, links), with a link to the printable one |
 | `curl` | | `curl jhemery.xyz` fetches the résumé the way a real curl would |
+| `tour` | | A one-minute walk through the site: `neofetch`, a colour scheme shown for a moment and put back, the games, the `curl` hint, and how many achievements you've found. `?run=tour` is the link to share |
 
 </details>
 

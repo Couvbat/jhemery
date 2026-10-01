@@ -346,7 +346,7 @@ describe('links (?run=)', () => {
 
   it('has something worth linking to', () => {
     expect(allCommands().filter((c) => isLinkable(c)).map((c) => c.name)).toEqual(
-      expect.arrayContaining(['neofetch', 'projects', 'wordle', 'ctf']),
+      expect.arrayContaining(['neofetch', 'projects', 'wordle', 'ctf', 'tour', 'why']),
     )
   })
 

@@ -308,6 +308,14 @@ commit, and the live Steam status if available. `curl <domain>` re-runs `resume`
 this site (or `localhost`), mirroring what a real `curl jhemery.xyz` returns (§7); any other host
 gets `curl: (6) Could not resolve host` and a note that a browser tab cannot open a raw socket.
 
+`tour` (`commands/work.ts`) is a paced walk through `TOUR_STOPS`, each a caption and either a
+command run inside it through `ctx.run` or one of three stops that are not commands. Those are a
+scheme shown for three seconds with `previewTheme()`, which saves nothing and is put back however
+the tour ends; the `curl` hint; and the achievement count. It is linkable, so every command it
+runs must be too (`tour.spec.ts`). It runs no game, which would hold the keyboard and switch the
+output's announcements off for the rest of the walk, and names no hidden command. Under reduced
+motion it prints everything at once and shows no scheme.
+
 ### live
 | Command | Endpoint | Fallback |
 |---|---|---|

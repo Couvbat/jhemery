@@ -134,3 +134,34 @@ describe('useTheme', () => {
     })
   })
 })
+
+// What `tour` uses: a scheme shown without being chosen.
+describe('previewTheme', () => {
+  it('paints a scheme without saving it, and puts the chosen one back', async () => {
+    const { previewTheme, useTheme } = await load()
+    const restore = previewTheme('gruvbox')!
+
+    expect(root.dataset.theme).toBe('gruvbox')
+    expect(useTheme().theme.value.id).toBe('gruvbox')
+    expect(window.localStorage.getItem(STORAGE_KEY)).toBeNull()
+    expect(root.classList.contains('theme-flash')).toBe(false)
+
+    restore()
+    expect(root.dataset.theme).toBeUndefined()
+    expect(useTheme().theme.value.id).toBe('cyberpunk')
+  })
+
+  it('lets a scheme picked during the preview win', async () => {
+    const { previewTheme, setTheme, useTheme } = await load()
+    const restore = previewTheme('gruvbox')!
+    setTheme('nord')
+    restore()
+    expect(root.dataset.theme).toBe('nord')
+    expect(useTheme().theme.value.id).toBe('nord')
+  })
+
+  it('refuses an unknown scheme', async () => {
+    const { previewTheme } = await load()
+    expect(previewTheme('nope')).toBeNull()
+  })
+})
