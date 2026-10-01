@@ -35,6 +35,17 @@ const T0 = 1_700_000_000_000;
 /** Long enough for the real mkdir/readdir/stat the service awaits to complete. */
 const flush = () => new Promise<void>((r) => setTimeout(r, 40));
 
+/**
+ * Waits for a job's directory to go. The service removes it without awaiting the `rm`
+ * (the response doesn't wait on the disk), so a fixed pause is only as long as the
+ * slowest CI runner allows; this waits for the fact, up to two seconds.
+ */
+async function gone(path: string): Promise<boolean> {
+  for (const end = Date.now() + 2000; existsSync(path) && Date.now() < end;)
+    await flush();
+  return !existsSync(path);
+}
+
 describe('JobsService', () => {
   let root: string;
   let service: JobsService;
@@ -159,7 +170,7 @@ describe('JobsService', () => {
 
     expect(service.get(job.id)?.status).toBe('failed');
     expect(service.get(job.id)?.error).toContain('not a bot');
-    expect(existsSync(cwd)).toBe(false);
+    expect(await gone(cwd)).toBe(true);
   });
 
   it('treats a clean exit with no file as a failure — the size-limit skip', async () => {
@@ -217,7 +228,7 @@ describe('JobsService', () => {
 
     await service.release(job.id);
     expect(service.get(job.id)).toBeUndefined();
-    expect(existsSync(cwd)).toBe(false);
+    expect(await gone(cwd)).toBe(true);
   });
 
   it('sweeps files nobody fetched after their TTL', async () => {
@@ -234,7 +245,7 @@ describe('JobsService', () => {
     expect(service.get(job.id)).toBeDefined();
     await service.sweep(finishedAt + FILE_TTL_MS + 1);
     expect(service.get(job.id)).toBeUndefined();
-    expect(existsSync(cwd)).toBe(false);
+    expect(await gone(cwd)).toBe(true);
   });
 
   it('lists newest first and never leaks a path', () => {
