@@ -211,7 +211,7 @@ never show two different contents.
 | `base64` | | `base64 [-d] <file\|text>`: encode or decode, as the encode tool does |
 | `uuidgen` | | A random v4 UUID |
 | `jq` | | `jq . <json>`: pretty-print, pointing at the error when it isn't JSON |
-| `strace` | | `strace <command>`: run a command and list the requests it made (`GET /weather = 200 · 1.1 kB · 84 ms`), with the keys of each body and never their values. `strace ls` prints just what `ls` does |
+| `strace` | | `strace <command>`: run a command and list the requests it made (`GET /weather = 200 · 1.10 kB · 84 ms`), with the keys of each body and never their values. `strace ls` prints just what `ls` does |
 | `exit` | `quit`, `logout` | Close the terminal |
 
 </details>

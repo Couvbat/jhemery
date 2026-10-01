@@ -82,6 +82,9 @@ export function parseSgr(text: string): OutputLine[] {
         at = match.index + match[0].length
       }
       push(row.slice(at))
+      // An empty row has no segments at all: the output draws a segment-less row as a
+      // line's height, and an empty list of segments as nothing.
+      if (!segments.length) return { text: '', pre: true }
       return { text: segments.map((s) => s.text).join(''), segments, pre: true }
     })
 }

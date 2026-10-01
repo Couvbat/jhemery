@@ -109,8 +109,13 @@ const strace: Command = {
   // The command first, then whatever that command offers: so a link's arguments are held
   // to the inner command's own list, as they would be without strace.
   complete: ({ args, index, word }) => {
-    if (index === 0) return visibleCommands().flatMap((c) => [c.name, ...(c.aliases ?? [])]).filter((name) => name !== 'strace')
+    const names = visibleCommands()
+      .flatMap((c) => [c.name, ...(c.aliases ?? [])])
+      .filter((name) => name !== 'strace')
+    // A two-word name (`git log`) is offered a word at a time, as the shell reads it.
+    if (index === 0) return [...new Set(names.map((name) => name.split(' ')[0]!))]
     const inner = traced(args.slice(0, index))
+    if (!inner && index === 1) return names.filter((name) => name.startsWith(`${args[0]} `)).map((name) => name.split(' ')[1]!)
     if (!inner) return []
     const consumed = index - inner.args.length
     return inner.command.complete?.({ args: args.slice(consumed), index: index - consumed, word }) ?? []
@@ -127,22 +132,26 @@ const strace: Command = {
       if (!trace.background) traces.push(trace)
     })
     let exit = 0
+    let killed = false
     try {
       await ctx.run(ctx.args.join(' '))
     } catch (error) {
-      if ((error as Error)?.name === 'AbortError') {
-        stop()
-        ctx.print([...traces.flatMap(traceLines), line('+++ killed by SIGINT +++', 'muted')])
-        throw error
+      if ((error as Error)?.name !== 'AbortError') {
+        ctx.print(line(String((error as Error)?.message ?? error), 'error'))
+        exit = 1
       }
-      ctx.print(line(String((error as Error)?.message ?? error), 'error'))
-      exit = 1
+      killed = (error as Error)?.name === 'AbortError'
     } finally {
       stop()
     }
-    // No request, no trailer: `strace ls` looks exactly like `ls`.
-    if (!traces.length) return
-    return [...traces.flatMap(traceLines), line(`+++ exited with ${exit} +++`, 'muted')]
+    // Some commands keep what they had on Ctrl+C rather than rethrowing (`ask`), so the
+    // signal is the truth about whether the run was stopped.
+    killed ||= ctx.signal.aborted
+    // No request, no trailer: `strace ls` looks exactly like `ls`, stopped or not.
+    if (traces.length) {
+      ctx.print([...traces.flatMap(traceLines), line(killed ? '+++ killed by SIGINT +++' : `+++ exited with ${exit} +++`, 'muted')])
+    }
+    if (killed) throw Object.assign(new Error('aborted'), { name: 'AbortError' })
   },
 }
 

@@ -52,17 +52,22 @@ export function resolveTarget(target: string, here: string = typeof location ===
   if (!stripped.startsWith('/')) {
     const slash = stripped.indexOf('/')
     const host = (slash < 0 ? stripped : stripped.slice(0, slash)).toLowerCase().replace(/\.$/, '')
+    const name = host.replace(/:\d+$/, '')
     path = slash < 0 ? '' : stripped.slice(slash)
     const ours =
       host === '' ||
-      host === profile.domain ||
-      host === `www.${profile.domain}` ||
-      /^(localhost|127\.0\.0\.1|\[::1\])(:\d+)?$/.test(host) ||
+      name === profile.domain ||
+      name === `www.${profile.domain}` ||
+      /^(localhost|127\.0\.0\.1|\[::1\])$/.test(name) ||
       (here !== '' && host === here.toLowerCase())
-    if (!ours) return { unresolved: host.replace(/:\d+$/, '') }
+    if (!ours) return { unresolved: name }
   }
-  path = path.replace(/#.*$/, '')
-  return { path: path === '' || path === '/' ? '/resume.txt' : path }
+  // Read the path the way `fetch` will: `//host/x` and `/\host/x` are another origin's
+  // URL in a path's clothing, and must not leave this one.
+  const url = new URL(path.replace(/#.*$/, '') || '/', 'https://same.invalid')
+  if (url.host !== 'same.invalid') return { unresolved: url.hostname }
+  const local = `${url.pathname}${url.search}`
+  return { path: local === '/' ? '/resume.txt' : local }
 }
 
 /** Text a terminal can show: a textual type (or none) and no NUL byte, as curl itself checks. */

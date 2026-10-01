@@ -129,8 +129,9 @@ export function buildResume(at = new Date()): string {
   )
   lines.push(`${DIM}  A printable one is at https://${profile.domain}/resume.html${RESET}`)
   // Stage 3 of the CTF chain (src/terminal/ctf.ts): present in every byte `curl`
-  // receives, invisible in any terminal that honours SGR 8. Only here, never in the
-  // terminal's own `curl`, which renders the résumé from the content instead.
+  // receives, invisible in any terminal that honours SGR 8. The terminal's own `curl`
+  // fetches this file too, and `terminal/ansi.ts`'s parseSgr is what keeps the line
+  // hidden there, by dropping SGR 8 runs: conceal it any other way and that must follow.
   lines.push(`${CONCEAL}  CTF{e883c12a903c4432} - next: cat /etc/shadow${REVEAL}`)
   lines.push('')
 

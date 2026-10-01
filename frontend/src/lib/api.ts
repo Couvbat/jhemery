@@ -431,6 +431,8 @@ export async function fetchSite(
   method: 'GET' | 'HEAD' = 'GET',
   { limit = 256 * 1024, signal }: { limit?: number; signal?: AbortSignal } = {},
 ): Promise<SiteResponse> {
+  // A path on this origin, and only that: `//host` would be another origin's URL.
+  if (!path.startsWith('/') || /^\/[\\/]/.test(path)) throw new TypeError(`not a path on this origin: ${path}`)
   const started = performance.now()
   let res: Response
   try {

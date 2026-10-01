@@ -8,6 +8,8 @@ vi.mock('@/composables/useCrt', async (importOriginal) => ({
 import { setLocale } from '@/i18n'
 import { runLink, submit, useTerminal } from '@/composables/useTerminal'
 import { clearAliases, setAlias } from '../aliases'
+import { cancel } from '@/composables/useTerminal'
+import { isLinkable, resolve } from '../registry'
 import { maskQuery, shapeOf } from '../strace'
 
 /**
@@ -94,6 +96,33 @@ describe('strace', () => {
     clearBuffer()
     await run('strace nope')
     expect(texts().at(-1)).toBe("strace: Can't stat 'nope': No such file or directory")
+  })
+
+  it('links a two-word command the way it links it bare', () => {
+    expect(isLinkable(resolve('git log')!, [])).toBe(true)
+    expect(isLinkable(resolve('strace')!, ['git', 'log'])).toBe(true)
+  })
+
+  // Found in review: `ask` keeps what it had on Ctrl+C rather than rethrowing, which
+  // strace read as a clean exit.
+  it('ends a run stopped by Ctrl+C as killed, whether or not the command rethrew', async () => {
+    let finish: (value: Response) => void = () => {}
+    fetchMock.mockReturnValue(new Promise<Response>((resolve) => (finish = resolve)))
+    const done = run('strace guestbook')
+    await vi.waitFor(() => expect(fetchMock).toHaveBeenCalled())
+    cancel()
+    finish(json({ enabled: false }))
+    await done
+    const lines = texts()
+    expect(lines).toContain('+++ killed by SIGINT +++')
+    expect(lines).not.toContain('+++ exited with 0 +++')
+  })
+
+  it('prints no trailer for a run stopped before any request', async () => {
+    const done = run('strace ls')
+    cancel()
+    await done
+    expect(texts().join('\n')).not.toContain('+++')
   })
 
   it('runs from a link only when what it traces could', async () => {

@@ -45,6 +45,8 @@ describe('resolveTarget', () => {
     ['here.test:8080/robots.txt', '/robots.txt'],
     ['/content.json', '/content.json'],
     ['jhemery.xyz/notes/#heading', '/notes/'],
+    ['https://jhemery.xyz:443/llms.txt', '/llms.txt'],
+    ['/content.json?x=1', '/content.json?x=1'],
   ])('%s is %s on this origin', (target, path) => {
     expect(resolveTarget(target, 'here.test:8080')).toEqual({ path })
   })
@@ -53,6 +55,14 @@ describe('resolveTarget', () => {
     expect(resolveTarget('example.com/x', 'here.test')).toEqual({ unresolved: 'example.com' })
     expect(resolveTarget('https://evil.example:8443', 'here.test')).toEqual({ unresolved: 'evil.example' })
   })
+
+  // Found in review: `fetch('//host/x')` is another origin's URL, so these must not pass as paths.
+  it.each(['//api.jhemery.xyz/weather', '/\\api.jhemery.xyz/weather', 'jhemery.xyz//api.jhemery.xyz/presence'])(
+    'refuses %s, a protocol-relative path to another origin',
+    (target) => {
+      expect(resolveTarget(target, 'here.test')).toEqual({ unresolved: 'api.jhemery.xyz' })
+    },
+  )
 })
 
 describe('isPrintable', () => {

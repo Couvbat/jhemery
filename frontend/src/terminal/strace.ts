@@ -35,7 +35,7 @@ export function shapeOf(value: unknown, depth = 1): string {
   return keys.length ? `{ ${keys.join(', ')} }` : '{}'
 }
 
-/** `GET /weather = 200 · 1.1 kB · 84 ms`, then the shapes sent and received. */
+/** `GET /weather = 200 · 1.10 kB · 84 ms`, then the shapes sent and received. */
 export function traceLines(trace: RequestTrace): OutputLine[] {
   const where = trace.site ? `${profile.domain}${maskQuery(trace.url)}` : maskQuery(trace.url)
   const parts = [`${trace.method} ${where} = ${trace.status}`]

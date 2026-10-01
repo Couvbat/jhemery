@@ -17,6 +17,13 @@ describe('parseSgr', () => {
     expect(row!.pre).toBe(true)
   })
 
+  // An empty list of segments draws as nothing; a row with none draws a line tall.
+  it('leaves an empty row without segments, so it keeps its height', () => {
+    const rows = parseSgr(`a\n\n${ESC}2m${ESC}0m\nb`)
+    expect(rows[1]).toEqual({ text: '', pre: true })
+    expect(rows[2]).toEqual({ text: '', pre: true })
+  })
+
   it('drops a concealed run until 28 or a reset, across lines', () => {
     const rows = parseSgr(`a${ESC}8msecret${ESC}28mb\n${ESC}8mhidden\nstill${ESC}0m shown`)
     expect(rows.map((r) => r.text)).toEqual(['ab', '', ' shown'])
