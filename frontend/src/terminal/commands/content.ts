@@ -30,7 +30,7 @@ import { MARK } from '../ascii'
 import { isPrintable, MAX_LINES, parseCurlArgs, resolveTarget, SITE_FILES } from '../curl'
 import { closest } from '../fuzzy'
 import { workLines } from '../work'
-import { blank, heading, keyValues, line, pre, segmented, tags, wrap } from '../format'
+import { blank, fail, heading, keyValues, line, pre, segmented, tags, wrap } from '../format'
 import type { Command, OutputLine } from '../types'
 import { swatches } from './theme'
 
@@ -167,7 +167,7 @@ export const contentCommands: Command[] = [
         if (part) return workLines(part, t)
         const hint = closest(wanted, work.map((p) => p.id))
         return [
-          line(`projects: ${wanted}: ${t({ en: 'no such part', fr: 'partie inconnue' })}`, 'error'),
+          fail(`projects: ${wanted}: ${t({ en: 'no such part', fr: 'partie inconnue' })}`),
           ...(hint ? [line(`${t({ en: 'did you mean', fr: 'vouliez-vous dire' })} \`projects ${hint}\`?`, 'muted')] : []),
         ]
       }
@@ -244,7 +244,7 @@ export const contentCommands: Command[] = [
       const requested = args[0]?.toLowerCase()
 
       if (requested !== undefined && !isHardwareTab(requested)) {
-        return [line(`hardware: unknown group \`${args[0]}\``, 'error')]
+        return [fail(`hardware: unknown group \`${args[0]}\``)]
       }
 
       // Keep the rendered section's tab strip in sync with what was asked for.
@@ -414,14 +414,14 @@ export const contentCommands: Command[] = [
     async run(ctx) {
       const { t } = ctx
       const parsed = parseCurlArgs(ctx.args)
-      if (!parsed.ok) return parsed.lines.map((text) => line(text, 'error'))
+      if (!parsed.ok) return parsed.lines.map((text) => fail(text))
 
       const out: OutputLine[] = []
       for (const target of parsed.targets) {
         const resolved = resolveTarget(target)
         if ('unresolved' in resolved) {
           out.push(
-            line(`curl: (6) Could not resolve host: ${resolved.unresolved}`, 'error'),
+            fail(`curl: (6) Could not resolve host: ${resolved.unresolved}`),
             line(
               t({
                 en: 'This is a terminal inside a browser tab, so it can only reach this site. Try that one in a real terminal.',
@@ -438,7 +438,7 @@ export const contentCommands: Command[] = [
           res = await fetchCurlPath(resolved.path, parsed.head ? 'HEAD' : 'GET', ctx.locale, ctx.signal)
         } catch (error) {
           if ((error as Error)?.name === 'AbortError') throw error
-          out.push(line(`curl: (7) Failed to connect to ${profile.domain} port 443: Couldn't connect to server`, 'error'))
+          out.push(fail(`curl: (7) Failed to connect to ${profile.domain} port 443: Couldn't connect to server`))
           continue
         }
 

@@ -161,9 +161,47 @@ page all talk to the same session, so history survives closing the panel).
   never `disabled` while a command runs, only `readonly` + `aria-disabled`: a disabled input
   drops focus to `<body>`, and Ctrl+C would have nowhere to land.
 
+### The shell language
+
+`terminal/parse.ts` reads a line as a chain of pipelines joined by `;`, `&&` and `||`, each
+pipeline stages joined by `|`, at most 16 stages a line. Leading `NAME=value` words are the
+stage's env: `LANG=fr` (or `LC_ALL`) runs that stage in French and never touches the visitor's
+setting. A single `&` and `>` are literal; an empty stage is `couvsh: syntax error near
+unexpected token '|'`.
+
+**Quotes only group.** French is typed here (`c'est`, `qu'est-ce`, `sign l'un et l'autre`), so a
+quote opens a group only at the start of a word and closes only on the same quote followed by a
+space, the end of the line or an operator; anything else is a letter. Inside a group the
+operators are text (`sign "great site; love it"`). That is all a group does: a stage's words are
+its text split on spaces, quotes and all, as every line was before there were pipes, so a line
+with no operator runs exactly as it did. `useTerminal.quoting.spec.ts` pins that for `echo`,
+`sign` and `ask`.
+
+**Running a line.** Aliases are expanded per stage and the line is read again, since an alias may
+hold a pipe. Then every stage resolves (`registry.resolveStage`, the rule links and Tab share)
+before any runs: an unknown stage runs nothing, and when it follows an operator the shell
+suggests quoting, so `sign great site; love it` never posts half an entry. Stages run one after
+another, because commands return arrays rather than streams. A stage's output, minus its
+`stderr` lines, is the next stage's `stdin`, `OutputLine`s and their colours included; its
+`stderr` lines (`fail()`, achievement toasts) go to the screen wherever it stands, so
+`fortune | cowsay` keeps the toast outside the cow. A stage on the left of a `|` has `tty`
+false, and its `capture` and `prompt` throw "not a tty". `&&` and `||` read a pipeline as failed
+when a stage throws or prints a failing `stderr` line, which is what `fail()` makes; the error
+*tone* alone counts for nothing, because `btc`'s red sparkline and `diff`'s removed lines are
+colour. One Ctrl+C stops the whole line, with one `^C`. A link runs a pipe or a chain only if
+every stage, resolved without aliases, passes `isLinkable`.
+
+**The text commands** (`commands/text.ts`) are what a pipe is for: `grep [-i -v -n -c]`, `head`
+and `tail [-n N | -N]`, `wc [-l -w -c]`, `sort [-r -n -u]` and `uniq [-c]`. Each reads the file
+it names, else its stdin, else fails. `grep` matches a literal substring and never builds a
+`RegExp` from input. `sha256sum`, `base64` and `jq` read their stdin as a file's bytes when they
+have no argument, so `cat about.txt | sha256sum` is `sha256sum about.txt`; `cat` passes its stdin
+on, and `cowsay` says it.
+
 ### Tab completion
 
-One routine handles both halves of a line. It splits on whitespace, works out which word the
+One routine handles both halves of a line, counting words from the stage being typed: after
+`ls | gr`, `gr` is a command again. It splits on whitespace, works out which word the
 cursor is on, collects candidates for that position, then filters by prefix, inserts the single
 match (or the longest common prefix) and prints the list when the choice is still ambiguous.
 Only the *source* of the candidates changes:
@@ -185,8 +223,6 @@ join it as soon as `guestbook` has cached them.
 
 An alias in the first position is expanded before the owning command is resolved, so `zz ab`
 completes against whatever `zz` will actually run.
-
-`run(input)` handles `&&`-free single commands only — chaining is out of scope (§10).
 
 ### Chrome
 
@@ -240,7 +276,7 @@ Grouped as they appear in `help`.
 | `lang [en\|fr]` | Prints or switches locale |
 | `theme [name\|random]` (alias `colorscheme`) | Lists the colour schemes with a swatch strip each, or applies one |
 | `alias` / `unalias` | Session-persistent command renames, expanded before anything else parses the line |
-| `sha256sum` (aliases `sha1sum`, `sha512sum`) · `base64 [-d]` · `uuidgen` · `jq .` | The shell versions of the hash, encode and JSON tools, each importing the pure module its panel uses. No pipes: a fake-filesystem name is read as that file, anything else as literal text |
+| `sha256sum` (aliases `sha1sum`, `sha512sum`) · `base64 [-d]` · `uuidgen` · `jq .` | The shell versions of the hash, encode and JSON tools, each importing the pure module its panel uses. A fake-filesystem name is read as that file, other text as literal text, and with no argument they read what a `\|` hands them |
 | `strace <command>` | Runs the command inside itself (`ctx.run`, so without the visitor's aliases) and then lists the non-background requests made meanwhile, as `GET /weather = 200 · 1.10 kB · 84 ms` with the shapes of the bodies below, and `+++ exited with 0 +++`. No request, no trailer, so `strace ls` is `ls`. Its `writes` is the traced command's, so `?run=strace sign x` is refused like `sign x`; `strace strace` is refused |
 | `exit` (aliases `quit`, `logout`) | Closes the overlay |
 
@@ -991,7 +1027,6 @@ Retrofitting these is painful, so they are part of the definition of done:
   schemes exist only as opt-in choices, through `theme` or the navbar's scheme menu (§3 core), and the achievement for picking one is
   called Flashbang. That is this entry's position, stated as a joke.
 - **Blog** — infrastructure without content is worse than no infrastructure.
-- **Command chaining / pipes** — `ls | grep` is a lot of parser for a joke nobody will run twice.
 - **Terminal on mobile** — see §9.
 
 ## 11. Views, the prism swing and the tools page

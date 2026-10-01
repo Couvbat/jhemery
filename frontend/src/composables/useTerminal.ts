@@ -1,8 +1,11 @@
 import { computed, nextTick, ref, shallowRef, watch } from 'vue'
-import { currentLocale, useLocale } from '@/i18n'
+import { currentLocale } from '@/i18n'
 import { messages } from '@/i18n/messages'
 import { expandAliases } from '@/terminal/aliases'
 import { history, pushHistory } from '@/terminal/history'
+import { pick, type Locale } from '@/content/types'
+import { fail } from '@/terminal/format'
+import { joinChain, lastStageStart, parseLine, type Link, type Stage } from '@/terminal/parse'
 import {
   commonPrefix,
   completeCommand,
@@ -10,6 +13,7 @@ import {
   isLinkable,
   resolve,
   resolveLink,
+  resolveStage,
   suggest,
 } from '@/terminal/registry'
 import type {
@@ -148,16 +152,105 @@ export function handleVimKeydown(event: KeyboardEvent): boolean {
   return handleVimKey(vimBuffer.value, event)
 }
 
-function buildContext(args: string[], raw: string, signal: AbortSignal): CommandContext {
-  const { t } = useLocale()
+// ---------------------------------------------------------------------------
+// Where output goes
+// ---------------------------------------------------------------------------
+
+/**
+ * A stage's output goes to the screen, or, on the left of a `|`, to the next stage's
+ * stdin. Either way its stderr lines (`fail()`, achievement toasts) go to the screen, and a
+ * failing one marks the stage as failed for `&&` and `||`.
+ */
+interface Sink {
+  print: (lines: OutputLine[]) => void
+  frame: () => (lines: OutputLine[]) => void
+  clear: () => void
+  failed: boolean
+}
+
+function toLines(input: OutputLine | OutputLine[] | string): OutputLine[] {
+  return typeof input === 'string' ? [{ text: input }] : Array.isArray(input) ? input : [input]
+}
+
+const failing = (line: OutputLine) => line.stderr === true && line.tone === 'error'
+
+function screen(): Sink {
+  const sink: Sink = {
+    failed: false,
+    print: (lines) => {
+      if (lines.some(failing)) sink.failed = true
+      append(lines)
+    },
+    frame: openFrame,
+    clear: clearBuffer,
+  }
+  return sink
+}
+
+function collector(): Sink & { lines: OutputLine[] } {
+  const lines: OutputLine[] = []
+  const keep = (input: OutputLine[]) => {
+    const remarks = input.filter((line) => line.stderr)
+    if (remarks.length) {
+      if (remarks.some(failing)) sink.failed = true
+      append(remarks)
+    }
+    return input.filter((line) => !line.stderr)
+  }
+  const sink = {
+    lines,
+    failed: false,
+    print: (input: OutputLine[]) => void lines.push(...keep(input)),
+    // A frame's region is where it was opened; each draw replaces what the last one wrote,
+    // so the next stage reads the final picture rather than every frame of it.
+    frame: () => {
+      const start = lines.length
+      let height = 0
+      return (input: OutputLine[]) => {
+        const kept = keep(input)
+        lines.splice(start, height, ...kept)
+        height = kept.length
+      }
+    },
+    clear: () => void lines.splice(0),
+  }
+  return sink
+}
+
+// ---------------------------------------------------------------------------
+// The context a command runs in
+// ---------------------------------------------------------------------------
+
+interface Scope {
+  signal: AbortSignal
+  sink: Sink
+  tty: boolean
+  locale: Locale
+}
+
+/** `LANG=fr neofetch`: this stage in French, the visitor's own setting untouched. */
+function localeOf(env: Record<string, string>): Locale {
+  const asked = (env.LC_ALL || env.LANG || '').slice(0, 2).toLowerCase()
+  return asked === 'fr' || asked === 'en' ? asked : currentLocale()
+}
+
+function notATty(raw: string): Error {
+  const name = raw.trim().split(/\s+/)[0] ?? ''
+  return new Error(`${name}: ${messages.terminal.notATty[currentLocale()]}`)
+}
+
+function buildContext(args: string[], raw: string, scope: Scope, stdin?: OutputLine[]): CommandContext {
+  const { signal, sink, tty, locale } = scope
   return {
     args,
     raw,
-    locale: currentLocale(),
-    t,
-    print: append,
-    frame: openFrame,
-    clear: clearBuffer,
+    stdin,
+    tty,
+    locale,
+    t: (value) => pick(value, locale),
+    print: (input) => sink.print(toLines(input)),
+    frame: () => sink.frame(),
+    clear: () => sink.clear(),
     close: () => {
       open.value = false
     },
@@ -166,8 +259,9 @@ function buildContext(args: string[], raw: string, signal: AbortSignal): Command
       if (ok) open.value = false
       return ok
     },
-    prompt: (question: string, options) =>
-      new Promise<string>((resolvePrompt, rejectPrompt) => {
+    prompt: (question: string, options) => {
+      if (!tty) throw notATty(raw)
+      return new Promise<string>((resolvePrompt, rejectPrompt) => {
         append({ text: question, tone: 'accent' })
         pendingPrompt.value = {
           question,
@@ -175,8 +269,11 @@ function buildContext(args: string[], raw: string, signal: AbortSignal): Command
           resolve: resolvePrompt,
           reject: rejectPrompt,
         }
-      }),
+      })
+    },
     capture: (handler: (key: string) => void) => {
+      // Nobody is reading a stage on the left of a `|`, so nobody is typing at it either.
+      if (!tty) throw notATty(raw)
       // Only one capture at a time — commands don't nest, so a second call
       // replaces the first rather than stacking.
       keyCapture.value = handler
@@ -184,7 +281,7 @@ function buildContext(args: string[], raw: string, signal: AbortSignal): Command
         if (keyCapture.value === handler) keyCapture.value = null
       }
     },
-    run: (input: string) => runNested(input, signal),
+    run: (input: string) => runNested(input, scope),
     effects,
     signal,
   }
@@ -192,24 +289,24 @@ function buildContext(args: string[], raw: string, signal: AbortSignal): Command
 
 /**
  * `ctx.run`: another command inside the one running. It shares the parent's signal, so
- * Ctrl+C stops both, and leaves `busy`, the abort controller and the keyboard alone,
- * because the parent is still running; going through `run()` reset all three when the
- * child finished. It never expands the visitor's aliases: the parent may be a link or
+ * Ctrl+C stops both, its output goes where the parent's does (the screen, or a pipe), and
+ * it leaves `busy`, the abort controller and the keyboard alone, because the parent is
+ * still running. It never expands the visitor's aliases: the parent may be a link or
  * `tour`, which the visitor didn't type. Two-word names resolve as typed ones do.
  */
-async function runNested(input: string, signal: AbortSignal): Promise<void> {
+async function runNested(input: string, scope: Scope): Promise<void> {
   const target = resolveLink(input)
   if (!target) {
     const [name = ''] = input.trim().split(/\s+/)
-    append({ text: `${name}: ${messages.terminal.notFound[currentLocale()]}`, tone: 'error' })
+    scope.sink.print([fail(`${name}: ${messages.terminal.notFound[currentLocale()]}`)])
     return
   }
   // A capture is one slot, not a stack: hand the parent's back once the child is done,
   // whether the child took the keyboard, released it, or threw.
   const parentCapture = keyCapture.value
   try {
-    const result = await target.command.run(buildContext(target.args, input, signal))
-    if (result) append(result)
+    const result = await target.command.run(buildContext(target.args, input.trim(), scope))
+    if (result) scope.sink.print(toLines(result))
   } finally {
     keyCapture.value = parentCapture
   }
@@ -224,73 +321,118 @@ function namesCommand(name: string, next?: string): boolean {
   return resolve(name) !== undefined || (next !== undefined && resolve(`${name} ${next}`) !== undefined)
 }
 
-export async function run(input: string): Promise<void> {
-  // Aliases are rewritten before anything else looks at the line, so `resolve`,
-  // the two-word fallback and the "did you mean …?" suggestion all reason about
-  // the command that will actually run. `alias` itself is never expanded — it
-  // reads its own raw line — because it is a real command and aliases cannot
-  // shadow those.
-  const raw = expandAliases(input, namesCommand)
-  if (!raw) return
+// ---------------------------------------------------------------------------
+// Running a line
+// ---------------------------------------------------------------------------
 
-  const [name = '', ...args] = raw.split(/\s+/)
-  const command = resolve(name)
-
-  if (!command) {
-    // `git log` reads better than `gitlog`, so try a two-word command name too.
-    const twoWord = resolve(`${name} ${args[0] ?? ''}`.trim())
-    if (twoWord) {
-      return execute(twoWord.name, args.slice(1), raw)
-    }
-    const hint = suggest(name)
-    append({
-      text: `${name}: ${messages.terminal.notFound[currentLocale()]}`,
-      tone: 'error',
-    })
-    if (hint) {
-      append({
-        text: `${messages.terminal.didYouMean[currentLocale()]} \`${hint}\`?`,
-        tone: 'muted',
-      })
-    } else if (raw.includes(' ')) {
-      // Nothing is within two edits of it and it has a space in it, so it reads
-      // as a sentence rather than a typo. Someone who types `where does he work`
-      // into a terminal has told you exactly what they want.
-      append({
-        text: `${messages.terminal.askInstead[currentLocale()]} \`ask "${raw}"\``,
-        tone: 'muted',
-      })
-    }
-    return
-  }
-
-  return execute(command.name, args, raw)
+interface ResolvedStage {
+  command: Command
+  args: string[]
+  raw: string
+  env: Record<string, string>
 }
 
-async function execute(name: string, args: string[], raw: string): Promise<void> {
-  const command = resolve(name)
-  if (!command) return
+interface ResolvedLink {
+  op: Link['op']
+  stages: ResolvedStage[]
+}
 
+/** Every stage of a parsed line resolved, or the first one that isn't. */
+function resolveChain(chain: Link[]): { links: ResolvedLink[] } | { unknown: Stage; first: boolean } {
+  const links: ResolvedLink[] = []
+  let first = true
+  for (const link of chain) {
+    const stages: ResolvedStage[] = []
+    for (const stage of link.pipeline) {
+      const target = resolveStage(stage.argv)
+      if (!target) return { unknown: stage, first }
+      stages.push({ command: target.command, args: target.args, raw: stage.raw, env: stage.env })
+      first = false
+    }
+    links.push({ op: link.op, stages })
+  }
+  return { links }
+}
+
+/** Why a line ran nothing: which word is not a command, and what the visitor may have meant. */
+function reportUnknown(stage: Stage, first: boolean, input: string, single: boolean): void {
+  const locale = currentLocale()
+  const [name = ''] = stage.argv
+  append(fail(`${name}: ${messages.terminal.notFound[locale]}`))
+  const hint = suggest(name)
+  if (hint) {
+    append({ text: `${messages.terminal.didYouMean[locale]} \`${hint}\`?`, tone: 'muted' })
+  } else if (!first) {
+    // After an operator, the likelier story is text that should have been quoted:
+    // `sign great site; love it` must not post "great site" and then fail on `love`.
+    const [command = ''] = input.trim().split(/\s+/)
+    const rest = input.trim().slice(command.length).trim()
+    const quote = rest.includes('"') ? "'" : '"'
+    append({
+      text: messages.terminal.quoteIt[locale].replace('{example}', `${command} ${quote}${rest}${quote}`),
+      tone: 'muted',
+    })
+  } else if (single && stage.raw.includes(' ')) {
+    // Nothing is within two edits of it and it has a space in it, so it reads
+    // as a sentence rather than a typo. Someone who types `where does he work`
+    // into a terminal has told you exactly what they want.
+    append({ text: `${messages.terminal.askInstead[locale]} \`ask "${stage.raw}"\``, tone: 'muted' })
+  }
+}
+
+/**
+ * One pipeline, a stage at a time: commands return arrays, not streams, so each stage
+ * finishes before the next reads its output. Failed when any stage throws or reports a
+ * failure (`fail()`), the way `set -o pipefail` reads a pipeline. An abort is rethrown:
+ * it ends the whole line, not this stage.
+ */
+async function runPipeline(stages: ResolvedStage[], signal: AbortSignal): Promise<boolean> {
+  let stdin: OutputLine[] | undefined
+  let ok = true
+  for (const [i, stage] of stages.entries()) {
+    const last = i === stages.length - 1
+    const sink = last ? screen() : collector()
+    // Each stage starts with the keyboard free: a stage before it can't leave a handler.
+    keyCapture.value = null
+    const scope: Scope = { signal, sink, tty: last, locale: localeOf(stage.env) }
+    try {
+      const result = await stage.command.run(buildContext(stage.args, stage.raw, scope, stdin))
+      if (result) sink.print(toLines(result))
+    } catch (error) {
+      if ((error as Error)?.name === 'AbortError') throw error
+      append(fail(String((error as Error)?.message ?? error)))
+      ok = false
+    }
+    if (sink.failed) ok = false
+    stdin = 'lines' in sink ? (sink as ReturnType<typeof collector>).lines : undefined
+  }
+  return ok
+}
+
+/** A whole line: its pipelines in order, `&&` and `||` deciding which run. */
+async function runChain(links: ResolvedLink[]): Promise<void> {
   const controller = new AbortController()
   abortController = controller
   busy.value = true
   let aborted = false
+  let failed = false
 
   try {
-    const result = await command.run(buildContext(args, raw, controller.signal))
-    if (result) append(result)
-  } catch (error) {
-    if ((error as Error)?.name === 'AbortError') {
-      aborted = true
-    } else {
-      append({ text: String((error as Error)?.message ?? error), tone: 'error' })
+    for (const link of links) {
+      if (link.op === '&&' && failed) continue
+      if (link.op === '||' && !failed) continue
+      failed = !(await runPipeline(link.stages, controller.signal))
+      if (controller.signal.aborted) break
     }
+  } catch (error) {
+    if ((error as Error)?.name === 'AbortError') aborted = true
+    else append(fail(String((error as Error)?.message ?? error)))
   } finally {
     // The one `^C` line for this run, printed here rather than in `cancel()` so
     // there is exactly one however the abort surfaced: commands that rethrow it
     // (`sl`, `hack`, the games), commands that swallow it to keep the partial
     // output they already have (`ask`), and a cancelled `ctx.prompt()` all land
-    // in the same place.
+    // in the same place. One per line, however many stages it had.
     if (aborted || controller.signal.aborted) {
       append({ text: messages.terminal.cancelled[currentLocale()], tone: 'muted' })
     }
@@ -300,6 +442,37 @@ async function execute(name: string, args: string[], raw: string): Promise<void>
     // leave the keyboard routed at a handler nobody owns any more.
     keyCapture.value = null
   }
+}
+
+export async function run(input: string): Promise<void> {
+  const parsed = parseLine(input)
+  if (!parsed.ok) return void append(fail(parsed.error))
+  if (!parsed.chain.length) return
+
+  // Aliases are rewritten before anything else looks at a stage, so resolving, the
+  // two-word fallback and "did you mean …?" all reason about the command that will
+  // actually run; and the line is read again, because an alias may hold a pipe.
+  // `alias` itself is never expanded — it reads its own raw line — because it is a
+  // real command and aliases cannot shadow those.
+  let chain = parsed.chain
+  const expanded = chain.map((link) => ({
+    ...link,
+    pipeline: link.pipeline.map((stage) => ({ ...stage, raw: expandAliases(stage.raw, namesCommand) })),
+  }))
+  if (expanded.some((link, i) => link.pipeline.some((stage, j) => stage.raw !== chain[i]!.pipeline[j]!.raw))) {
+    const again = parseLine(joinChain(expanded))
+    if (!again.ok) return void append(fail(again.error))
+    chain = again.chain
+  }
+
+  // Every stage resolves before any runs: an unknown one runs nothing, so a line the
+  // visitor meant as text never half-runs (the guestbook never gets a truncated entry).
+  const resolved = resolveChain(chain)
+  if ('unknown' in resolved) {
+    reportUnknown(resolved.unknown, resolved.first, input, chain.length === 1 && chain[0]!.pipeline.length === 1)
+    return
+  }
+  await runChain(resolved.links)
 }
 
 /** Handles the Enter key: either answers a pending prompt or runs a command. */
@@ -314,20 +487,21 @@ export async function submit(value: string): Promise<void> {
   }
 
   append({ text: value, prompt: true })
-  pushHistory(value)
   historyIndex.value = -1
-
+  // Into history once it has run, so `history | grep …` lists what came before it.
   await run(value)
+  pushHistory(value)
 }
 
 /** A link's command can never be longer than this, or carry control characters. */
 const LINK_MAX = 200
 
 /**
- * Runs a command a `?run=` link asked for — once, and only if `isLinkable()` says so
- * for these arguments: opted in, not hidden, writes nothing. It is echoed as if typed, so the reader sees exactly what ran, and
- * executed directly rather than through `run()`: that would expand the reader's own
- * aliases, which a link's author must not be able to reach.
+ * Runs a line a `?run=` link asked for, once, and only if every stage passes
+ * `isLinkable()` for its arguments: opted in, not hidden, writes nothing, arguments
+ * the command offers. It is echoed as if typed, so the reader sees exactly what ran,
+ * and resolved without the reader's own aliases, which a link's author must not be
+ * able to reach.
  */
 export async function runLink(input: string): Promise<void> {
   const line = Array.from(input, (c) => (c < ' ' || c === '\u007f' ? ' ' : c))
@@ -335,13 +509,15 @@ export async function runLink(input: string): Promise<void> {
     .trim()
     .slice(0, LINK_MAX)
   if (!line) return
-  // A link in the scrollback stays clickable while a command runs, and `execute()` would
-  // take the shell from under it: the running command would lose its keyboard, its ^C
-  // and its busy flag, and never settle. Enter is blocked then; so is a click.
+  // A link in the scrollback stays clickable while a command runs, and running it would
+  // take the shell from under that command: it would lose its keyboard, its ^C and its
+  // busy flag, and never settle. Enter is blocked then; so is a click.
   if (busy.value || pendingPrompt.value) return
 
-  const target = resolveLink(line)
-  if (!target || !isLinkable(target.command, target.args)) {
+  const parsed = parseLine(line)
+  const resolved = parsed.ok && parsed.chain.length ? resolveChain(parsed.chain) : undefined
+  const links = resolved && 'links' in resolved ? resolved.links : undefined
+  if (!links || !links.every((link) => link.stages.every((stage) => isLinkable(stage.command, stage.args)))) {
     // Quoted short: a refused link's text is the link author's, not the site's.
     const asked = line.length > 60 ? `${line.slice(0, 59)}…` : line
     append({
@@ -352,9 +528,9 @@ export async function runLink(input: string): Promise<void> {
   }
 
   append({ text: line, prompt: true })
-  pushHistory(line)
   historyIndex.value = -1
-  await execute(target.command.name, target.args, line)
+  await runChain(links)
+  pushHistory(line)
 }
 
 /** Ctrl+C — abort an in-flight command or cancel a pending prompt. */
@@ -457,7 +633,8 @@ export function completeInput(value: string, caret: number = value.length): Comp
   // on a new argument nobody has typed a prefix for yet.
   const word = /\S*$/.exec(head)![0]
   const start = head.length - word.length
-  const preceding = head.slice(0, start).trim()
+  // Words count from the stage being typed: after `ls | gr`, `gr` is a command again.
+  const preceding = head.slice(Math.min(lastStageStart(head), start), start).trim()
   const priorWords = preceding ? preceding.split(/\s+/) : []
   const index = priorWords.length
   const words = [...priorWords, word]

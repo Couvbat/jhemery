@@ -162,6 +162,7 @@ work badly with mobile virtual keyboards, and the page itself shows the same con
 
 | Key | Does |
 |---|---|
+| `\|` `;` `&&` `\|\|` | Pipes and chains: `fortune \| cowsay`, `history \| grep theme`, `cat about.txt \| sha256sum`, `projects --json \| jq .`, `cat nope && pwd`. A stage keeps its colours across a pipe. Quote text that holds an operator (`sign "great site; love it"`): an apostrophe inside a word is a letter, so `c'est` needs nothing. `LANG=fr neofetch` runs one command in French |
 | <kbd>Tab</kbd> | Completes to the longest common prefix. First commands and your own aliases, then their arguments: filenames for `cat`/`vim`/`diff`, sections and pages for `cd`/`ping`, tool names, scheme names for `theme`, `on`/`off` for the background toggles |
 | <kbd>↑</kbd> / <kbd>↓</kbd> | Command history (saved between visits) |
 | <kbd>Ctrl</kbd>+<kbd>L</kbd> | Clear |
@@ -212,6 +213,10 @@ never show two different contents.
 | `base64` | | `base64 [-d] <file\|text>`: encode or decode, as the encode tool does |
 | `uuidgen` | | A random v4 UUID |
 | `jq` | | `jq . <json>`: pretty-print, pointing at the error when it isn't JSON |
+| `grep` | | `grep [-i -v -n -c] <text> [file]`: the lines containing some text, matched literally |
+| `head` · `tail` | | `head [-n N \| -N] [file]`: the first (or last) ten lines, or N |
+| `wc` | | `wc [-l -w -c] [file]`: lines, words and bytes |
+| `sort` · `uniq` | | `sort [-r -n -u]`, `uniq [-c]`: sort lines; fold neighbouring repeats |
 | `strace` | | `strace <command>`: run a command and list the requests it made (`GET /weather = 200 · 1.10 kB · 84 ms`), with the keys of each body and never their values. `strace ls` prints just what `ls` does |
 | `exit` | `quit`, `logout` | Close the terminal |
 

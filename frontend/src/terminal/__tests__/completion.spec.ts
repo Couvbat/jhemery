@@ -27,6 +27,17 @@ describe('completeInput', () => {
     expect(line('zzzz')).toBe('zzzz')
   })
 
+  // Words count from the stage being typed: after an operator, the next word is a command.
+  it('completes a command after |, ; and &&, and its arguments from there', () => {
+    expect(line('ls | whoam')).toBe('ls | whoami ')
+    expect(line('pwd; whoam')).toBe('pwd; whoami ')
+    expect(line('pwd && cat ab')).toBe('pwd && cat about.txt ')
+    // Inside a closed group an operator is text, so this is still an argument of echo;
+    // an unclosed quote is a letter, as it would be on Enter.
+    expect(line('echo "a | b" whoam')).toBe('echo "a | b" whoam')
+    expect(line('echo "a | whoam')).toBe('echo "a | whoami ')
+  })
+
   it('completes an argument once the line has a space', () => {
     expect(line('cat ab')).toBe('cat about.txt ')
   })

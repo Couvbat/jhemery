@@ -129,6 +129,13 @@ they land. `ctx.run` checks nothing, so only pass it fixed command lines. Read `
 `writesOf()`; `registry.spec.ts` pins the whole classification, so a new writer or a quiet
 downgrade fails it.
 
+A line is read by `terminal/parse.ts` (pipes, `;`, `&&`, `||`, `NAME=value`): quotes only group
+(they hide operators), and a stage's words are still its text split on spaces, so commands read
+their own quoting as they always have. On the left of a `|` a command has `tty: false` (`capture`
+and `prompt` throw) and its output becomes the next stage's `stdin`. Report an operand or usage
+error with `fail()` from `format.ts`: it is marked `stderr`, so it reaches the screen from inside
+a pipe and is what stops `&&`. The error *tone* alone means nothing to the shell.
+
 `CommandContext` (in `terminal/types.ts`) is the whole capability surface a command gets: `print`,
 `frame()` for redrawable animation regions, `capture()` for holding the keyboard (how the games
 work — released automatically when the command settles, so a throw can't wedge input), `prompt`,

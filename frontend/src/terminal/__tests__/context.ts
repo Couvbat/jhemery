@@ -30,6 +30,8 @@ export function recordingContext(
      * writing half a page.
      */
     interactive?: boolean
+    /** What a `|` would hand the command. */
+    stdin?: OutputLine[]
   } = {},
 ): Recorded {
   const locale = options.locale ?? 'en'
@@ -44,6 +46,8 @@ export function recordingContext(
   const ctx: CommandContext = {
     args,
     raw: [name, ...args].join(' '),
+    tty: options.interactive !== false,
+    stdin: options.stdin,
     locale,
     t: (<T,>(value: Localised<T>) => value[locale]) as CommandContext['t'],
     print: (input) => void printed.push(...toLines(input)),

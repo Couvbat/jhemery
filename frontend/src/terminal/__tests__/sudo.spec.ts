@@ -35,6 +35,7 @@ function context(args: string[], answer = ''): CommandContext & { prompts: strin
     prompts,
     args,
     raw: args.join(' '),
+    tty: true,
     locale: 'en',
     t: (<T,>(value: Localised<T>) => value.en) as CommandContext['t'],
     print: () => {},

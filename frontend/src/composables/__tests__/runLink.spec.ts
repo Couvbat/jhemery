@@ -100,6 +100,27 @@ describe('runLink', () => {
     expect(busy.value).toBe(false)
   })
 
+  it('runs a pipe or a chain only when every stage could run from a link alone', async () => {
+    await runLink('whoami | wc -c')
+    expect(texts().at(-1)).toBe('8')
+
+    clearBuffer()
+    await runLink('whoami ; sign x')
+    expect(buffer.value).toHaveLength(1)
+    expect(buffer.value[0]!.tone).toBe('warning')
+
+    // grep's pattern is free text a link's author chose, so it is refused like any other.
+    clearBuffer()
+    await runLink('help | grep SESSION-EXPIRED')
+    expect(buffer.value[0]!.tone).toBe('warning')
+  })
+
+  it('never expands the reader’s aliases in any stage of a linked pipe', async () => {
+    setAlias('mine', 'echo should-not-run')
+    await runLink('whoami | mine')
+    expect(texts().join('\n')).not.toContain('should-not-run')
+  })
+
   it('strips control characters and caps the length', async () => {
     await runLink(`whoami\u001b[2J${'x'.repeat(500)}`)
     expect(buffer.value[0]!.text.length).toBeLessThan(300)
