@@ -247,9 +247,14 @@ field, the confetti and the colour tool re-read the properties on a switch. Ligh
 text halos (a glow on a light page reads as a smudge) and thin the scanlines. A `light:` Tailwind
 variant covers the few fixed palette colours that stay. The listing's swatches are the one place
 output needs a colour that is *not* the current scheme's, so `OutputSegment` has a `colour` field.
-It is only ever set from the theme table. `themes.spec.ts` holds every scheme to WCAG floors
-(4.5:1 for body and primary text, 3:1 for the other tones). Three upstream colours were adjusted
-to pass, each noted in the file.
+It is only ever set from the theme table. The floors live in `src/lib/themeRules.ts`: body and
+muted text at 4.5:1 on background, surface *and* raised (the `bg-muted` title bars are 12 px
+muted text), primary at 4.5:1, the other tones at 3:1. Muted and body text are lifted to the
+floor by rule when the table is built, stepping OKLCH lightness with hue and chroma kept, so a
+new scheme passes by construction; `themes.spec.ts` checks every scheme against the same floors.
+The default is never lifted. It lives in `main.css` and Lighthouse measures it, so it must pass as
+shipped, and a spec holds that. Three upstream colours were also adjusted by hand before the rule
+existed, each noted in the file.
 
 Switching from a dark scheme to a light one whites the page out for 0.9 s (`theme-flash` on
 `<html>`, skipped under reduced motion). That is the joke the `flashbang` achievement is named

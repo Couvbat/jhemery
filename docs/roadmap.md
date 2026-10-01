@@ -270,7 +270,7 @@ them.
 | [x] | Re-seal the CTF payoff | `PAYOFF` still says "Hiring, a project…" while `availability.open` is false. Re-running the seal changes only `SEALED`, so `STAGE_HASHES` and everyone's stored flags survive. | `frontend/scripts/ctf-seal.mjs`, `terminal/ctf.ts` | S |
 | [x] | `ask` reads its own origin | `CORPUS_URL` is hard-coded to production's `llms.txt`, so local and staging `ask` answer from production's corpus. Read `${FRONTEND_URL}/llms.txt`, as MCP already does. Its comment also calls the file generated; it's hand-written (see *generated llms.txt* below). | `backend/src/ask/ask.service.ts` | S |
 | [x] | Experience as content | The `resume` command hard-codes an experience block, and "2 years" is typed in three places, so `resume.txt`, both printable résumés and `content.json` have no experience section: the README's "one source for the CV" no longer holds. `content/experience.ts` holds dated `Role`s with a pure `durationLabel()` beside `daysSince`, every renderer reads it, and a résumé spec asserts they list the same roles in the same order. `content.json` gaining `experience` is a shape change, so it needs a new `version` and the matching backend change, deployed together. | `content/experience.ts` (new), `commands/content.ts`, `content/profile.ts`, `content/projects.ts`, `vite-plugins/resume.ts`, `backend/src/mcp/*` | S |
-| [ ] | Accessibility gate at 1.00 | Clear the two failures `lighthouserc.yml` lists. Muted text measures 4.04:1: derive muted in `themeTokens()` by stepping OKLCH lightness until it clears 4.5:1 against background *and* surface, so all eleven schemes pass by construction, and raise `themes.spec`'s muted floor from 3:1 to match. The language toggle shows `FR` under a label that says something else: show `EN · FR`, with `lang` on each. Then `categories:accessibility` goes to 1, as SEO already is. | `lib/themes.ts`, `assets/main.css`, `lib/__tests__/themes.spec.ts`, `components/NavBar.vue`, `lighthouserc.yml` | S |
+| [x] | Accessibility gate at 1.00 | Clear the two failures `lighthouserc.yml` lists. Muted text measures 4.04:1: derive muted in `themeTokens()` by stepping OKLCH lightness until it clears 4.5:1 against background *and* surface, so all eleven schemes pass by construction, and raise `themes.spec`'s muted floor from 3:1 to match. The language toggle shows `FR` under a label that says something else: show `EN · FR`, with `lang` on each. Then `categories:accessibility` goes to 1, as SEO already is. | `lib/themes.ts`, `assets/main.css`, `lib/__tests__/themes.spec.ts`, `components/NavBar.vue`, `lighthouserc.yml` | S |
 | [x] | Lazy registry + cycle guard | Clears the [Known issue](#known-issues): `byName` is built on first use, so nothing runs at import time and either module can load first. A dependency-free spec walks the static imports and fails on any cycle not on an allowlist (shadcn's `ui/button` and `ui/badge` pairs are the two others today). A test reproduces the HMR failure with `vi.resetModules()`. | `terminal/registry.ts`, `src/__tests__/import-cycles.spec.ts` (new) | S |
 | [x] | Generated `llms.txt` and sitemap | **The S part is shipped; generation stays open.** `llms.txt` named four of the fourteen public tools and left out `/now` and the printable résumés; `sitemap.xml` had no `/tools/<id>`. `content/__tests__/discovery.spec.ts` now fails when a view, a router path, a public tool or a printable résumé is missing from either, and both were updated by hand. The e2e "sitemap lists every view" test moved into it. Generating them from content comes later, once something else pays for splitting a pure `content/tools.ts` off `tools/registry.ts` (whose `load` keeps it out of `content/`). CTF stage 7's note for agents stays verbatim. | `public/llms.txt`, `public/sitemap.xml`, a content spec; later `content/tools.ts` (new), `vite-plugins/resume.ts` | S (+M) |
 
@@ -339,6 +339,18 @@ Recorded as each row ships.
   one importing the registry back), and building the Map lazily fixed only one entry order, so
   `commands/index.ts` exports `collectCommands()` instead of an eager array too. The cycle itself
   stays, allowlisted by pattern: the registry plus anything under `terminal/commands/`.
+- **Accessibility gate:**
+  - Muted failed on **raised** (4.04:1, the `bg-muted` title bars), not on background or surface,
+    so the floors cover all three surfaces.
+  - Muted is derived when the theme table is built, not in `themeTokens()`, so the swatches show
+    the colour that is painted. The default is set by hand in `main.css` (`oklch(0.58 0.1 145)`),
+    since `themeTokens()` never writes it.
+  - Measured first: `--secondary` was not flagged, so it was left alone.
+  - The rule also lifts Solarized's body text, which leaves its muted and body text close
+    together. That was accepted.
+  - The language toggle shows the language a click switches to, named by its content, rather
+    than `EN · FR`. `EN·FR` fitted the navbar with only ~0.7% of slack, against the 3.5% that a
+    wider monospace font has already needed.
 
 ## Build order
 

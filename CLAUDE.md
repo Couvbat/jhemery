@@ -142,7 +142,9 @@ the overrides, so `main.css` stays its only definition. The consequences for new
 - Code that reads colours in JS (three.js, canvases) must re-read `--neon-*` on a switch, by
   watching `useTheme().theme` or reading at draw time, not caching them on mount.
 - `themes.spec.ts` holds every scheme to contrast floors and to writing exactly the tokens
-  `:root` declares, so a new token needs deriving in `themeTokens()`.
+  `:root` declares, so a new token needs deriving in `themeTokens()`. The floors live in one
+  place, `lib/themeRules.ts`; muted and body text are lifted to them when the table is built,
+  but the default never is, so a change to `main.css` has to pass on its own.
 
 ### Backend: NestJS, one module per capability
 

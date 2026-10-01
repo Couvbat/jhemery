@@ -4,8 +4,9 @@
 import { readFileSync } from 'node:fs'
 import { fileURLToPath, URL } from 'node:url'
 import { describe, expect, it } from 'vitest'
-import { contrastRatio, parseColour } from '@/tools/colour/colour'
-import { DEFAULT_THEME, findTheme, themes, themeTokens, type Theme } from '../themes'
+import { parseColour } from '@/lib/colour'
+import { checkFloors, liftToFloor, TEXT_FLOOR } from '../themeRules'
+import { DEFAULT_THEME, findTheme, themes, themeTokens } from '../themes'
 
 /** Every custom property `:root` declares in the stylesheet, with its value. */
 function rootTokens(): Map<string, string> {
@@ -14,10 +15,6 @@ function rootTokens(): Map<string, string> {
   return new Map(
     [...block.matchAll(/(--[\w-]+)\s*:\s*([^;]+);/g)].map(([, name, value]) => [name!, value!.trim()]),
   )
-}
-
-function ratio(theme: Theme, text: keyof Theme['colours'], on: keyof Theme['colours']): number {
-  return contrastRatio(parseColour(theme.colours[text])!, parseColour(theme.colours[on])!)
 }
 
 describe('themes', () => {
@@ -73,19 +70,23 @@ describe('themes', () => {
     }
   })
 
-  // The body copy and the primary text reach AA (4.5:1); the colourful tones reach
-  // AA-large (3:1), which is where the site's own default already sits for them.
-  describe.each(themes.map((theme) => [theme.id, theme] as const))('%s', (_, theme) => {
-    it('keeps body text and primary text at AA', () => {
-      expect(ratio(theme, 'foreground', 'background')).toBeGreaterThanOrEqual(4.5)
-      expect(ratio(theme, 'foreground', 'surface')).toBeGreaterThanOrEqual(4.5)
-      expect(ratio(theme, 'primary', 'background')).toBeGreaterThanOrEqual(4.5)
-    })
+  // The default is never written, so main.css is its only definition, and it is the
+  // scheme Lighthouse measures. It has to pass as shipped, not because the table lifted
+  // a copy of it that nothing paints.
+  it('ships a default that needs no lifting', () => {
+    const root = rootTokens()
+    const on = [root.get('--background')!, root.get('--card')!, root.get('--muted')!]
+    for (const token of ['--foreground', '--muted-foreground']) {
+      const value = root.get(token)!
+      expect(liftToFloor(value, on, TEXT_FLOOR, 'dark'), token).toBe(value)
+    }
+  })
 
-    it('keeps every other text tone at AA-large', () => {
-      for (const tone of ['muted', 'accent', 'secondary', 'warning', 'destructive'] as const) {
-        expect(ratio(theme, tone, 'background'), tone).toBeGreaterThanOrEqual(3)
-      }
+  // The floors live in themeRules.ts: body and muted text at AA (4.5:1) on background,
+  // surface and raised; primary at AA; the colourful tones at AA-large (3:1).
+  describe.each(themes.map((theme) => [theme.id, theme] as const))('%s', (_, theme) => {
+    it('meets every contrast floor', () => {
+      expect(checkFloors(theme.colours)).toEqual([])
     })
 
     it('says which way it faces', () => {

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted } from 'vue'
+import { computed, ref, onMounted, onUnmounted } from 'vue'
 import { sections, profile, views } from '@/content'
 import { useLocale } from '@/i18n'
 import { activeSection } from '@/composables/useActiveSection'
@@ -8,6 +8,15 @@ import AchievementsModal from '@/components/AchievementsModal.vue'
 import ThemeMenu from '@/components/ThemeMenu.vue'
 
 const { t, m, locale, toggleLocale } = useLocale()
+
+/**
+ * The toggle shows the language a click switches to, not the current one: "FR" on the
+ * English page reads as an offer rather than a state. Its accessible name comes from
+ * its content ("Switch language FR"), so what a voice-control user sees is inside what
+ * they can say. Showing both, "EN·FR", was the first plan; it cost the bar width it
+ * doesn't have (see the desktop links' comment).
+ */
+const otherLocale = computed(() => (locale.value === 'en' ? 'fr' : 'en'))
 
 const menuOpen = ref(false)
 const achievementsOpen = ref(false)
@@ -101,10 +110,10 @@ onUnmounted(() => window.removeEventListener('scroll', onScroll))
           <button
             @click="toggleLocale"
             :title="t(m.nav.language)"
-            :aria-label="t(m.nav.language)"
             class="ml-2 px-2 py-1 text-xs font-mono rounded border border-border text-muted-foreground hover:text-primary hover:border-primary/50 transition-colors"
           >
-            {{ locale.toUpperCase() }}
+            <span class="sr-only">{{ t(m.nav.language) }} </span>
+            <span :lang="otherLocale">{{ otherLocale.toUpperCase() }}</span>
           </button>
         </li>
         <li>
@@ -136,10 +145,11 @@ onUnmounted(() => window.removeEventListener('scroll', onScroll))
         <ThemeMenu class="px-2 py-1 text-xs rounded border border-border text-muted-foreground" />
         <button
           @click="toggleLocale"
-          :aria-label="t(m.nav.language)"
+          :title="t(m.nav.language)"
           class="px-2 py-1 text-xs font-mono rounded border border-border text-muted-foreground"
         >
-          {{ locale.toUpperCase() }}
+          <span class="sr-only">{{ t(m.nav.language) }} </span>
+          <span :lang="otherLocale">{{ otherLocale.toUpperCase() }}</span>
         </button>
         <button
           class="text-primary p-2"
