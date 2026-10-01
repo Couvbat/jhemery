@@ -10,7 +10,8 @@
 
 import type { Localised } from '@/content/types'
 import { announce as announceAchievement } from '../../achievements'
-import { segmented } from '../../format'
+import { messages } from '@/i18n/messages'
+import { fail, segmented } from '../../format'
 import { type GameId, bestScore, isLowerBetter, recordScore } from '../../games/scores'
 import type { CommandContext, OutputLine, OutputSegment, Tone } from '../../types'
 
@@ -76,6 +77,10 @@ export async function play(
   game: GameId,
   loop: (session: Session) => Promise<void>,
 ): Promise<OutputLine[]> {
+  // A game needs someone at the keyboard, and on the left of a `|` there is nobody.
+  // Saying so after a room was made or a board drawn would be too late: `connect4 | cat`
+  // would have taken another visitor's seat.
+  if (!ctx.tty) return [fail(`${game}: ${ctx.t(messages.terminal.notATty)}`)]
   const unlocks: OutputLine[] = []
   const session: Session = {
     announce: (id) => unlocks.push(...announceAchievement(id, ctx.t)),

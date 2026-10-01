@@ -58,16 +58,18 @@ tools, watch-party and radio rooms, and 38 hidden achievements. English and Fren
 - 🧰 **In-browser tools at `/tools`.** Image conversion, hashing, encoding, JSON, colour, time,
   passwords, text stats, a JWT decoder, a regex tester, a cron explainer, a QR encoder written from
   the standard, a text diff and an `ffmpeg.wasm` converter. Your files are never uploaded.
-- 📺 **Watch party and radio rooms.** YouTube or SoundCloud stays in sync across everyone in a
-  five-character room, over SSE.
+- 📺 **Watch party and radio rooms.** A YouTube video, or a radio queue that mixes SoundCloud
+  tracks and YouTube videos, stays in sync across everyone in a five-character room, over SSE.
 - 🏆 **38 achievements** for finding the hidden layer, each announced with a burst of monospace
   confetti — and a capture-the-flag chain, eight stages deep, for whoever keeps pulling threads.
 - 🌐 **Live data** from Steam, GitHub, CI runs, the weather and crypto prices, plus live presence,
   a guestbook and a self-hosted LLM behind `ask`. Every integration degrades gracefully when it's
   switched off.
 - 🔒 **Privacy by construction.** Presence is one anonymous integer, stats count sessions rather
-  than commands, `ask` logs nothing, analytics are self-hosted and cookieless.
-- 📄 **One source for the CV.** `curl jhemery.xyz` returns an ANSI-coloured résumé, and
+  than commands, `ask` logs nothing, analytics are self-hosted and cookieless. `strace <cmd>`
+  shows every request a command makes and the shape of what it carries, never a value.
+- 📄 **One source for the CV.** `curl jhemery.xyz` returns an ANSI-coloured résumé (and
+  `curl jhemery.xyz/help` the shell's other pages), and
   `/resume.html` a printable one in either language, both generated at build time from the same
   content the page renders. So is `content.json`, which a read-only MCP endpoint serves to agents.
   Experience and education are dated, never typed as durations: every résumé works out "3 years"
@@ -150,7 +152,7 @@ Each app has its own README for working on its code:
 | **Matrix rain** | `matrix` follows the white rabbit. The effect component is lazy-loaded on demand. |
 | **i18n** | English and French. The language comes from `navigator.language` and can be changed with the navbar toggle or `lang en\|fr`. It's saved in `localStorage`. All content and every terminal string is `Localised<T>`. |
 | **PWA** | Installable, with an `autoUpdate` service worker, maskable icons and an offline navigation fallback. |
-| **`curl jhemery.xyz`** | A Vite plugin generates an ANSI-coloured `resume.txt` from `src/content` at build time, so the résumé has exactly one source. LLM crawlers get the same file. |
+| **`curl jhemery.xyz`** | A Vite plugin generates an ANSI-coloured `resume.txt` from `src/content` at build time, so the résumé has exactly one source. LLM crawlers get the same file, and so does the terminal's own `curl`, which fetches it for real and turns its colours into the scheme's. `curl jhemery.xyz/help` lists the other pages a real terminal can read, one per command (`/neofetch`, `/skills`, `/why`…), in English or, with `Accept-Language: fr`, French. `/jules.1` and `/jules.fr.1` are the person as a roff manual page. |
 
 ## The terminal
 
@@ -160,8 +162,14 @@ work badly with mobile virtual keyboards, and the page itself shows the same con
 
 | Key | Does |
 |---|---|
+| `\|` `;` `&&` `\|\|` | Pipes and chains: `fortune \| cowsay`, `history \| grep theme`, `cat about.txt \| sha256sum`, `projects --json \| jq .`, `cat nope && pwd`. A stage keeps its colours across a pipe. Quote text that holds an operator (`sign "great site; love it"`): an apostrophe inside a word is a letter, so `c'est` needs nothing. `LANG=fr neofetch` runs one command in French |
 | <kbd>Tab</kbd> | Completes to the longest common prefix. First commands and your own aliases, then their arguments: filenames for `cat`/`vim`/`diff`, sections and pages for `cd`/`ping`, tool names, scheme names for `theme`, `on`/`off` for the background toggles |
-| <kbd>↑</kbd> / <kbd>↓</kbd> | Command history (saved between visits) |
+| <kbd>↑</kbd> / <kbd>↓</kbd> | Command history (saved between visits). With text in the input, ↑ walks only the lines that start with it |
+| <kbd>Ctrl</kbd>+<kbd>R</kbd> | Reverse search through history: type to narrow, <kbd>Ctrl</kbd>+<kbd>R</kbd> again for an older match, Enter to run it, Esc, → or Tab to edit it, <kbd>Ctrl</kbd>+<kbd>C</kbd> to give up. Cmd+R still reloads |
+| <kbd>→</kbd> / <kbd>End</kbd> | Takes the faded suggestion after the caret, which only ever comes from your own history |
+| `!!` `!$` `!N` `^a^b` | The last line, its last word, line N of `history`, and the last line with `a` replaced by `b`. The expansion is shown before it runs, and one that would change something is put in history for ↑ and Enter instead. A line with `sign`, `mail` or `ask` in it is never expanded, so `sign Great site!!` posts what you typed, and `:q!` is just `:q!` |
+| `--help` | As the first argument, any command's usage and flags: `ls --help` |
+| `-`<kbd>Tab</kbd> | Completes a flag, listing what each does when several are left: `grep -`<kbd>Tab</kbd> |
 | <kbd>Ctrl</kbd>+<kbd>L</kbd> | Clear |
 | <kbd>Ctrl</kbd>+<kbd>C</kbd> | Cancel a running command |
 | <kbd>Esc</kbd> | Close the overlay (focus goes back where it was) |
@@ -198,7 +206,8 @@ never show two different contents.
 
 | Command | Aliases | Usage |
 |---|---|---|
-| `help` | `?`, `man` | `help [command] [--all]`: list commands, or explain one |
+| `help` | `?` | `help [command] [--all]`: list commands, or explain one |
+| `man` | | `man [section] <page>`: a command's manual page, in a `less`-style pager (space and `b` to turn, `/` to search, `q` to quit). Every command has one; section 6 is the games and the rest of the fun. `man jules` is the person, and `curl -s jhemery.xyz/jules.1 \| man -l -` reads the same page in a real `man` |
 | `clear` | `cls` | Clear the screen |
 | `history` | | Show command history |
 | `echo` | | `echo <text>` |
@@ -210,6 +219,11 @@ never show two different contents.
 | `base64` | | `base64 [-d] <file\|text>`: encode or decode, as the encode tool does |
 | `uuidgen` | | A random v4 UUID |
 | `jq` | | `jq . <json>`: pretty-print, pointing at the error when it isn't JSON |
+| `grep` | | `grep [-i -v -n -c] <text> [file]`: the lines containing some text, matched literally |
+| `head` · `tail` | | `head [-n N \| -N] [file]`: the first (or last) ten lines, or N |
+| `wc` | | `wc [-l -w -c] [file]`: lines, words and bytes |
+| `sort` · `uniq` | | `sort [-r -n -u]`, `uniq [-c]`: sort lines; fold neighbouring repeats |
+| `strace` | | `strace <command>`: run a command and list the requests it made (`GET /weather = 200 · 1.10 kB · 84 ms`), with the keys of each body and never their values. `strace ls` prints just what `ls` does |
 | `exit` | `quit`, `logout` | Close the terminal |
 
 </details>
@@ -244,7 +258,7 @@ never show two different contents.
 | `contact` | `links` | How to reach me |
 | `neofetch` | `fetch` | System summary with an ASCII logo, an "uptime" counted from the first commit and whether I'm open to work |
 | `resume` | `cv` | Condensed résumé (experience, education, stack, links), with a link to the printable one |
-| `curl` | | `curl jhemery.xyz` fetches the résumé the way a real curl would |
+| `curl` | | `curl [-I] jhemery.xyz[/path]`: a real request to this site. The bare host is `resume.txt`, coloured, with the hidden parts left hidden; `-I` prints the real response headers. Any other host can't be resolved from a browser tab |
 | `why` | | `why <topic>`: what the site chose, what it turned down and why, the PR, and a link to the design note. `why` alone lists the fifteen topics (`why mcp-sdk`, `why polling`, `why battleship`…) |
 | `tour` | | A one-minute walk through the site: `neofetch`, a colour scheme shown for a moment and put back, the games, the `curl` hint, and how many achievements you've found. `?run=tour` is the link to share |
 
@@ -328,7 +342,7 @@ to its panel, with its own tests.
 
 | Tool | Does |
 |---|---|
-| **`image`** | Converts between PNG, JPEG and WebP, resizes to a maximum width, and sets the quality. Re-encoding through a canvas drops EXIF, GPS and colour-profile data by construction. When a browser can't write the requested format (Safari and WebP), the tool says so and names the file after the format it actually produced. |
+| **`image`** | Converts between PNG, JPEG and WebP, resizes to a maximum width, and sets the quality. First it lists what the file gives away: camera, serial number, lens, software, timestamps, artist, and GPS as decimal degrees ("this says where you stood"), read by its own parser of JPEG, PNG and WebP metadata, from the whole file up to 64 MB. HEIC, AVIF and GIF are reported as unreadable, never as clean. A photo is turned upright from its Orientation tag before encoding. Then the tool reads its own output back with the same parser and shows "0 fields — verified", or how many fields survived and which. Chromium's JPEG and WebP encoders write an sRGB colour profile of their own, which counts as one; its PNG carries none. When a browser can't write the requested format (Safari and WebP), the tool says so and names the file after the format it actually produced. |
 | **`hash`** | SHA-1, SHA-256 and SHA-512 of some text or a dropped file, in hex or base64, using Web Crypto. |
 | **`encode`** | Base64 (UTF-8 safe, accepts the URL-safe alphabet and missing padding), URL encoding and hex, in both directions. Malformed input is reported rather than guessed at. |
 | **`json`** | Pretty-prints with 2, 4 or tab indentation, or minifies. Invalid JSON is reported with its line and column and a caret under the offending character. It uses its own scanner, because `JSON.parse`'s messages no longer include a position. |
@@ -348,9 +362,15 @@ The page, the `tools` command and Tab completion all read `src/tools/registry.ts
 means adding one object there, plus the tool's folder.
 
 **Rooms.** `/watch` and `/radio` are the third and fourth faces of the prism. A room is a
-five-character code. The host pastes a YouTube link (watch) or queues SoundCloud tracks and sets
-(radio), and every guest's player follows the host's play, pause and seeks to within two seconds,
-correcting for drift against the server's clock. Both embeds are controlled over `postMessage`, so
+five-character code. The host pastes a YouTube link (watch) or queues SoundCloud tracks, sets and
+YouTube videos in any mix (radio), and every guest's player follows the host's play, pause and seeks to within two seconds,
+correcting for drift against the server's clock. An *up next* sidebar, beside the player on a wide
+screen and under it on a phone, shows what is playing and the numbered queue, by title where the
+server found one: the host skips, reorders and removes from it with buttons, and guests only read
+it. The player is chosen per item,
+so a radio hands over from the SoundCloud widget to YouTube and back as the queue moves on. A
+video in a radio plays in a small player, at least 200 pixels each way, because YouTube's terms
+don't allow hiding it to keep the sound. Both embeds are controlled over `postMessage`, so
 no YouTube or SoundCloud script runs on the page, and the CSP only needs one extra `frame-src`.
 Rooms are off unless the API sets `ROOMS_ENABLED`.
 
@@ -439,8 +459,8 @@ uses the front of `X-Forwarded-For`, which any client can write.
 | `GET /guestbook` · `POST /guestbook` | Read and sign. Sanitised, link-filtered, 1/min per IP, capped at 500 entries. Stored in a JSON file under `DATA_DIR`, or in MongoDB if `MONGODB_URI` is set. **Off by default.** |
 | `DELETE /guestbook/:id` | Moderation. Requires the `x-admin-password` header. |
 | `GET /rooms` · `POST /rooms` | Whether rooms are enabled, and creating a watch, radio or connect4 room. Creating one returns a five-character code and a host token that is never sent again. 10 rooms/hour per IP, 200 rooms at most, all in memory. **Off by default.** |
-| `GET /rooms/:code` · `GET /rooms/:code/events` | A room's snapshot, and the SSE stream every member keeps open: the host's playback state tied to the server clock, the queue, and a head count. As with `/presence`, it's a number, never a list of who's there. |
-| `POST /rooms/:code/state` · `DELETE /rooms/:code` | Changing the room's state and closing it, host only (`x-room-token`). What a host can load is allowlisted on the server: an eleven-character YouTube ID or an https soundcloud.com URL. Nothing else can reach a guest's iframe. 120 state changes/min per IP. |
+| `GET /rooms/:code` · `GET /rooms/:code/events` | A room's snapshot, and the SSE stream every member keeps open: the host's playback state tied to the server clock, the queue, and a head count. As with `/presence`, it's a number, never a list of who's there. Beside the queue, `titles` maps each item to the title the server found for it (and `state.title` repeats the current one's): the server asks YouTube's or SoundCloud's oEmbed endpoint in the background, so a host can't put text in front of the guests. Each item is asked about once and a miss again after ten minutes, at most 30 lookups a minute and four at once across every room; an item with no title stays its bare ID. |
+| `POST /rooms/:code/state` · `DELETE /rooms/:code` | Changing the room's state and closing it, host only (`x-room-token`). What a host can load is allowlisted on the server: an eleven-character YouTube ID in a watch room, and either that or an https soundcloud.com URL in a radio room, queue items included. Nothing else can reach a guest's iframe. 120 state changes/min per IP. |
 | `POST /rooms/:code/join` · `/move` · `/rematch` | Connect four. The first `join` gets the second seat's token and a third is refused; a `move` carries a seat token (`x-room-token`) and is accepted only on that seat's turn, into a column with room; a `rematch` clears the board and swaps who opens. Wins are the clients' to work out from the public move list. |
 | `GET /jobs` · `POST /jobs` | Owner only (`x-admin-password` on every route). Returns the downloader's state, or starts a job for one YouTube video or one SoundCloud track. URLs must match an allowlist, and sets and profiles are refused. yt-dlp runs on the server in the background, and the request returns immediately with a job ID. 20/hour per IP, at most three pending and one running, ten minutes per job. **Off by default.** |
 | `GET /jobs/:id` · `GET /jobs/:id/file` · `DELETE /jobs/:id` | Poll a job, fetch its file (once: it's deleted as soon as the download completes, or 30 minutes after it was produced), or cancel/dismiss it. |

@@ -79,7 +79,7 @@ How the site was thought through, written while building it: what was chosen and
 ## Optional
 
 - [Watch party](https://jhemery.xyz/watch): Watch a YouTube video in sync with friends — one room code, the host drives, everyone follows
-- [Radio](https://jhemery.xyz/radio): A shared SoundCloud queue, one track at a time, everyone hearing the same second
+- [Radio](https://jhemery.xyz/radio): A shared queue of SoundCloud tracks and YouTube videos, one at a time, everyone hearing the same second
 - [Hardware](https://jhemery.xyz/#hardware): PCs, NAS and peripherals
 - [Gaming](https://jhemery.xyz/#gaming): Currently playing and favourite genres
 - [Sitemap](https://jhemery.xyz/sitemap.xml)

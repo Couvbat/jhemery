@@ -15,12 +15,54 @@ import {
   positionAt,
   validMedia,
 } from './rooms.service';
+import { RoomTitles } from './room-titles';
 import { RoomSnapshot } from './rooms.types';
 
-function build(env: Record<string, string> = { ROOMS_ENABLED: 'true' }) {
+function build(
+  env: Record<string, string> = { ROOMS_ENABLED: 'true' },
+  titles = new RoomTitles(),
+) {
   const config = { get: (key: string) => env[key] } as unknown as ConfigService;
-  return new RoomsService(config);
+  return new RoomsService(config, titles);
 }
+
+// Every update looks titles up. Nothing in this file may reach YouTube or SoundCloud:
+// by default every oEmbed call is a 404, and the title tests supply their own.
+const realFetch = global.fetch;
+let fetchMock: jest.Mock;
+beforeEach(() => {
+  fetchMock = jest.fn(() =>
+    Promise.resolve(new Response('{}', { status: 404 })),
+  );
+  global.fetch = fetchMock;
+});
+afterEach(() => {
+  global.fetch = realFetch;
+  jest.restoreAllMocks();
+});
+
+/** An oEmbed fetch the test answers by hand, call by call. */
+function oembedByHand() {
+  const calls: { url: string; title: (title: string | null) => void }[] = [];
+  fetchMock.mockImplementation(
+    (url: string) =>
+      new Promise<Response>((resolve) =>
+        calls.push({
+          url,
+          title: (title) =>
+            resolve(
+              title === null
+                ? new Response('{}', { status: 404 })
+                : new Response(JSON.stringify({ title })),
+            ),
+        }),
+      ),
+  );
+  return calls;
+}
+
+/** Lets the background lookups that have been answered run to the end. */
+const settle = () => new Promise((resolve) => setImmediate(resolve));
 
 /** Subscribes like a member would and keeps every snapshot it is sent. */
 function join(service: RoomsService, code: string) {
@@ -127,8 +169,12 @@ describe('RoomsService', () => {
       expect(
         service.update(radio.code, radio.hostToken, { media: SC }).state.media,
       ).toBe(SC);
+      // A radio plays YouTube too: the id is the same allowlisted shape watch takes.
+      expect(
+        service.update(radio.code, radio.hostToken, { media: YT }).state.media,
+      ).toBe(YT);
       for (const bad of [
-        YT,
+        'https://youtube.com/watch?v=aqz-KE-bpKQ',
         'http://soundcloud.com/x',
         'https://evil.com/?soundcloud.com',
         'https://soundcloud.com.evil.com/x',
@@ -163,6 +209,39 @@ describe('RoomsService', () => {
       expect(() =>
         service.update(room.code, room.hostToken, { queue: [YT, SC] }),
       ).toThrow(BadRequestException);
+    });
+
+    it('takes a mixed queue in radio and refuses it in watch', () => {
+      const service = build();
+      const radio = service.create('radio', T0);
+      const watch = service.create('watch', T0);
+      const mixed = [SC, YT, 'https://m.soundcloud.com/couvbat/sets/mon-bruit'];
+
+      expect(
+        service.update(radio.code, radio.hostToken, { queue: mixed }).queue,
+      ).toEqual(mixed);
+      // Promoting the YouTube item makes it the current one, as `next` does.
+      expect(
+        service.update(radio.code, radio.hostToken, {
+          media: YT,
+          queue: mixed.slice(2),
+        }).state.media,
+      ).toBe(YT);
+      expect(() =>
+        service.update(watch.code, watch.hostToken, { queue: mixed }),
+      ).toThrow(BadRequestException);
+      expect(() =>
+        service.update(watch.code, watch.hostToken, { media: SC }),
+      ).toThrow('Not a YouTube video id');
+      // One bad item still sinks the whole radio queue.
+      expect(() =>
+        service.update(radio.code, radio.hostToken, {
+          queue: [...mixed, 'https://youtube.com/watch?v=aqz-KE-bpKQ'],
+        }),
+      ).toThrow(BadRequestException);
+      expect(() =>
+        service.update(radio.code, radio.hostToken, { media: 'javascript:1' }),
+      ).toThrow('Not a soundcloud.com URL or a YouTube video id');
     });
 
     it('starts a new item from the top and stamps the server clock', () => {
@@ -301,10 +380,149 @@ describe('RoomsService', () => {
   });
 });
 
+describe('titles', () => {
+  const OTHER = 'zyxwvutsrq9';
+
+  it('answers an add before its lookup does, and publishes the title when it lands', async () => {
+    const calls = oembedByHand();
+    const service = build();
+    const room = service.create('radio', T0);
+    const guest = join(service, room.code);
+
+    const added = service.update(room.code, room.hostToken, { queue: [YT] });
+    expect(added.queue).toEqual([YT]);
+    expect(added.titles).toEqual({});
+    expect(calls).toHaveLength(1);
+
+    calls[0].title('Big Buck Bunny');
+    await settle();
+    expect(service.snapshot(room.code)!.titles).toEqual({
+      [YT]: 'Big Buck Bunny',
+    });
+    expect(guest.seen.at(-1)!.titles).toEqual({ [YT]: 'Big Buck Bunny' });
+    guest.leave();
+  });
+
+  it('keeps the bare id when the lookup fails', async () => {
+    const service = build();
+    const room = service.create('watch', T0);
+    service.update(room.code, room.hostToken, { media: YT, queue: [OTHER] });
+    await settle();
+
+    const after = service.snapshot(room.code)!;
+    expect(after.queue).toEqual([OTHER]);
+    expect(after.state.media).toBe(YT);
+    expect(after.titles).toEqual({});
+    expect(after.state).not.toHaveProperty('title');
+  });
+
+  it('carries the current item’s title on the state too, through next', async () => {
+    const calls = oembedByHand();
+    const service = build();
+    const room = service.create('radio', T0);
+    service.update(room.code, room.hostToken, { queue: [YT, SC] });
+    calls[0].title('Video');
+    calls[1].title('Track by couvbat');
+    await settle();
+
+    // `next`, as the page sends it: the head becomes the current item.
+    const promoted = service.update(room.code, room.hostToken, {
+      media: YT,
+      queue: [SC],
+      position: 0,
+      playing: true,
+    });
+    expect(promoted.state.title).toBe('Video');
+    expect(promoted.titles).toEqual({
+      [YT]: 'Video',
+      [SC]: 'Track by couvbat',
+    });
+  });
+
+  it('starts no new lookup on a reorder, a pause or a seek', async () => {
+    const calls = oembedByHand();
+    const service = build();
+    const room = service.create('radio', T0);
+    service.update(room.code, room.hostToken, { queue: [YT, SC, OTHER] });
+    expect(calls).toHaveLength(3);
+    calls[0].title('One');
+    calls[1].title('Two');
+    calls[2].title(null);
+    await settle();
+
+    service.update(room.code, room.hostToken, { queue: [OTHER, SC, YT] });
+    service.update(room.code, room.hostToken, { playing: false });
+    service.update(room.code, room.hostToken, { position: 30 });
+    await settle();
+    expect(calls).toHaveLength(3);
+    // A second room holding the same item asks nothing either.
+    const other = service.create('radio', T0);
+    expect(
+      service.update(other.code, other.hostToken, { queue: [YT] }).titles,
+    ).toEqual({ [YT]: 'One' });
+    expect(calls).toHaveLength(3);
+  });
+
+  it('prunes titles for items the room no longer holds', async () => {
+    const calls = oembedByHand();
+    const service = build();
+    const room = service.create('radio', T0);
+    service.update(room.code, room.hostToken, { queue: [YT, SC] });
+    calls[0].title('Video');
+    calls[1].title('Track');
+    await settle();
+
+    expect(
+      service.update(room.code, room.hostToken, { queue: [SC] }).titles,
+    ).toEqual({ [SC]: 'Track' });
+    expect(
+      service.update(room.code, room.hostToken, { queue: [] }).titles,
+    ).toEqual({});
+  });
+
+  it('drops a title that lands after its item has gone', async () => {
+    const calls = oembedByHand();
+    const service = build();
+    const room = service.create('radio', T0);
+    service.update(room.code, room.hostToken, { queue: [YT] });
+    service.update(room.code, room.hostToken, { queue: [] });
+
+    calls[0].title('Too late');
+    await settle();
+    expect(service.snapshot(room.code)!.titles).toEqual({});
+  });
+
+  it('publishes nothing for a room that has ended', async () => {
+    const calls = oembedByHand();
+    const service = build();
+    const room = service.create('watch', T0);
+    service.update(room.code, room.hostToken, { media: YT });
+    service.end(room.code, room.hostToken);
+    const publish = jest.spyOn(
+      service as unknown as { publish: () => void },
+      'publish',
+    );
+
+    calls[0].title('Nobody is listening');
+    await settle();
+    expect(publish).not.toHaveBeenCalled();
+  });
+
+  it('never puts titles on a game room', () => {
+    const service = build();
+    const room = service.create('connect4', T0);
+    expect(service.snapshot(room.code)).not.toHaveProperty('titles');
+  });
+});
+
 describe('validMedia', () => {
   it('knows a YouTube id and a soundcloud.com URL, and nothing else', () => {
     expect(validMedia('watch', YT)).toBe(true);
+    expect(validMedia('radio', YT)).toBe(true);
+    expect(validMedia('watch', SC)).toBe(false);
+    expect(validMedia('connect4', YT)).toBe(false);
     expect(validMedia('watch', 'a'.repeat(12))).toBe(false);
+    expect(validMedia('radio', 'a'.repeat(12))).toBe(false);
     expect(
       validMedia('radio', 'https://m.soundcloud.com/couvbat/sets/mon-bruit'),
     ).toBe(true);

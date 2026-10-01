@@ -28,6 +28,7 @@ function context(args: string[]): CommandContext {
   return {
     args,
     raw: ['theme', ...args].join(' '),
+    tty: true,
     locale: 'en',
     t: (<T,>(value: Localised<T>) => value.en) as CommandContext['t'],
     print: () => {},

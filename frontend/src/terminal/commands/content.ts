@@ -23,13 +23,32 @@ import { useSteam } from '@/composables/useSteam'
 import { uptime } from '@/composables/useStatus'
 import { useStats } from '@/composables/useStats'
 import { useTheme } from '@/composables/useTheme'
+import { fetchSite, type SiteResponse } from '@/lib/api'
 import { REPO } from '@/lib/source'
+import { parseSgr } from '../ansi'
 import { MARK } from '../ascii'
+import { isPrintable, MAX_LINES, parseCurlArgs, resolveTarget, SITE_FILES } from '../curl'
 import { closest } from '../fuzzy'
 import { workLines } from '../work'
-import { blank, heading, keyValues, line, segmented, tags, wrap } from '../format'
+import { blank, fail, heading, keyValues, line, pre, segmented, tags, wrap } from '../format'
 import type { Command, OutputLine } from '../types'
 import { swatches } from './theme'
+
+/**
+ * What a real terminal gets for this path: `/neofetch` is the curl page
+ * `/run/<locale>/neofetch.txt` there, which `.htaccess` hands to curl by its user agent,
+ * a header a page's `fetch` can't set. So a one-word path tries that page first, in the
+ * reader's language, and falls back to the path itself (whose answer is then the app's
+ * `index.html`, as a browser would get).
+ */
+async function fetchCurlPath(path: string, method: 'GET' | 'HEAD', locale: string, signal: AbortSignal): Promise<SiteResponse> {
+  const page = /^\/([a-z0-9-]+)\/?$/.exec(path)?.[1]
+  if (page) {
+    const run = await fetchSite(`/run/${locale}/${page}.txt`, method, { signal })
+    if (run.status === 200 && (run.headers.get('content-type') ?? '').startsWith('text/plain')) return run
+  }
+  return fetchSite(path, method, { signal })
+}
 
 /** The printable résumé `vite-plugins/resume.ts` emits, in the reader's language. */
 export function resumeHtmlPath(locale: string): string {
@@ -67,6 +86,12 @@ export const contentCommands: Command[] = [
     name: 'skills',
     usage: 'skills [--why]',
     description: { en: 'Tech I work with', fr: "Technos que j'utilise" },
+    manual: {
+      options: {
+        '--why': { en: 'Where each skill is used on this site or in its code: the evidence, not the claim.', fr: 'Où chaque compétence sert sur ce site ou dans son code : la preuve, pas l’affirmation.' },
+      },
+      seeAlso: ['projects(1)', 'resume(1)'],
+    },
     group: 'content',
     writes: 'none',
     linkable: true,
@@ -117,6 +142,13 @@ export const contentCommands: Command[] = [
     name: 'projects',
     usage: 'projects [--json] [<part>]',
     description: { en: 'What I have built', fr: "Ce que j'ai construit" },
+    manual: {
+      options: {
+        '--json': { en: 'The projects as JSON, for `jq` or another program; this site’s own entry carries its case studies.', fr: 'Les projets en JSON, pour `jq` ou un autre programme ; l’entrée de ce site porte ses études de cas.' },
+      },
+      examples: [{ command: 'projects qr' }, { command: 'projects --json | jq .' }],
+      seeAlso: ['why(1)', 'skills(1)'],
+    },
     group: 'content',
     writes: 'none',
     linkable: true,
@@ -148,7 +180,7 @@ export const contentCommands: Command[] = [
         if (part) return workLines(part, t)
         const hint = closest(wanted, work.map((p) => p.id))
         return [
-          line(`projects: ${wanted}: ${t({ en: 'no such part', fr: 'partie inconnue' })}`, 'error'),
+          fail(`projects: ${wanted}: ${t({ en: 'no such part', fr: 'partie inconnue' })}`),
           ...(hint ? [line(`${t({ en: 'did you mean', fr: 'vouliez-vous dire' })} \`projects ${hint}\`?`, 'muted')] : []),
         ]
       }
@@ -225,7 +257,7 @@ export const contentCommands: Command[] = [
       const requested = args[0]?.toLowerCase()
 
       if (requested !== undefined && !isHardwareTab(requested)) {
-        return [line(`hardware: unknown group \`${args[0]}\``, 'error')]
+        return [fail(`hardware: unknown group \`${args[0]}\``)]
       }
 
       // Keep the rendered section's tab strip in sync with what was asked for.
@@ -374,51 +406,97 @@ export const contentCommands: Command[] = [
           tone: 'accent',
         },
         line(`tip: curl ${profile.domain}`, 'muted'),
+        line(`tip: curl ${profile.domain}/help`, 'muted'),
       ]
     },
   },
   {
     name: 'curl',
-    usage: `curl ${profile.domain}`,
+    usage: `curl [-I] [${profile.domain}[/path]]`,
     description: {
-      en: 'Fetch the résumé (as a real curl would)',
-      fr: 'Récupérer le CV (comme un vrai curl)',
+      en: 'Fetch a page of this site, as a real curl would',
+      fr: 'Récupérer une page de ce site, comme un vrai curl',
+    },
+    manual: {
+      options: {
+        '-I': { en: 'Ask for the headers only (HEAD), and print the real ones: the CSP and HSTS included.', fr: 'Ne demander que les en-têtes (HEAD), et afficher les vrais : CSP et HSTS compris.' },
+      },
+      examples: [{ command: `curl ${profile.domain}` }, { command: `curl -I ${profile.domain}/llms.txt` }],
+      seeAlso: ['strace(1)', 'resume(1)', 'jules(1)'],
     },
     group: 'content',
     writes: 'none',
     linkable: true,
     palette: true,
-    complete: ({ index }) => (index === 0 ? [profile.domain] : []),
+    // Also the whole of what a `?run=` link may pass: a link names a known file, never
+    // a path of its author's choosing.
+    complete: ({ index }) => (index < 3 ? [profile.domain, '-I', ...SITE_FILES] : []),
     async run(ctx) {
-      const target = ctx.args[0]
-        ?.toLowerCase()
-        .replace(/^https?:\/\//, '')
-        .replace(/\/.*$/, '')
+      const { t } = ctx
+      const parsed = parseCurlArgs(ctx.args)
+      if (!parsed.ok) return parsed.lines.map((text) => fail(text))
 
-      const isSelf =
-        !target || target === profile.domain || /^localhost(:\d+)?$/.test(target)
+      const out: OutputLine[] = []
+      for (const target of parsed.targets) {
+        const resolved = resolveTarget(target)
+        if ('unresolved' in resolved) {
+          out.push(
+            fail(`curl: (6) Could not resolve host: ${resolved.unresolved}`),
+            line(
+              t({
+                en: 'This is a terminal inside a browser tab, so it can only reach this site. Try that one in a real terminal.',
+                fr: 'Ce terminal vit dans un onglet de navigateur : il ne joint que ce site. Essayez celui-là dans un vrai terminal.',
+              }),
+              'muted',
+            ),
+          )
+          continue
+        }
 
-      if (!isSelf) {
-        return [
-          line(`curl: (6) Could not resolve host: ${ctx.args[0]}`, 'error'),
-          line(
-            'this is a terminal inside a browser tab, not a real shell — it can only',
-            'muted',
-          ),
-          line('reach this site. try it in an actual terminal on your machine.', 'muted'),
-        ]
+        let res: SiteResponse
+        try {
+          res = await fetchCurlPath(resolved.path, parsed.head ? 'HEAD' : 'GET', ctx.locale, ctx.signal)
+        } catch (error) {
+          if ((error as Error)?.name === 'AbortError') throw error
+          out.push(fail(`curl: (7) Failed to connect to ${profile.domain} port 443: Couldn't connect to server`))
+          continue
+        }
+
+        // What a same-origin fetch may read is every header but Set-Cookie: the CSP and
+        // HSTS lines are the real ones.
+        if (parsed.head) {
+          out.push(pre(`HTTP/2 ${res.status}`), ...[...res.headers].map(([name, value]) => pre(`${name}: ${value}`)))
+          continue
+        }
+        if (res.truncated) {
+          out.push(
+            line(
+              t({
+                en: `Warning: that is more than this terminal will print. \`curl -O https://${profile.domain}${resolved.path}\` in a real one saves it.`,
+                fr: `Attention : c’est plus que ce terminal n’affiche. \`curl -O https://${profile.domain}${resolved.path}\` dans un vrai terminal l’enregistre.`,
+              }),
+              'warning',
+            ),
+          )
+          continue
+        }
+        if (!isPrintable(res.headers.get('content-type') ?? '', res.body)) {
+          out.push(
+            line('Warning: Binary output can mess up your terminal. Use "--output -" to tell', 'warning'),
+            line('Warning: curl to output it to your terminal anyway, or consider "--output', 'warning'),
+            line('Warning: <FILE>" to save to a file.', 'warning'),
+          )
+          continue
+        }
+        // Colours become tones; a concealed run is dropped, so the CTF's stage 3 still
+        // wants a real terminal and `cat -v`.
+        const lines = parseSgr(new TextDecoder().decode(res.body))
+        out.push(...lines.slice(0, MAX_LINES))
+        if (lines.length > MAX_LINES) {
+          out.push(line(t({ en: `… ${lines.length - MAX_LINES} more lines`, fr: `… ${lines.length - MAX_LINES} lignes de plus` }), 'muted'))
+        }
       }
-
-      ctx.print([
-        line(`$ curl ${profile.domain}`, 'muted'),
-        line(
-          '(same response a real curl gets — a browser tab cannot open a raw socket,',
-          'muted',
-        ),
-        line(' so this reuses the résumé data instead of actually connecting)', 'muted'),
-        blank,
-      ])
-      await ctx.run('resume')
+      return out
     },
   },
 ]
