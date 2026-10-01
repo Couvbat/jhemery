@@ -75,15 +75,17 @@
   animation: crt-roll 6s linear infinite;
 }
 
-/* Cheap chromatic aberration — no filters, just offset shadows. */
+/* Cheap chromatic aberration — no filters, just offset shadows. The fringe is the
+ * scheme's own pink and cyan slots, so under the default it is the magenta and cyan it
+ * always was, and under any other scheme it is that scheme's. */
 .crt-overdrive h1,
 .crt-overdrive h2,
 .crt-overdrive .glow-green,
 .crt-overdrive .glow-cyan,
 .crt-overdrive .glow-purple {
   text-shadow:
-    -1.5px 0 rgba(255, 0, 128, 0.7),
-    1.5px 0 rgba(0, 255, 255, 0.7),
+    -1.5px 0 color-mix(in srgb, var(--neon-pink) 70%, transparent),
+    1.5px 0 color-mix(in srgb, var(--neon-cyan) 70%, transparent),
     0 0 10px currentColor;
 }
 
@@ -353,6 +355,25 @@
   .theme-flash::after { display: none; }
 }
 [data-motion].theme-flash::after { display: none; }
+
+/*
+ * The theme circle — a dark-to-dark or light-to-either `theme` switch at full motion
+ * (`useTheme.ts`). The browser's cross-fade is off: the old page stays whole underneath,
+ * and the new one is revealed by a `clip-path` circle that `useTheme` animates on
+ * `::view-transition-new(root)` from where the pick happened. Below `full` motion, or
+ * dark to light (the flashbang's switch), no transition is started at all, so nothing
+ * here needs a reduced-motion twin.
+ */
+::view-transition-old(root),
+::view-transition-new(root) {
+  animation: none;
+  mix-blend-mode: normal;
+}
+/* While a transition runs, its snapshot covers the page and takes the clicks; letting
+ * them through means the next pick in the 🎨 menu lands, and cuts this one short. */
+::view-transition {
+  pointer-events: none;
+}
 
 /*
  * The screensaver (`useIdle.ts`): every child of #app fades except the wireframe

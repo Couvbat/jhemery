@@ -2,7 +2,7 @@
 import { nextTick, ref } from 'vue'
 import { onClickOutside } from '@vueuse/core'
 import { useLocale } from '@/i18n'
-import { useTheme } from '@/composables/useTheme'
+import { useTheme, type ThemeOrigin } from '@/composables/useTheme'
 import { MOTION_SETTINGS, useMotion, type MotionSetting } from '@/composables/useMotion'
 import { swatch, type Theme } from '@/lib/themes'
 import { tryTheme } from '@/terminal/achievements'
@@ -68,9 +68,19 @@ function hide() {
 
 /** Stays open on a pick: the page repaints behind the menu, so it is a live preview, and
  *  `ricer` wants five of them. */
-function pick(theme: Theme) {
+function pick(theme: Theme, event: MouseEvent) {
   if (theme.id === active.value.id && theme.id === painted.value.id) return
-  tryTheme(setTheme(theme.id)!)
+  tryTheme(setTheme(theme.id, { origin: originOf(event) })!)
+}
+
+/**
+ * Where the new scheme spreads from: the pointer for a click, and the item's centre for
+ * Enter or Space, whose synthesised click has no position worth using (`detail` is 0).
+ */
+function originOf(event: MouseEvent): ThemeOrigin {
+  if (event.detail > 0) return { x: event.clientX, y: event.clientY }
+  const box = (event.currentTarget as HTMLElement).getBoundingClientRect()
+  return { x: box.left + box.width / 2, y: box.top + box.height / 2 }
 }
 
 function move(event: KeyboardEvent) {
@@ -138,7 +148,7 @@ function onKeydown(event: KeyboardEvent) {
             :aria-checked="theme.id === active.id"
             tabindex="-1"
             class="w-full flex items-center gap-2 rounded px-2 py-1.5 text-left transition-colors hover:bg-muted focus-visible:bg-primary/15 focus-visible:outline-none"
-            @click="pick(theme)"
+            @click="pick(theme, $event)"
           >
             <!-- `git branch`'s marker, as in `theme`'s own listing. -->
             <span class="w-2 text-primary" aria-hidden="true">{{ theme.id === active.id ? '*' : '' }}</span>

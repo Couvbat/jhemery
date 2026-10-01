@@ -164,12 +164,34 @@ let mouseY = 0
 let pointerActive = false
 let pointerIdleTimer: ReturnType<typeof setTimeout> | undefined
 
-/** The four neon hues from the stylesheet — or from the `theme` written over it. */
-const neon: Record<string, THREE.Color> = {}
+/** The four hue slots a palette picks from, by their historical names (§3: under Gruvbox
+ *  `green` is orange). */
+type Hue = 'green' | 'cyan' | 'purple' | 'pink'
+const HUES: readonly Hue[] = ['green', 'cyan', 'purple', 'pink']
+/** What each slot reads when the property is empty, the default's own hex. */
+const HUE_FALLBACKS: Record<Hue, string> = { green: '#00ff41', cyan: '#00ffff', purple: '#bf00ff', pink: '#ff0080' }
+
+function hueColours(): Record<Hue, THREE.Color> {
+  return { green: new THREE.Color(), cyan: new THREE.Color(), purple: new THREE.Color(), pink: new THREE.Color() }
+}
+
+/** The four hues as the wireframes paint them right now — the stylesheet's, or a `theme`'s. */
+const neon = hueColours()
+/**
+ * A scheme switch eases the wireframes from the hues on screen (`neonFrom`) to the new
+ * ones (`neonTo`) over `RECOLOUR_MS`, in the loop. Preallocated, so the lerp allocates
+ * nothing; with no loop running (`paused`) the switch is still the instant recolour.
+ */
+const neonFrom = hueColours()
+const neonTo = hueColours()
+/** Matches the theme circle, so the field and the page land on the new scheme together. */
+const RECOLOUR_MS = 450
+/** How far through the current ease, 0 → 1. At rest it is 1. */
+let recolour = 1
 
 interface Palette {
-  base: string
-  accent: string
+  base: Hue
+  accent: Hue
   /** Multiplies the rotation speed, on top of the CRT boost. */
   speed: number
 }
@@ -228,10 +250,6 @@ function handleMouseMove(event: MouseEvent) {
   }, POINTER_IDLE_MS)
 }
 
-function readNeonColor(varName: string, fallback: string): THREE.Color {
-  const value = getComputedStyle(document.documentElement).getPropertyValue(varName).trim()
-  return new THREE.Color(value || fallback)
-}
 
 /** Half the visible world at the z=0 plane — the frustum maths the spread and the
  *  pointer projection both need. */
@@ -247,34 +265,45 @@ function currentPalette(): Palette {
   return SECTION_PALETTES[activeSection.value] ?? SECTION_PALETTES.about!
 }
 
+/** The colour half of `applyPalette`: every material takes its hue from `neon` as it
+ *  stands. The loop calls this alone on each frame of a scheme's ease. */
+function applyColours() {
+  const palette = currentPalette()
+  for (const { mesh, accent } of shapes) {
+    ;(mesh.material as THREE.MeshBasicMaterial).color.copy(neon[accent ? palette.accent : palette.base])
+  }
+  for (const shape of visitors) (shape.mesh.material as THREE.MeshBasicMaterial).color.copy(neon[palette.base])
+  if (links) (links.material as THREE.LineBasicMaterial).color.copy(neon[palette.base])
+}
+
 /** Recolours the existing materials in place — cheaper than rebuilding the scene,
  *  and the shapes keep their positions across a section change. */
 function applyPalette() {
-  const palette = currentPalette()
-  sectionSpeed = palette.speed
+  sectionSpeed = currentPalette().speed
+  applyColours()
 
   const mood = weatherMood.value
-  for (const { mesh, accent, baseOpacity } of shapes) {
-    const material = mesh.material as THREE.MeshBasicMaterial
-    const colour = neon[accent ? palette.accent : palette.base]
-    if (colour) material.color.copy(colour)
+  for (const { mesh, baseOpacity } of shapes) {
     // Scaled from `baseOpacity` rather than from the current value, so a run of
     // weather changes can't ratchet every shape down to invisible.
-    material.opacity = Math.min(baseOpacity * mood.opacity, 0.6)
+    ;(mesh.material as THREE.MeshBasicMaterial).opacity = Math.min(baseOpacity * mood.opacity, 0.6)
   }
-  for (const shape of visitors) {
-    const material = shape.mesh.material as THREE.MeshBasicMaterial
-    const colour = neon[palette.base]
-    if (colour) material.color.copy(colour)
-    material.opacity = visitorOpacity(shape)
-  }
-  if (links) {
-    const colour = neon[palette.base]
-    if (colour) (links.material as THREE.LineBasicMaterial).color.copy(colour)
-  }
+  for (const shape of visitors) (shape.mesh.material as THREE.MeshBasicMaterial).opacity = visitorOpacity(shape)
 
-  // Nothing is redrawing on its own in the reduced-motion path.
+  // Nothing is redrawing on its own while motion is paused.
   if (animationFrameId === null && renderer && scene && camera) renderer.render(scene, camera)
+}
+
+/** One frame of a scheme's ease, `dt` milliseconds long. Smoothstepped, so the new
+ *  colour arrives without a jolt at either end. */
+function easeColours(dt: number) {
+  recolour = Math.min(1, recolour + dt / RECOLOUR_MS)
+  const k = recolour * recolour * (3 - 2 * recolour)
+  for (let i = 0; i < HUES.length; i++) {
+    const hue = HUES[i]!
+    neon[hue].copy(neonFrom[hue]).lerp(neonTo[hue], k)
+  }
+  applyColours()
 }
 
 /** A fresh position from the spawn distribution, in the field's own axes — the same
@@ -292,7 +321,7 @@ function addShape(accent: boolean, pool: AnimatedShape[] = shapes) {
   const palette = currentPalette()
   const baseOpacity = 0.15 + Math.random() * 0.25
   const material = new THREE.MeshBasicMaterial({
-    color: neon[accent ? palette.accent : palette.base] ?? 0xffffff,
+    color: neon[accent ? palette.accent : palette.base],
     wireframe: true,
     transparent: true,
     opacity: baseOpacity * weatherMood.value.opacity,
@@ -390,16 +419,22 @@ function syncShapeCount() {
   if (animationFrameId === null && renderer && scene && camera) renderer.render(scene, camera)
 }
 
-/** Called on mount and again on every `theme` switch, which rewrites the properties. */
-function readNeon() {
-  neon.green = readNeonColor('--neon-green', '#00ff41')
-  neon.cyan = readNeonColor('--neon-cyan', '#00ffff')
-  neon.purple = readNeonColor('--neon-purple', '#bf00ff')
-  neon.pink = readNeonColor('--neon-pink', '#ff0080')
+/**
+ * Reads the four hues the stylesheet paints into `into`. Under the default they are
+ * `:root`'s hex (`#00ff41`, …), not the table's `oklch()` primary, accent and secondary,
+ * which are close but not the same colour, and which `THREE.Color` can't parse: reading
+ * the computed property is what keeps an ease starting from the colour actually on screen.
+ */
+function readNeon(into: Record<Hue, THREE.Color>) {
+  const style = getComputedStyle(document.documentElement)
+  for (let i = 0; i < HUES.length; i++) {
+    const hue = HUES[i]!
+    into[hue].set(style.getPropertyValue(`--neon-${hue}`).trim() || HUE_FALLBACKS[hue])
+  }
 }
 
 function createInitialShapes() {
-  readNeon()
+  readNeon(neon)
 
   // Exactly three accents in the opening scene, so "not all of them are the same
   // colour" is a fact rather than a probability.
@@ -426,7 +461,7 @@ function ensureLinks() {
   links = new THREE.LineSegments(
     geometry,
     new THREE.LineBasicMaterial({
-      color: neon.green ?? 0xffffff,
+      color: neon.green,
       transparent: true,
       opacity: 0.12,
     }),
@@ -599,6 +634,7 @@ function animate(now: number) {
   }
 
   fadeVisitors(ease(VISITOR_FADE, f))
+  if (recolour < 1) easeColours(f * REFERENCE_MS)
   // Snap during a glitch, drift the rest of the time.
   const drift = ease(shaking ? 0.65 : 0.045, f)
   forEachShape(({ mesh, speed, home, offset }) => {
@@ -683,6 +719,8 @@ function pauseLoop() {
     swingArmed = false
   }
   if (camera) camera.position.z = cameraBaseZ
+  // Nor will a scheme's ease: the still frame is in the new colours.
+  if (recolour < 1) easeColours(RECOLOUR_MS)
   // No fade will finish now: whoever is arriving is here, and whoever is leaving goes
   // (`syncVisitors` disposes them when nothing loops, and draws the frame).
   for (const shape of visitors) {
@@ -702,10 +740,17 @@ watch(motion, (level) => (level === 'paused' ? pauseLoop() : startLoop()))
 watch([activeSection, activeView, unlocked, weatherMood], applyPalette)
 // A scheme changes what the palette's names mean, not which names it picks — so the
 // same recolour, after re-reading the hues. `useTheme` has already written the new
-// properties by the time this runs.
+// properties by the time this runs (inside the view transition's callback, when the
+// circle runs). With the loop running the wireframes ease there; paused, they jump.
 watch(theme, () => {
-  readNeon()
-  applyPalette()
+  if (animationFrameId === null) {
+    readNeon(neon)
+    applyPalette()
+    return
+  }
+  for (let i = 0; i < HUES.length; i++) neonFrom[HUES[i]!].copy(neon[HUES[i]!])
+  readNeon(neonTo)
+  recolour = 0
 })
 watch(shapeCount, syncShapeCount)
 watch(visitorShapes, syncVisitors)

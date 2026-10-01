@@ -315,7 +315,7 @@ them.
 |---|---|---|---|---|
 | [x] | `acid` | A 16-step TB-303-style sequencer on `/tools` in plain Web Audio: saw or square into a resonant low-pass, accent, slide and drive, a tempo that reaches hardcore speeds, and "randomise in phrygian". The link is the save file: the pattern packs to about 30 bytes behind a version byte into `?p=`, decoded defensively (every field clamped). One persistent oscillator → `BiquadFilter` (resonance capped short of self-oscillation) → `tanh` shaper → gain, a lookahead scheduler against `AudioContext.currentTime`, master at −12 dB into a limiter, nothing sounds without a gesture. `acid <code>` plays it from the shell and is **not** linkable: a link that starts sound is hostile. If the site ever gets more sound, it starts from this engine. | `tools/acid/` (new), `tools/registry.ts`, `commands/tools.ts` | M |
 | [ ] | Scheme forge and export | `theme forge #d65d0e` (or *make one* in the 🎨 menu) grows a twelve-colour scheme in OKLCH around one seed, then steps lightness until it passes the floors every shipped scheme is held to, reporting any it can't meet. The floors move from `themes.spec.ts` into `lib/themeRules.ts` so the test and the forge share one rule; colours go through `toHex`, so typed input never reaches a style attribute verbatim. A forged scheme is one extra theme, `custom`, restored before mount. `theme export alacritty\|kitty\|base16` prints the scheme on screen as a config for a real terminal; start with those three. | `lib/themeRules.ts` (new), `lib/forge.ts` (new), `lib/themes.ts`, `composables/useTheme.ts`, `commands/theme.ts`, `components/ThemeMenu.vue` | M |
-| [ ] | Theme transitions | A new scheme spreads in a circle from the swatch clicked (`document.startViewTransition`, a clip-path on `::view-transition-new(root)`, ~450 ms; skipped for dark → light so the Flashbang plays as today), and the wireframes ease to their new colour with a preallocated lerp. Fixes three things that ignore the scheme: `MatrixRain.vue`'s hard-coded greens and English-only hint, the `.crt-overdrive` fringe, and the SoundCloud colour baked into `content/music.ts`. | `composables/useTheme.ts`, `components/ThreeBackground.vue`, `components/effects/MatrixRain.vue`, `assets/main.css`, `content/music.ts`, `sections/MusicSection.vue` | S |
+| [x] | Theme transitions | A new scheme spreads in a circle from the swatch clicked (`document.startViewTransition`, a clip-path on `::view-transition-new(root)`, ~450 ms; skipped for dark → light so the Flashbang plays as today), and the wireframes ease to their new colour with a preallocated lerp. Fixes three things that ignore the scheme: `MatrixRain.vue`'s hard-coded greens and English-only hint, the `.crt-overdrive` fringe, and the SoundCloud colour baked into `content/music.ts`. | `composables/useTheme.ts`, `components/ThreeBackground.vue`, `components/effects/MatrixRain.vue`, `assets/main.css`, `content/music.ts`, `sections/MusicSection.vue` | S |
 | [x] | Motion control | *Full · calm · paused* in the 🎨 menu and a `motion` command, persisted as `couvbat:motion`. Today only the OS setting stops the field (WCAG 2.2.2). The OS setting is a floor the row can't lift. Decorative surfaces read a `decorativeMotion()` (field, confetti, glitch, boot replay, prompt cycling, swing), while the games keep reading `prefersReducedMotion()`. Also a frame governor: 60 fps at most, 30 while the terminal's blurred panel is open. Not linkable, since it writes a setting. | `composables/useMotion.ts` (new), `components/ThemeMenu.vue`, `components/ThreeBackground.vue`, the effect components | S |
 | [ ] | Accessible page changes | After the prism swing settles, focus the new view's `<h1 tabindex="-1">` and announce its `tabTitle()` in one `role="status"` node; the leaving face is `inert` for the swing (two `<main>`s overlap today); a skip link comes first. Tested in e2e, because focus after a real transition is what jsdom can't see. | `App.vue`, `composables/useViewSwing.ts`, `composables/useTabTitle.ts`, `e2e/navigation.spec.ts` | M |
 | [ ] | `who` and `wall` | `who` lists everyone on the site as anonymous ttys (`somebody pts/3`). `wall` sends a wave with no content: every other visitor's wireframes ripple outward, and an open terminal prints "Broadcast message from somebody@jhemery.xyz". Rides the existing presence stream, so no new connection; the server coalesces waves to one per 3 s. No text, no id, and the count is the one already sent. After the rate-limit fix. | `backend/src/presence/*`, `composables/usePresence.ts`, `components/ThreeBackground.vue`, `commands/system.ts` | S |
@@ -561,6 +561,21 @@ Recorded as each row ships.
     pulsed with no guard at all, beside the `motion-safe:` ones.
   - Outside the census: scrolling to a section (`scrollToSection()` and the router's hash
     scroll) was smooth even under reduced motion. It jumps with motion `paused` now.
+- **Theme transitions:**
+  - Beside dark → light, the circle is also skipped below `full` motion and while the prism
+    turns, and a new pick cuts one in flight short.
+  - The circle is a Web Animations `clip-path` on `::view-transition-new(root)`, started from
+    `useTheme` once the transition is ready, rather than CSS keyframes, so its radius reaches
+    the farthest corner from wherever the pick was. `::view-transition` lets clicks through, so
+    the next pick in the menu lands while one spreads.
+  - The wireframes' ease lasts as long as the circle (450 ms, smoothstepped), and only runs with
+    the loop; paused, they jump.
+  - The window dots became one `WindowDots.vue` in `destructive`, `warning` and `primary` (the
+    terminal's error, warning and success tones), so green is orange under Gruvbox. The
+    terminal's own dots, which are buttons, take the same three from it, and their glyphs moved
+    from black to the page background so they read on a light scheme.
+  - The radio rooms' SoundCloud player, which hard-coded the same green, takes the scheme's too,
+    read when an item mounts; both embeds now write `auto_play` once.
 
 ## Build order
 

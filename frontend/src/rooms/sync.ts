@@ -1,4 +1,5 @@
 import type { PlaybackState, RoomKind } from '@/lib/api'
+import { embedColour } from '@/content/music'
 
 /**
  * The pure half of the rooms: codes, media parsing, the drift maths and the embed
@@ -186,13 +187,14 @@ export function youtubeEmbed(id: string, pageOrigin: string, host: boolean): str
   return `${YOUTUBE_ORIGIN}/embed/${id}?${params}`
 }
 
-/** The same widget `MusicSection` embeds, in the site's green, with every share
- *  and buy button off — a party is not a shop. */
-export function soundcloudEmbed(url: string): string {
+/** The same widget `MusicSection` embeds, in the scheme's `--neon-green` (read by the
+ *  caller, validated by `embedColour`), with every share and buy button off — a party is
+ *  not a shop. `auto_play` is written once, rather than patched into the string after. */
+export function soundcloudEmbed(url: string, colour: string, autoplay = false): string {
   const params = new URLSearchParams({
     url,
-    color: '#00ff41',
-    auto_play: 'false',
+    color: embedColour(colour),
+    auto_play: String(autoplay),
     hide_related: 'true',
     show_comments: 'false',
     show_reposts: 'false',

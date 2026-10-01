@@ -360,8 +360,29 @@ shipped, and a spec holds that. Three upstream colours were also adjusted by han
 existed, each noted in the file.
 
 Switching from a dark scheme to a light one whites the page out for 0.9 s (`theme-flash` on
-`<html>`, skipped under reduced motion). That is the joke the `flashbang` achievement is named
-after. Adding `theme` also tightened "did you mean …?": two edits in a five-letter word make a
+`<html>`, only at *full* motion, §9). That is the joke the `flashbang` achievement is named
+after. Every other switch spreads: `setTheme(id, { origin })` paints inside
+`document.startViewTransition`, and the new view grows as a `clip-path` circle on
+`::view-transition-new(root)` over 450 ms, from the click in the 🎨 menu (the item's centre for
+Enter or Space) or the centre of the viewport from the terminal. It runs only where the API
+exists, at *full* motion, not dark to light (the flashbang's switch) and not while the prism
+turns. A new pick cuts one still in flight short, since hit-testing goes to the root while it
+runs, and a transition's callback that lands after a newer pick paints nothing. The circle is
+animated from script, with rounded numbers for its centre and radius, so nothing a visitor typed
+reaches a style; the CSS only turns the default cross-fade off. Meanwhile the wireframes ease
+from the hues on screen to the new ones (`neonFrom` → `neonTo`, preallocated, inside the loop);
+paused, they jump. Under the default the hues on screen are `:root`'s hex `--neon-*`, not the
+table's oklch primary, accent and secondary, which `THREE.Color` can't parse, so the ease reads
+the painted property, never the table.
+
+The last things that ignored the scheme follow it now: the matrix rain draws in `--neon-green`
+over `--background` (and says "press any key" in both languages), the CRT overdrive's fringe is a
+`color-mix()` of the pink and cyan slots, and the SoundCloud widgets (the music section's and the
+radio rooms') take `--neon-green`, read only when the frame mounts, since a new `src` reloads the
+cross-origin player and stops it. `content/music.ts`'s `soundcloudEmbedSrc(colour, autoplay)` is
+pure and lets only a `#rrggbb` into the URL. The window dots of every title bar are one
+`WindowDots.vue` in `destructive`, `warning` and `primary`, instead of Tailwind's red, yellow and
+green in thirteen copies. Adding `theme` also tightened "did you mean …?": two edits in a five-letter word make a
 different word (`where` is two from `theme`), so names under six letters get one edit, and a
 swapped pair counts as one.
 

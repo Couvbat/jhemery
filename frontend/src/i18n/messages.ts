@@ -843,6 +843,9 @@ export const messages = {
   boot: {
     skip: { en: 'press any key to skip', fr: 'appuyez sur une touche pour passer' },
   },
+  matrix: {
+    wake: { en: 'press any key to wake up', fr: 'appuyez sur une touche pour vous réveiller' },
+  },
   achievements: {
     title: { en: 'Achievements', fr: 'Succès' },
     open: { en: 'View achievements', fr: 'Voir les succès' },

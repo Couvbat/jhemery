@@ -1,10 +1,19 @@
 import { computed, ref, shallowRef } from 'vue'
 import { DEFAULT_THEME, findTheme, themes, themeTokens, type Theme } from '@/lib/themes'
 import { decorativeMotion } from './useMotion'
+import { useViewSwing } from './useViewSwing'
 
 const STORAGE_KEY = 'couvbat:theme'
 /** Matches the `theme-flash` keyframes in main.css. */
 const FLASH_MS = 900
+/** How long a new scheme takes to spread across the page from where it was picked. */
+const CIRCLE_MS = 450
+
+/** Where a pick happened, in viewport pixels: the circle the new scheme spreads in starts here. */
+export interface ThemeOrigin {
+  x: number
+  y: number
+}
 
 const defaultTheme = findTheme(DEFAULT_THEME)!
 /** Every property any scheme writes — all schemes derive the same set. */
@@ -23,6 +32,14 @@ const shown = shallowRef<Theme | null>(null)
  *  default can put back exactly what shipped. */
 let shippedThemeColour: string | null = null
 let flashTimer: ReturnType<typeof setTimeout> | undefined
+/** The circle still spreading, if any. */
+let spreading: ViewTransition | null = null
+/**
+ * Counts picks. A view transition runs its callback a frame or so after it is asked
+ * for, and one cut short by a newer pick still runs it; the count is how that callback
+ * knows a newer pick has happened and leaves the page to it.
+ */
+let picks = 0
 
 function paint(theme: Theme) {
   if (typeof document === 'undefined') return
@@ -65,16 +82,81 @@ function flash() {
   flashTimer = setTimeout(() => root.classList.remove('theme-flash'), FLASH_MS)
 }
 
-/** Applies and saves a scheme. Returns it, or `null` for an id no scheme has. */
-export function setTheme(id: string): Theme | null {
+/**
+ * Whether a switch spreads as a circle (`document.startViewTransition`): only where the
+ * API exists, only at `full` motion, not from dark to light — that one is the flashbang,
+ * and a circle would hide the joke — and not while the prism turns, which is motion
+ * enough, and whose stage a snapshot would freeze mid-swing.
+ */
+function circles(from: Theme, next: Theme): boolean {
+  return (
+    typeof document !== 'undefined' &&
+    typeof document.startViewTransition === 'function' &&
+    !(from.mode === 'dark' && next.mode === 'light') &&
+    decorativeMotion() === 'full' &&
+    !useViewSwing().swinging.value
+  )
+}
+
+/**
+ * The new scheme grows as a circle from `origin` over the old one, on
+ * `::view-transition-new(root)` (main.css turns the default cross-fade off). Animated
+ * from here rather than in CSS so the radius can reach the farthest corner from wherever
+ * the pick was; the coordinates are numbers, rounded, never anything typed.
+ */
+function spread(next: Theme, origin: ThemeOrigin | undefined, pick: number) {
+  // While a transition runs, hit-testing goes to the root, so a circle still spreading
+  // is cut short rather than left between the visitor and the next click.
+  spreading?.skipTransition()
+  const x = Math.round(origin?.x ?? window.innerWidth / 2)
+  const y = Math.round(origin?.y ?? window.innerHeight / 2)
+  const transition = document.startViewTransition(() => {
+    if (pick === picks) apply(next)
+  })
+  spreading = transition
+  const root = document.documentElement
+  transition.ready.then(
+    () => {
+      if (typeof root.animate !== 'function') return
+      const radius = Math.hypot(Math.max(x, window.innerWidth - x), Math.max(y, window.innerHeight - y))
+      root.animate(
+        { clipPath: [`circle(0px at ${x}px ${y}px)`, `circle(${Math.ceil(radius)}px at ${x}px ${y}px)`] },
+        { duration: CIRCLE_MS, easing: 'cubic-bezier(0.4, 0, 0.2, 1)', pseudoElement: '::view-transition-new(root)' },
+      )
+    },
+    // Cut short before it was ready: there is no circle to draw.
+    () => {},
+  )
+  const done = () => {
+    if (spreading === transition) spreading = null
+  }
+  transition.finished.then(done, done)
+}
+
+function apply(next: Theme) {
+  paint(next)
+  shown.value = null
+  current.value = next
+}
+
+/**
+ * Applies and saves a scheme. Returns it, or `null` for an id no scheme has. `origin`
+ * is where the pick happened (the 🎨 menu passes the click); the terminal passes none,
+ * and the circle starts from the centre of the viewport. Where the circle doesn't run,
+ * the page repaints at once, as it always did.
+ */
+export function setTheme(id: string, { origin }: { origin?: ThemeOrigin } = {}): Theme | null {
   const next = findTheme(id)
   if (!next) return null
-  shown.value = null
 
   const from = current.value
-  paint(next)
-  current.value = next
-  if (from.mode === 'dark' && next.mode === 'light') flash()
+  const pick = ++picks
+  if (circles(from, next)) {
+    spread(next, origin, pick)
+  } else {
+    apply(next)
+    if (from.mode === 'dark' && next.mode === 'light') flash()
+  }
 
   try {
     if (next.id === DEFAULT_THEME) window.localStorage.removeItem(STORAGE_KEY)

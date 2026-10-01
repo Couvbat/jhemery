@@ -14,9 +14,11 @@ const props = defineProps<PlayerProps>()
 const emit = defineEmits<{ reading: [reading: PlayerReading]; finished: [] }>()
 
 const frame = ref<HTMLIFrameElement | null>(null)
+// The colour is read when the source is built — a new item, or autoplay switching —
+// and not on a scheme change: a new `src` reloads the cross-origin player and stops it.
 const src = computed(() => {
-  const url = soundcloudEmbed(props.media)
-  return props.autoplay ? url.replace('auto_play=false', 'auto_play=true') : url
+  const colour = getComputedStyle(document.documentElement).getPropertyValue('--neon-green')
+  return soundcloudEmbed(props.media, colour, props.autoplay)
 })
 
 const EVENTS = ['ready', 'play', 'pause', 'playProgress', 'finish', 'seek']
