@@ -15,9 +15,11 @@ test.use({ serviceWorkers: 'block' })
 test.describe('the tools under the production CSP', () => {
   test('every listed tool opens without a refusal', async ({ page, cspViolations }) => {
     await page.goto('/tools')
-    const ids = await page
-      .locator('a[href^="/tools/"]')
-      .evaluateAll((links) => links.map((link) => link.getAttribute('href')!.slice('/tools/'.length)))
+    // The list is rendered by the app, not the HTML: read it once it is there, not the
+    // instant the document loads, or a slow machine finds no tools at all.
+    const links = page.locator('a[href^="/tools/"]')
+    await expect(links.first()).toBeVisible()
+    const ids = await links.evaluateAll((all) => all.map((link) => link.getAttribute('href')!.slice('/tools/'.length)))
     expect(ids.length).toBeGreaterThan(0)
 
     for (const id of ids) {
