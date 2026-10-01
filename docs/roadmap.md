@@ -4,7 +4,8 @@ Status tracker for the feature brainstorm: first three categories (three.js back
 commands, live information), then games vol. 2 (§E), views and tools (§F), the September 2026
 batch (§G) and the late-September brainstorm (§H). Built feature by feature, across sessions.
 
-**Current state: §A–§G are shipped; §H is proposed and not started.** Anything else still open is
+**Current state: §A–§G are shipped; in §H the *Fixes found on the way* have shipped and the rest
+is proposed.** Anything else still open is
 under [Open](#open) and [Known issues](#known-issues).
 
 **How to use:** tick a box when the feature ships, and append the PR number. Design detail for
@@ -255,7 +256,7 @@ sell anyone on hiring Jules, so this batch leans towards showing the work and pr
 site claims rather than adding toys; §G already called the playground large. Six lenses proposed
 54 ideas, and three reviews (does it already exist, does it fit the site's principles, is it worth
 the effort) cut them to the rows below. What was cut, and why, is under [Dropped](#dropped).
-Nothing here is built yet. The implementation plan, which checks each row against the code and
+The *Fixes found on the way* have shipped; the rest is not built yet. The implementation plan, which checks each row against the code and
 corrects several of them, is
 [`superpowers/plans/2026-10-01-late-september-batch.md`](superpowers/plans/2026-10-01-late-september-batch.md).
 
@@ -266,13 +267,13 @@ them.
 
 | ✔ | Feature | Approach | Files | Effort |
 |---|---|---|---|---|
-| [ ] | Rate-limit key | `clientIp()` keys on the leftmost `X-Forwarded-For` entry, which is the one the client writes; Cloudflare and Apache append theirs after it. Key on `CF-Connecting-IP` when present, else on `req.ip` with the trust-proxy hop count that matches Cloudflare → Apache, and cap the size of the `hits` Map. The spec that matters: a client-sent `X-Forwarded-For` must not open a new bucket. `who`/`wall` below waits for this. | `backend/src/common/rate-limit.guard.ts`, `backend/src/main.ts`, a guard spec (new) | S |
-| [ ] | Re-seal the CTF payoff | `PAYOFF` still says "Hiring, a project…" while `availability.open` is false. Re-running the seal changes only `SEALED`, so `STAGE_HASHES` and everyone's stored flags survive. | `frontend/scripts/ctf-seal.mjs`, `terminal/ctf.ts` | S |
-| [ ] | `ask` reads its own origin | `CORPUS_URL` is hard-coded to production's `llms.txt`, so local and staging `ask` answer from production's corpus. Read `${FRONTEND_URL}/llms.txt`, as MCP already does. Its comment also calls the file generated; it's hand-written (see *generated llms.txt* below). | `backend/src/ask/ask.service.ts` | S |
-| [ ] | Experience as content | The `resume` command hard-codes an experience block, and "2 years" is typed in three places, so `resume.txt`, both printable résumés and `content.json` have no experience section: the README's "one source for the CV" no longer holds. `content/experience.ts` holds dated `Role`s with a pure `durationLabel()` beside `daysSince`, every renderer reads it, and a résumé spec asserts they list the same roles in the same order. `content.json` gaining `experience` is a shape change, so it needs a new `version` and the matching backend change, deployed together. | `content/experience.ts` (new), `commands/content.ts`, `content/profile.ts`, `content/projects.ts`, `vite-plugins/resume.ts`, `backend/src/mcp/*` | S |
-| [ ] | Accessibility gate at 1.00 | Clear the two failures `lighthouserc.yml` lists. Muted text measures 4.04:1: derive muted in `themeTokens()` by stepping OKLCH lightness until it clears 4.5:1 against background *and* surface, so all eleven schemes pass by construction, and raise `themes.spec`'s muted floor from 3:1 to match. The language toggle shows `FR` under a label that says something else: show `EN · FR`, with `lang` on each. Then `categories:accessibility` goes to 1, as SEO already is. | `lib/themes.ts`, `assets/main.css`, `lib/__tests__/themes.spec.ts`, `components/NavBar.vue`, `lighthouserc.yml` | S |
-| [ ] | Lazy registry + cycle guard | Clears the [Known issue](#known-issues): `byName` is built on first use, so nothing runs at import time and either module can load first. A dependency-free spec walks the static imports and fails on any cycle not on an allowlist (shadcn's `ui/button` and `ui/badge` pairs are the two others today). A test reproduces the HMR failure with `vi.resetModules()`. | `terminal/registry.ts`, `src/__tests__/import-cycles.spec.ts` (new) | S |
-| [ ] | Generated `llms.txt` and sitemap | `llms.txt` names four of the fourteen public tools and leaves out `/now` and the printable résumés; `sitemap.xml` has no `/tools/<id>`. First a spec that fails when a public tool or route is missing from either, and a hand update (S). Generating them from content comes later, once something else pays for splitting a pure `content/tools.ts` off `tools/registry.ts` (whose `load` keeps it out of `content/`). CTF stage 7's note for agents stays verbatim. | `public/llms.txt`, `public/sitemap.xml`, a content spec; later `content/tools.ts` (new), `vite-plugins/resume.ts` | S (+M) |
+| [x] | Rate-limit key | Shipped in #104, before this row was written. `clientIp()` keys on `req.ip` with `trust proxy` at one hop, the one entry no client can write. It switches to `CF-Connecting-IP` only when that peer is in Cloudflare's published ranges, because the origin also answers direct connections, where the header is anyone's to write. The `hits` Map is capped at 10 000 buckets, dropping the oldest. `rate-limit.guard.spec.ts` holds that a client-sent `X-Forwarded-For` never opens a new bucket. | `backend/src/common/rate-limit.guard.ts`, `backend/src/main.ts`, `rate-limit.guard.spec.ts` | S |
+| [x] | Re-seal the CTF payoff | `PAYOFF` still says "Hiring, a project…" while `availability.open` is false. Re-running the seal changes only `SEALED`, so `STAGE_HASHES` and everyone's stored flags survive. | `frontend/scripts/ctf-seal.mjs`, `terminal/ctf.ts` | S |
+| [x] | `ask` reads its own origin | `CORPUS_URL` is hard-coded to production's `llms.txt`, so local and staging `ask` answer from production's corpus. Read `${FRONTEND_URL}/llms.txt`, as MCP already does. Its comment also calls the file generated; it's hand-written (see *generated llms.txt* below). | `backend/src/ask/ask.service.ts` | S |
+| [x] | Experience as content | The `resume` command hard-codes an experience block, and "2 years" is typed in three places, so `resume.txt`, both printable résumés and `content.json` have no experience section: the README's "one source for the CV" no longer holds. `content/experience.ts` holds dated `Role`s with a pure `durationLabel()` beside `daysSince`, every renderer reads it, and a résumé spec asserts they list the same roles in the same order. `content.json` gaining `experience` is a shape change, so it needs a new `version` and the matching backend change, deployed together. | `content/experience.ts` (new), `commands/content.ts`, `content/profile.ts`, `content/projects.ts`, `vite-plugins/resume.ts`, `backend/src/mcp/*` | S |
+| [x] | Accessibility gate at 1.00 | Clear the two failures `lighthouserc.yml` lists. Muted text measures 4.04:1: derive muted in `themeTokens()` by stepping OKLCH lightness until it clears 4.5:1 against background *and* surface, so all eleven schemes pass by construction, and raise `themes.spec`'s muted floor from 3:1 to match. The language toggle shows `FR` under a label that says something else: show `EN · FR`, with `lang` on each. Then `categories:accessibility` goes to 1, as SEO already is. | `lib/themes.ts`, `assets/main.css`, `lib/__tests__/themes.spec.ts`, `components/NavBar.vue`, `lighthouserc.yml` | S |
+| [x] | Lazy registry + cycle guard | Clears the [Known issue](#known-issues): `byName` is built on first use, so nothing runs at import time and either module can load first. A dependency-free spec walks the static imports and fails on any cycle not on an allowlist (shadcn's `ui/button` and `ui/badge` pairs are the two others today). A test reproduces the HMR failure with `vi.resetModules()`. | `terminal/registry.ts`, `src/__tests__/import-cycles.spec.ts` (new) | S |
+| [x] | Generated `llms.txt` and sitemap | **The S part is shipped; generation stays open.** `llms.txt` named four of the fourteen public tools and left out `/now` and the printable résumés; `sitemap.xml` had no `/tools/<id>`. `content/__tests__/discovery.spec.ts` now fails when a view, a router path, a public tool or a printable résumé is missing from either, and both were updated by hand. The e2e "sitemap lists every view" test moved into it. Generating them from content comes later, once something else pays for splitting a pure `content/tools.ts` off `tools/registry.ts` (whose `load` keeps it out of `content/`). CTF stage 7's note for agents stays verbatim. | `public/llms.txt`, `public/sitemap.xml`, a content spec; later `content/tools.ts` (new), `vite-plugins/resume.ts` | S (+M) |
 
 ### Show the work
 
@@ -319,6 +320,42 @@ them.
 | [ ] | Accessible page changes | After the prism swing settles, focus the new view's `<h1 tabindex="-1">` and announce its `tabTitle()` in one `role="status"` node; the leaving face is `inert` for the swing (two `<main>`s overlap today); a skip link comes first. Tested in e2e, because focus after a real transition is what jsdom can't see. | `App.vue`, `composables/useViewSwing.ts`, `composables/useTabTitle.ts`, `e2e/navigation.spec.ts` | M |
 | [ ] | `who` and `wall` | `who` lists everyone on the site as anonymous ttys (`somebody pts/3`). `wall` sends a wave with no content: every other visitor's wireframes ripple outward, and an open terminal prints "Broadcast message from somebody@jhemery.xyz". Rides the existing presence stream, so no new connection; the server coalesces waves to one per 3 s. No text, no id, and the count is the one already sent. After the rate-limit fix. | `backend/src/presence/*`, `composables/usePresence.ts`, `components/ThreeBackground.vue`, `commands/system.ts` | S |
 
+### Departures from the approach column
+
+Recorded as each row ships.
+
+- **Rate-limit key:** `trust proxy` stays at **1**, not the two hops "Cloudflare → Apache" suggests.
+  Passenger forwards the header it was given, then appends its own line carrying Apache's peer, so
+  at 1 `req.ip` is that peer. At 2 it would be the entry before it, which a request sent straight to
+  the origin writes itself. The reasoning is in `backend/src/main.ts`.
+- **Experience as content:**
+  - The row grew an **education** list beside the roles, read by the same renderers.
+  - The earlier employer and the training centre are described rather than named, as the site
+    says nothing narrower than "France": their names point at a département and a registry
+    address. A spec fails on a city, a département or a company form.
+  - Durations count both the first and the last month, which is LinkedIn's rule, so the CV never
+    disagrees with the profile.
+  - The date maths moved to `content/dates.ts`, which `now.ts` imports, rather than sitting in
+    `now.ts`.
+  - `content.json` is version 2, but nothing is "deployed together": the backend accepts 1 and 2,
+    because both apps deploy from one push in no fixed order.
+- **Lazy registry + cycle guard:** the cycle is three modules, not two (`commands/core.ts` is the
+  one importing the registry back), and building the Map lazily fixed only one entry order, so
+  `commands/index.ts` exports `collectCommands()` instead of an eager array too. The cycle itself
+  stays, allowlisted by pattern: the registry plus anything under `terminal/commands/`.
+- **Accessibility gate:**
+  - Muted failed on **raised** (4.04:1, the `bg-muted` title bars), not on background or surface,
+    so the floors cover all three surfaces.
+  - Muted is derived when the theme table is built, not in `themeTokens()`, so the swatches show
+    the colour that is painted. The default is set by hand in `main.css` (`oklch(0.58 0.1 145)`),
+    since `themeTokens()` never writes it.
+  - Measured first: `--secondary` was not flagged, so it was left alone.
+  - The rule also lifts Solarized's body text, which leaves its muted and body text close
+    together. That was accepted.
+  - The language toggle shows the language a click switches to, named by its content, rather
+    than `EN · FR`. `EN·FR` fitted the navbar with only ~0.7% of slack, against the 3.5% that a
+    wider monospace font has already needed.
+
 ## Build order
 
 **Phase 1 — quick wins, no backend (S):** ✅ shipped on `feat/phase-1` → `dev`.
@@ -364,13 +401,13 @@ destinations (#87), the swing's end-of-transition twitch (#89).
 6. The backend rows: `systemctl status`, the wordle histogram, the MCP server.
 7. Two-player games last. It's the only L, and it changes the rooms' trust model.
 
-**Phase 7 — the late-September brainstorm (§H):** proposed, not started. One branch per step
+**Phase 7 — the late-September brainstorm (§H):** step 1 shipped, the rest proposed. One branch per step
 (the [plan](superpowers/plans/2026-10-01-late-september-batch.md#order) splits steps 3, 5 and 6
 further):
 
-1. **Fixes found on the way**, the rate-limit key first. Each is S and independent, and several
-   later rows lean on them: `who`/`wall` on the rate limit, the case studies on experience as
-   content, generated `llms.txt` on `ask` reading its own origin.
+1. **Fixes found on the way.** The rate-limit key already shipped in #104. The rest are each S
+   and independent, and later rows lean on them: the case studies on experience as content,
+   generated `llms.txt` on `ask` reading its own origin.
 2. **`effects` on `Command`**, before anything that decides whether a command may run without
    the visitor typing it: `tour`, pipes and chains, history expansion.
 3. **Show the work** and **prove the claims**. The case studies and `why` share one `Decision`
@@ -384,18 +421,17 @@ further):
 
 ## Open
 
-- Everything in [§H](#h-late-september-2026-brainstorm) is proposed and not started.
+- Everything in [§H](#h-late-september-2026-brainstorm) after *Fixes found on the way* is proposed
+  and not started.
 - A curation pass, which is a judgement call rather than a row: retire or fold the weakest joke
   commands, and record each removal here, the way *Dropped* records what never shipped.
 
 ## Known issues
 
-- **`registry.ts` ↔ `commands/index.ts` is a circular import.** Pre-dates all of this: the command
-  modules import `resolve()` back from the registry, whose top-level code builds the lookup Map.
-  A clean load is fine because the registry is entered first, but entering `commands/index.ts`
-  first throws `Cannot access 'coreCommands' before initialization` — seen once in the dev server
-  during an HMR reload. The fix is to build the Map lazily so nothing runs at import time; it is
-  a §H row, *Lazy registry + cycle guard*.
+None open. The last one, the registry's circular import, was fixed by the §H row *Lazy registry +
+cycle guard*: the lookup table is built on first use, and two specs hold it there
+(`registry-load.spec.ts` enters through every module in the cycle; `import-cycles.spec.ts` keeps
+any other cycle from forming).
 
 ## Dropped
 

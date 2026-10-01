@@ -54,7 +54,10 @@ src/content/
   music.ts       genres, tools, blurb, playlist URL
   gaming.ts      genres, platforms, fallback game log, blurb
   hardware.ts    machines[] + peripherals[]
-  contact.ts     socials, availability line
+  contact.ts     socials
+  experience.ts  dated roles and courses, newest first; the current role names profile.employer
+  dates.ts       the date maths: daysSince, monthsBetween (both ends count), durationLabel, periodLabel
+  now.ts         the /now list and its staleness rule
   sections.ts    section ids, nav labels, per-section shell prompt lines
   views.ts       the routes (home, tools, watch, radio) in prism order — §11
   index.ts       re-exports
@@ -124,6 +127,12 @@ guestbook entry cannot inject markup.
 `registry.ts` holds the array plus `resolve(name)` (honouring aliases), `complete(prefix)` and
 `visibleCommands()`. `help` renders straight from `visibleCommands()` grouped by `group`, so a new
 command documents itself.
+
+The lookup table is built on first use, not at import. `registry.ts`, `commands/index.ts` (which
+exports `collectCommands()`, a function, for the same reason) and `commands/core.ts` import each
+other, and an HMR reload that entered `core.ts` first once threw on an eager spread. So no module
+in that cycle may call a registry function at module scope. `registry-load.spec.ts` enters through
+every one; `src/__tests__/import-cycles.spec.ts` fails on any cycle outside the allowlist.
 
 ### Session state
 
@@ -238,9 +247,14 @@ field, the confetti and the colour tool re-read the properties on a switch. Ligh
 text halos (a glow on a light page reads as a smudge) and thin the scanlines. A `light:` Tailwind
 variant covers the few fixed palette colours that stay. The listing's swatches are the one place
 output needs a colour that is *not* the current scheme's, so `OutputSegment` has a `colour` field.
-It is only ever set from the theme table. `themes.spec.ts` holds every scheme to WCAG floors
-(4.5:1 for body and primary text, 3:1 for the other tones). Three upstream colours were adjusted
-to pass, each noted in the file.
+It is only ever set from the theme table. The floors live in `src/lib/themeRules.ts`: body and
+muted text at 4.5:1 on background, surface *and* raised (the `bg-muted` title bars are 12 px
+muted text), primary at 4.5:1, the other tones at 3:1. Muted and body text are lifted to the
+floor by rule when the table is built, stepping OKLCH lightness with hue and chroma kept, so a
+new scheme passes by construction; `themes.spec.ts` checks every scheme against the same floors.
+The default is never lifted. It lives in `main.css` and Lighthouse measures it, so it must pass as
+shipped, and a spec holds that. Three upstream colours were also adjusted by hand before the rule
+existed, each noted in the file.
 
 Switching from a dark scheme to a light one whites the page out for 0.9 s (`theme-flash` on
 `<html>`, skipped under reduced motion). That is the joke the `flashbang` achievement is named
@@ -616,6 +630,12 @@ a frontend deploy, which is fine for a résumé.
 The same plugin emits `resume.html` and `resume.fr.html` (static, script-free, with `resume.css` as
 a sibling file so the CSP needs nothing new) and `content.json`, which the MCP endpoint reads (§8).
 All three are on `navigateFallbackDenylist` and served by the plugin's dev middleware too.
+
+Every résumé, and the `resume` command, has an experience and an education section read from
+`content/experience.ts`. No duration is typed anywhere: each is worked out from the months, at
+build time for the files and at run time for the command, counting both the first and the last
+month as LinkedIn does, so the CV and the profile agree. `content.json` is version 2 since those
+sections were added, and the backend accepts 1 and 2.
 
 ---
 

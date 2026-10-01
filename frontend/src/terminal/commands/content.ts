@@ -1,4 +1,7 @@
 import {
+  durationLabel,
+  education,
+  experience,
   gaming,
   isExternal,
   machines,
@@ -11,6 +14,7 @@ import {
   skillNames,
   skills,
   socials,
+  yearSpan,
 } from '@/content'
 import { hardwareTab, isHardwareTab } from '@/composables/useHardwareTab'
 import { useSteam } from '@/composables/useSteam'
@@ -308,14 +312,22 @@ export const contentCommands: Command[] = [
         ...heading(profile.name),
         line(`${t(profile.role)} · ${profile.location} · ${profile.email}`, 'accent'),
         blank,
-        line('EXPERIENCE', 'primary'),
-        line(`  ${profile.employer} — ${t(profile.role)} (2 ${t({ en: 'years', fr: 'ans' })})`),
-        line(`  ${t({ en: 'Web apps, REST APIs and internal tools.', fr: 'Applications web, APIs REST et outils internes.' })}`, 'muted'),
+        line(t({ en: 'EXPERIENCE', fr: 'EXPÉRIENCE' }), 'primary'),
+        ...experience.flatMap((role) => [
+          line(`  ${t(role.employer)} — ${t(role.title)} (${t(durationLabel(role.start, role.end, new Date()))})`),
+          ...(role.summary ? [line(`  ${t(role.summary)}`, 'muted')] : []),
+        ]),
         blank,
-        line('STACK', 'primary'),
+        line(t({ en: 'EDUCATION', fr: 'FORMATION' }), 'primary'),
+        ...education.flatMap((course) => [
+          line(`  ${t(course.school)} — ${t(course.course)} (${yearSpan(course.start, course.end)})`),
+          ...(course.note ? [line(`  ${t(course.note)}`, 'muted')] : []),
+        ]),
+        blank,
+        line(t({ en: 'STACK', fr: 'COMPÉTENCES' }), 'primary'),
         ...tags(skillNames, 'muted'),
         blank,
-        line('LINKS', 'primary'),
+        line(t({ en: 'LINKS', fr: 'LIENS' }), 'primary'),
         ...socials.map((s) => ({ text: `  ${s.label.padEnd(11)} ${s.href}`, href: s.href, tone: 'accent' as const, pre: true })),
         blank,
         line(t(profile.availability.note), profile.availability.open ? 'success' : 'muted'),

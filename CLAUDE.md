@@ -83,8 +83,9 @@ prints), the printable `/resume.html` and `/resume.fr.html`, and `/content.json`
 CV has exactly one source. `content.json` is fetched at runtime by the **backend's** MCP endpoint
 from `${FRONTEND_URL}`. That is the one place the two apps depend on each other, and the shape is
 mirrored rather than shared (`backend/src/mcp/mcp.types.ts`), with the backend refusing any
-`version` but 1. So a change to its shape needs a new `version` and a backend change that deploys
-with it.
+`version` it doesn't list in `CONTENT_VERSIONS` (1 and 2 today). So a change to its shape needs a
+new `version`, and a backend that accepts both the old and the new one: the two apps deploy from
+the same push in no fixed order.
 
 `sections.ts` defines the six sections once; the navbar, terminal `ls`/`cd`/`pwd`, command palette
 and every section header consume it.
@@ -100,7 +101,9 @@ content strings in `src/content/`. Facts (tech names, URLs, specs) stay plain st
 ### Terminal: the registry is the API
 
 `src/terminal/commands/*.ts` each export an array of `Command` objects; `commands/index.ts`
-concatenates them and `registry.ts` builds the name/alias map. Adding a command means adding one
+concatenates them and `registry.ts` builds the name/alias map — on first use, because the registry
+and the command modules import each other: never call a registry function at a command module's
+top level (`registry-load.spec.ts` and `src/__tests__/import-cycles.spec.ts` will fail). Adding a command means adding one
 object — never a special case in the shell. A `Command` declares its own `hidden` (out of `help`
 and Tab), `palette` (in Ctrl+K), `linkable` (may run from a `?run=` link), `group`, and
 `complete(ctx)` for argument completion; the shell handles prefix filtering, common-prefix
@@ -139,14 +142,17 @@ the overrides, so `main.css` stays its only definition. The consequences for new
 - Code that reads colours in JS (three.js, canvases) must re-read `--neon-*` on a switch, by
   watching `useTheme().theme` or reading at draw time, not caching them on mount.
 - `themes.spec.ts` holds every scheme to contrast floors and to writing exactly the tokens
-  `:root` declares, so a new token needs deriving in `themeTokens()`.
+  `:root` declares, so a new token needs deriving in `themeTokens()`. The floors live in one
+  place, `lib/themeRules.ts`; muted and body text are lifted to them when the table is built,
+  but the default never is, so a change to `main.css` has to pass on its own.
 
 ### Backend: NestJS, one module per capability
 
 `app.module.ts` wires ~13 feature modules, each `{controller, service, dto, spec}`. `main.ts`
 carries the cross-cutting decisions and explains each in comments: helmet with a `default-src
 'none'` CSP (JSON API, never a document), CORS locked to `FRONTEND_URL` + localhost,
-`trust proxy` so the per-IP `common/rate-limit.guard.ts` sees real clients behind Apache, and a
+`trust proxy` at one hop so the per-IP `common/rate-limit.guard.ts` sees real clients behind Apache
+(`CF-Connecting-IP` only from Cloudflare's ranges — don't "fix" the hop count to 2), and a
 whitelisting `ValidationPipe`.
 
 **Everything optional degrades gracefully.** No Steam key → live activity hidden; no GitHub token

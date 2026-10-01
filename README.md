@@ -70,6 +70,8 @@ tools, watch-party and radio rooms, and 38 hidden achievements. English and Fren
 - 📄 **One source for the CV.** `curl jhemery.xyz` returns an ANSI-coloured résumé, and
   `/resume.html` a printable one in either language, both generated at build time from the same
   content the page renders. So is `content.json`, which a read-only MCP endpoint serves to agents.
+  Experience and education are dated, never typed as durations: every résumé works out "3 years"
+  from the months, counted the way LinkedIn counts them.
 
 ## Quick start
 
@@ -133,7 +135,7 @@ Each app has its own README for working on its code:
 | **Views** | home · tools · watch · radio. These are the routes, defined once in `src/content/views.ts` in the order they sit on the prism. The navbar, `cd` and <kbd>Ctrl</kbd>+<kbd>K</kbd> all navigate through the same `goTo()`, which goes home first when you ask for a section from another page. |
 | **Prism swing** | Changing view turns the page like a face of a prism whose axis runs through the centre of the three.js scene. The old page rotates out and the new one rotates in from the same side, in 3D CSS on a fixed, clipped stage, over 650 ms. The navbar and launcher stay put. Going back turns the other way. Under `prefers-reduced-motion` the pages simply swap. It works without three.js loaded. |
 | **CRT overdrive** | `crt` in the terminal, or the Konami code anywhere on the page, toggles scanlines and flicker, and speeds up the wireframes. The setting is saved in `localStorage`. |
-| **Colour schemes** | `theme` lists eleven schemes with a swatch strip each, and `theme <name>` (or `theme random`) applies one: the site's own *cyberpunk* default, plus Gruvbox (dark and light), Nord, Dracula, Catppuccin (Mocha and Latte), Tokyo Night, Rosé Pine, Everforest and Solarized. A scheme is a table of a dozen colours in `src/lib/themes.ts`, and every CSS token is derived from it. That means the glows, the three.js wireframes, the confetti and `neofetch`'s colour strip all follow along. Going back to the default removes every override, so the stylesheet stays the default's only definition. Switching from a dark scheme to a light one whites the screen out for a moment (skipped under reduced motion). The choice is saved in `localStorage` and applied before the app mounts. A unit test holds every scheme to WCAG contrast floors. The 🎨 button in the navbar opens the same list as a menu, drawing each scheme's strip on its own background. It's the only way to switch on a phone, which has no terminal. It stays open while you pick, so the page behind it is the preview. |
+| **Colour schemes** | `theme` lists eleven schemes with a swatch strip each, and `theme <name>` (or `theme random`) applies one: the site's own *cyberpunk* default, plus Gruvbox (dark and light), Nord, Dracula, Catppuccin (Mocha and Latte), Tokyo Night, Rosé Pine, Everforest and Solarized. A scheme is a table of a dozen colours in `src/lib/themes.ts`, and every CSS token is derived from it. That means the glows, the three.js wireframes, the confetti and `neofetch`'s colour strip all follow along. Going back to the default removes every override, so the stylesheet stays the default's only definition. Switching from a dark scheme to a light one whites the screen out for a moment (skipped under reduced motion). The choice is saved in `localStorage` and applied before the app mounts. Muted and body text are lifted to 4.5:1 on every surface by one rule, and a unit test holds every scheme to the same WCAG floors. The 🎨 button in the navbar opens the same list as a menu, drawing each scheme's strip on its own background. It's the only way to switch on a phone, which has no terminal. It stays open while you pick, so the page behind it is the preview. |
 | **Boot sequence** | A fake `couvsh 1.0` kernel log plays on your first visit. `reboot` replays it on demand, and `ssh` ends by triggering it. Skipped under reduced motion. |
 | **Status ticker** | The footer shows the uptime `neofetch` reports (days since the first commit), how long ago this build shipped, and whether I'm open to work. It refreshes slowly, so a tab left open stays accurate. |
 | **Skills with evidence** | Under the skill badges, `skills --why` links each claim to where it's actually used: SSE to the presence stream and the watch parties, WebAssembly to the ffmpeg tool, GraphQL to the heatmap. Skills with nothing to show stay plain badges. |
@@ -235,7 +237,7 @@ never show two different contents.
 | `hardware` | | `hardware [pc\|nas\|peripherals]` |
 | `contact` | `links` | How to reach me |
 | `neofetch` | `fetch` | System summary with an ASCII logo, an "uptime" counted from the first commit and whether I'm open to work |
-| `resume` | `cv` | Condensed résumé, with a link to the printable one |
+| `resume` | `cv` | Condensed résumé (experience, education, stack, links), with a link to the printable one |
 | `curl` | | `curl jhemery.xyz` fetches the résumé the way a real curl would |
 
 </details>

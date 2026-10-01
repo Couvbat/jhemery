@@ -14,8 +14,8 @@ export const projects: Project[] = [
   {
     name: 'in-leed / work projects',
     description: {
-      en: 'Professional fullstack projects at In-Leed — web apps, REST APIs and internal tools built over 2 years.',
-      fr: 'Projets fullstack professionnels chez In-Leed — applications web, APIs REST et outils internes développés sur 2 ans.',
+      en: 'Professional fullstack projects at In-Leed — web apps, REST APIs and internal tools.',
+      fr: 'Projets fullstack professionnels chez In-Leed — applications web, APIs REST et outils internes.',
     },
     stack: ['React', 'Node.js', 'Express', 'MongoDB', 'MySQL', 'PHP', 'Docker'],
     status: 'production',

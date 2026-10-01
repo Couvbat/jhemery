@@ -86,8 +86,12 @@ coordinates so everyone gets the same answer, and `ask` never logs questions or 
 allows the `x-admin-password` and `x-room-token` headers — without which the guestbook DELETE and
 the rooms' host and seat routes fail their preflight in the browser.
 
-**`trust proxy`** is on: Apache fronts the app, so `req.ip` must come from `X-Forwarded-For` or the
-rate limiter would see one client (the proxy) for the whole internet.
+**`trust proxy`** is set to one hop. Apache fronts the app through Passenger, which appends its own
+`X-Forwarded-For` line carrying Apache's peer, so at 1 `req.ip` is that peer: the one entry no
+client can write. Without it the rate limiter would see one client (the proxy) for the whole
+internet; at 2 it would read an entry a direct-to-origin request writes itself. Visitors behind
+Cloudflare are told apart by `CF-Connecting-IP`, honoured only when the peer is in Cloudflare's
+published ranges (`clientIp()` in `common/rate-limit.guard.ts`).
 
 **Validation** is a global `ValidationPipe({ whitelist: true })`; DTOs use `class-validator`.
 
@@ -102,9 +106,10 @@ network, and it spends a private machine's electricity, so it is opt-in by desig
 
 - Works with any OpenAI-compatible runtime — Ollama, llama.cpp, vLLM, LM Studio. Point
   `LLM_BASE_URL` at whatever has `/chat/completions` under it.
-- Grounded on `https://jhemery.xyz/llms.txt`, cached for an hour, capped at 16k chars, with a
-  built-in fallback corpus. **The corpus never blocks an answer** — a cold or unreachable fetch is
-  skipped, not awaited.
+- Grounded on `${FRONTEND_URL}/llms.txt`, so a local or staging install answers from its own
+  copy. Cached for an hour, capped at 16k chars, with a built-in fallback corpus, which is also all
+  it uses when `FRONTEND_URL` is unset: then it fetches nothing. **The corpus never blocks an
+  answer** — a cold or unreachable fetch is skipped, not awaited.
 - Budgets: ~300 output tokens, 20 s to the first token (then it detaches and lets the model warm
   up in the background), 15 s idle timeout, and a 45 s structural silence ceiling in the
   controller.
@@ -171,8 +176,8 @@ SDK to manage.
   `resources/templates/list` and `resources/read`, with `202` for notifications and batches
   accepted. Five tools and six resources: profile, résumé (EN and FR), projects, skills, `/now`.
 - Everything comes from `${FRONTEND_URL}/content.json`, which the frontend build emits beside
-  `resume.txt`. It's cached for 10 minutes with a stale fallback, and anything but `version: 1` is
-  refused. A tool that can't reach it returns `isError` rather than a protocol error.
+  `resume.txt`. It's cached for 10 minutes with a stale fallback, and any `version` not in
+  `CONTENT_VERSIONS` (1 and 2) is refused. A tool that can't reach it returns `isError` rather than a protocol error.
 - Nothing asked of it is logged, same as `ask`.
 
 ## `jobs`

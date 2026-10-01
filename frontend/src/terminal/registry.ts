@@ -1,28 +1,44 @@
 import type { Command } from './types'
 import { aliases } from './aliases'
-import { commands } from './commands'
+import { collectCommands } from './commands'
 
-const byName = new Map<string, Command>()
-for (const command of commands) {
-  byName.set(command.name, command)
-  for (const alias of command.aliases ?? []) byName.set(alias, command)
+/**
+ * Built on first use, not at import. This module, `commands/index.ts` and
+ * `commands/core.ts` import each other, so whichever is entered first, no module in
+ * that cycle may call a registry function at module scope. `registry-load.spec.ts`
+ * enters through every one of them; `import-cycles.spec.ts` keeps the cycle from
+ * reaching outside `terminal/commands/`.
+ */
+let table: { list: Command[]; byName: Map<string, Command> } | undefined
+
+function registry(): { list: Command[]; byName: Map<string, Command> } {
+  if (!table) {
+    const list = collectCommands()
+    const byName = new Map<string, Command>()
+    for (const command of list) {
+      byName.set(command.name, command)
+      for (const alias of command.aliases ?? []) byName.set(alias, command)
+    }
+    table = { list, byName }
+  }
+  return table
 }
 
 export function allCommands(): Command[] {
-  return commands
+  return registry().list
 }
 
 /** Commands that appear in `help` and tab-completion. */
 export function visibleCommands(): Command[] {
-  return commands.filter((c) => !c.hidden)
+  return registry().list.filter((c) => !c.hidden)
 }
 
 export function paletteCommands(): Command[] {
-  return commands.filter((c) => c.palette)
+  return registry().list.filter((c) => c.palette)
 }
 
 export function resolve(name: string): Command | undefined {
-  return byName.get(name.toLowerCase())
+  return registry().byName.get(name.toLowerCase())
 }
 
 /**
@@ -44,9 +60,8 @@ export function resolveLink(input: string): { command: Command; args: string[] }
  * with no argument — `try: cd` would only teach someone an error message.
  */
 export function suggestionPool(): string[] {
-  return commands
-    .filter((c) => !c.hidden && c.palette && !c.usage?.includes('<'))
-    .map((c) => c.name)
+  const { list } = registry()
+  return list.filter((c) => !c.hidden && c.palette && !c.usage?.includes('<')).map((c) => c.name)
 }
 
 /** Every name and alias that can be tab-completed. */
