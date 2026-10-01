@@ -34,7 +34,8 @@
 
 /*
  * CRT overdrive — toggled on <html> by the Konami code or the `crt` command.
- * Everything here is decorative and disabled under prefers-reduced-motion.
+ * Everything here is decorative and disabled under prefers-reduced-motion, or with
+ * motion paused.
  */
 .crt-overdrive body {
   animation: crt-flicker 0.15s infinite;
@@ -119,6 +120,29 @@
 }
 
 /*
+ * Motion control (`composables/useMotion.ts`) writes the visitor's choice on <html> as
+ * `data-motion` — `calm` or `paused`, nothing for `full` — and every reduced-motion block
+ * in this file has a twin that reads it, since a media query only knows the OS setting.
+ * `calm` keeps what a typed command asked for (overdrive is one), so these are `paused`;
+ * the swing and the flashbang never run below `full`, so theirs read any value.
+ */
+[data-motion='paused'].crt-overdrive body,
+[data-motion='paused'].crt-overdrive body::before,
+[data-motion='paused'].crt-glitch body {
+  animation: none;
+}
+[data-motion='paused'].crt-glitch body { filter: none; }
+
+/* Tailwind's `motion-safe:` reads only the OS setting, and the hero's cursor had no
+ * guard at all. */
+@media (prefers-reduced-motion: reduce) {
+  .animate-pulse { animation: none; }
+}
+[data-motion='paused'] :is(.animate-pulse, .motion-safe\:animate-pulse) {
+  animation: none;
+}
+
+/*
  * The prism swing between views — superpowers/specs/2026-09-22-tools-and-views-design.md §3.
  *
  * Nothing here animates on its own. `--swing` (eased, 0→1), `--swing-dir` (±1) and
@@ -178,6 +202,10 @@
   .view-stage.is-swinging .view-leave-active {
     transform: none;
   }
+}
+[data-motion] .view-stage.is-swinging .view-enter-active,
+[data-motion] .view-stage.is-swinging .view-leave-active {
+  transform: none;
 }
 
 #app {
@@ -324,6 +352,7 @@
 @media (prefers-reduced-motion: reduce) {
   .theme-flash::after { display: none; }
 }
+[data-motion].theme-flash::after { display: none; }
 
 /*
  * The screensaver (`useIdle.ts`): every child of #app fades except the wireframe

@@ -1,6 +1,6 @@
 import { computed, ref, shallowRef } from 'vue'
 import { DEFAULT_THEME, findTheme, themes, themeTokens, type Theme } from '@/lib/themes'
-import { prefersReducedMotion } from './useCrt'
+import { decorativeMotion } from './useMotion'
 
 const STORAGE_KEY = 'couvbat:theme'
 /** Matches the `theme-flash` keyframes in main.css. */
@@ -51,10 +51,11 @@ function paint(theme: Theme) {
 
 /**
  * The white-out on a dark-to-light switch — the joke the `flashbang` achievement is
- * named after. One flash, never repeated, and skipped under reduced motion.
+ * named after. One flash, never repeated, and only at `full` motion: `calm` leaves it
+ * out, and reduced motion forces `paused`.
  */
 function flash() {
-  if (prefersReducedMotion() || typeof document === 'undefined') return
+  if (decorativeMotion() !== 'full' || typeof document === 'undefined') return
   const root = document.documentElement
   clearTimeout(flashTimer)
   root.classList.remove('theme-flash')

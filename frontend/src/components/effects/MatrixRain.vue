@@ -1,6 +1,14 @@
 <script setup lang="ts">
-import { onMounted, onUnmounted, ref } from 'vue'
+import { onMounted, onUnmounted, ref, watch } from 'vue'
 import { hideMatrix } from '@/composables/useMatrix'
+import { useMotion } from '@/composables/useMotion'
+
+// Its own guard, not only the command's: whatever shows the rain, it never runs with
+// motion paused, and pausing while it falls stops it.
+const { level } = useMotion()
+watch(level, (motion) => {
+  if (motion === 'paused') hideMatrix()
+})
 
 const canvasRef = ref<HTMLCanvasElement | null>(null)
 
@@ -63,6 +71,10 @@ function exit() {
 }
 
 onMounted(() => {
+  if (level.value === 'paused') {
+    hideMatrix()
+    return
+  }
   resize()
   frameId = requestAnimationFrame(draw)
   window.addEventListener('resize', resize)

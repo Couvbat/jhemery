@@ -123,6 +123,18 @@ describe('useTheme', () => {
       expect(root.classList.contains('theme-flash')).toBe(false)
     })
 
+    it('never goes off under calm or paused motion', async () => {
+      const { setTheme } = await load()
+      const { setMotion } = await import('../useMotion')
+      for (const level of ['calm', 'paused'] as const) {
+        setMotion(level)
+        setTheme('nord')
+        setTheme('catppuccin-latte')
+        expect(root.classList.contains('theme-flash'), level).toBe(false)
+      }
+      setMotion('full')
+    })
+
     it('never goes off under reduced motion', async () => {
       motion.reduced = true
       const { setTheme } = await load()

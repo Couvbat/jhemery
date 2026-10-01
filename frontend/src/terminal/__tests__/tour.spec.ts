@@ -6,6 +6,7 @@ vi.mock('@/composables/useCrt', async (importOriginal) => ({
   prefersReducedMotion: () => motion.reduced,
 }))
 
+import { setMotion } from '@/composables/useMotion'
 import { setTheme, useTheme } from '@/composables/useTheme'
 import { TOUR_STOPS } from '../commands/work'
 import { allCommands, isLinkable, resolve, resolveLink } from '../registry'
@@ -16,6 +17,7 @@ const runStops = TOUR_STOPS.flatMap((stop) => ('run' in stop ? [stop.run] : []))
 
 afterEach(() => {
   motion.reduced = true
+  setMotion('full')
   vi.useRealTimers()
   setTheme('cyberpunk')
 })
@@ -52,6 +54,28 @@ describe('tour', () => {
     expect(Date.now() - started).toBeLessThan(1000)
     expect(useTheme().theme.value.id).toBe(before)
     expect(text).not.toMatch(/Here is|and back/)
+  })
+
+  // The pauses are the pacing of something typed, which `calm` keeps; the repaint that
+  // undoes itself is decoration, which it doesn't.
+  it('keeps its pauses under calm, and shows no scheme', async () => {
+    motion.reduced = false
+    setMotion('calm')
+    vi.useFakeTimers()
+    const before = useTheme().theme.value.id
+    const recorded = recordingContext('tour', [])
+    const done = tour.run(recorded.ctx) as Promise<void>
+
+    await vi.advanceTimersByTimeAsync(1000)
+    expect(recorded.printed.map((l) => l.text).join('\n')).not.toContain('End of the tour')
+    await vi.advanceTimersByTimeAsync(6000 + 1000)
+    expect(useTheme().theme.value.id).toBe(before)
+
+    await vi.runAllTimersAsync()
+    await done
+    const text = recorded.printed.map((l) => l.text).join('\n')
+    expect(text).toContain('`theme` lists them.')
+    expect(text).not.toMatch(/Here is/)
   })
 
   it('shows another scheme to a visitor who already wears the first', async () => {

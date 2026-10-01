@@ -2,7 +2,7 @@
 import { onMounted, onUnmounted, ref, watch } from 'vue'
 import { profile } from '@/content'
 import { useLocale } from '@/i18n'
-import { prefersReducedMotion } from '@/composables/useCrt'
+import { decorativeMotion } from '@/composables/useMotion'
 import { useBoot } from '@/composables/useBoot'
 
 const STORAGE_KEY = 'couvbat:booted'
@@ -92,8 +92,9 @@ function hasBooted(): boolean {
 }
 
 onMounted(() => {
-  // First visit only, and never when the visitor asked for less motion.
-  if (hasBooted() || prefersReducedMotion()) return
+  // First visit only, and never with motion paused (reduced motion forces that). `calm`
+  // keeps it: lines of text appearing are the tagline's kind of motion, not the swing's.
+  if (hasBooted() || decorativeMotion() === 'paused') return
 
   start()
 })

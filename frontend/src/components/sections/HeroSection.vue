@@ -5,6 +5,7 @@ import HighlightText from '@/components/HighlightText.vue'
 import { isExternal, profile, skills } from '@/content'
 import { useLocale } from '@/i18n'
 import { goTo } from '@/composables/useViewSwing'
+import { decorativeMotion } from '@/composables/useMotion'
 
 const { t, m, locale } = useLocale()
 
@@ -25,7 +26,8 @@ function typeTagline() {
   clearInterval(timer)
   const fullText = t(profile.tagline)
 
-  if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+  // Typed under `calm` too; only `paused` (or reduced motion) prints it whole.
+  if (decorativeMotion() === 'paused') {
     displayed.value = fullText
     return
   }

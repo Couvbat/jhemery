@@ -221,7 +221,7 @@ describe('what a command writes', () => {
     expect(named((c) => c.writes === 'server')).toEqual(['ask', 'connect4', 'mail', 'sign', 'sudo'])
     expect(named((c) => c.writes === 'local')).toEqual([
       ':q', 'acid', 'alias', 'banner', 'clear', 'constellation', 'cowsay', 'crt', 'decrypt', 'echo',
-      'flag', 'gravity', 'jq', 'open', 'play', 'rickroll', 'spawn', 'unalias', 'vim',
+      'flag', 'gravity', 'jq', 'motion', 'open', 'play', 'rickroll', 'spawn', 'unalias', 'vim',
     ])
     expect(named((c) => typeof c.writes === 'function')).toEqual(['base64', 'hack', 'lang', 'scene', 'strace', 'theme', 'wordle'])
   })
@@ -237,6 +237,7 @@ describe('what a command writes', () => {
     ['echo', ['hi'], 'local'],
     ['banner', ['hi'], 'local'],
     ['theme', ['dracula'], 'local'],
+    ['motion', ['paused'], 'local'],
     ['lang', ['fr'], 'local'],
     ['alias', ["x='ls'"], 'local'],
     ['unalias', ['x'], 'local'],

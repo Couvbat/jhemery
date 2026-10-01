@@ -29,7 +29,10 @@ things the static page cannot — query live APIs, send mail, mutate the page.
    tab-completion and the command palette are all derived from it — none of them hardcode a list.
 3. **Progressive, never blocking.** Every live-data command degrades to a useful message when the
    backend is unreachable or unconfigured. The site works with the API entirely down.
-4. **Motion is opt-out-able.** Everything animated checks `prefers-reduced-motion`.
+4. **Motion is opt-out-able.** Everything animated reads the motion level (§9): *full*, *calm* or
+   *paused*, chosen in the 🎨 menu or with `motion`, under a floor the OS sets —
+   `prefers-reduced-motion` holds it at *paused*. The games are the exception: they read the OS
+   setting alone, because their stepped mode changes the rules.
 5. **No new runtime dependencies.** i18n, the terminal and the effects are all hand-rolled against
    what is already installed (Vue, Tailwind, Three.js). The one accepted exception is
    `ffmpeg.wasm` for the `ffmpeg` tool (§11), fetched only on an explicit click.
@@ -314,6 +317,7 @@ Grouped as they appear in `help`.
 | `whoami` | Prints the current user |
 | `lang [en\|fr]` | Prints or switches locale |
 | `theme [name\|random]` (alias `colorscheme`) | Lists the colour schemes with a swatch strip each, or applies one |
+| `motion [full\|calm\|paused]` | Lists the three motion settings with the one in force marked, or sets one (§9). `writes: 'local'`, so never from a link; in the palette |
 | `alias` / `unalias` | Session-persistent command renames, expanded before anything else parses the line |
 | `sha256sum` (aliases `sha1sum`, `sha512sum`) · `base64 [-d]` · `uuidgen` · `jq .` | The shell versions of the hash, encode and JSON tools, each importing the pure module its panel uses. A fake-filesystem name is read as that file, other text as literal text, and with no argument they read what a `\|` hands them |
 | `strace <command>` | Runs the command inside itself (`ctx.run`, so without the visitor's aliases) and then lists the non-background requests made meanwhile, as `GET /weather = 200 · 1.10 kB · 84 ms` with the shapes of the bodies below, and `+++ exited with 0 +++`. No request, no trailer, so `strace ls` is `ls`. Its `writes` is the traced command's, so `?run=strace sign x` is refused like `sign x`; `strace strace` is refused |
@@ -644,8 +648,8 @@ Three surfaces, one source of truth:
   The canvas is mounted only while particles are alive and the loop stops itself when the last one
   dies — no idle `requestAnimationFrame`, no full-viewport backing store sitting around for the
   visitor who never unlocks anything. Phones get half the particles. `fireConfetti()` is a no-op
-  under `prefers-reduced-motion`, which is also why nothing accumulates in the queue when there is
-  no renderer to drain it.
+  below *full* motion (reduced motion included), which is also why nothing accumulates in the
+  queue when there is no renderer to drain it.
 
 `unlocked` is exported as a `Ref<Set<string>>` so Vue components read live state directly — the
 same pattern `history.ts` already uses — while the terminal command keeps using the plain
@@ -673,6 +677,16 @@ integer, in a pool of its own capped at 12 that fades in and out and turns with 
   entirely. It is the only visual state no amount of scrolling can produce.
 
 One watcher covers the last two inputs, because `currentPalette()` already encodes which wins.
+
+**The loop runs on elapsed time.** It used to add a fixed step per frame, so a 120 Hz screen ran
+the field at twice the speed it was tuned at, and a frame cap would have slowed it. Each frame
+now measures how many 60 Hz frames have passed (`f`, capped at 4 so a tab back from the
+background resumes rather than leaps): rotations scale by `f`, and every lerp factor `k` becomes
+`1 - (1 - k) ** f`, the same easing at any rate. A governor then draws at most 60 frames a
+second, and 30 under *calm* or while the terminal's blurred panel is open. *calm* also runs the
+field at 0.35× and drops the pointer pull, both the gravity well and the camera's parallax.
+*paused* cancels the frame, draws one still frame and stops the screensaver; the component stays
+mounted, so coming back to *full* or *calm* picks the scene up where it stood.
 
 - **Colour scheme** — a palette picks hue *names* (`green`, `cyan`, …), and a `theme` changes what
   those names mean by rewriting the `--neon-*` properties. So a second watcher on
@@ -705,7 +719,8 @@ shapes are the accent colour; clicking one of those is the `cyanSpotter` achieve
 
 - **Boot sequence** (`BootSequence.vue`, `composables/useBoot.ts`) — fake kernel log resolving into
   the page. Shown once, gated on `localStorage['couvbat:booted']`, skippable with any key or click,
-  ~2.2s at most. Skipped entirely under `prefers-reduced-motion`. `reboot` (and the tail of `ssh`)
+  ~2.2s at most. Skipped entirely with motion *paused*, which reduced motion forces; *calm* keeps
+  it, since lines of text appearing are the tagline's kind of motion. `reboot` (and the tail of `ssh`)
   raise a module-level flag the component watches, replaying the same `start()` the first visit
   runs — no `alreadyBooted` gate, and `finish()` clears the flag so it is immediately repeatable.
   The dismiss listeners are armed 300 ms late: the keypress that submitted `reboot` is still
@@ -728,8 +743,8 @@ shapes are the accent colour; clicking one of those is the `cyanSpotter` achieve
   not a page.
 - **Screensaver** (`composables/useIdle.ts`) — three idle minutes with the tab visible fade every
   child of `#app` but the canvas (`[data-screensaver]` in `main.css`). The waking key or press is
-  swallowed. Vetoed by `terminalCapturing` and `roomPlaying`; started by `ThreeBackground`, so
-  reduced motion needs no branch.
+  swallowed. Vetoed by `terminalCapturing` and `roomPlaying`; started and stopped by
+  `ThreeBackground` with its loop, so motion needs no branch of its own.
 - **Console art** — `console.log` in `main.ts`. Costs nothing; the people who open DevTools on a
   developer portfolio are exactly the target audience.
 
@@ -1072,7 +1087,27 @@ Retrofitting these is painful, so they are part of the definition of done:
   on open and restored to the nav button on close.
 - Achievement toast: `role="status"` with `aria-live="polite"`, so an unlock is announced without
   stealing focus from whatever the visitor was doing.
-- Every animated feature honours `prefers-reduced-motion`.
+- **Motion control** (WCAG 2.2.2, pause, stop, hide). The wireframes move for as long as the
+  page is open, and before this only the OS setting could stop them. `composables/useMotion.ts`
+  holds *full · calm · paused*, saved under `couvbat:motion`, restored in `main.ts` before mount
+  and written on `<html>` as `data-motion`, which `main.css` reads beside each
+  `prefers-reduced-motion` block (Tailwind's `motion-safe:` only knows the OS, so `.animate-pulse`
+  is stopped there too). The OS setting is a floor: it holds the level at *paused* whatever was
+  chosen, and the 🎨 menu shows *full* and *calm* as `aria-disabled` with a note saying why.
+  - *calm* — the field at 0.35× and 30 fps with no pointer pull; no swing, confetti, glitch,
+    flashbang or theme circle; prompt cycling, the tagline, the boot sequence and the animations
+    of typed commands stay.
+  - *paused* — nothing moves. The three.js chunk isn't fetched until some other level is chosen,
+    and is never unloaded after: pausing stops its loop.
+
+  Decorative surfaces read `decorativeMotion()` and take their own threshold: the swing, the
+  confetti, the glitch, the flashbang and the theme circle need *full*; the tagline, the prompt
+  hints and the boot sequence only stop at *paused*. Typed animations (`matrix`, `reboot`, `ssh`,
+  `hack`, `sl`, `top`, `ping`, `ask`'s typewriter, `tour`'s pauses) honour *paused* only, since
+  the visitor asked for them by name; `tour`'s scheme preview is decoration and needs *full*. The
+  games (`snake`, `tetris`) keep reading `prefersReducedMotion()`, because their stepped mode
+  changes the rules.
+- Every other animated feature honours the same level, and so `prefers-reduced-motion`.
 - The launcher is `hidden` below `md`. Mobile virtual keyboards fight fixed-position input panels
   badly enough that a bad terminal is worse than none; mobile users get the full rendered page,
   which carries the same information. `Ctrl+K` remains available for anyone on a tablet with a
@@ -1103,8 +1138,8 @@ this section only fixes the rules the code cites.
 - **The swing is one clock with three readers.** `useViewSwing` eases 0→1 once; `App.vue` binds it
   as CSS custom properties on the stage that rotates the two pages as faces of a prism, and
   `ThreeBackground` yaws the wireframe *field* (not the camera — see the spec for why), re-homes
-  every shape on the first frame and bakes the rotation away on the last. Under reduced motion
-  nothing moves and the pages swap. The transition is complete with no three.js present.
+  every shape on the first frame and bakes the rotation away on the last. Below *full* motion
+  (§9) nothing moves and the pages swap. The transition is complete with no three.js present.
 - **Pages outside the prism.** `/now` and `/work/<id>` are routes but not views: they are reached
   from links, not the navbar, so the prism keeps its four faces, and `viewIndex()` puts them after
   the faces so a swing to one still has a direction. `cd` doesn't reach them, because

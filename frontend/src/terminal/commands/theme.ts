@@ -1,4 +1,7 @@
+import { decorativeMotion, isMotionSetting, MOTION_SETTINGS, useMotion } from '@/composables/useMotion'
 import { useTheme } from '@/composables/useTheme'
+import type { Localised } from '@/content/types'
+import { messages as m } from '@/i18n/messages'
 import { DEFAULT_THEME, findTheme, swatch, themes, type Theme } from '@/lib/themes'
 import { toast, tryTheme } from '../achievements'
 import { blank, fail, line, segmented } from '../format'
@@ -38,6 +41,24 @@ function listing(active: Theme): OutputLine[] {
   })
 }
 
+/** `motion`'s listing: the three settings, the one in force marked as `theme` marks its. */
+function motionListing(t: <T>(value: Localised<T>) => T): OutputLine[] {
+  const on = decorativeMotion()
+  const width = Math.max(...MOTION_SETTINGS.map((id) => id.length))
+  return MOTION_SETTINGS.map((id) =>
+    segmented([
+      { text: id === on ? '* ' : '  ', tone: 'primary' },
+      { text: id.padEnd(width + 2), tone: id === on ? 'primary' : 'default' },
+      { text: t(m.motion[id]), tone: 'muted' },
+    ]),
+  )
+}
+
+/** Said whenever the OS is what holds the level at `paused`, so a choice never looks ignored. */
+function heldByOs(t: <T>(value: Localised<T>) => T): OutputLine[] {
+  return useMotion().osReduced.value ? [line(t(m.motion.os), 'warning')] : []
+}
+
 export const themeCommands: Command[] = [
   {
     name: 'theme',
@@ -73,6 +94,37 @@ export const themeCommands: Command[] = [
         ...(from.mode === 'dark' && next.mode === 'light' ? [line(t(FLASHBANG), 'muted')] : []),
         ...toast(tryTheme(next), t),
       ]
+    },
+  },
+  {
+    name: 'motion',
+    usage: 'motion [full|calm|paused]',
+    description: { en: 'Show or set how much the page moves', fr: 'Afficher ou régler les animations' },
+    group: 'core',
+    // A constant rather than a function of the arguments, as `theme` has: the bare
+    // listing only reads, but `motion` is never worth a link, so nothing gains from it.
+    writes: 'local',
+    palette: true,
+    complete: ({ index }) => (index === 0 ? [...MOTION_SETTINGS] : []),
+    run({ args, t }) {
+      const [requested] = args
+      if (!requested) {
+        return [
+          ...motionListing(t),
+          ...heldByOs(t),
+          blank,
+          line(t({ en: '`motion <full|calm|paused>` to change it.', fr: '`motion <full|calm|paused>` pour le changer.' }), 'muted'),
+        ]
+      }
+      const id = requested.toLowerCase()
+      if (!isMotionSetting(id)) {
+        return [
+          line(`motion: unknown setting \`${requested}\``, 'error'),
+          line('usage: motion [full|calm|paused]', 'muted'),
+        ]
+      }
+      useMotion().setMotion(id)
+      return [segmented([{ text: `motion: ${id}  `, tone: 'primary' }, { text: t(m.motion[id]), tone: 'muted' }]), ...heldByOs(t)]
     },
   },
 ]

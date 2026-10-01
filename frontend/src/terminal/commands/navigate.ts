@@ -1,6 +1,6 @@
 import { profile, sectionIds, sections, socials, viewIds, views, work } from '@/content'
 import { currentPath, resolvePath } from '@/composables/useViewSwing'
-import { prefersReducedMotion } from '@/composables/useCrt'
+import { decorativeMotion } from '@/composables/useMotion'
 import { visibleTools } from '@/tools/registry'
 import { announce, toast, visitSection } from '../achievements'
 import { diffLines, hasChanges } from '../diff'
@@ -252,6 +252,8 @@ export const navigateCommands: Command[] = [
       const replies: OutputLine[] = []
 
       ctx.print(line(`PING ${host} (127.0.0.1) 56(84) bytes of data.`, 'muted'))
+      // All at once with motion paused; a typed command keeps its pacing under `calm`.
+      const still = decorativeMotion() === 'paused'
       for (let seq = 1; seq <= PING_COUNT; seq++) {
         const time = latency()
         times.push(time)
@@ -260,11 +262,11 @@ export const navigateCommands: Command[] = [
           'primary',
         )
         replies.push(reply)
-        if (prefersReducedMotion()) continue
+        if (still) continue
         ctx.print(reply)
         await sleep(280, ctx.signal)
       }
-      if (prefersReducedMotion()) ctx.print(replies)
+      if (still) ctx.print(replies)
 
       const min = Math.min(...times)
       const max = Math.max(...times)

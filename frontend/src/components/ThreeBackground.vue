@@ -2,6 +2,7 @@
 import { onMounted, onUnmounted, ref, watch } from 'vue'
 import * as THREE from 'three'
 import { useCrt } from '@/composables/useCrt'
+import { useMotion } from '@/composables/useMotion'
 import { activeSection } from '@/composables/useActiveSection'
 import { terminalOpen } from '@/composables/useTerminalShell'
 import { BASE_SHAPE_COUNT, MAX_SHAPE_COUNT, useSceneControl } from '@/composables/useSceneControl'
@@ -23,6 +24,9 @@ const { t, m } = useLocale()
 // clock; the DOM turns the pages by it and this component turns the field by it.
 const { swing, swingDirection, swinging, activeView } = useViewSwing()
 const { theme } = useTheme()
+// `full`, `calm` or `paused` (composables/useMotion.ts). This component only mounts once
+// the level has been something other than `paused`; pausing afterwards stops the loop.
+const { level: motion } = useMotion()
 
 const canvasRef = ref<HTMLCanvasElement | null>(null)
 /** What `click-to-inspect` is currently showing, if anything. */
@@ -117,6 +121,41 @@ const FOCUS_MS = 2200
 const FIELD_DEPTH = -4
 const FIELD_YAW = (40 * Math.PI) / 180
 const DOLLY = 6
+
+/**
+ * The loop runs on elapsed time, not on frames. It used to add a fixed step per frame,
+ * so a 120 Hz screen ran the field at twice the speed it was tuned at. Every rotation
+ * now scales by how many of these reference frames have passed, and every lerp factor
+ * `k` becomes `1 - (1 - k) ** f` (`ease`), the same easing at any rate. A 120 Hz screen
+ * slows to the speed a 60 Hz one always had, which is visible and intended.
+ */
+const REFERENCE_MS = 1000 / 60
+/** The frame governor: at most 60 fps, and 30 under `calm` or while the terminal's
+ *  blurred panel is open, which re-composites its backdrop on every frame drawn. */
+const FULL_FRAME_MS = 1000 / 60
+const SLOW_FRAME_MS = 1000 / 30
+/** Frames arrive a little early or late; one this close to due counts, or a 60 Hz screen
+ *  would drop every other frame against a 60 fps cap. */
+const FRAME_SLACK_MS = 2.5
+/** How far one frame may advance the field, so a tab back from the background resumes
+ *  rather than leaping. */
+const MAX_STEP = 4
+/** `calm`'s share of the field's speed. */
+const CALM_SPEED = 0.35
+
+/** The timestamp of the last frame drawn, or 0 when the loop has just (re)started. */
+let lastFrame = 0
+/**
+ * When the governor next lets a frame through. Kept on a grid rather than counted from
+ * the last frame, so a frame that arrives a little late doesn't push every later one
+ * back with it: jitter never drops a frame, and the long-run rate is still the cap.
+ */
+let nextDue = 0
+
+/** A lerp factor tuned per reference frame, for a frame `f` reference frames long. */
+function ease(k: number, f: number): number {
+  return 1 - (1 - k) ** f
+}
 
 let stopScreensaver: (() => void) | null = null
 
@@ -323,12 +362,12 @@ function syncVisitors() {
   }
 }
 
-/** One frame of the visitors' fades; removes whoever has finished leaving. */
-function fadeVisitors() {
+/** One frame of the visitors' fades, `k` of the way; removes whoever has finished leaving. */
+function fadeVisitors(k: number) {
   for (let i = visitors.length - 1; i >= 0; i--) {
     const shape = visitors[i]!
     const presence = shape.presence!
-    presence.level += ((presence.leaving ? 0 : 1) - presence.level) * VISITOR_FADE
+    presence.level += ((presence.leaving ? 0 : 1) - presence.level) * k
     if (presence.leaving && presence.level < 0.01) {
       disposeShape(visitors.splice(i, 1)[0]!)
       continue
@@ -522,14 +561,24 @@ function bake() {
   field.rotation.y = 0
 }
 
-function animate() {
+function animate(now: number) {
   animationFrameId = requestAnimationFrame(animate)
 
-  const boost = speedMultiplier.value * sectionSpeed * weatherMood.value.speed
+  const calm = motion.value === 'calm'
+  const budget = calm || terminalOpen.value ? SLOW_FRAME_MS : FULL_FRAME_MS
+  if (now < nextDue - FRAME_SLACK_MS) return
+  // Far behind (a tab back from the background), the grid starts again from here
+  // rather than letting frames through back to back to catch up.
+  nextDue = now > nextDue + budget ? now + budget : nextDue + budget
+  const f = lastFrame ? Math.min(MAX_STEP, (now - lastFrame) / REFERENCE_MS) : 1
+  lastFrame = now
+
+  const boost = speedMultiplier.value * sectionSpeed * weatherMood.value.speed * (calm ? CALM_SPEED : 1) * f
   const shaking = glitching.value
   const turning = swinging.value
-  // The well's z=0-plane maths is wrong in a rotated frame; off for the 650 ms.
-  const pulling = pointerActive && gravityOn.value && !turning
+  // The well's z=0-plane maths is wrong in a rotated frame; off for the 650 ms. `calm`
+  // has no pointer pull at all: neither the well nor the camera follows the cursor.
+  const pulling = pointerActive && gravityOn.value && !turning && !calm
 
   if (field) {
     if (turning) {
@@ -549,7 +598,9 @@ function animate() {
     pointerWorld.set(mouseX * half.x, -mouseY * half.y, 0)
   }
 
-  fadeVisitors()
+  fadeVisitors(ease(VISITOR_FADE, f))
+  // Snap during a glitch, drift the rest of the time.
+  const drift = ease(shaking ? 0.65 : 0.045, f)
   forEachShape(({ mesh, speed, home, offset }) => {
     mesh.rotation.x += speed.x * boost
     mesh.rotation.y += speed.y * boost
@@ -576,25 +627,25 @@ function animate() {
       target.z += (Math.random() - 0.5) * 0.4
     }
 
-    // Snap during a glitch, drift the rest of the time.
-    offset.lerp(target, shaking ? 0.65 : 0.045)
+    offset.lerp(target, drift)
     mesh.position.copy(home).add(offset)
   })
 
   if (constellationOn.value) updateLinks()
 
   if (camera) {
-    const targetX = mouseX * 0.6
-    const targetY = -mouseY * 0.4
-    camera.position.x += (targetX - camera.position.x) * 0.03
-    camera.position.y += (targetY - camera.position.y) * 0.03
+    const targetX = calm ? 0 : mouseX * 0.6
+    const targetY = calm ? 0 : -mouseY * 0.4
+    const follow = ease(0.03, f)
+    camera.position.x += (targetX - camera.position.x) * follow
+    camera.position.y += (targetY - camera.position.y) * follow
     camera.position.z = cameraBaseZ + (turning ? DOLLY * Math.sin(Math.PI * swing.value) : 0)
 
     // An inspected shape draws the camera's gaze for a couple of seconds, then
     // the origin takes it back — easing both ways, so nothing ever snaps. World
     // position, because a mesh's own position is field-local while the field turns.
     if (focused && performance.now() > focusUntil) focused = null
-    lookTarget.lerp(focused ? focused.mesh.getWorldPosition(worldPosition) : ORIGIN, 0.04)
+    lookTarget.lerp(focused ? focused.mesh.getWorldPosition(worldPosition) : ORIGIN, ease(0.04, f))
     camera.lookAt(lookTarget)
   }
 
@@ -602,6 +653,47 @@ function animate() {
     renderer.render(scene, camera)
   }
 }
+
+/** Starts the loop, the pointer and the screensaver — on mount, and when motion comes
+ *  back from `paused`. */
+function startLoop() {
+  if (animationFrameId !== null || !renderer) return
+  lastFrame = 0
+  nextDue = 0
+  animationFrameId = requestAnimationFrame(animate)
+  window.addEventListener('mousemove', handleMouseMove)
+  stopScreensaver ??= startScreensaver()
+}
+
+/**
+ * `paused`: the loop stops and one frame is drawn as the scene stands. The screensaver
+ * stops with it — it hands the screen to a field that no longer moves. A swing caught
+ * halfway is finished and baked first, so the still frame is not a field turned askew.
+ */
+function pauseLoop() {
+  if (animationFrameId !== null) cancelAnimationFrame(animationFrameId)
+  animationFrameId = null
+  window.removeEventListener('mousemove', handleMouseMove)
+  pointerActive = false
+  stopScreensaver?.()
+  stopScreensaver = null
+  if (swingArmed && field) {
+    field.rotation.y = -swingDirection.value * FIELD_YAW
+    bake()
+    swingArmed = false
+  }
+  if (camera) camera.position.z = cameraBaseZ
+  // No fade will finish now: whoever is arriving is here, and whoever is leaving goes
+  // (`syncVisitors` disposes them when nothing loops, and draws the frame).
+  for (const shape of visitors) {
+    if (shape.presence!.leaving) continue
+    shape.presence!.level = 1
+    ;(shape.mesh.material as THREE.MeshBasicMaterial).opacity = visitorOpacity(shape)
+  }
+  syncVisitors()
+}
+
+watch(motion, (level) => (level === 'paused' ? pauseLoop() : startLoop()))
 
 // Both the section and the completionist unlock change how the scene looks; one
 // watcher covers them because `currentPalette()` already knows which wins.
@@ -644,22 +736,17 @@ onMounted(() => {
 
   if (!renderer || !scene || !camera) return
 
-  const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches
-  if (prefersReducedMotion) {
-    renderer.render(scene, camera)
-  } else {
-    animate()
-    window.addEventListener('mousemove', handleMouseMove)
-  }
+  // The screensaver starts with the loop, so only once there is a field to hand the
+  // screen to: a failed WebGL context returns above. The level can have gone back to
+  // `paused` between the idle callback that mounted this and now.
+  if (motion.value === 'paused') renderer.render(scene, camera)
+  else startLoop()
 
   window.addEventListener('resize', handleResize)
   window.addEventListener('click', handleClick)
-  // Only once there is a field to hand the screen to: a failed WebGL context returns
-  // above, and reduced motion never mounts this component at all.
-  stopScreensaver = startScreensaver()
 
   // One request, from the surface that actually reacts to the answer. This
-  // component is not mounted under reduced motion, so the call is never made
+  // component is never mounted while motion is paused, so the call is not made
   // for a scene that would sit still anyway.
   void fetchWeather()
 })
@@ -688,6 +775,8 @@ onUnmounted(() => {
   field = null
   camera = null
   swingArmed = false
+  lastFrame = 0
+  nextDue = 0
 })
 </script>
 
