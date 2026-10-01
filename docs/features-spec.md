@@ -554,6 +554,7 @@ It shares the registry, so it needs no separate maintenance.
 | `hack [target]` | Fake nmap/progress output ending in `ACCESS DENIED — nice try` |
 | `coffee` | `HTTP 418: I'm a teapot` |
 | `play` | Scrolls to the music section and starts the SoundCloud embed |
+| `acid [<code>]` | Plays the acid tool's pattern, or a shared code's, with a frame playhead read off the audio clock (§11). `writes: 'local'`, so no link may start it |
 | `cowsay <text>` | ASCII cow |
 | `fortune` | Random dev aphorism |
 | `sl` | ASCII train, animated across the buffer |
@@ -573,7 +574,7 @@ are deliberately *not* hidden: they are signposts rather than secrets.
 `useCrt.ts` rather than each re-reading the media query. `matrix` prints a one-line reply instead
 of opening the canvas, `sl` renders a static train, `top` draws one frame instead of six, the
 boot sequence and the Three.js background are skipped entirely, CRT overdrive resolves without
-animating, and the achievement toast shortens its dwell time.
+animating, `acid` plays without a playhead, and the achievement toast shortens its dwell time.
 
 ### The CTF chain
 
@@ -1164,6 +1165,20 @@ this section only fixes the rules the code cites.
   (hand-written encoder, verified against ISO/IEC 18004's examples and a reference encoder's
   matrices) and `diff` (`unifiedDiff` in `terminal/diff.ts`, the same code as the command, with a
   trimmed-ends guard for large unrelated texts).
+- **`acid` is the one tool with sound** (`tools/acid/`), so it is the one where a gesture
+  matters. `pattern.ts` is pure: 27 bytes behind a version byte, as base64url in `?p=`, and
+  `decode` clamps every field and refuses a short code or an unknown version. `engine.ts` is one
+  persistent oscillator → low-pass (`Q` at most 18 dB) → `tanh` shaper → amp → master at −12 dB →
+  a limiting compressor, with a 25 ms timer booking 120 ms ahead on `currentTime`. It takes an
+  `AudioContext` and never creates one; `audio.ts` opens it inside the click or keystroke, before
+  the first `await`, which Safari requires and which lets the shell import the engine lazily
+  after. No `AudioWorklet`: one loaded from `blob:` is refused by `script-src`. Playback stops on
+  `visibilitychange`, one sequencer sounds at a time, and a stopped one suspends its context. The
+  panel reads `?p=` on mount and never writes it back, because `router.replace` would trip
+  `scrollBehavior`'s jump to the top on every knob drag; the link is built on *copy link*. The
+  shell's `acid [<code>]` writes `local`, so `isLinkable` keeps every link from starting sound,
+  and it stops on Ctrl+C, a hidden tab, the overlay closing, or after two minutes. Under reduced
+  motion neither draws the playhead.
 - **The admin tier is hidden, not secret** (`download`, `lib/admin.ts`). `visibleTools()` leaves
   it out of the page, `tools`, `ls tools` and Tab until the owner unlocks — `sudo -i` in the
   terminal, or the panel's own field — but `findTool` still resolves it, so `cd tools/download`

@@ -57,7 +57,8 @@ tools, watch-party and radio rooms, and 38 hidden achievements. English and Fren
   visitor over a room code. The word games use real bilingual word lists.
 - 🧰 **In-browser tools at `/tools`.** Image conversion, hashing, encoding, JSON, colour, time,
   passwords, text stats, a JWT decoder, a regex tester, a cron explainer, a QR encoder written from
-  the standard, a text diff and an `ffmpeg.wasm` converter. Your files are never uploaded.
+  the standard, a text diff, a TB-303-style acid sequencer and an `ffmpeg.wasm` converter. Your
+  files are never uploaded.
 - 📺 **Watch party and radio rooms.** A YouTube video, or a radio queue that mixes SoundCloud
   tracks and YouTube videos, stays in sync across everyone in a five-character room, over SSE.
 - 🏆 **38 achievements** for finding the hidden layer, each announced with a burst of monospace
@@ -182,7 +183,7 @@ until you type anything, and then not again that session. Under reduced motion i
 `neofetch` once (`?run=tour` is the one to put in a bio), then drops the parameter from the URL. A command has to opt in (`linkable`), and
 even then a link only runs it if, with those arguments, it writes nothing and isn't hidden. Every
 command declares what it writes (`none`, `local` or `server`), so `?run=theme dracula`,
-`?run=sign hi`, `?run=help vim` and `?run=ls -a` are all refused. A link's arguments must be ones
+`?run=sign hi`, `?run=help vim`, `?run=ls -a` and `?run=acid` are all refused. A link's arguments must be ones
 the command offers for Tab (`?run=wordle daily`, `?run=projects --json`), so a link can't put
 free text on the screen as if you'd typed it. A refused link says what it asked for. It ignores your own aliases, and on a phone
 the parameter is simply ignored.
@@ -282,14 +283,18 @@ never show two different contents.
 </details>
 
 <details>
-<summary><b>misc</b>: games, achievements, play, background control</summary>
+<summary><b>misc</b>: games, achievements, play, acid, background control</summary>
 
 - **Games:** `games` (`arcade`), `2048`, `snake`, `minesweeper` (`mines`), `tetris`, `wordle`
   (`motus`), `hangman` (`pendu`), `wpm` (`typing`), `connect4` (`c4`, `puissance4`). See
   [Games](#games).
 - **Progress:** `achievements` (`trophies`) prints the same list as the trophy modal. `ctf`
   (`flags`) is the capture-the-flag board: solved stages, and a hint for the one you're on.
-- **Music:** `play` scrolls to the music section and starts the player.
+- **Music:** `play` scrolls to the music section and starts the player. `acid [<code>]` plays a
+  pattern from the [acid sequencer](#tools) in the buffer, with a playhead: the tool's own, or the
+  one a code from its *copy link* holds. `q`, <kbd>Esc</kbd> or <kbd>Ctrl</kbd>+<kbd>C</kbd> stop
+  it, and so do a hidden tab, closing the terminal and two minutes. **Never from a link:**
+  `?run=acid` is refused, because a link that starts sound is hostile.
 - **Background control:** `spawn [n]`, `gravity [on|off]`, `constellation [on|off]` (`stars`) and
   `scene [reset]`.
 
@@ -355,6 +360,7 @@ to its panel, with its own tests.
 | **`cron`** | A five-field expression (ranges, steps, lists, month and weekday names, `@hourly`-style macros) as a sentence in either language, and its next five runs in your time zone. Vixie rules: 0 and 7 are both Sunday, and when both day fields are set either one matches. |
 | **`qr`** | Text or a URL as a QR code, downloadable as PNG or SVG. The encoder is written from ISO/IEC 18004 — byte mode, versions 1–40, all four error-correction levels, penalty-chosen mask — and tested against the standard's worked examples and a reference encoder, module for module. |
 | **`diff`** | Two texts and a unified diff, from the same `terminal/diff.ts` the `diff` command uses. |
+| **`acid`** | A 16-step TB-303-style bassline in plain Web Audio: saw or square into a resonant low-pass (capped at 18 dB, short of self-oscillation), a `tanh` drive, accent and slide per step, 60 to 300 bpm, and *randomise in phrygian*. One oscillator is scheduled against the audio clock, 120 ms ahead, through a master at −12 dB and a limiter. The link is the save file: the whole pattern packs into 27 bytes behind a version byte, in `?p=`, and a code that has been tampered with is clamped or refused rather than trusted. Nothing sounds until you press play, and it stops when the tab goes to the background. `acid <code>` plays the same pattern in the terminal. |
 | **`ffmpeg`** | The one tool with a dependency: ffmpeg compiled to WebAssembly. Converts to mp3, m4a, ogg, wav or flac, extracts the audio stream without re-encoding, re-encodes video to H.264 mp4, makes palette-optimised GIFs, and trims any of these. The 32 MB core is only downloaded when you press the button, from this site's own `/assets/`, and then stays in the browser cache. Input is read in place from disk, so multi-gigabyte files work. It's single-threaded, so video is slow, but audio isn't. |
 | **`download`** | The owner's tool, and the only one with a server behind it. yt-dlp on the server turns one YouTube video or one SoundCloud track into an mp3. It runs as a *job* that the page polls, and the file is handed over once and then deleted. The tool stays hidden until `sudo -i` (or the panel's own field) unlocks it with the admin password. It never accepts a playlist, set or profile: fetching a whole profile is what got the server's IP blocked for an hour. See [deploy.md](docs/deploy.md#what-the-shell-can-run--facts-for-the-downloader). |
 
