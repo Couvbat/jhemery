@@ -50,7 +50,12 @@ function fail(ctx: Context, at: number, what: string): never {
 
 const ESCAPABLE = /\\([\\`*_{}[\]()#+\-.!|<>])/g
 
-/** Escaping and emphasis, leaving held runs (`\u0000n\u0000`) where they are. */
+// A held run is its index between two private-use characters: never in a spec, never
+// touched by escaping or emphasis, and not a control character, which lint refuses in a
+// regular expression.
+const HELD = /\uE000(\d+)\uE001/g
+
+/** Escaping and emphasis, leaving held runs (`\uE000n\uE001`) where they are. */
 function finish(text: string): string {
   return escapeHtml(text)
     .replace(/\*\*(?=\S)([\s\S]*?\S)\*\*/g, '<strong>$1</strong>')
@@ -64,7 +69,7 @@ function inline(text: string, ctx: Context, at: number): string {
   if (/\[\^/.test(text)) fail(ctx, at, 'a footnote')
 
   const held: string[] = []
-  const hold = (html: string) => `\u0000${held.push(html) - 1}\u0000`
+  const hold = (html: string) => `\uE000${held.push(html) - 1}\uE001`
 
   let out = text
     // Code first: nothing inside a code span is markdown.
@@ -78,12 +83,12 @@ function inline(text: string, ctx: Context, at: number): string {
     )
     .replace(/https?:\/\/[^\s<>()]+[^\s<>().,;:!?'"]/g, (url) => hold(`<a href="${escapeHtml(url)}">${escapeHtml(url)}</a>`))
 
-  if (/<\/?[a-zA-Z][^>]*>/.test(out.replace(/\u0000\d+\u0000/g, ''))) fail(ctx, at, 'raw HTML')
+  if (/<\/?[a-zA-Z][^>]*>/.test(out.replace(HELD, ''))) fail(ctx, at, 'raw HTML')
 
   out = finish(out)
 
   // Held runs can contain held runs (a link's label holds its code), so restore until none are left.
-  while (/\u0000\d+\u0000/.test(out)) out = out.replace(/\u0000(\d+)\u0000/g, (_, i: string) => held[Number(i)]!)
+  while (out.search(HELD) >= 0) out = out.replace(HELD, (_, i: string) => held[Number(i)]!)
   return out
 }
 
