@@ -644,8 +644,8 @@ export const messages = {
       fr: "Une soirée vidéo : un code, une vidéo YouTube, tout le monde à la même seconde. L'hôte appuie sur lecture ; tous les autres lecteurs suivent.",
     },
     introRadio: {
-      en: 'A shared radio: a queue of SoundCloud tracks the host runs, and every listener hears the same one at the same time.',
-      fr: "Une radio partagée : une file de morceaux SoundCloud que l'hôte enchaîne, et chaque auditeur entend le même au même moment.",
+      en: 'A shared radio: a queue of SoundCloud tracks and YouTube videos the host runs, and every listener hears the same one at the same time. A video plays in a small player, never a hidden one.',
+      fr: "Une radio partagée : une file de morceaux SoundCloud et de vidéos YouTube que l'hôte enchaîne, et chaque auditeur entend le même au même moment. Une vidéo passe dans un petit lecteur, jamais dans un lecteur caché.",
     },
     lobby: { en: 'Rooms', fr: 'Salons' },
     host: { en: 'host', fr: 'hôte' },
@@ -687,14 +687,17 @@ export const messages = {
       fr: "L'hôte pilote ; votre lecteur suit. S'il ne démarre pas, appuyez une fois sur lecture.",
     },
     inputWatch: { en: 'YouTube link or video id', fr: 'lien YouTube ou identifiant de vidéo' },
-    inputRadio: { en: 'soundcloud.com track or set link', fr: 'lien soundcloud.com (morceau ou playlist)' },
+    inputRadio: {
+      en: 'soundcloud.com track or set link, or a YouTube link',
+      fr: 'lien soundcloud.com (morceau ou playlist) ou lien YouTube',
+    },
     badLinkWatch: {
       en: 'That is not a YouTube link or video id.',
       fr: "Ce n'est pas un lien YouTube ni un identifiant de vidéo.",
     },
     badLinkRadio: {
-      en: 'That is not a soundcloud.com track or set link.',
-      fr: "Ce n'est pas un lien soundcloud.com de morceau ou de playlist.",
+      en: 'That is neither a soundcloud.com track or set link nor a YouTube link or video id.',
+      fr: "Ce n'est ni un lien soundcloud.com de morceau ou de playlist, ni un lien YouTube ou un identifiant de vidéo.",
     },
     playNow: { en: 'play now', fr: 'lire maintenant' },
     enqueue: { en: 'queue', fr: 'en file' },

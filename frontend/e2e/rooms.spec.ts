@@ -18,9 +18,15 @@ const ROOM = {
   members: 3,
 }
 
+const STUB = '<!doctype html><title>stub</title>'
+const TRACK = 'https://soundcloud.com/couvbat/abysses'
+
 test.beforeEach(async ({ page }) => {
   await page.route('**/*.youtube-nocookie.com/**', (route) =>
-    route.fulfill({ status: 200, contentType: 'text/html', body: '<!doctype html><title>stub</title>' }),
+    route.fulfill({ status: 200, contentType: 'text/html', body: STUB }),
+  )
+  await page.route('https://w.soundcloud.com/**', (route) =>
+    route.fulfill({ status: 200, contentType: 'text/html', body: STUB }),
   )
 })
 
@@ -137,6 +143,63 @@ test.describe('rooms', () => {
     await aside.getByRole('button', { name: button('remove', c) }).click()
     await expect(aside.getByRole('listitem')).toHaveText([new RegExp(b), new RegExp(a)])
     expect(api.sent('POST', '/rooms/AB3DE/state').map((r) => r.body)).toEqual([{ queue: [b, a, c] }, { queue: [b, a] }])
+  })
+
+  test.describe('YouTube in radio', () => {
+    test('a video in the queue plays in a small player that is still at least 200 px high', async ({
+      page,
+      api,
+      pageErrors,
+    }) => {
+      api.room({ ...ROOM, kind: 'radio', queue: [TRACK] })
+      await page.goto('/radio/AB3DE')
+
+      const region = page.getByRole('region', { name: /radio AB3DE/i })
+      const frame = region.locator('iframe')
+      await expect(frame).toHaveAttribute('src', /^https:\/\/www\.youtube-nocookie\.com\/embed\/aqz-KE-bpKQ\?/)
+      // YouTube's terms: never hidden for the sound, never under 200×200.
+      const box = (await frame.boundingBox())!
+      expect(box.height).toBeGreaterThanOrEqual(200)
+      expect(box.width).toBeGreaterThanOrEqual(200)
+      await expect(region.getByRole('complementary', { name: /up next/i }).getByText('couvbat/abysses')).toBeVisible()
+      expect(pageErrors).toEqual([])
+    })
+
+    test('a track that finishes hands over to the video after it, and the queue moves on', async ({ page, api }) => {
+      // This widget answers the page's first message by saying the track has ended,
+      // which is all the handover needs from it.
+      await page.route('https://w.soundcloud.com/**', (route) =>
+        route.fulfill({
+          status: 200,
+          contentType: 'text/html',
+          body: `${STUB}<script>
+            addEventListener('message', function once() {
+              removeEventListener('message', once)
+              parent.postMessage(JSON.stringify({ method: 'finish' }), '*')
+            })
+          </script>`,
+        }),
+      )
+      api.room({
+        ...ROOM,
+        kind: 'radio',
+        state: { media: TRACK, position: 0, playing: true, at: Date.now() },
+        queue: ['aqz-KE-bpKQ'],
+        members: 1,
+      })
+      await page.goto('/radio')
+      await page.getByRole('button', { name: /start a room/i }).click()
+
+      const region = page.getByRole('region', { name: /radio AB3DE/i })
+      await expect(region.locator('iframe')).toHaveAttribute('src', /^https:\/\/www\.youtube-nocookie\.com\/embed\/aqz-KE-bpKQ\?/)
+      await expect(region.getByRole('complementary', { name: /up next/i }).getByText(/nothing queued/i)).toBeVisible()
+      expect(api.sent('POST', '/rooms/AB3DE/state').map((r) => r.body)).toContainEqual({
+        media: 'aqz-KE-bpKQ',
+        queue: [],
+        position: 0,
+        playing: true,
+      })
+    })
   })
 
   test('a code nobody has is reported as such', async ({ page, api }) => {

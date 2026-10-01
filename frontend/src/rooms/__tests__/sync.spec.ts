@@ -6,6 +6,7 @@ import {
   formatClock,
   isSeek,
   mediaLabel,
+  mediaSource,
   moveItem,
   normaliseCode,
   parseMedia,
@@ -83,12 +84,28 @@ describe('rooms sync', () => {
       }
     })
 
-    it('is what parseMedia dispatches to, per kind', () => {
+    it('is what parseMedia dispatches to: YouTube only in watch, either in radio', () => {
       expect(parseMedia('watch', 'https://youtu.be/aqz-KE-bpKQ')).toBe('aqz-KE-bpKQ')
-      expect(parseMedia('radio', 'https://youtu.be/aqz-KE-bpKQ')).toBeNull()
+      expect(parseMedia('watch', 'https://soundcloud.com/couvbat/abysses')).toBeNull()
       expect(parseMedia('radio', 'https://soundcloud.com/couvbat/abysses')).toBe('https://soundcloud.com/couvbat/abysses')
-      expect(mediaLabel('radio', 'https://soundcloud.com/couvbat/abysses')).toBe('couvbat/abysses')
-      expect(mediaLabel('watch', 'aqz-KE-bpKQ')).toBe('aqz-KE-bpKQ')
+      expect(parseMedia('radio', 'https://youtu.be/aqz-KE-bpKQ')).toBe('aqz-KE-bpKQ')
+      expect(parseMedia('radio', 'aqz-KE-bpKQ')).toBe('aqz-KE-bpKQ')
+      expect(parseMedia('radio', 'https://vimeo.com/12345')).toBeNull()
+    })
+  })
+
+  describe('mediaSource and mediaLabel', () => {
+    it('tells the two sources apart by the item alone', () => {
+      expect(mediaSource('aqz-KE-bpKQ')).toBe('youtube')
+      expect(mediaSource('https://soundcloud.com/couvbat/abysses')).toBe('soundcloud')
+      // Every item parseMedia can produce lands on the source that parsed it.
+      expect(mediaSource(parseMedia('radio', 'https://youtu.be/aqz-KE-bpKQ')!)).toBe('youtube')
+      expect(mediaSource(parseMedia('radio', 'https://m.soundcloud.com/couvbat/sets/mon-bruit')!)).toBe('soundcloud')
+    })
+
+    it('prints a track by its path and marks a video as YouTube’s', () => {
+      expect(mediaLabel('https://soundcloud.com/couvbat/abysses')).toBe('couvbat/abysses')
+      expect(mediaLabel('aqz-KE-bpKQ')).toBe('youtube:aqz-KE-bpKQ')
     })
   })
 

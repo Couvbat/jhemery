@@ -127,8 +127,12 @@ describe('RoomsService', () => {
       expect(
         service.update(radio.code, radio.hostToken, { media: SC }).state.media,
       ).toBe(SC);
+      // A radio plays YouTube too: the id is the same allowlisted shape watch takes.
+      expect(
+        service.update(radio.code, radio.hostToken, { media: YT }).state.media,
+      ).toBe(YT);
       for (const bad of [
-        YT,
+        'https://youtube.com/watch?v=aqz-KE-bpKQ',
         'http://soundcloud.com/x',
         'https://evil.com/?soundcloud.com',
         'https://soundcloud.com.evil.com/x',
@@ -163,6 +167,39 @@ describe('RoomsService', () => {
       expect(() =>
         service.update(room.code, room.hostToken, { queue: [YT, SC] }),
       ).toThrow(BadRequestException);
+    });
+
+    it('takes a mixed queue in radio and refuses it in watch', () => {
+      const service = build();
+      const radio = service.create('radio', T0);
+      const watch = service.create('watch', T0);
+      const mixed = [SC, YT, 'https://m.soundcloud.com/couvbat/sets/mon-bruit'];
+
+      expect(
+        service.update(radio.code, radio.hostToken, { queue: mixed }).queue,
+      ).toEqual(mixed);
+      // Promoting the YouTube item makes it the current one, as `next` does.
+      expect(
+        service.update(radio.code, radio.hostToken, {
+          media: YT,
+          queue: mixed.slice(2),
+        }).state.media,
+      ).toBe(YT);
+      expect(() =>
+        service.update(watch.code, watch.hostToken, { queue: mixed }),
+      ).toThrow(BadRequestException);
+      expect(() =>
+        service.update(watch.code, watch.hostToken, { media: SC }),
+      ).toThrow('Not a YouTube video id');
+      // One bad item still sinks the whole radio queue.
+      expect(() =>
+        service.update(radio.code, radio.hostToken, {
+          queue: [...mixed, 'https://youtube.com/watch?v=aqz-KE-bpKQ'],
+        }),
+      ).toThrow(BadRequestException);
+      expect(() =>
+        service.update(radio.code, radio.hostToken, { media: 'javascript:1' }),
+      ).toThrow('Not a soundcloud.com URL or a YouTube video id');
     });
 
     it('starts a new item from the top and stamps the server clock', () => {
@@ -304,7 +341,11 @@ describe('RoomsService', () => {
 describe('validMedia', () => {
   it('knows a YouTube id and a soundcloud.com URL, and nothing else', () => {
     expect(validMedia('watch', YT)).toBe(true);
+    expect(validMedia('radio', YT)).toBe(true);
+    expect(validMedia('watch', SC)).toBe(false);
+    expect(validMedia('connect4', YT)).toBe(false);
     expect(validMedia('watch', 'a'.repeat(12))).toBe(false);
+    expect(validMedia('radio', 'a'.repeat(12))).toBe(false);
     expect(
       validMedia('radio', 'https://m.soundcloud.com/couvbat/sets/mon-bruit'),
     ).toBe(true);

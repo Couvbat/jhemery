@@ -296,7 +296,7 @@ them.
 | ✔ | Feature | Approach | Files | Effort |
 |---|---|---|---|---|
 | [x] | Queue as a sidebar | The queue exists (50 items, visible to guests) but sits under the host's controls, listed by raw video id or track path, so nobody can see what's coming. On wide screens the room becomes two columns, the player and an *up next* sidebar with the current item on top and the queue numbered under it; on a phone the sidebar stacks under the player. The host removes and reorders from the sidebar, and "next" moves there too; guests read it. Reordering needs no backend: a queue update already replaces the whole array. | `rooms/RoomPage.vue`, `i18n/messages.ts` | S |
-| [ ] | YouTube in radio | A YouTube id (eleven characters) and a SoundCloud item (an https URL) can't be mistaken for each other, so the queue stays `string[]`. `validMedia()` accepts either for `radio` (watch stays YouTube-only), `parseMedia()` tries both, and the page picks the player per *item* rather than per room. The sync logic already drives both through one `PlayerHandle` and both emit `finished`, so a mixed queue hands over between them with no new sync code. YouTube's embed terms don't allow hiding the video to keep the audio, so a YouTube item in radio plays in a small but visible player. What keeps the two rooms distinct: watch is a big video player, radio a mixed playlist. | `backend/src/rooms/rooms.service.ts`, `rooms/sync.ts`, `rooms/RoomPage.vue`, `i18n/messages.ts` | S–M |
+| [x] | YouTube in radio | A YouTube id (eleven characters) and a SoundCloud item (an https URL) can't be mistaken for each other, so the queue stays `string[]`. `validMedia()` accepts either for `radio` (watch stays YouTube-only), `parseMedia()` tries both, and the page picks the player per *item* rather than per room. The sync logic already drives both through one `PlayerHandle` and both emit `finished`, so a mixed queue hands over between them with no new sync code. YouTube's embed terms don't allow hiding the video to keep the audio, so a YouTube item in radio plays in a small but visible player. What keeps the two rooms distinct: watch is a big video player, radio a mixed playlist. | `backend/src/rooms/rooms.service.ts`, `rooms/sync.ts`, `rooms/RoomPage.vue`, `i18n/messages.ts` | S–M |
 | [ ] | Titles in the queue (follow-up) | "Artist — Track" instead of an id. The backend resolves a title once, when the host adds the item, through YouTube's and SoundCloud's oEmbed endpoints, and keeps it beside the item. Fetching from the browser would mean widening `connect-src`, which is the reason not to. The queue becomes `{ media, title? }[]`, a change to the shape both apps read, so they deploy together; a failed lookup keeps the id, never blocks the add. | `backend/src/rooms/*`, `lib/api.ts`, `rooms/RoomPage.vue` | M |
 
 ### The shell, deeper
@@ -489,6 +489,17 @@ Recorded as each row ships.
     is in flight (`aria-disabled` rather than `disabled`, so the pressed one keeps focus), and the
     edits that can't be refused, a track ending on its own and a link added to the queue, wait
     their turn instead.
+- **YouTube in radio:**
+  - The page picks the player from `mediaSource(media)`, decided by the item alone, and a change
+    of source also resets the sync loop's anchor timer and seek cooldown, so the new player's
+    first readings aren't weighed against the old one's.
+  - "A small but visible player" is a `compact` prop on `YouTubePlayer`: `max-w-md`, and
+    `min-h-[200px]` for YouTube's 200×200 minimum. Both players now take one `PlayerProps`, so
+    the page can swap them per item.
+  - `mediaLabel()` takes the item alone and marks a video `youtube:<id>`, in watch too, until
+    titles land.
+  - An old backend answers a YouTube item in a radio with a 400 until it deploys; nothing else
+    depends on the order.
 
 ## Build order
 

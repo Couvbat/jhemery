@@ -13,6 +13,7 @@ import {
   formatClock,
   isSeek,
   mediaLabel,
+  mediaSource,
   moveItem,
   normaliseCode,
   parseMedia,
@@ -21,9 +22,10 @@ import {
 import { useRoom } from './useRoom'
 
 /**
- * Both room pages. The `kind` decides the player and the words; everything else —
- * the lobby, the code, the head count, and the loop that keeps a guest's player on
- * the host's second — is the same feature twice (spec §6).
+ * Both room pages. The `kind` decides what a host may load and the words, and each
+ * item's source decides its player; everything else — the lobby, the code, the head
+ * count, and the loop that keeps a guest's player on the host's second — is the same
+ * feature twice (spec §6).
  */
 const props = defineProps<{ kind: RoomKind }>()
 
@@ -45,7 +47,9 @@ const { status, snapshot, isHost, error } = room
 const state = computed(() => snapshot.value?.state ?? null)
 const queue = computed(() => snapshot.value?.queue ?? [])
 const members = computed(() => snapshot.value?.members ?? 0)
-const Player = computed(() => (props.kind === 'watch' ? YouTubePlayer : SoundCloudPlayer))
+/** The current item's embed. Per item, not per room: a radio queue mixes the two. */
+const source = computed(() => (state.value?.media ? mediaSource(state.value.media) : null))
+const Player = computed(() => (source.value === 'youtube' ? YouTubePlayer : SoundCloudPlayer))
 const player = ref<PlayerHandle | null>(null)
 /** Whether the item was already rolling when its frame was made; the player then
  *  asks to autoplay, so a guest who just joined mid-video does not open on pause. */
@@ -57,6 +61,16 @@ watch(
     last = null
   },
 )
+/**
+ * A new source is a new player with its own clock, mounted from scratch. Its first
+ * readings must not be weighed against the old one's: the anchor timer starts over,
+ * and a guest's seek cooldown, set against the old player, no longer applies.
+ */
+watch(source, () => {
+  last = null
+  lastAnchor = 0
+  seekCooldownUntil = 0
+})
 
 // ---- lobby ----------------------------------------------------------------------
 
@@ -389,6 +403,7 @@ const badLink = computed(() => t(props.kind === 'watch' ? m.rooms.badLinkWatch :
                     :media="state.media"
                     :host="isHost"
                     :autoplay="autoplay"
+                    :compact="kind === 'radio'"
                     @reading="onReading"
                     @finished="onFinished"
                   />
@@ -455,7 +470,7 @@ const badLink = computed(() => t(props.kind === 'watch' ? m.rooms.badLinkWatch :
                     <h2 class="text-muted-foreground">--{{ t(m.rooms.nowPlaying) }}</h2>
                     <template v-if="state?.media">
                       <p class="font-mono text-sm text-foreground truncate" :title="state.media">
-                        {{ mediaLabel(kind, state.media) }}
+                        {{ mediaLabel(state.media) }}
                       </p>
                       <p class="flex items-center gap-2 text-muted-foreground tabular-nums">
                         <span :class="state.playing ? 'text-primary' : ''">{{ state.playing ? '▶' : '❚❚' }}</span>
@@ -481,13 +496,13 @@ const badLink = computed(() => t(props.kind === 'watch' ? m.rooms.badLinkWatch :
                     <ol v-if="queue.length" ref="queueList" class="font-mono space-y-1">
                       <li v-for="(item, index) in queue" :key="`${index}-${item}`" class="flex items-center gap-1">
                         <span class="text-muted-foreground tabular-nums">{{ index + 1 }}.</span>
-                        <span class="flex-1 min-w-0 truncate" :title="item">{{ mediaLabel(kind, item) }}</span>
+                        <span class="flex-1 min-w-0 truncate" :title="item">{{ mediaLabel(item) }}</span>
                         <template v-if="isHost">
                           <button
                             type="button"
                             data-action="up"
                             :aria-disabled="queueBusy || index === 0"
-                            :aria-label="t(m.rooms.moveUp).replace('{item}', mediaLabel(kind, item))"
+                            :aria-label="t(m.rooms.moveUp).replace('{item}', mediaLabel(item))"
                             class="w-6 h-6 shrink-0 grid place-items-center rounded text-muted-foreground hover:text-foreground aria-disabled:opacity-40 aria-disabled:cursor-not-allowed"
                             @click="moveAt(index, index - 1)"
                           >
@@ -497,7 +512,7 @@ const badLink = computed(() => t(props.kind === 'watch' ? m.rooms.badLinkWatch :
                             type="button"
                             data-action="down"
                             :aria-disabled="queueBusy || index === queue.length - 1"
-                            :aria-label="t(m.rooms.moveDown).replace('{item}', mediaLabel(kind, item))"
+                            :aria-label="t(m.rooms.moveDown).replace('{item}', mediaLabel(item))"
                             class="w-6 h-6 shrink-0 grid place-items-center rounded text-muted-foreground hover:text-foreground aria-disabled:opacity-40 aria-disabled:cursor-not-allowed"
                             @click="moveAt(index, index + 1)"
                           >
@@ -507,7 +522,7 @@ const badLink = computed(() => t(props.kind === 'watch' ? m.rooms.badLinkWatch :
                             type="button"
                             data-action="remove"
                             :aria-disabled="queueBusy"
-                            :aria-label="t(m.rooms.remove).replace('{item}', mediaLabel(kind, item))"
+                            :aria-label="t(m.rooms.remove).replace('{item}', mediaLabel(item))"
                             class="w-6 h-6 shrink-0 grid place-items-center rounded text-muted-foreground hover:text-destructive aria-disabled:opacity-40 aria-disabled:cursor-not-allowed"
                             @click="removeAt(index)"
                           >

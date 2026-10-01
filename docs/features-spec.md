@@ -988,9 +988,10 @@ stay rejected. Rules the code cites:
   in memory with a two-hour idle TTL and a cap of 200. The host token is the only secret: random,
   returned once, compared in constant time, carried in `x-room-token`.
 - **Media is allowlisted per kind, server-side.** A YouTube id (eleven characters from its
-  alphabet) or an https URL on `soundcloud.com`. It becomes an iframe `src` on every guest's page,
-  so the host's page is not trusted to have checked it; the service 400s anything else, queue
-  items included.
+  alphabet) for `watch`; that or an https URL on `soundcloud.com` for `radio`, whose queue may mix
+  the two, since an id and a URL can't be mistaken for each other. It becomes an iframe `src` on
+  every guest's page, so the host's page is not trusted to have checked it; the service 400s
+  anything else, queue items included.
 - **State is anchored to the server clock.** `{ media, position, playing, at }`; guests compute
   `position + (now − at)` and seek when more than two seconds out. A patch without a position
   recomputes it to now, so a bare pause lands where the item actually is.
@@ -1128,8 +1129,12 @@ this section only fixes the rules the code cites.
   it. Inputs are read in place over WORKERFS; stream facts come from `ffprobe` as JSON; `-ss` goes
   before `-i` and the length is `-t`.
 - **Rooms are the third and fourth faces** (`watch`, `radio`; `rooms/*`). One page component for
-  both, one composable for the network, one pure module for the maths; the kind picks the player
-  and the words. **No third-party script**: both embeds are driven over `postMessage` — the wire
+  both, one composable for the network, one pure module for the maths. The kind picks what a host
+  may load and the words; each item's source (`mediaSource()`) picks its player, so a radio queue
+  that mixes SoundCloud and YouTube hands over between the two on `finished`, and a change of
+  source resets the sync loop's readings so the new player's first one isn't taken for a seek. A
+  YouTube item in a radio plays `compact`: small, never hidden, and at least 200×200, as YouTube's
+  embed terms require. **No third-party script**: both embeds are driven over `postMessage` — the wire
   protocol the YouTube IFrame API and the SoundCloud Widget API scripts would speak on the page's
   behalf — so the CSP gains one `frame-src` and no `script-src`, exactly as `MusicSection` decided
   for the SoundCloud widget. The players share one interface (`PlayerHandle`, `PlayerReading`);

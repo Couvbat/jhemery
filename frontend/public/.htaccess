@@ -124,7 +124,8 @@
   #                'self' covers same-origin builds and the precached assets.
   #   frame-src    w.soundcloud.com is the player embed in MusicSection.vue and
   #                the radio rooms; www.youtube-nocookie.com is the watch-party
-  #                player. Both are driven over postMessage (src/rooms/*), so
+  #                player and the small one for a YouTube item in a radio
+  #                queue. Both are driven over postMessage (src/rooms/*), so
   #                neither needs a script-src entry — no third-party script runs
   #                on this origin for them.
   #   object-src / base-uri / form-action are locked down because nothing here

@@ -58,8 +58,8 @@ tools, watch-party and radio rooms, and 38 hidden achievements. English and Fren
 - 🧰 **In-browser tools at `/tools`.** Image conversion, hashing, encoding, JSON, colour, time,
   passwords, text stats, a JWT decoder, a regex tester, a cron explainer, a QR encoder written from
   the standard, a text diff and an `ffmpeg.wasm` converter. Your files are never uploaded.
-- 📺 **Watch party and radio rooms.** YouTube or SoundCloud stays in sync across everyone in a
-  five-character room, over SSE.
+- 📺 **Watch party and radio rooms.** A YouTube video, or a radio queue that mixes SoundCloud
+  tracks and YouTube videos, stays in sync across everyone in a five-character room, over SSE.
 - 🏆 **38 achievements** for finding the hidden layer, each announced with a burst of monospace
   confetti — and a capture-the-flag chain, eight stages deep, for whoever keeps pulling threads.
 - 🌐 **Live data** from Steam, GitHub, CI runs, the weather and crypto prices, plus live presence,
@@ -362,11 +362,14 @@ The page, the `tools` command and Tab completion all read `src/tools/registry.ts
 means adding one object there, plus the tool's folder.
 
 **Rooms.** `/watch` and `/radio` are the third and fourth faces of the prism. A room is a
-five-character code. The host pastes a YouTube link (watch) or queues SoundCloud tracks and sets
-(radio), and every guest's player follows the host's play, pause and seeks to within two seconds,
+five-character code. The host pastes a YouTube link (watch) or queues SoundCloud tracks, sets and
+YouTube videos in any mix (radio), and every guest's player follows the host's play, pause and seeks to within two seconds,
 correcting for drift against the server's clock. An *up next* sidebar, beside the player on a wide
 screen and under it on a phone, shows what is playing and the numbered queue: the host skips,
-reorders and removes from it with buttons, and guests only read it. Both embeds are controlled over `postMessage`, so
+reorders and removes from it with buttons, and guests only read it. The player is chosen per item,
+so a radio hands over from the SoundCloud widget to YouTube and back as the queue moves on. A
+video in a radio plays in a small player, at least 200 pixels each way, because YouTube's terms
+don't allow hiding it to keep the sound. Both embeds are controlled over `postMessage`, so
 no YouTube or SoundCloud script runs on the page, and the CSP only needs one extra `frame-src`.
 Rooms are off unless the API sets `ROOMS_ENABLED`.
 
@@ -456,7 +459,7 @@ uses the front of `X-Forwarded-For`, which any client can write.
 | `DELETE /guestbook/:id` | Moderation. Requires the `x-admin-password` header. |
 | `GET /rooms` · `POST /rooms` | Whether rooms are enabled, and creating a watch, radio or connect4 room. Creating one returns a five-character code and a host token that is never sent again. 10 rooms/hour per IP, 200 rooms at most, all in memory. **Off by default.** |
 | `GET /rooms/:code` · `GET /rooms/:code/events` | A room's snapshot, and the SSE stream every member keeps open: the host's playback state tied to the server clock, the queue, and a head count. As with `/presence`, it's a number, never a list of who's there. |
-| `POST /rooms/:code/state` · `DELETE /rooms/:code` | Changing the room's state and closing it, host only (`x-room-token`). What a host can load is allowlisted on the server: an eleven-character YouTube ID or an https soundcloud.com URL. Nothing else can reach a guest's iframe. 120 state changes/min per IP. |
+| `POST /rooms/:code/state` · `DELETE /rooms/:code` | Changing the room's state and closing it, host only (`x-room-token`). What a host can load is allowlisted on the server: an eleven-character YouTube ID in a watch room, and either that or an https soundcloud.com URL in a radio room, queue items included. Nothing else can reach a guest's iframe. 120 state changes/min per IP. |
 | `POST /rooms/:code/join` · `/move` · `/rematch` | Connect four. The first `join` gets the second seat's token and a third is refused; a `move` carries a seat token (`x-room-token`) and is accepted only on that seat's turn, into a column with room; a `rematch` clears the board and swaps who opens. Wins are the clients' to work out from the public move list. |
 | `GET /jobs` · `POST /jobs` | Owner only (`x-admin-password` on every route). Returns the downloader's state, or starts a job for one YouTube video or one SoundCloud track. URLs must match an allowlist, and sets and profiles are refused. yt-dlp runs on the server in the background, and the request returns immediately with a job ID. 20/hour per IP, at most three pending and one running, ten minutes per job. **Off by default.** |
 | `GET /jobs/:id` · `GET /jobs/:id/file` · `DELETE /jobs/:id` | Poll a job, fetch its file (once: it's deleted as soon as the download completes, or 30 minutes after it was produced), or cancel/dismiss it. |
