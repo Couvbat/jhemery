@@ -53,6 +53,7 @@ function harness(): Harness {
   const ctx: CommandContext = {
     args: [],
     raw: '',
+    tty: true,
     locale: 'en',
     t: (<T,>(value: Localised<T>) => value.en) as CommandContext['t'],
     print: (input) => {

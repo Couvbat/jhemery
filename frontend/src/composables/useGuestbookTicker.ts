@@ -28,7 +28,7 @@ async function poll(seeding = false) {
   if (!seeding && typeof document !== 'undefined' && document.hidden) return
 
   try {
-    const data = await api.guestbook()
+    const data = await api.guestbook({ background: true })
     failures = 0
 
     // Guestbook off? Then there is nothing to watch, forever.

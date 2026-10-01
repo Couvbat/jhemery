@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref } from 'vue'
-import type { PlayerReading } from './players'
+import type { PlayerProps, PlayerReading } from './players'
 import { SOUNDCLOUD_ORIGIN, soundcloudEmbed } from './sync'
 
 /**
@@ -9,7 +9,8 @@ import { SOUNDCLOUD_ORIGIN, soundcloudEmbed } from './sync'
  * as `MusicSection`, which embeds the iframe and not the script: nothing from
  * w.soundcloud.com runs on this origin.
  */
-const props = defineProps<{ media: string; host: boolean; autoplay: boolean }>()
+// `compact` is accepted and ignored: the widget is always the compact one.
+const props = defineProps<PlayerProps>()
 const emit = defineEmits<{ reading: [reading: PlayerReading]; finished: [] }>()
 
 const frame = ref<HTMLIFrameElement | null>(null)

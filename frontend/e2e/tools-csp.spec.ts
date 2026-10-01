@@ -15,9 +15,11 @@ test.use({ serviceWorkers: 'block' })
 test.describe('the tools under the production CSP', () => {
   test('every listed tool opens without a refusal', async ({ page, cspViolations }) => {
     await page.goto('/tools')
-    const ids = await page
-      .locator('a[href^="/tools/"]')
-      .evaluateAll((links) => links.map((link) => link.getAttribute('href')!.slice('/tools/'.length)))
+    // The list is rendered by the app, not the HTML: read it once it is there, not the
+    // instant the document loads, or a slow machine finds no tools at all.
+    const links = page.locator('a[href^="/tools/"]')
+    await expect(links.first()).toBeVisible()
+    const ids = await links.evaluateAll((all) => all.map((link) => link.getAttribute('href')!.slice('/tools/'.length)))
     expect(ids.length).toBeGreaterThan(0)
 
     for (const id of ids) {
@@ -76,6 +78,42 @@ test.describe('the tools under the production CSP', () => {
     await expect.poll(() => preview.evaluate((img) => (img as HTMLImageElement).complete)).toBe(true)
     const width = await preview.evaluate((img) => (img as HTMLImageElement).naturalWidth)
     expect(width, `refused: ${cspViolations.join('; ') || 'nothing'}`).toBeGreaterThan(0)
+    expect(cspViolations).toEqual([])
+  })
+
+  test('the acid tool plays from a click, and leaves the URL alone', async ({ page, cspViolations }) => {
+    // The default pattern at 250 bpm, as `encode` writes it. The panel reads `?p=` once.
+    const code = 'AchIKhE8gEKVEMhF6rE8iEPBEL4JRsigbrRG'
+    await page.goto(`/tools/acid?p=${code}`)
+    const region = page.getByRole('region', { name: /acid sequencer/i })
+    await expect(region.getByText('250 bpm', { exact: true })).toBeVisible()
+
+    // The playhead is read off the audio clock, so its moving at all means the context
+    // started inside the click and the scheduler is booking steps against it.
+    await region.getByRole('button', { name: 'play' }).click()
+    const current = region.getByTestId('acid-steps').locator('[data-current]')
+    await expect(current).toHaveCount(1)
+    const first = await current.getAttribute('data-current')
+    await expect.poll(() => current.getAttribute('data-current')).not.toBe(first)
+
+    // A knob drag is heard, not written to the URL: a `router.replace` would scroll the
+    // page to the top on every step of the drag.
+    const scrolled = await page.evaluate(() => window.scrollY)
+    await region.getByLabel(/cutoff/).evaluate((input: HTMLInputElement) => {
+      input.value = '200'
+      input.dispatchEvent(new Event('input', { bubbles: true }))
+    })
+    await expect(region.getByText(/kHz/)).toBeVisible()
+    expect(page.url()).toMatch(new RegExp(`\\?p=${code}$`))
+    expect(await page.evaluate(() => window.scrollY)).toBe(scrolled)
+
+    // The link is built when it's asked for, from the pattern as it is now.
+    await region.getByRole('button', { name: 'copy link' }).click()
+    await expect(region.getByText(/\/tools\/acid\?p=/)).toBeVisible()
+    await expect(region.getByText(new RegExp(`\\?p=${code}$`))).toHaveCount(0)
+
+    await region.getByRole('button', { name: 'stop' }).click()
+    await expect(current).toHaveCount(0)
     expect(cspViolations).toEqual([])
   })
 })

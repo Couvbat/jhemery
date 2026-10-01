@@ -2,7 +2,8 @@ import { computed, onUnmounted, ref, shallowRef, watch, type Ref } from 'vue'
 import {
   ApiError,
   api,
-  roomEventsUrl,
+  openEventSource,
+  roomEventsPath,
   type RoomKind,
   type RoomPatch,
   type RoomSnapshot,
@@ -86,7 +87,7 @@ export function useRoom(kind: RoomKind, code: Ref<string | null>) {
       status.value = 'lost'
       return
     }
-    source = new EventSource(roomEventsUrl(target))
+    source = openEventSource(roomEventsPath(target))
     source.onmessage = (event) => {
       failures = 0
       try {
