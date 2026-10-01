@@ -66,6 +66,26 @@ test.describe('terminal', () => {
     })
   })
 
+  // Found in review: the overlay kept Escape from every capture, so Escape in the pager's
+  // search killed the page instead of dropping the search.
+  test.describe('the pager', () => {
+    test('Escape gives up a search, q leaves the page', async ({ page, terminal }) => {
+      await terminal.open()
+      await terminal.input.fill('man ls')
+      await terminal.input.press('Enter')
+      const status = page.getByText(/press q to quit/)
+      await expect(status).toBeVisible()
+      await terminal.input.press('/')
+      await terminal.input.press('z')
+      await expect(page.getByText('/z', { exact: true })).toBeVisible()
+      await terminal.input.press('Escape')
+      await expect(status).toBeVisible()
+      await terminal.input.press('q')
+      await expect(status).toBeHidden()
+      await expect(terminal.output).not.toContainText('cancelled')
+    })
+  })
+
   test.describe('the shell loop', () => {
     test('help lists commands and an unknown one is reported, not swallowed', async ({
       terminal,

@@ -11,6 +11,7 @@ import { systemCommands } from './system'
 import { themeCommands } from './theme'
 import { ctfCommands } from './ctf'
 import { workCommands } from './work'
+import { textCommands } from './text'
 
 /**
  * Every command, in `help` order. A function, not a constant: `core.ts` imports the
@@ -24,6 +25,7 @@ export function collectCommands(): Command[] {
     ...themeCommands,
     ...navigateCommands,
     ...toolCommands,
+    ...textCommands,
     ...contentCommands,
     ...workCommands,
     ...liveCommands,

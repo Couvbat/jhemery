@@ -2,15 +2,11 @@ import { findTool, visibleTools } from '@/tools/registry'
 import { decodeBase64, encodeBase64 } from '@/tools/encode/encode'
 import { digestText, toHex, type Algorithm } from '@/tools/hash/hash'
 import { formatJson } from '@/tools/json/json'
-import { blank, line, pre, segmented } from '../format'
-import type { Command, OutputLine } from '../types'
+import { blank, fail, line, pre, segmented } from '../format'
+import type { Command, CommandContext, OutputLine } from '../types'
 import { listFiles, resolveFileLines } from './files'
 
-/**
- * Everything after the command word and any leading `flags`, outer quotes stripped.
- * There are no pipes in this shell — adding them would be the special case the
- * registry exists to avoid — so the text a tool works on is its argument.
- */
+/** Everything after the command word and any leading `flags`, outer quotes stripped. */
 export function operand(raw: string, flags: readonly string[] = []): string {
   let rest = raw.trim().replace(/^\S+\s*/, '')
   for (;;) {
@@ -24,6 +20,21 @@ export function operand(raw: string, flags: readonly string[] = []): string {
 /** A fake-filesystem file as bytes would read: its lines, each ending in a newline. */
 function fileText(lines: OutputLine[]): string {
   return lines.map((l) => `${l.text}\n`).join('')
+}
+
+/**
+ * What a tool works on, and the name to print for it: a file the fake filesystem knows,
+ * as its bytes; any other argument, as text (`-`); and with no argument, whatever came in
+ * through a `|`, read as a file would be. So `cat about.txt | sha256sum` and
+ * `sha256sum about.txt` print the same digest.
+ */
+function input(ctx: CommandContext, flags: readonly string[] = []): { text: string; name: string } | undefined {
+  const given = operand(ctx.raw, flags)
+  if (given) {
+    const file = resolveFileLines(given, ctx.t)
+    return file ? { text: fileText(file), name: given } : { text: given, name: '-' }
+  }
+  return ctx.stdin ? { text: fileText(ctx.stdin), name: '-' } : undefined
 }
 
 /** GNU `base64` wraps at 76 columns; so does this. */
@@ -49,9 +60,9 @@ function uuid(): string {
   return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`
 }
 
-const NO_PIPES = {
-  en: 'there are no pipes here — pass the text, or a file name, as the argument',
-  fr: 'pas de pipes ici — passez le texte, ou un nom de fichier, en argument',
+const NO_INPUT = {
+  en: 'nothing to read: pass the text or a file name, or pipe it in',
+  fr: 'rien à lire : passez le texte ou un nom de fichier, ou envoyez-le par un pipe',
 }
 
 /**
@@ -96,7 +107,7 @@ export const toolCommands: Command[] = [
 
       const tool = findTool(id)
       if (!tool || !navigate(`tools/${tool.id}`)) {
-        return [line(`tools: ${id}: No such tool`, 'error')]
+        return [fail(`tools: ${id}: No such tool`)]
       }
       return [line(`~/tools/${tool.id}`, 'muted')]
     },
@@ -115,17 +126,12 @@ export const toolCommands: Command[] = [
     group: 'core',
     writes: 'none',
     complete: ({ index }) => (index === 0 ? listFiles() : []),
-    async run({ raw, t }) {
-      const invoked = raw.trim().split(/\s+/)[0]!.toLowerCase()
+    async run(ctx) {
+      const invoked = ctx.raw.trim().split(/\s+/)[0]!.toLowerCase()
       const algorithm = ALGORITHM_BY_NAME[invoked] ?? 'SHA-256'
-      const text = operand(raw)
-      if (!text) return [line(`${invoked}: ${t(NO_PIPES)}`, 'error')]
-
-      // A name the fake filesystem knows is hashed as that file, and printed as its
-      // name; anything else is text, printed as `-`, as `echo … |` would.
-      const file = resolveFileLines(text, t)
-      const hex = toHex(await digestText(algorithm, file ? fileText(file) : text))
-      return [pre(`${hex}  ${file ? text : '-'}`)]
+      const read = input(ctx)
+      if (!read) return [fail(`${invoked}: ${ctx.t(NO_INPUT)}`)]
+      return [pre(`${toHex(await digestText(algorithm, read.text))}  ${read.name}`)]
     },
   },
   {
@@ -135,24 +141,29 @@ export const toolCommands: Command[] = [
       en: 'Encode or decode base64, as the encode tool does',
       fr: "Encoder ou décoder du base64, comme l'outil encode",
     },
+    manual: {
+      options: { '-d': { en: 'Decode rather than encode. Line breaks in the input are ignored.', fr: 'Décoder plutôt qu’encoder. Les retours à la ligne sont ignorés.' } },
+      examples: [{ command: 'base64 about.txt' }, { command: 'echo aGkK | base64 -d' }],
+      seeAlso: ['sha256sum(1)', 'tools(1)'],
+    },
     group: 'core',
     writes: (args) => (args[0] === '-d' || args[0] === '--decode' ? 'local' : 'none'),
     complete: ({ index, args }) =>
       index === 0 ? ['-d', ...listFiles()] : index === 1 && args[0] === '-d' ? listFiles() : [],
-    run({ raw, args, t }) {
-      const decoding = args[0] === '-d' || args[0] === '--decode'
-      const text = operand(raw, ['-d', '--decode'])
-      if (!text) return [line(`base64: ${t(NO_PIPES)}`, 'error')]
+    run(ctx) {
+      const decoding = ctx.args[0] === '-d' || ctx.args[0] === '--decode'
+      const read = input(ctx, ['-d', '--decode'])
+      if (!read) return [fail(`base64: ${ctx.t(NO_INPUT)}`)]
 
       if (decoding) {
         try {
-          return decodeBase64(text).split('\n').map((l) => pre(l))
+          // Line breaks are wrapping, as GNU base64 reads them.
+          return decodeBase64(read.text.replace(/\s+/g, '')).split('\n').map((l) => pre(l))
         } catch {
-          return [line('base64: invalid input', 'error')]
+          return [fail('base64: invalid input')]
         }
       }
-      const file = resolveFileLines(text, t)
-      return hardWrap(encodeBase64(file ? fileText(file) : text)).map((l) => pre(l))
+      return hardWrap(encodeBase64(read.text)).map((l) => pre(l))
     },
   },
   {
@@ -174,20 +185,20 @@ export const toolCommands: Command[] = [
     group: 'core',
     writes: 'local',
     complete: ({ index }) => (index === 0 ? ['.'] : []),
-    run({ raw, args, t }) {
-      if (args[0] !== '.') {
+    run(ctx) {
+      if (ctx.args[0] !== '.') {
         return [
-          line('jq: only the identity filter `.` works here — it pretty-prints', 'error'),
+          fail('jq: only the identity filter `.` works here — it pretty-prints'),
           line('usage: jq . \'{"a": 1}\'', 'muted'),
         ]
       }
-      const text = operand(raw, ['.'])
-      if (!text) return [line(`jq: ${t(NO_PIPES)}`, 'error')]
+      const read = input(ctx, ['.'])
+      if (!read) return [fail(`jq: ${ctx.t(NO_INPUT)}`)]
 
-      const result = formatJson(text, 2)
+      const result = formatJson(read.text, 2)
       if (result.ok) return result.output.split('\n').map((l) => pre(l))
       const where = result.line ? ` at line ${result.line}, column ${result.column}` : ''
-      return [line(`jq: error: ${result.message}${where}`, 'error')]
+      return [fail(`jq: error: ${result.message}${where}`)]
     },
   },
 ]

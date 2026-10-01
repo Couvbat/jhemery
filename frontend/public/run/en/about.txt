@@ -1,0 +1,13 @@
+[38;5;46mJules Hémery[0m
+[2m────────────[0m
+[38;5;51mFull-Stack Developer @ In-Leed — France[0m
+
+Hey, I'm Jules Hémery, aka Couvbat.
+
+25 y/o Full-Stack Developer at In-Leed, based in France — building web apps
+with modern stacks. When I'm not shipping features I'm producing music,
+playing games w/friends, or tinkering with AI.
+
+[2m🌐 French · English[0m
+
+[2mcurl jhemery.xyz/help for the other pages · live in a browser: https://jhemery.xyz/?run=about[0m

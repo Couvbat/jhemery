@@ -17,6 +17,7 @@ const {
   revision,
   pendingPrompt,
   capturing,
+  captureTakesEscape,
   vimBuffer,
   handleVimKeydown,
   handleCaptureKeydown,
@@ -120,7 +121,7 @@ function onKeydown(event: KeyboardEvent) {
   // return synchronously and hold no capture), but the precedence is written
   // down rather than inferred. Escape is deliberately let through to
   // `onPanelKeydown`, which turns it into an abort while a game is running.
-  if (capturing.value && event.key !== 'Escape' && handleCaptureKeydown(event)) {
+  if (capturing.value && (event.key !== 'Escape' || captureTakesEscape.value) && handleCaptureKeydown(event)) {
     event.preventDefault()
     event.stopPropagation()
     return

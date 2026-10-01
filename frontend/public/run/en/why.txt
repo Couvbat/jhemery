@@ -1,0 +1,21 @@
+[38;5;46mWhy the site is built the way it is:[0m
+
+  prism-turn            How pages change
+  swing-not-fade        Why pages swing instead of fading
+  tools-page            Why the tools have their own page
+  rooms-sse             How the rooms stay in sync
+  ffmpeg-single-thread  Why ffmpeg runs on one thread
+  ask-no-rag            How ask knows about the site
+  mcp-sdk               Why the MCP server is hand-written
+  polling               Why the guestbook ticker polls
+  steam-proxy           Where the Steam game log comes from
+  soundcloud-widget     How the music player is embedded
+  ctf-client-side       Where CTF flags are checked
+  battleship            Why the two-player game is connect four
+  tetris                Why tetris exists after all
+  minesweeper-score     How a lower score can be the record
+  word-lists            Where the word lists come from
+
+[2mwhy <topic> — what was chosen, and what was turned down[0m
+
+[2mcurl jhemery.xyz/help for the other pages · live in a browser: https://jhemery.xyz/?run=why[0m

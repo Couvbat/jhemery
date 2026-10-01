@@ -1,7 +1,6 @@
 import { ref } from 'vue'
 import type { Localised } from '@/content/types'
 import type { Theme } from '@/lib/themes'
-import { blank, line } from './format'
 import { loadSet, persistSet as persist } from './storage'
 import type { OutputLine } from './types'
 
@@ -442,6 +441,11 @@ export function toast(newly: string[], t: <T>(value: Localised<T>) => T): Output
   if (!newly.length) return []
   return newly.flatMap((unlockedId) => {
     const achievement = achievementList.find((a) => a.id === unlockedId)!
-    return [blank, line(`🏆 achievement unlocked: ${t(achievement.title)}`, 'success')]
+    // A remark about the output, not part of it: on the screen even mid-pipeline, so
+    // `fortune | cowsay` doesn't put the toast inside the cow.
+    return [
+      { text: '', stderr: true },
+      { text: `🏆 achievement unlocked: ${t(achievement.title)}`, tone: 'success' as const, stderr: true },
+    ]
   })
 }
