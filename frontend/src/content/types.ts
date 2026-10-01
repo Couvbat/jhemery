@@ -145,6 +145,35 @@ export interface Decision {
   hindsight?: Localised
 }
 
+/** A figure on a case study: a fact that doesn't drift, like a standard's limits. */
+export interface WorkNumber {
+  label: Localised
+  value: string
+}
+
+/**
+ * A short study of one of the site's own parts, at `/work/<id>`: what it is, what was
+ * hard, a few numbers, and where its code and its design note are.
+ */
+export interface WorkPart {
+  id: string
+  name: Localised
+  summary: Localised
+  /** A few short paragraphs, the same number in each language. */
+  hard: Localised<string[]>
+  numbers: WorkNumber[]
+  /**
+   * Somewhere to see it: a path `goTo()` accepts (`tools/qr`), or a command line a link
+   * could run (`why mcp-sdk`). A hidden command can't be one.
+   */
+  try?: string
+  /** Repo-relative paths, linked at the build's commit. */
+  code: string[]
+  spec: Required<DocRef>
+  /** `why` topics that belong to this part. */
+  decisions?: string[]
+}
+
 export type NowCategory = 'building' | 'playing' | 'learning' | 'listening'
 
 export interface NowEntry {

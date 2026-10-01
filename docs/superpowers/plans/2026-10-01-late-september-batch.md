@@ -1,7 +1,7 @@
 # Plan — the late-September batch (roadmap §H)
 
-**Status: in progress.** Slice 1 is in #117 and slice 2 on `feat/h-writes`; the rest is
-proposed. Written on 2026-10-01 against `dev` at `c9ef6fb`.
+**Status: in progress.** Slice 1 is in #117, slice 2 in #118 and slice 3 on
+`feat/h-show-the-work`; the rest is proposed. Written on 2026-10-01 against `dev` at `c9ef6fb`.
 
 This plan implements [roadmap §H](../../roadmap.md#h-late-september-2026-brainstorm), whose approach
 column is still the brief. Before this was written, each of the 27 rows was checked against the

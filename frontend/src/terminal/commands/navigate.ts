@@ -1,4 +1,4 @@
-import { profile, sectionIds, sections, socials, viewIds, views } from '@/content'
+import { profile, sectionIds, sections, socials, viewIds, views, work } from '@/content'
 import { currentPath, resolvePath } from '@/composables/useViewSwing'
 import { prefersReducedMotion } from '@/composables/useCrt'
 import { visibleTools } from '@/tools/registry'
@@ -73,7 +73,16 @@ export const navigateCommands: Command[] = [
             ]),
           )
         }
-        // A section is an empty directory; `ls /` and `ls ~` fall through to the root.
+        // The projects section holds the case studies, one `.md` each.
+        if (resolved.kind === 'section' && resolved.section.id === 'projects' && work.length) {
+          return work.map((part) =>
+            segmented([
+              { text: `${part.id}.md`.padEnd(16), tone: 'primary' },
+              { text: t(part.name), tone: 'muted' },
+            ]),
+          )
+        }
+        // Any other section is an empty directory; `ls /` and `ls ~` fall through to the root.
         if (resolved.kind === 'section' || resolved.view.id !== 'home') return undefined
       }
 
@@ -133,7 +142,12 @@ export const navigateCommands: Command[] = [
     description: { en: 'Print a file', fr: 'Afficher un fichier' },
     group: 'navigate',
     writes: 'none',
-    complete: ({ index }) => (index === 0 ? listFiles() : []),
+    // The case studies only once the word reaches into `projects/`, so a bare Tab
+    // doesn't list eight more files.
+    complete: ({ index, word }) =>
+      index === 0
+        ? [...listFiles(), ...(word.startsWith('projects/') ? work.map((part) => `projects/${part.id}.md`) : [])]
+        : [],
     run({ args, t }) {
       const [file] = args
       if (!file) return [line('cat: missing operand', 'error')]

@@ -21,6 +21,26 @@ export const messages = {
     more: { en: 'more', fr: 'plus' },
     justNow: { en: 'just now', fr: "à l'instant" },
     noDescription: { en: 'No description provided.', fr: 'Aucune description fournie.' },
+    work: { en: 'How this site is built', fr: 'Comment ce site est construit' },
+    workHint: {
+      en: 'Its own parts, one at a time: what was hard, the code, and the design note.',
+      fr: 'Ses propres morceaux, un par un : ce qui était difficile, le code, et la note de conception.',
+    },
+  },
+  work: {
+    hard: { en: 'What was hard', fr: 'Ce qui était difficile' },
+    numbers: { en: 'Numbers', fr: 'En chiffres' },
+    tryIt: { en: 'Try it', fr: 'Essayer' },
+    code: { en: 'The code', fr: 'Le code' },
+    design: { en: 'Read the design note', fr: 'Lire la note de conception' },
+    decisions: { en: 'Decisions', fr: 'Décisions' },
+    notFound: {
+      en: 'There is no part by that name. Here are the ones there are:',
+      fr: 'Aucune partie de ce nom. Voici celles qui existent :',
+    },
+    previous: { en: 'previous', fr: 'précédente' },
+    next: { en: 'next', fr: 'suivante' },
+    back: { en: 'back to the projects', fr: 'retour aux projets' },
   },
   build: {
     title: { en: 'gh run list', fr: 'gh run list' },

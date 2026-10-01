@@ -3,6 +3,7 @@ import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
 import { tools } from '@/tools/registry'
 import { noteSlug } from '../docs'
+import { work } from '../work'
 import { profile } from '../profile'
 import { views } from '../views'
 
@@ -43,6 +44,8 @@ const expected = [
     ...readdirSync(join(process.cwd(), '../docs/superpowers/specs'))
       .filter((file) => file.endsWith('.md'))
       .map((file) => `/notes/${noteSlug(file)}`),
+    // The case studies: a route with a required parameter, so the router parse skips it.
+    ...work.map((part) => `/work/${part.id}`),
   ]),
 ].sort()
 

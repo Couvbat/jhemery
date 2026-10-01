@@ -7,7 +7,7 @@ vi.hoisted(() => {
   document.title = 'Site title'
 })
 
-import { profile } from '@/content'
+import { profile, work } from '@/content'
 import { setLocale } from '@/i18n'
 import { tabTitle, useTabTitle } from '../useTabTitle'
 
@@ -29,6 +29,13 @@ describe('tabTitle', () => {
     expect(tabTitle('/watch')).toBe(`Watch party — ${profile.name}`)
     expect(tabTitle('/watch/ab3de')).toBe(`Watch party · AB3DE — ${profile.name}`)
     expect(tabTitle('/radio/abcd')).toBe(`Radio — ${profile.name}`)
+  })
+
+  it('names the pages outside the prism: /now, and a case study by its part', () => {
+    expect(tabTitle('/now')).toBe(`What I’m doing now — ${profile.name}`)
+    expect(tabTitle('/work/qr')).toBe(`${work.find((p) => p.id === 'qr')!.name.en} — ${profile.name}`)
+    // An unknown part still names the page it is on, which says so in its body.
+    expect(tabTitle('/work/nope')).toBe(`How this site is built — ${profile.name}`)
   })
 
   it('follows the locale', () => {

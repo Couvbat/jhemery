@@ -141,6 +141,7 @@ Each app has its own README for working on its code:
 | **Skills with evidence** | Under the skill badges, `skills --why` links each claim to where it's actually used: SSE to the presence stream and the watch parties, WebAssembly to the ffmpeg tool, GraphQL to the heatmap. Skills with nothing to show stay plain badges. |
 | **`/now`** | What I'm doing at the moment, dated. Past 90 days old, the page says how old it is instead of passing for current. It's also `cat now.txt`, and it's a route outside the prism so the navbar stays at four faces. |
 | **Printable résumé** | `/resume.html` and `/resume.fr.html`: static, script-free, with a print stylesheet, so "Save as PDF" gives a clean CV. Linked from the contact section and `resume`. |
+| **Case studies** | `/work/<part>`: eight parts of this site, from the vim pane and the QR encoder to the rooms and the word lists, each with what was hard, its numbers, a *try it* link, the code at the build's commit, the design note and the `why` behind it. Linked from a "How this site is built" grid in the projects section, and the same text as `projects <part>`. Every number is pinned by a test to the line of code it comes from. |
 | **Design notes** | [`/notes/`](https://jhemery.xyz/notes/): the design specs in `docs/superpowers/specs`, published as static, script-free pages by a small hand-written markdown renderer. Each one says which language it is in (one is French). `why` links into them. |
 | **Live presence** | The footer also shows how many people are on the site right now, over SSE. It's a single count and nothing else (see [the API](#the-api)). |
 | **Live cards** | Steam "currently playing", recent GitHub commits, the latest CI runs, a contribution heatmap and pinned repos, a SoundCloud player and the guestbook. |
@@ -218,11 +219,11 @@ never show two different contents.
 
 | Command | Usage |
 |---|---|
-| `ls` | `ls [-a] [path]`: list sections, pages and files (`-a` shows more than you were meant to see). `ls tools` lists the tools |
+| `ls` | `ls [-a] [path]`: list sections, pages and files (`-a` shows more than you were meant to see). `ls tools` lists the tools, and `ls projects` the case studies |
 | `cd` | `cd <section>` scrolls there, routing home first if you're on another page. `cd tools` and `cd tools/<tool>` open the tools page or a single tool. `cd watch/<code>` and `cd radio/<code>` join a room. `cd`, `cd ~` and `cd /` go home |
 | `pwd` | Print where you are: `/home/couvbat/projects` on the page, `/home/couvbat/tools/image` with a tool open, `/home/couvbat/watch/AB3DE` in a room |
 | `tools` | `tools [<tool>]`: list the tools with their descriptions, or open one |
-| `cat` | `cat <file>`: `about.txt`, `skills.txt`, `contact.txt`, `now.txt`, guestbook entries, … |
+| `cat` | `cat <file>`: `about.txt`, `skills.txt`, `contact.txt`, `now.txt`, `projects/<part>.md`, guestbook entries, … |
 | `diff` | `diff <file> <file>`: unified line diff of any two files in the fake filesystem |
 | `ping` | `ping <section\|page>`: four fake round trips, then it actually goes there |
 | `open` | `open <github\|linkedin\|soundcloud\|steam\|email>` |
@@ -236,7 +237,7 @@ never show two different contents.
 |---|---|---|
 | `about` | `bio` | Who I am |
 | `skills` | | Tech I work with. `skills --why` shows where each one is used |
-| `projects` | | What I've built. `projects --json` gives a machine-readable version |
+| `projects` | | What I've built. `projects <part>` reads one case study of the site (`projects qr`, `projects rooms`…), and `projects --json` gives a machine-readable version |
 | `music` | | What I produce |
 | `gaming` | | What I play |
 | `hardware` | | `hardware [pc\|nas\|peripherals]` |

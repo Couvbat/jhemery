@@ -58,6 +58,9 @@ src/content/
   experience.ts  dated roles and courses, newest first; the current role names profile.employer
   dates.ts       the date maths: daysSince, monthsBetween (both ends count), durationLabel, periodLabel
   now.ts         the /now list and its staleness rule
+  docs.ts        githubSlug and headingSlugs, so a link to a doc's heading can be checked
+  decisions.ts   Decision[], what the site chose and turned down; read by `why` (§3)
+  work.ts        WorkPart[], the case studies at /work/<id>, `projects <id>` and projects/<id>.md
   sections.ts    section ids, nav labels, per-section shell prompt lines
   views.ts       the routes (home, tools, watch, radio) in prism order — §11
   index.ts       re-exports
@@ -283,11 +286,11 @@ refused: it survives a reload, so `alias ls=rickroll` would be a lockout rather 
 ### navigate
 | Command | Behaviour |
 |---|---|
-| `ls [-a] [path]` | Lists sections and views as directories; `ls tools` lists the tools. `-a` also reveals `.secret` and `.env` (§5) |
+| `ls [-a] [path]` | Lists sections and views as directories; `ls tools` lists the tools and `ls projects` the case studies, the one section that isn't empty. `-a` also reveals `.secret` and `.env` (§5) |
 | `cd <path>` | A section scrolls there and closes the overlay, routing home first from another view; `tools`, `tools/<id>`, `watch/<code>` and `radio/<code>` go through `goTo()` (§11) |
 | `pwd` | The view plus the current section — `/home/couvbat/projects`, `/home/couvbat/tools/image` |
 | `tools [<id>]` | Lists the tools from `tools/registry.ts`, or opens one |
-| `cat <file>` | `about.txt`, `skills.txt`, `contact.txt`, `.secret`, `.env` |
+| `cat <file>` | `about.txt`, `skills.txt`, `contact.txt`, `now.txt`, `projects/<id>.md`, `.secret`, `.env` |
 | `diff <a> <b>` | Line diff of any two files the fake filesystem resolves |
 | `ping <section\|view>` | Four paced fake replies and an rtt summary, then `cd`s there |
 | `open <target>` | `github`, `linkedin`, `soundcloud`, `steam`, `email` — opens in a new tab |
@@ -298,7 +301,7 @@ dozen lines each, so the O(n·m) table is cheaper than a diffing library.
 
 ### content
 Reads from §1, so it can never contradict the page: `about`, `skills [--why]`,
-`projects [--json]`, `music`, `gaming`, `hardware [pc|nas|peripherals]`, `contact`, `resume`,
+`projects [--json] [<part>]`, `music`, `gaming`, `hardware [pc|nas|peripherals]`, `contact`, `resume`,
 `neofetch`, `curl`. `skills --why` prints each skill's `usedIn` evidence (a `goTo` path or a repo
 URL), and `neofetch` has a `Status` row from `profile.availability`, the same flag the footer and
 both résumés read. `now.txt` is the `/now` list, with the same 90-day staleness rule.
@@ -314,6 +317,13 @@ heading of the doc it came from. A spec is linked as its note on the site, and a
 GitHub at the build's commit (`lib/source.ts`). The doc stays the authority: `decisions.spec.ts`
 fails if an anchor stops matching a heading. An unknown topic gets a "did you mean" from
 `terminal/fuzzy.ts`.
+
+`projects <part>` prints one case study from `content/work.ts` (what was hard, its numbers, a
+*try it* link, the code, the design note and the decisions behind it), through `terminal/work.ts`
+`workLines()`, the one renderer `cat projects/<id>.md` also uses. Code links go through
+`lib/source.ts`, pinned to the build's commit; *try it* is a place on the site or a `?run=` link,
+and `work.spec.ts` holds every command-form one to `isLinkable`. `projects --json` keeps its array,
+with the parts on this site's own entry.
 
 `tour` (`commands/work.ts`) is a paced walk through `TOUR_STOPS`, each a caption and either a
 command run inside it through `ctx.run` or one of three stops that are not commands. Those are a
@@ -964,6 +974,10 @@ this section only fixes the rules the code cites.
   `ThreeBackground` yaws the wireframe *field* (not the camera — see the spec for why), re-homes
   every shape on the first frame and bakes the rotation away on the last. Under reduced motion
   nothing moves and the pages swap. The transition is complete with no three.js present.
+- **Pages outside the prism.** `/now` and `/work/<id>` are routes but not views: they are reached
+  from links, not the navbar, so the prism keeps its four faces, and `viewIndex()` puts them after
+  the faces so a swing to one still has a direction. `cd` doesn't reach them, because
+  `resolvePath` is shared by four callers. Each names itself in `tabTitle()`.
 - **Nothing inside a view may be `position: fixed`** — the stage is a transformed ancestor for the
   duration of a swing. Fixed chrome lives in `App.vue`, beside `RouterView`.
 - **The tool registry is the API** (`tools/registry.ts`), exactly as §2 says of commands: the page,

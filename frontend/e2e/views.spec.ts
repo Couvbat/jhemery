@@ -22,6 +22,9 @@ async function openNav(page: import('@playwright/test').Page) {
   }
 }
 
+/** The navbar's link to the tools page; the projects section's case studies mention tools too. */
+const navToTools = (page: import('@playwright/test').Page) => page.getByRole('banner').getByRole('link', { name: /tools/ })
+
 test.describe('the tools page', () => {
   test('renders at /tools and survives a hard reload', async ({ page, pageErrors }) => {
     await page.goto('/tools')
@@ -52,7 +55,7 @@ test.describe('the prism', () => {
   test('the navbar turns to the tools page, then back', async ({ page, pageErrors }) => {
     await page.goto('/')
     await openNav(page)
-    await page.getByRole('link', { name: /tools/ }).click()
+    await navToTools(page).click()
 
     // The stage is only `.is-swinging` while it turns — it has to appear, and it has
     // to go away, or the pages would stay fixed and unclickable.
@@ -93,7 +96,7 @@ test.describe('the prism', () => {
     })
 
     await openNav(page)
-    await page.getByRole('link', { name: /tools/ }).click()
+    await navToTools(page).click()
     await expect(page.getByRole('heading', { level: 1, name: heading() })).toBeVisible()
 
     expect(await page.evaluate(() => (window as unknown as { __swung: boolean }).__swung)).toBe(
@@ -109,5 +112,23 @@ test.describe('the prism', () => {
 
     await expect(page).toHaveURL(/\/tools\/hash$/)
     await expect(page.getByRole('region', { name: /hash/i })).toBeVisible()
+  })
+})
+
+test.describe('the case studies', () => {
+  test('one renders from a hard load at /work/<id>, and its try link reaches the tool', async ({ page, pageErrors }) => {
+    await page.goto('/work/qr')
+    await expect(page.getByRole('heading', { level: 1, name: /QR/ })).toBeVisible()
+
+    await page.getByRole('link', { name: new RegExp(`${messages.work.tryIt.en} → tools/qr`) }).click()
+    await expect(page).toHaveURL(/\/tools\/qr$/)
+    expect(pageErrors).toEqual([])
+  })
+
+  test('an unknown one lists the ones there are', async ({ page }) => {
+    await page.goto('/work/nope')
+    await expect(page.getByText(messages.work.notFound.en)).toBeVisible()
+    await page.getByRole('link', { name: /vim/ }).click()
+    await expect(page).toHaveURL(/\/work\/vim$/)
   })
 })

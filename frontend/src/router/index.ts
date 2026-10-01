@@ -43,6 +43,13 @@ const router = createRouter({
       component: () => import('../views/NowView.vue'),
     },
     {
+      // The case studies (content/work.ts). Like /now, not a face of the prism: they are
+      // reached from the projects section, and `viewIndex()` puts them after the faces.
+      path: '/work/:id',
+      name: 'work',
+      component: () => import('../views/WorkView.vue'),
+    },
+    {
       // Needs the .htaccess rewrite in public/ to survive a hard refresh on Apache.
       path: '/:pathMatch(.*)*',
       name: 'not-found',

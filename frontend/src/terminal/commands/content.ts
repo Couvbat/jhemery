@@ -14,6 +14,8 @@ import {
   skillNames,
   skills,
   socials,
+  work,
+  findWork,
   yearSpan,
 } from '@/content'
 import { hardwareTab, isHardwareTab } from '@/composables/useHardwareTab'
@@ -21,7 +23,10 @@ import { useSteam } from '@/composables/useSteam'
 import { uptime } from '@/composables/useStatus'
 import { useStats } from '@/composables/useStats'
 import { useTheme } from '@/composables/useTheme'
+import { REPO } from '@/lib/source'
 import { MARK } from '../ascii'
+import { closest } from '../fuzzy'
+import { workLines } from '../work'
 import { blank, heading, keyValues, line, segmented, tags, wrap } from '../format'
 import type { Command, OutputLine } from '../types'
 import { swatches } from './theme'
@@ -110,25 +115,42 @@ export const contentCommands: Command[] = [
   },
   {
     name: 'projects',
-    usage: 'projects [--json]',
+    usage: 'projects [--json] [<part>]',
     description: { en: 'What I have built', fr: "Ce que j'ai construit" },
     group: 'content',
     writes: 'none',
     linkable: true,
     palette: true,
-    complete: ({ index }) => (index === 0 ? ['--json'] : []),
+    complete: ({ index }) => (index === 0 ? ['--json', ...work.map((part) => part.id)] : []),
     run({ args, t }) {
       if (args.includes('--json')) {
+        // The case studies belong to this site's own entry, so the output stays the array
+        // it always was.
         const payload = projects.map((p) => ({
           name: p.name,
           status: p.status,
           stack: p.stack,
           repo: p.repo,
           description: t(p.description),
+          ...(p.repo === REPO && work.length
+            ? { parts: work.map((part) => ({ id: part.id, name: t(part.name), summary: t(part.summary), url: `/work/${part.id}` })) }
+            : {}),
         }))
         return JSON.stringify(payload, null, 2)
           .split('\n')
           .map((text) => ({ text, tone: 'muted' as const, pre: true }))
+      }
+
+      // `projects vim`: one case study, the same lines `cat projects/vim.md` prints.
+      const [wanted] = args
+      if (wanted) {
+        const part = findWork(wanted)
+        if (part) return workLines(part, t)
+        const hint = closest(wanted, work.map((p) => p.id))
+        return [
+          line(`projects: ${wanted}: ${t({ en: 'no such part', fr: 'partie inconnue' })}`, 'error'),
+          ...(hint ? [line(`${t({ en: 'did you mean', fr: 'vouliez-vous dire' })} \`projects ${hint}\`?`, 'muted')] : []),
+        ]
       }
 
       const out: OutputLine[] = [...heading('projects'), blank]
@@ -138,6 +160,10 @@ export const contentCommands: Command[] = [
         out.push(line(`  ${project.stack.join(' · ')}`, 'muted'))
         if (project.repo) out.push({ text: `  ${project.repo}`, href: project.repo, tone: 'accent' })
         out.push(blank)
+      }
+      if (work.length) {
+        out.push(line(t({ en: 'How this site is built, part by part:', fr: 'Comment ce site est construit, morceau par morceau :' }), 'primary'))
+        out.push(line(`  projects <${t({ en: 'part', fr: 'partie' })}> — ${work.map((p) => p.id).join(', ')}`, 'muted'))
       }
       return out
     },

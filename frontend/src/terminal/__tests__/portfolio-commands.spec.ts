@@ -1,8 +1,10 @@
 import { describe, expect, it, vi } from 'vitest'
-import { education, experience, now, profile, skills } from '@/content'
+import { education, experience, now, profile, skills, work } from '@/content'
+import { REPO } from '@/lib/source'
 import { contentCommands } from '../commands/content'
 import { resolveFileLines } from '../commands/files'
 import { runCommand } from './context'
+import { workLines } from '../work'
 
 vi.mock('@/composables/useCrt', () => ({ prefersReducedMotion: () => true }))
 
@@ -30,6 +32,39 @@ describe('skills', () => {
 
   it('completes --why', () => {
     expect(command('skills').complete!({ args: [''], index: 0, word: '' })).toEqual(['--why'])
+  })
+})
+
+describe('projects', () => {
+  const t = <T,>(value: { en: T; fr: T }) => value.en
+
+  it('points at the case studies after the cards', async () => {
+    const { text } = await runCommand(command('projects'))
+    for (const part of work) expect(text).toContain(part.id)
+  })
+
+  it('prints one case study, and suggests the nearest for a typo', async () => {
+    const qr = work.find((p) => p.id === 'qr')!
+    expect((await runCommand(command('projects'), ['qr'])).lines).toEqual(workLines(qr, t))
+    expect((await runCommand(command('projects'), ['QR'])).lines).toEqual(workLines(qr, t))
+
+    const { lines, text } = await runCommand(command('projects'), ['presense'])
+    expect(lines[0]).toMatchObject({ tone: 'error' })
+    expect(text).toContain('`projects presence`')
+  })
+
+  it('--json stays an array, with the parts on this site’s own entry', async () => {
+    const payload = JSON.parse((await runCommand(command('projects'), ['--json'])).text)
+    expect(Array.isArray(payload)).toBe(true)
+    const own = payload.filter((p: { parts?: unknown }) => p.parts)
+    expect(own).toHaveLength(1)
+    expect(own[0].repo).toBe(REPO)
+    expect(own[0].parts.map((p: { id: string }) => p.id)).toEqual(work.map((p) => p.id))
+    expect(own[0].parts[0].url).toBe(`/work/${work[0]!.id}`)
+  })
+
+  it('completes --json and the part ids', () => {
+    expect(command('projects').complete!({ args: [''], index: 0, word: '' })).toEqual(['--json', ...work.map((p) => p.id)])
   })
 })
 

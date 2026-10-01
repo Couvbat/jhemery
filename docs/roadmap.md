@@ -279,7 +279,7 @@ them.
 
 | ✔ | Feature | Approach | Files | Effort |
 |---|---|---|---|---|
-| [ ] | Case studies of the site's own parts | The one portfolio card, whose blurb still reads "shadcn-vue and a cyberpunk terminal aesthetic", opens into eight to ten short studies: the modal vim, the ISO 18004 QR encoder, room sync, the ffmpeg.wasm tier, the prism swing, MCP, presence, and the word-list licensing. `content/work.ts` holds `WorkPart { id, name, summary, hard, numbers, try?, code, spec?, decisions? }`, and every surface reads that one array. `try` is a `goTo()` path or a command line, and a spec asserts every command-form `try` resolves through `resolveLink()`, so *try it* is an ordinary `?run=` link. Code and spec links are pinned to `__BUILD_SHA__`, not `tree/master`. Surfaces: a grid under the portfolio card, a lazy `/work/:id` route outside the prism like `/now`, `ls projects` and `cat`, and `projects <id>`. Most of the cost is writing, about 150 bilingual words a part; wherever a number can come from the build, it should, because typed ones go stale. | `content/work.ts` (new), `sections/ProjectsSection.vue`, `router/index.ts`, `views/WorkView.vue` (new), `commands/content.ts`, `commands/navigate.ts`, `commands/files.ts` | M |
+| [x] | Case studies of the site's own parts | The one portfolio card, whose blurb still reads "shadcn-vue and a cyberpunk terminal aesthetic", opens into eight to ten short studies: the modal vim, the ISO 18004 QR encoder, room sync, the ffmpeg.wasm tier, the prism swing, MCP, presence, and the word-list licensing. `content/work.ts` holds `WorkPart { id, name, summary, hard, numbers, try?, code, spec?, decisions? }`, and every surface reads that one array. `try` is a `goTo()` path or a command line, and a spec asserts every command-form `try` resolves through `resolveLink()`, so *try it* is an ordinary `?run=` link. Code and spec links are pinned to `__BUILD_SHA__`, not `tree/master`. Surfaces: a grid under the portfolio card, a lazy `/work/:id` route outside the prism like `/now`, `ls projects` and `cat`, and `projects <id>`. Most of the cost is writing, about 150 bilingual words a part; wherever a number can come from the build, it should, because typed ones go stale. | `content/work.ts` (new), `sections/ProjectsSection.vue`, `router/index.ts`, `views/WorkView.vue` (new), `commands/content.ts`, `commands/navigate.ts`, `commands/files.ts` | M |
 | [x] | `why <topic>` | `why battleship`, `why polling`, `why mcp-sdk`: what was chosen, what was rejected and why, the PR, and an honest `hindsight` (the registry cycle is a good first one). `why` alone lists them. `content/decisions.ts` is seeded from the ~15 "Rejected alternative" lines already in the specs, and shares its `Decision` type with the case studies. Keep each `because` to one sentence and always link the spec's anchor, so the spec stays the authority and the two can't drift far. `complete()` offers ids; "did you mean" comes from exporting the registry's `editDistance`. Linkable. | `content/decisions.ts` (new), `commands/work.ts` (new), `terminal/registry.ts` | S |
 | [x] | `tour` | A linkable walk of about a minute through `ctx.run`: `neofetch`, a colour scheme shown but not saved, one game, `vim`, the `curl` hint, and the achievements count. With this much on the site, finding things is the bottleneck, not the number of them, and `?run=tour` is the one link to put in a bio. It may only run what a link could run itself, which `writes` (the *effects on `Command`* row) makes checkable. | `commands/work.ts` | S |
 | [x] | Design specs as pages | `docs/superpowers/specs` as static, script-free pages at `/notes/<slug>`, built like `resume.html`, in English with a line saying so. They are the best evidence of how the site was thought through, and today they are only on GitHub; the case studies' *read the design* links point here. Needs markdown to HTML at build time: write a small one or take a dependency, and say which in the design. | `vite-plugins/notes.ts` (new), `vite.config.ts` (`navigateFallbackDenylist`) | M |
@@ -389,6 +389,21 @@ Recorded as each row ships.
     rest of the walk. The tour shows the `games` listing and points at `wordle daily` instead.
   - "A colour scheme shown but not saved" is a new `previewTheme()`: it paints for three
     seconds, saves nothing, fires no achievement, and is put back however the tour ends.
+- **Case studies:**
+  - Eight parts, each drafted from its spec and the code and then fact-checked against both, as
+    `why` was. The copy is a first draft for the owner to edit.
+  - No number is a count the build has to hand (commands, achievements, tools, schemes), so
+    `WorkNumber.value` stays a string. Each one is instead pinned in `work.spec.ts` to the line
+    of code it was read from, so changing the constant fails the test until the copy follows.
+    The one with no code behind it, ffmpeg's deflated size, is marked as such.
+  - `spec` is required rather than optional: every part has a design note to link.
+  - `projects --json` stays an array. The parts hang off this site's own entry as `parts`, so
+    nothing that already reads the array breaks.
+  - The `vim` part has no *try it*: the command is hidden, so a link may not run it.
+  - `work.ts` stays in the eager chunk, as planned, but it costs about 14 kB gzipped, not the 6–8
+    estimated. The projects grid and the tab title read it. The home page measured 278 KiB of the
+    300 KiB budget (median of five), so nothing was split. The decisions, the other half of the
+    copy, ride in the lazy terminal chunk.
 
 ## Build order
 

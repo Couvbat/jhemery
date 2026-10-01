@@ -21,6 +21,19 @@
 - [Projects section](https://jhemery.xyz/#projects): This portfolio, professional work at In-Leed, and current side projects, plus pinned GitHub repos
 - [GitHub](https://github.com/Couvbat): Source code, including this site's repository
 
+## How this site is built
+
+Parts of the site, each with what was hard, its numbers, the code and the design note behind it.
+
+- [The vim pane](https://jhemery.xyz/work/vim): A modal editor that takes the place of the terminal's scrollback when `vim` runs: normal and insert modes, `hjkl` motion, line splits and merges, dirty tracking, and real vim's E37 and E45 refusals. Edits live in memory only, and the files it opens are the ones `cat` reads, through the same resolver.
+- [The QR encoder](https://jhemery.xyz/work/qr): A QR encoder written from ISO/IEC 18004 instead of installed from npm: byte mode for any UTF-8 text, versions 1 to 40, all four error-correction levels, Reed–Solomon over GF(2⁸), and the mask chosen by the standard's penalty score. It outputs a single-path SVG, or a PNG drawn only at download time, and nothing leaves the browser.
+- [Watch and radio rooms](https://jhemery.xyz/work/rooms): Shared YouTube and SoundCloud playback behind a five-character code: the host drives with a token-checked `POST`, guests follow over a server-sent event stream and correct their own drift. The server holds one state and a head count per room, in memory, with no list of who is there.
+- [The ffmpeg.wasm tool](https://jhemery.xyz/work/ffmpeg): Audio and video conversion, trimming and GIF export with ffmpeg compiled to WebAssembly, running in a worker in the visitor's browser. It is the one dependency the tools page makes an exception for: 32 MB, fetched from the site's own `/assets/` only after the visitor presses the button that states the size.
+- [The prism swing](https://jhemery.xyz/work/prism): Changing page turns the site like a prism: the page being left and the one arriving are two faces meeting at a right angle behind the screen, while the three.js wireframe field turns the same way. One eased 650 ms clock drives both the CSS and the WebGL scene, so the two cannot drift apart.
+- [The MCP endpoint](https://jhemery.xyz/work/mcp): `POST /mcp` is a read-only Model Context Protocol server, so an agent can ask about the résumé, projects, skills and the /now page in English or French. It is hand-written, stateless Streamable HTTP, and it reads its content from the `content.json` the frontend build emits.
+- [Live presence](https://jhemery.xyz/work/presence): The footer's head count is one integer pushed over server-sent events, with no visitor id anywhere in the system. The same integer adds one wireframe per other visitor to the three.js background.
+- [The word lists](https://jhemery.xyz/work/wordlists): wordle, hangman and the typing test draw on lists generated from permissively licensed sources only: SCOWL for English, three sources combined for French. A script builds them, the output is committed, and each locale is a chunk fetched only when a word game runs.
+
 ## Other
 
 - [LinkedIn](https://www.linkedin.com/in/jules-h%C3%A9mery-338134195/)
