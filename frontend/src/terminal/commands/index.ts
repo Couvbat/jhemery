@@ -1,15 +1,15 @@
-import type { Command } from "../types";
-import { coreCommands } from "./core";
-import { navigateCommands } from "./navigate";
-import { toolCommands } from "./tools";
-import { contentCommands } from "./content";
-import { liveCommands } from "./live";
-import { askCommands } from "./ask";
-import { eggCommands } from "./eggs";
-import { gameCommands } from "./games";
-import { systemCommands } from "./system";
-import { themeCommands } from "./theme";
-import { ctfCommands } from "./ctf";
+import type { Command } from '../types'
+import { coreCommands } from './core'
+import { navigateCommands } from './navigate'
+import { toolCommands } from './tools'
+import { contentCommands } from './content'
+import { liveCommands } from './live'
+import { askCommands } from './ask'
+import { eggCommands } from './eggs'
+import { gameCommands } from './games'
+import { systemCommands } from './system'
+import { themeCommands } from './theme'
+import { ctfCommands } from './ctf'
 
 /**
  * Every command, in `help` order. A function, not a constant: `core.ts` imports the
@@ -30,5 +30,5 @@ export function collectCommands(): Command[] {
     ...gameCommands,
     ...systemCommands,
     ...ctfCommands,
-  ];
+  ]
 }
