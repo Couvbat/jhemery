@@ -1,6 +1,7 @@
 # Plan — the late-September batch (roadmap §H)
 
-**Status: proposed, nothing built.** Written on 2026-10-01 against `dev` at `c9ef6fb`.
+**Status: in progress.** Slice 1 is in #117 and slice 2 on `feat/h-writes`; the rest is
+proposed. Written on 2026-10-01 against `dev` at `c9ef6fb`.
 
 This plan implements [roadmap §H](../../roadmap.md#h-late-september-2026-brainstorm), whose approach
 column is still the brief. Before this was written, each of the 27 rows was checked against the
@@ -66,8 +67,9 @@ These cross several rows. Agreeing them once stops each row from making its own 
    what every "may this run without the visitor typing it?" rule reads: links, the tour, pipe and
    chain stages, and history expansion. No second per-command flag.
 2. **`linkable` becomes a predicate:** `linkable?: boolean | ((args) => boolean)`. It is only ever
-   read through `isLinkable(command, args)` in `registry.ts`, which also requires `!hidden` and
-   `writesOf(command, args) === 'none'`. `runLink`, every pipe stage, tour's stop list, `strace`
+   read through `isLinkable(command, args)` in `registry.ts`, which also requires `!hidden`,
+   `writesOf(command, args) === 'none'` and, added during slice 2's review, that every argument
+   is one the command offers in `complete()`, so a link can't echo free text as if typed. `runLink`, every pipe stage, tour's stop list, `strace`
    and `man` all go through it.
 3. **Nested runs.** `ctx.run(input)` runs inside its caller: the same signal, keyboard and output.
    It never touches `busy`, `abortController` or `keyCapture`, and it never expands the visitor's

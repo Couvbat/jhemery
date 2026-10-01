@@ -172,8 +172,9 @@ until you type anything, and then not again that session. Under reduced motion i
 `neofetch` once, then drops the parameter from the URL. A command has to opt in (`linkable`), and
 even then a link only runs it if, with those arguments, it writes nothing and isn't hidden. Every
 command declares what it writes (`none`, `local` or `server`), so `?run=theme dracula`,
-`?run=sign hi`, `?run=help vim` and `?run=ls -a` are all refused; a refused link says what it
-asked for. It ignores your own aliases, and on a phone
+`?run=sign hi`, `?run=help vim` and `?run=ls -a` are all refused. A link's arguments must be ones
+the command offers for Tab (`?run=wordle daily`, `?run=projects --json`), so a link can't put
+free text on the screen as if you'd typed it. A refused link says what it asked for. It ignores your own aliases, and on a phone
 the parameter is simply ignored.
 
 An unknown command gets a "did you mean …?" suggestion when it is one edit away (a swapped pair of
@@ -183,7 +184,8 @@ listed here". `help --all` reveals the hidden ones.
 
 **vim.** `vim` (or `vi`, `nvim`, `emacs`) opens a real modal editor pane with normal and insert
 modes, `hjkl` and the arrows, `i`/`a`/`A`/`o`, `x` and `dd`. And yes, `:q!` gets you out. `:q`
-refuses once you've typed something, just like the real thing. The red title-bar dot always works
+refuses once you've typed something, just like the real thing (and at the prompt, with no vim
+open, it only notes the reflex). The red title-bar dot always works
 if you'd rather not play along. `cat` and `vim` read from the same fake filesystem, so a file can
 never show two different contents.
 

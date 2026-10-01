@@ -354,7 +354,9 @@ drop a visitor into a keyboard-captured surface they did not ask for.
 language shares one word a day. The board is saved after every guess under
 `couvbat:games:wordle:daily`, so a closed tab resumes rather than restarts, and a finished board is
 shown again instead of replayed. It is reported once to `POST /stats/wordle` and everyone's
-distribution is drawn under it. `wordle share` copies an emoji grid ending in a `?run=wordle daily`
+distribution is drawn under it. Only the keystroke that finishes the board reports it: reopening
+a finished board, from a `?run=wordle daily` link or another tab, only reads the tallies, and a
+report that failed at the time is not retried. That is what keeps `wordle` at `writes: 'none'`. `wordle share` copies an emoji grid ending in a `?run=wordle daily`
 link, to the clipboard only.
 
 `connect4` is the only game with a second person. The rules are `games/connect4.ts`, a pure
