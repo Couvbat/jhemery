@@ -1,8 +1,11 @@
 import { profile } from '@/content'
 import { prefersReducedMotion, useCrt } from '@/composables/useCrt'
 import { useMusicPlayer } from '@/composables/useMusicPlayer'
+import { observeRequests, type RequestTrace } from '@/lib/api'
 import { achievementList, announce, isUnlocked, unlockedCount } from '../achievements'
 import { blank, line } from '../format'
+import { isLinkable, resolveLink, visibleCommands, writesOf } from '../registry'
+import { traceLines } from '../strace'
 import { sleep } from '../timing'
 import type { Command, OutputLine, Tone } from '../types'
 import { uptime } from './content'
@@ -78,8 +81,74 @@ function table(procs: Proc[]): OutputLine[] {
   ]
 }
 
+/**
+ * The command `strace` wraps, resolved the way a link resolves one: without the visitor's
+ * aliases, so `strace ls` traces `ls` whatever `ls` is aliased to.
+ */
+function traced(args: readonly string[]) {
+  return args.length ? resolveLink(args.join(' ')) : undefined
+}
+
+const strace: Command = {
+  name: 'strace',
+  usage: 'strace <command> [args]',
+  description: {
+    en: 'The requests a command makes, and the shape of what they carry',
+    fr: 'Les requêtes d’une commande, et la forme de ce qu’elles transportent',
+  },
+  group: 'core',
+  // It writes whatever it runs writes, so `?run=strace sign x` is refused like `sign x`.
+  writes: (args) => {
+    const inner = traced(args)
+    return inner && inner.command.name !== 'strace' ? writesOf(inner.command, inner.args) : 'none'
+  },
+  linkable: (args) => {
+    const inner = traced(args)
+    return !!inner && inner.command.name !== 'strace' && isLinkable(inner.command, inner.args)
+  },
+  // The command first, then whatever that command offers: so a link's arguments are held
+  // to the inner command's own list, as they would be without strace.
+  complete: ({ args, index, word }) => {
+    if (index === 0) return visibleCommands().flatMap((c) => [c.name, ...(c.aliases ?? [])]).filter((name) => name !== 'strace')
+    const inner = traced(args.slice(0, index))
+    if (!inner) return []
+    const consumed = index - inner.args.length
+    return inner.command.complete?.({ args: args.slice(consumed), index: index - consumed, word }) ?? []
+  },
+  async run(ctx) {
+    const inner = traced(ctx.args)
+    if (!ctx.args.length) return [line('strace: must have PROG [ARGS] or -p PID', 'error')]
+    if (!inner) return [line(`strace: Can't stat '${ctx.args[0]}': No such file or directory`, 'error')]
+    if (inner.command.name === 'strace') return [line('strace: one at a time: it would only trace itself', 'error')]
+
+    // Only what the visitor's command asked for: the two pollers mark themselves.
+    const traces: RequestTrace[] = []
+    const stop = observeRequests((trace) => {
+      if (!trace.background) traces.push(trace)
+    })
+    let exit = 0
+    try {
+      await ctx.run(ctx.args.join(' '))
+    } catch (error) {
+      if ((error as Error)?.name === 'AbortError') {
+        stop()
+        ctx.print([...traces.flatMap(traceLines), line('+++ killed by SIGINT +++', 'muted')])
+        throw error
+      }
+      ctx.print(line(String((error as Error)?.message ?? error), 'error'))
+      exit = 1
+    } finally {
+      stop()
+    }
+    // No request, no trailer: `strace ls` looks exactly like `ls`.
+    if (!traces.length) return
+    return [...traces.flatMap(traceLines), line(`+++ exited with ${exit} +++`, 'muted')]
+  },
+}
+
 export const systemCommands: Command[] = [
   systemctl,
+  strace,
   {
     name: 'ps',
     aliases: ['ps aux', 'ps -ef'],
