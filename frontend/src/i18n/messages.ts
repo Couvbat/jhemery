@@ -33,6 +33,10 @@ export const messages = {
     tryIt: { en: 'Try it', fr: 'Essayer' },
     code: { en: 'The code', fr: 'Le code' },
     design: { en: 'Read the design note', fr: 'Lire la note de conception' },
+    // A design that lives in features-spec or the roadmap: on GitHub, not a note.
+    designDoc: { en: 'Read the design', fr: 'Lire la conception' },
+    // Below the terminal's breakpoint there is no shell for a `?run=` link to open.
+    tryWide: { en: 'in the terminal, on a wider screen', fr: 'dans le terminal, sur un écran plus large' },
     decisions: { en: 'Decisions', fr: 'Décisions' },
     notFound: {
       en: 'There is no part by that name. Here are the ones there are:',

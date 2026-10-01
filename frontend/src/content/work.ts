@@ -86,7 +86,7 @@ export const work: WorkPart[] = [
       { label: {
         en: 'Largest payload: version 40, level L',
         fr: 'Charge maximale : version 40, niveau L',
-      }, value: '2,953 bytes' },
+      }, value: { en: '2,953 bytes', fr: '2 953 octets' } },
       { label: {
         en: 'Reed–Solomon field polynomial',
         fr: 'Polynôme du corps de Reed–Solomon',
@@ -186,15 +186,15 @@ export const work: WorkPart[] = [
       { label: {
         en: 'ffmpeg-core.wasm, checked by a test against the installed file',
         fr: 'ffmpeg-core.wasm, vérifié par un test contre le fichier installé',
-      }, value: '32,232,419 bytes' },
+      }, value: { en: '32,232,419 bytes', fr: '32 232 419 octets' } },
       { label: {
         en: 'The same core, deflated over the wire',
         fr: 'Le même cœur, compressé pour le transfert',
-      }, value: 'about 10 MB' },
+      }, value: { en: 'about 10 MB', fr: 'environ 10 Mo' } },
       { label: {
         en: 'Core',
         fr: 'Cœur',
-      }, value: '@ffmpeg/core 0.12.10, single-thread' },
+      }, value: { en: '@ffmpeg/core 0.12.10, single-thread', fr: '@ffmpeg/core 0.12.10, mono-thread' } },
     ],
     try: 'tools/ffmpeg',
     code: [

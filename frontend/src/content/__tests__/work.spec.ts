@@ -4,7 +4,7 @@ import { describe, expect, it } from 'vitest'
 import { resolvePath } from '@/composables/useViewSwing'
 import { sourceUrl } from '@/lib/source'
 import { isLinkable, resolveLink } from '@/terminal/registry'
-import { workLines } from '@/terminal/work'
+import { figure, workLines } from '@/terminal/work'
 import { findDecision } from '../decisions'
 import { headingSlugs } from '../docs'
 import { work } from '../work'
@@ -17,10 +17,12 @@ const t = <T,>(value: { en: T; fr: T }) => value.en
  * so] }`. Typed figures go stale (roadmap §H: "wherever a number can come from the build,
  * it should"), and none of these is a count the build has to hand, so instead each is held
  * to the line it was read from: change the constant and this fails until the copy follows.
- * A number with no code behind it (a fact about vim, or the standard) is `null`, so a new
- * number has to be one or the other.
+ * A figure made of several numbers pins each of them. A number with no code behind it (a
+ * measurement) is `null`, so a new number has to be one or the other. Keys are the English
+ * figure.
  */
-const PINNED: Record<string, Record<string, [file: string, pattern: RegExp] | null>> = {
+type Pin = [file: string, pattern: RegExp]
+const PINNED: Record<string, Record<string, Pin | Pin[] | null>> = {
   vim: {
     E37: ['frontend/src/terminal/commands/eggs.ts', /'E37: No write since last change/],
     E45: ['frontend/src/terminal/commands/eggs.ts', /"E45: 'readonly' option is set/],
@@ -46,7 +48,10 @@ const PINNED: Record<string, Record<string, [file: string, pattern: RegExp] | nu
   },
   prism: {
     '650 ms': ['frontend/src/composables/useViewSwing.ts', /SWING_MS = 650\b/],
-    '90° / 40°': ['frontend/src/components/ThreeBackground.vue', /FIELD_YAW = \(40 \* Math\.PI\)/],
+    '90° / 40°': [
+      ['frontend/src/assets/main.css', /rotateY\(calc\(var\(--swing-dir, 1\) \* -90deg \* var\(--swing, 1\)\)\)/],
+      ['frontend/src/components/ThreeBackground.vue', /FIELD_YAW = \(40 \* Math\.PI\)/],
+    ],
     '1200px': ['frontend/src/assets/main.css', /perspective: 1200px/],
   },
   mcp: {
@@ -81,7 +86,8 @@ describe('case studies', () => {
   })
 
   it.each(work.map((p) => [p.id, p] as const))('%s says everything in both languages', (_id, part) => {
-    for (const value of [part.name, part.summary, ...part.numbers.map((n) => n.label)]) {
+    const figures = part.numbers.flatMap((n) => (typeof n.value === 'string' ? [] : [n.value]))
+    for (const value of [part.name, part.summary, ...part.numbers.map((n) => n.label), ...figures]) {
       expect(value.en.trim()).toBeTruthy()
       expect(value.fr.trim()).toBeTruthy()
     }
@@ -113,12 +119,14 @@ describe('case studies', () => {
   })
 
   it.each(work.map((p) => [p.id, p] as const))('%s: every number is the code’s, or says it isn’t', (id, part) => {
-    for (const { value } of part.numbers) {
+    for (const number of part.numbers) {
+      const value = figure(number.value, t)
       const pin = PINNED[id]?.[value]
       expect(pin, `${id}: ${value} is neither pinned to code nor marked null`).not.toBeUndefined()
       if (!pin) continue
-      const [file, pattern] = pin
-      expect(readFileSync(join(repo, file), 'utf8'), `${id}: ${value} in ${file}`).toMatch(pattern)
+      for (const [file, pattern] of (Array.isArray(pin[0]) ? pin : [pin]) as Pin[]) {
+        expect(readFileSync(join(repo, file), 'utf8'), `${id}: ${value} in ${file}`).toMatch(pattern)
+      }
     }
   })
 

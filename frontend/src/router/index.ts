@@ -48,6 +48,7 @@ const router = createRouter({
       path: '/work/:id',
       name: 'work',
       component: () => import('../views/WorkView.vue'),
+      props: true,
     },
     {
       // Needs the .htaccess rewrite in public/ to survive a hard refresh on Apache.

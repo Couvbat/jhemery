@@ -125,6 +125,40 @@ test.describe('the case studies', () => {
     expect(pageErrors).toEqual([])
   })
 
+  // The leaving face stays mounted for the whole turn; read from the app-wide route, it
+  // re-rendered as "not found" the moment the router moved on.
+  test('keeps its own part on the face turning away', async ({ page }) => {
+    await page.goto('/work/qr')
+    await page.evaluate((notFound) => {
+      const w = window as unknown as { __flipped: boolean }
+      w.__flipped = false
+      new MutationObserver(() => {
+        if (document.body.innerText.includes(notFound)) w.__flipped = true
+      }).observe(document.body, { childList: true, subtree: true, characterData: true })
+    }, messages.work.notFound.en)
+
+    await openNav(page)
+    await navToTools(page).click()
+    await expect(page.getByRole('heading', { level: 1, name: heading() })).toBeVisible()
+    await expect(page.locator('.view-stage')).not.toHaveClass(/is-swinging/)
+    expect(await page.evaluate(() => (window as unknown as { __flipped: boolean }).__flipped)).toBe(false)
+  })
+
+  // Below md there is no terminal to read a `?run=` link, so none is offered.
+  test('offers run links where there is a terminal', async ({ page }) => {
+    test.skip(test.info().project.name === 'mobile', 'No terminal on a phone.')
+    await page.goto('/work/wordlists')
+    await expect(page.locator('a[href^="/?run="]').first()).toBeVisible()
+  })
+
+  test('names the command on a phone instead, and links the decisions’ notes', async ({ page }) => {
+    test.skip(test.info().project.name !== 'mobile', 'The phone layout.')
+    await page.goto('/work/wordlists')
+    await expect(page.locator('a[href^="/?run="]').first()).toBeHidden()
+    await expect(page.getByText('wordle daily', { exact: true })).toBeVisible()
+    await expect(page.locator('a[href^="/notes/"]:visible').first()).toBeVisible()
+  })
+
   test('an unknown one lists the ones there are', async ({ page }) => {
     await page.goto('/work/nope')
     await expect(page.getByText(messages.work.notFound.en)).toBeVisible()

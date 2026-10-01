@@ -125,6 +125,14 @@ describe('ls', () => {
     expect((await run('ls', 'nope')).out[0]).toMatchObject({ tone: 'error' })
   })
 
+  it('lets cat complete the case studies only once the word reaches into projects/', () => {
+    const cat = navigateCommands.find((c) => c.name === 'cat')!
+    expect(cat.complete!({ args: [''], index: 0, word: '' }).some((f) => f.startsWith('projects/'))).toBe(false)
+    expect(cat.complete!({ args: ['projects/'], index: 0, word: 'projects/' })).toEqual(
+      expect.arrayContaining(work.map((p) => `projects/${p.id}.md`)),
+    )
+  })
+
   it('still honours -a with a path', async () => {
     const plain = (await run('ls', '/')).text
     const all = (await run('ls', '-a', '/')).text

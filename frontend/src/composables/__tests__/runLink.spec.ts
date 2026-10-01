@@ -10,10 +10,10 @@ vi.mock('@/composables/useCrt', async (importOriginal) => ({
 import { setLocale } from '@/i18n'
 import { setAlias, clearAliases } from '@/terminal/aliases'
 import { consumeRunParam } from '../useRunLink'
-import { runLink, useTerminal } from '../useTerminal'
+import { cancel, runLink, useTerminal } from '../useTerminal'
 import { pendingLinkCommand, terminalOpen } from '../useTerminalShell'
 
-const { buffer, clearBuffer } = useTerminal()
+const { buffer, busy, capturing, clearBuffer, run } = useTerminal()
 const texts = () => buffer.value.map((l) => l.text)
 
 beforeEach(() => {
@@ -81,6 +81,23 @@ describe('runLink', () => {
   it.each(['whoami', 'help ls', 'ls', 'projects --json', 'hardware pc'])('still runs `%s`', async (line) => {
     await runLink(line)
     expect(buffer.value[0]).toMatchObject({ text: line, prompt: true })
+  })
+
+  // Found in review: a run link in the scrollback stays clickable while a game holds the
+  // keyboard, and running it took the shell from under the game.
+  it('ignores a link clicked while a command is running, which keeps its keyboard and its ^C', async () => {
+    const game = run('snake')
+    await vi.waitFor(() => expect(capturing.value).toBe(true))
+    const before = buffer.value.length
+
+    await runLink('whoami')
+    expect(buffer.value.length).toBe(before)
+    expect(busy.value).toBe(true)
+    expect(capturing.value).toBe(true)
+
+    cancel()
+    await game
+    expect(busy.value).toBe(false)
   })
 
   it('strips control characters and caps the length', async () => {

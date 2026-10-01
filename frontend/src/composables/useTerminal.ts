@@ -335,6 +335,10 @@ export async function runLink(input: string): Promise<void> {
     .trim()
     .slice(0, LINK_MAX)
   if (!line) return
+  // A link in the scrollback stays clickable while a command runs, and `execute()` would
+  // take the shell from under it: the running command would lose its keyboard, its ^C
+  // and its busy flag, and never settle. Enter is blocked then; so is a click.
+  if (busy.value || pendingPrompt.value) return
 
   const target = resolveLink(line)
   if (!target || !isLinkable(target.command, target.args)) {

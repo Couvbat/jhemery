@@ -1,29 +1,35 @@
 <script setup lang="ts">
 import { computed } from 'vue'
-import { RouterLink, useRoute } from 'vue-router'
-import { findWork, noteSlug, profile, work } from '@/content'
+import { RouterLink } from 'vue-router'
+import { findDecision, findWork, profile, work } from '@/content'
 import CodeText from '@/components/CodeText.vue'
 import { useLocale } from '@/i18n'
-import { docUrl, sourceUrl } from '@/lib/source'
-import { triesPath, tryHref } from '@/terminal/work'
+import { docUrl, isNote, sourceUrl } from '@/lib/source'
+import { designLabel, figure, triesPath, tryHref } from '@/terminal/work'
 
+// A route prop rather than `useRoute()`: the face that turns away during the prism swing
+// keeps its own id, where the app-wide route would already be the next page's and flip
+// it to "not found" mid-turn.
+const props = defineProps<{ id: string }>()
 const { t, m } = useLocale()
-const route = useRoute()
 
-const part = computed(() => findWork(String(route.params.id ?? '')))
+const part = computed(() => findWork(props.id))
 const index = computed(() => (part.value ? work.indexOf(part.value) : -1))
 const previous = computed(() => (index.value > 0 ? work[index.value - 1] : undefined))
 const next = computed(() => (index.value >= 0 && index.value < work.length - 1 ? work[index.value + 1] : undefined))
+const decisions = computed(() => (part.value?.decisions ?? []).flatMap((id) => findDecision(id) ?? []))
 </script>
 
 <template>
   <main class="scanlines min-h-screen pt-14">
     <div class="max-w-3xl mx-auto px-4 py-16 md:py-20 space-y-8">
       <header>
-        <p class="text-muted-foreground text-sm mb-1">
+        <!-- Only a real part gets the prompt line: an unknown id is the URL's text, and a
+             link's author must not get to type a line in the owner's shell. -->
+        <p v-if="part" class="text-muted-foreground text-sm mb-1">
           <span class="text-primary">{{ profile.handle }}</span
           ><span class="text-muted-foreground">:~$</span>
-          <span class="ml-2 text-foreground">cat projects/{{ part?.id ?? route.params.id }}.md</span>
+          <span class="ml-2 text-foreground">cat projects/{{ part.id }}.md</span>
         </p>
         <h1 tabindex="-1" class="text-2xl md:text-3xl font-bold glow-cyan text-accent focus:outline-none">
           <span class="text-accent">#</span> {{ part ? t(part.name) : t(m.projects.work) }}
@@ -44,7 +50,7 @@ const next = computed(() => (index.value >= 0 && index.value < work.length - 1 ?
           <dl class="grid gap-x-6 gap-y-1 sm:grid-cols-[minmax(0,14rem)_1fr] font-mono text-sm">
             <template v-for="(n, i) in part.numbers" :key="i">
               <dt class="text-muted-foreground"><CodeText :text="t(n.label)" /></dt>
-              <dd class="text-foreground">{{ n.value }}</dd>
+              <dd class="text-foreground">{{ figure(n.value, t) }}</dd>
             </template>
           </dl>
         </section>
@@ -54,8 +60,14 @@ const next = computed(() => (index.value >= 0 && index.value < work.length - 1 ?
             <RouterLink v-if="triesPath(part.try)" :to="tryHref(part.try)" class="text-primary hover:underline">
               {{ t(m.work.tryIt) }} → {{ part.try }}
             </RouterLink>
-            <!-- A `?run=` link is read when a page loads, so this one loads the page. -->
-            <a v-else :href="tryHref(part.try)" class="text-primary hover:underline">{{ t(m.work.tryIt) }} → {{ part.try }}</a>
+            <template v-else>
+              <!-- A `?run=` link is read when a page loads, so this one loads the page; below
+                   md there is no terminal to read it, so the command is only named. -->
+              <a :href="tryHref(part.try)" class="hidden md:inline text-primary hover:underline">{{ t(m.work.tryIt) }} → {{ part.try }}</a>
+              <span class="md:hidden text-muted-foreground"
+                >{{ t(m.work.tryIt) }} → <code class="text-foreground">{{ part.try }}</code>, {{ t(m.work.tryWide) }}</span
+              >
+            </template>
           </p>
           <p class="text-muted-foreground">{{ t(m.work.code) }}</p>
           <ul class="pl-4 space-y-1">
@@ -64,13 +76,20 @@ const next = computed(() => (index.value >= 0 && index.value < work.length - 1 ?
             </li>
           </ul>
           <p>
-            <a :href="docUrl(part.spec)" class="text-accent hover:underline">{{ t(m.work.design) }} → {{ noteSlug(part.spec.doc) }}</a>
+            <a
+              :href="docUrl(part.spec)"
+              v-bind="isNote(part.spec.doc) ? {} : { target: '_blank', rel: 'noopener noreferrer' }"
+              class="text-accent hover:underline"
+              >{{ designLabel(part, t) }}</a
+            >
           </p>
-          <p v-if="part.decisions?.length" class="text-muted-foreground">
+          <p v-if="decisions.length" class="text-muted-foreground">
             {{ t(m.work.decisions) }}:
-            <template v-for="(id, i) in part.decisions" :key="id">
-              <a :href="tryHref(`why ${id}`)" class="text-accent hover:underline">why {{ id }}</a
-              ><span v-if="i < part.decisions.length - 1">, </span>
+            <template v-for="(decision, i) in decisions" :key="decision.id">
+              <!-- `why` in the terminal where there is one; its design note where there isn't. -->
+              <a :href="tryHref(`why ${decision.id}`)" class="hidden md:inline text-accent hover:underline">why {{ decision.id }}</a
+              ><a :href="docUrl(decision.source)" class="md:hidden text-accent hover:underline">{{ t(decision.topic) }}</a
+              ><span v-if="i < decisions.length - 1">, </span>
             </template>
           </p>
         </section>

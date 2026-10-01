@@ -6,7 +6,7 @@ vi.mock('@/composables/useCrt', async (importOriginal) => ({
   prefersReducedMotion: () => motion.reduced,
 }))
 
-import { useTheme } from '@/composables/useTheme'
+import { setTheme, useTheme } from '@/composables/useTheme'
 import { TOUR_STOPS } from '../commands/work'
 import { allCommands, isLinkable, resolve, resolveLink } from '../registry'
 import { recordingContext, runCommand } from './context'
@@ -17,6 +17,7 @@ const runStops = TOUR_STOPS.flatMap((stop) => ('run' in stop ? [stop.run] : []))
 afterEach(() => {
   motion.reduced = true
   vi.useRealTimers()
+  setTheme('cyberpunk')
 })
 
 describe('tour', () => {
@@ -44,12 +45,27 @@ describe('tour', () => {
     }
   })
 
-  it('prints everything at once under reduced motion, and changes no scheme', async () => {
+  it('prints everything at once under reduced motion, and changes no scheme or says it did', async () => {
     const before = useTheme().theme.value.id
     const started = Date.now()
-    await runCommand(tour)
+    const { text } = await runCommand(tour)
     expect(Date.now() - started).toBeLessThan(1000)
     expect(useTheme().theme.value.id).toBe(before)
+    expect(text).not.toMatch(/Here is|and back/)
+  })
+
+  it('shows another scheme to a visitor who already wears the first', async () => {
+    setTheme('gruvbox')
+    motion.reduced = false
+    vi.useFakeTimers()
+    const recorded = recordingContext('tour', [])
+    const done = tour.run(recorded.ctx) as Promise<void>
+    await vi.advanceTimersByTimeAsync(6000 + 1000)
+    expect(useTheme().theme.value.id).toBe('nord')
+    expect(recorded.printed.map((l) => l.text).join('\n')).toContain('Here is Nord')
+    await vi.runAllTimersAsync()
+    await done
+    expect(useTheme().theme.value.id).toBe('gruvbox')
   })
 
   it('puts the scheme back when stopped halfway through showing it', async () => {

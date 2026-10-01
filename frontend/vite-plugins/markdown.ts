@@ -78,10 +78,16 @@ function inline(text: string, ctx: Context, at: number): string {
     )
     .replace(ESCAPABLE, (_, char: string) => hold(escapeHtml(char)))
     // The label keeps the runs already held (its code, its escapes) and is finished in place.
-    .replace(/\[([^\]]+)\]\(([^)\s]+)\)/g, (_, label: string, href: string) =>
+    // The destination may not hold one: restored inside the href, a code span's markup
+    // would be an attribute's text.
+    .replace(/\[([^\]]+)\]\(([^)\s\uE000\uE001]+)\)/g, (_, label: string, href: string) =>
       hold(`<a href="${escapeHtml(ctx.rewriteLink(href))}">${finish(label)}</a>`),
     )
-    .replace(/https?:\/\/[^\s<>()]+[^\s<>().,;:!?'"]/g, (url) => hold(`<a href="${escapeHtml(url)}">${escapeHtml(url)}</a>`))
+        // A bare URL stops at a held run: glued to a link, it would otherwise take that link's
+    // marker in, and the restored `<a href="…">` would land inside this one's href.
+    .replace(/https?:\/\/[^\s<>()\uE000\uE001]+[^\s<>().,;:!?'"\uE000\uE001]/g, (url) =>
+      hold(`<a href="${escapeHtml(url)}">${escapeHtml(url)}</a>`),
+    )
 
   if (/<\/?[a-zA-Z][^>]*>/.test(out.replace(HELD, ''))) fail(ctx, at, 'raw HTML')
 

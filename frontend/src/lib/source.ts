@@ -24,6 +24,11 @@ export function sourceUrl(path: string, sha?: string): string {
 
 const SPECS = 'docs/superpowers/specs/'
 
+/** Whether a doc is published as a note at `/notes/<slug>` (`vite-plugins/notes.ts`). */
+export function isNote(doc: string): boolean {
+  return doc.startsWith(SPECS)
+}
+
 /**
  * A heading in a design doc. A spec is published as a note on the site
  * (`vite-plugins/notes.ts`), so it links there; any other doc (the roadmap,
@@ -31,6 +36,6 @@ const SPECS = 'docs/superpowers/specs/'
  */
 export function docUrl(ref: DocRef, sha?: string): string {
   const anchor = ref.anchor ? `#${ref.anchor}` : ''
-  if (ref.doc.startsWith(SPECS)) return `/notes/${noteSlug(ref.doc)}${anchor}`
+  if (isNote(ref.doc)) return `/notes/${noteSlug(ref.doc)}${anchor}`
   return `${sourceUrl(ref.doc, sha)}${anchor}`
 }

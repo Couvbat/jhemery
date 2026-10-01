@@ -372,9 +372,9 @@ Recorded as each row ships.
 - **`why <topic>`:**
   - "Did you mean" comes from a new leaf module, `terminal/fuzzy.ts`, rather than exporting the
     registry's `editDistance`: a command importing the registry would join its import cycle.
-  - It is seeded with fifteen decisions, from the specs' rejected alternatives and from the
-    roadmap's and features-spec's (`battleship`, `mcp-sdk` and `polling` aren't in the specs). Each
-    was drafted from its doc and the code, then fact-checked against both.
+  - It is seeded with fifteen decisions, from the specs' rejected alternatives and, for
+    `polling`, from features-spec's. Each was drafted from its doc and the code, then
+    fact-checked against both.
 - **Design specs as pages:**
   - The markdown renderer is hand-written (`vite-plugins/markdown.ts`), for exactly the subset
     the specs use, and it fails the build on anything else. A dependency would have meant
@@ -393,9 +393,12 @@ Recorded as each row ships.
   - Eight parts, each drafted from its spec and the code and then fact-checked against both, as
     `why` was. The copy is a first draft for the owner to edit.
   - No number is a count the build has to hand (commands, achievements, tools, schemes), so
-    `WorkNumber.value` stays a string. Each one is instead pinned in `work.spec.ts` to the line
-    of code it was read from, so changing the constant fails the test until the copy follows.
-    The one with no code behind it, ffmpeg's deflated size, is marked as such.
+    `WorkNumber.value` is a string, or a `Localised` one where it carries a word or a thousands
+    separator. Each figure is instead pinned in `work.spec.ts` to the line of code it was read
+    from, so changing the constant fails the test until the copy follows. The one with no code
+    behind it, ffmpeg's deflated size, is marked as measured.
+  - Below the terminal's breakpoint a case study names its command rather than linking it, and
+    its decisions link their design notes, since a `?run=` link has no shell to open there.
   - `spec` is required rather than optional: every part has a design note to link.
   - `projects --json` stays an array. The parts hang off this site's own entry as `parts`, so
     nothing that already reads the array breaks.

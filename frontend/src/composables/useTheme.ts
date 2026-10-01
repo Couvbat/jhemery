@@ -125,6 +125,8 @@ export function useTheme() {
   return {
     /** What is painted: a preview while one is showing, the chosen scheme otherwise. */
     theme: computed(() => shown.value ?? current.value),
+    /** What the visitor picked, whatever a preview is painting over it. */
+    chosen: computed(() => current.value),
     themes,
     setTheme,
   }

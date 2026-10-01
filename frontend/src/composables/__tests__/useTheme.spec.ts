@@ -137,12 +137,14 @@ describe('useTheme', () => {
 
 // What `tour` uses: a scheme shown without being chosen.
 describe('previewTheme', () => {
-  it('paints a scheme without saving it, and puts the chosen one back', async () => {
+  // A light scheme over the dark default: the one switch that would flash if it were chosen.
+  it('paints a scheme without saving it or flashing, and puts the chosen one back', async () => {
     const { previewTheme, useTheme } = await load()
-    const restore = previewTheme('gruvbox')!
+    const restore = previewTheme('gruvbox-light')!
 
-    expect(root.dataset.theme).toBe('gruvbox')
-    expect(useTheme().theme.value.id).toBe('gruvbox')
+    expect(root.dataset.theme).toBe('gruvbox-light')
+    expect(useTheme().theme.value.id).toBe('gruvbox-light')
+    expect(useTheme().chosen.value.id).toBe('cyberpunk')
     expect(window.localStorage.getItem(STORAGE_KEY)).toBeNull()
     expect(root.classList.contains('theme-flash')).toBe(false)
 

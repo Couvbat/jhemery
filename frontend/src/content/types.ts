@@ -148,7 +148,8 @@ export interface Decision {
 /** A figure on a case study: a fact that doesn't drift, like a standard's limits. */
 export interface WorkNumber {
   label: Localised
-  value: string
+  /** A figure, or a localised one where it carries a word or a thousands separator. */
+  value: string | Localised
 }
 
 /**

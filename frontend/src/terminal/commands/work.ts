@@ -1,6 +1,7 @@
 import { decisions, findDecision, profile, type Decision, type Localised } from '@/content'
 import { prefersReducedMotion } from '@/composables/useCrt'
-import { previewTheme } from '@/composables/useTheme'
+import { previewTheme, useTheme } from '@/composables/useTheme'
+import { findTheme } from '@/lib/themes'
 import { docUrl } from '@/lib/source'
 import { achievementList, unlockedCount } from '../achievements'
 import { blank, line, link, pre } from '../format'
@@ -49,9 +50,9 @@ function listing(t: <T>(value: Localised<T>) => T): OutputLine[] {
 /**
  * The stops of `tour`, in order. A `run` stop is a command line run inside the tour,
  * so it must be one a link could run itself: `tour.spec.ts` holds every one to
- * `isLinkable`, since `?run=tour` is the one link to put in a bio. Two stops are not
- * commands: a scheme shown for a moment and put back, and the `curl` hint, which only
- * means something in a real terminal. No game (it would hold the keyboard and turn the
+ * `isLinkable`, since `?run=tour` is the one link to put in a bio. Three stops are not
+ * commands: a scheme shown for a moment and put back, the `curl` hint, which only means
+ * something in a real terminal, and the achievement count. No game (it would hold the keyboard and turn the
  * output's announcements off for the rest of the walk) and no hidden command (naming
  * one hands out an easter egg).
  */
@@ -68,8 +69,8 @@ export const TOUR_STOPS: Array<
   },
   {
     caption: {
-      en: 'Every colour comes from a scheme, and there are eleven. Here is Gruvbox, for a moment.',
-      fr: 'Chaque couleur vient d’un thème, et il y en a onze. Voici Gruvbox, un instant.',
+      en: 'Every colour comes from a scheme, and there are eleven.',
+      fr: 'Chaque couleur vient d’un thème, et il y en a onze.',
     },
     show: 'scheme',
   },
@@ -97,7 +98,8 @@ export const TOUR_STOPS: Array<
   },
 ]
 
-const SCHEME = 'gruvbox'
+/** The scheme the tour shows, or the second when the visitor already wears the first. */
+const SCHEMES = ['gruvbox', 'nord'] as const
 const STOP_MS = 6000
 const SCHEME_MS = 3000
 
@@ -130,7 +132,10 @@ async function tourStop(ctx: CommandContext, stop: (typeof TOUR_STOPS)[number], 
     print(line(`  ${t({ en: '`theme` lists them.', fr: '`theme` les liste.' })}`, 'muted'))
     return
   }
-  const restore = previewTheme(SCHEME)
+  const id = SCHEMES.find((scheme) => scheme !== useTheme().chosen.value.id)!
+  const name = findTheme(id)!.name
+  print(line(`  ${t({ en: `Here is ${name}, for a moment.`, fr: `Voici ${name}, un instant.` })}`, 'muted'))
+  const restore = previewTheme(id)
   try {
     await sleep(SCHEME_MS, signal)
   } finally {
