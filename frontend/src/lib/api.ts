@@ -296,6 +296,11 @@ export interface JobsInfo {
   jobs: DownloadJob[]
 }
 
+/** `POST /presence/wall` on a deployment that hasn't opted in. */
+export interface WallOff {
+  configured: false
+}
+
 export class ApiError extends Error {
   constructor(
     message: string,
@@ -587,6 +592,8 @@ export const api = {
       body: JSON.stringify({ day, locale, guesses }),
     }),
   health: () => request<HealthReport>('/health'),
+  /** `wall`'s wave. Enabled, a bare 204 (`undefined` here), whatever became of it. */
+  wall: () => request<WallOff | undefined>('/presence/wall', { method: 'POST' }),
   guestbook: (options?: RequestOptions) => request<GuestbookList>('/guestbook', undefined, options),
   sign: (name: string, message: string) =>
     request<GuestbookEntry>('/guestbook', {

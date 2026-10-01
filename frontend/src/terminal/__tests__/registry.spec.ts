@@ -218,7 +218,7 @@ describe('what a command writes', () => {
         .filter(keep)
         .map((c) => c.name)
         .sort()
-    expect(named((c) => c.writes === 'server')).toEqual(['ask', 'connect4', 'mail', 'sign', 'sudo'])
+    expect(named((c) => c.writes === 'server')).toEqual(['ask', 'connect4', 'mail', 'sign', 'sudo', 'wall'])
     expect(named((c) => c.writes === 'local')).toEqual([
       ':q', 'acid', 'alias', 'banner', 'clear', 'constellation', 'cowsay', 'crt', 'decrypt', 'echo',
       'flag', 'gravity', 'jq', 'motion', 'open', 'play', 'rickroll', 'spawn', 'unalias', 'vim',
@@ -234,6 +234,7 @@ describe('what a command writes', () => {
     ['ask', ['who'], 'server'],
     ['sudo', [], 'server'],
     ['connect4', [], 'server'],
+    ['wall', [], 'server'],
     ['echo', ['hi'], 'local'],
     ['banner', ['hi'], 'local'],
     ['theme', ['dracula'], 'local'],
@@ -365,7 +366,7 @@ describe('links (?run=)', () => {
 
   it('has something worth linking to', () => {
     expect(allCommands().filter((c) => isLinkable(c)).map((c) => c.name)).toEqual(
-      expect.arrayContaining(['neofetch', 'projects', 'wordle', 'ctf', 'tour', 'why']),
+      expect.arrayContaining(['neofetch', 'projects', 'wordle', 'ctf', 'tour', 'why', 'who']),
     )
   })
 

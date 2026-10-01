@@ -3,6 +3,8 @@ import { onMounted, onUnmounted, ref, watch } from 'vue'
 import * as THREE from 'three'
 import { useCrt } from '@/composables/useCrt'
 import { useMotion } from '@/composables/useMotion'
+import { usePresence } from '@/composables/usePresence'
+import { RIPPLE_SECONDS, rippleOffset } from './ripple'
 import { activeSection } from '@/composables/useActiveSection'
 import { terminalOpen } from '@/composables/useTerminalShell'
 import { BASE_SHAPE_COUNT, MAX_SHAPE_COUNT, useSceneControl } from '@/composables/useSceneControl'
@@ -27,6 +29,8 @@ const { theme } = useTheme()
 // `full`, `calm` or `paused` (composables/useMotion.ts). This component only mounts once
 // the level has been something other than `paused`; pausing afterwards stops the loop.
 const { level: motion } = useMotion()
+// `wall`: someone else waved, and the field ripples outward from its centre.
+const { wave } = usePresence()
 
 const canvasRef = ref<HTMLCanvasElement | null>(null)
 /** What `click-to-inspect` is currently showing, if anything. */
@@ -145,6 +149,8 @@ const CALM_SPEED = 0.35
 
 /** The timestamp of the last frame drawn, or 0 when the loop has just (re)started. */
 let lastFrame = 0
+/** When the current ripple began, on the loop's clock, or null when there is none. */
+let rippleAt: number | null = null
 /**
  * When the governor next lets a frame through. Kept on a grid rather than counted from
  * the last frame, so a frame that arrives a little late doesn't push every later one
@@ -636,6 +642,9 @@ function animate(now: number) {
   if (recolour < 1) easeColours(f * REFERENCE_MS)
   // Snap during a glitch, drift the rest of the time.
   const drift = ease(shaking ? 0.65 : 0.045, f)
+  // Seconds into a ripple, or -1 for none: `rippleOffset` is zero outside its life.
+  if (rippleAt !== null && (now - rippleAt) / 1000 >= RIPPLE_SECONDS) rippleAt = null
+  const rippling = rippleAt === null ? -1 : (now - rippleAt) / 1000
   forEachShape(({ mesh, speed, home, offset }) => {
     mesh.rotation.x += speed.x * boost
     mesh.rotation.y += speed.y * boost
@@ -653,6 +662,18 @@ function animate(now: number) {
       if (distance > 0.001 && distance < GRAVITY_RADIUS) {
         const pull = (1 - distance / GRAVITY_RADIUS) * GRAVITY_STRENGTH
         target.set((dx / distance) * pull, (dy / distance) * pull, 0)
+      }
+    }
+
+    // The ripple pushes outward along the line from the centre to the shape's home, a
+    // term in the target like the well's, so the drift carries the shape out and back.
+    if (rippling >= 0) {
+      const radius = home.length()
+      const push = rippleOffset(radius, rippling)
+      if (push && radius > 0.001) {
+        target.x += (home.x / radius) * push
+        target.y += (home.y / radius) * push
+        target.z += (home.z / radius) * push
       }
     }
 
@@ -718,6 +739,7 @@ function pauseLoop() {
     swingArmed = false
   }
   if (camera) camera.position.z = cameraBaseZ
+  rippleAt = null
   // Nor will a scheme's ease: the still frame is in the new colours.
   if (recolour < 1) easeColours(RECOLOUR_MS)
   // No fade will finish now: whoever is arriving is here, and whoever is leaving goes
@@ -731,6 +753,14 @@ function pauseLoop() {
 }
 
 watch(motion, (level) => (level === 'paused' ? pauseLoop() : startLoop()))
+
+// Decoration, so only at `full` motion, and only with the loop there to play it; a wave
+// that lands while the field is still or calm simply isn't drawn. `usePresence` has
+// already dropped the tab's own echo and thinned a burst to one every 15 s.
+watch(wave, () => {
+  if (motion.value !== 'full' || animationFrameId === null) return
+  rippleAt = performance.now()
+})
 
 // Both the section and the completionist unlock change how the scene looks; one
 // watcher covers them because `currentPalette()` already knows which wins.

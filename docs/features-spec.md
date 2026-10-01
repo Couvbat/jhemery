@@ -734,6 +734,11 @@ mounted, so coming back to *full* or *calm* picks the scene up where it stood.
 - **Colour scheme** — a palette picks hue *names* (`green`, `cyan`, …), and a `theme` changes what
   those names mean by rewriting the `--neon-*` properties. So a second watcher on
   `useTheme().theme` re-reads the four hues and runs the same in-place recolour.
+- **`wall`'s ripple** — someone else's wave (§8, presence) sends a ring out from the field's
+  centre: `components/ripple.ts`'s pure `rippleOffset(radius, elapsed)` gives each shape an outward
+  push as the ring passes, added to its target like the gravity well's, so the ordinary drift
+  carries it out and back. Allocation-free, gone after 2.6 s, and only at *full* motion with the
+  loop running; a wave that lands while the field is calm or still isn't drawn.
 
 **Terminal control** (`composables/useSceneControl.ts`) adds three more knobs, in the same
 flag-and-watch shape as `useMatrix`/`useBoot` — the commands only ever set, the component is the
@@ -979,7 +984,27 @@ payload has exactly one key, so a field creeping in alongside it fails the build
 
 `usePresence.ts` holds the `EventSource`. It gives up after three failed connections rather than
 reconnecting for as long as the tab is open, and the footer segment stays out of the DOM entirely
-until a first message arrives — an unreachable backend shows nothing rather than a zero.
+until a first message arrives — an unreachable backend shows nothing rather than a zero. It starts
+where it is wanted: the footer on the home page, and `whenPresent(signal)` for `who` and `wall`
+from anywhere. Starting it app-wide would change what the footer's number counts.
+
+**`who` and `wall` ride the same stream.** `who` draws the count as anonymous ttys (`you pts/0`,
+then `somebody pts/N`, twelve at most — the field's cap — and "… and N more", so the rows still add
+up). `wall` is the one way a visitor reaches the others, so its sending half is a `POST
+/presence/wall`, and it is the first unauthenticated route that makes other visitors' pages react:
+**off unless `WALL_ENABLED` is set**, like every other publicly writable route, rate-limited to
+6/min per IP, and coalesced by `wave()` to one every 3 s across the site, which is what still
+holds with rotated addresses. Enabled, it answers a bare 204 whatever happened; off, `{
+configured: false }`. A wave is a *named* SSE event, `wave`, whose data is `{}`: the count frame
+stays exactly `{ online }`, the privacy test above stays literally true, and an old bundle, which
+only listens to `message`, never sees one. It carries no text, no sender and no time, and is not
+replayed to anyone who arrives after it. The server can't tell connections apart, so the sender
+mutes its own echo for 3.5 s from just before its POST; and however many arrive, a tab shows one
+every 15 s at most. Showing one means the field ripples (§5.3) and an open, idle terminal prints
+"Broadcast message from somebody@jhemery.xyz" — a wave that lands while a command runs is printed
+after it, since a `frame()` owns the tail of the buffer. `wall` reports `sent`, `alone` (nobody
+else here, and no POST made), `limited`, `off` or `unavailable` (no stream, or an older backend
+that 404s the route).
 
 ### `GET /stats` · `POST /stats/session`
 
