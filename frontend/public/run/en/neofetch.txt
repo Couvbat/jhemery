@@ -2,6 +2,7 @@
    |o_o |      OS: Portfolio 1.0 (Vue 3 / Vite)
    |:_/ |      Host: jhemery.xyz
   //   \ \     Kernel: NestJS 11
+ (|     | )
 /'\_   _/'\    Shell: couvsh 1.0
 \___)=(___/    DE: TailwindCSS 4
                Theme: Cyberpunk [dark]

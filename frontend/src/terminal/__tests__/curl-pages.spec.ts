@@ -86,7 +86,27 @@ async function stableOutput(command: Command, locale: Locale): Promise<OutputLin
   }
   const [a, b] = runs as [OutputLine[], OutputLine[]]
   expect(b.length, `${command.name} prints a different number of lines on another day`).toBe(a.length)
-  return a.filter((row, i) => row.text === b[i]!.text)
+  return a.flatMap((row, i) => (row.text === b[i]!.text ? [row] : steadyColumns(row, b[i]!.text)))
+}
+
+/**
+ * What stays of a row that differs between the clocks: the columns before the change,
+ * cut at the last gap of two spaces. So neofetch's Tux keeps every row while its Uptime
+ * goes, and a sentence with a date in it goes whole.
+ */
+function steadyColumns(row: OutputLine, other: string): OutputLine[] {
+  let same = 0
+  while (same < row.text.length && row.text[same] === other[same]) same++
+  const gap = [...row.text.slice(0, same).matchAll(/ {2,}/g)].at(-1)
+  const kept = gap ? row.text.slice(0, gap.index).trimEnd() : ''
+  if (!kept) return []
+  let room = kept.length
+  const segments = row.segments?.flatMap((segment) => {
+    const text = segment.text.slice(0, Math.max(0, room))
+    room -= segment.text.length
+    return text ? [{ ...segment, text }] : []
+  })
+  return [{ ...row, text: kept, segments }]
 }
 
 afterAll(() => {
