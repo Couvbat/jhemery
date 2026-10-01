@@ -100,6 +100,25 @@ export interface Availability {
   note: Localised
 }
 
+/** A job. Months are `YYYY-MM`; an `end` left out means it is the current one. */
+export interface Role {
+  /** Localised so an employer can be described rather than named (see `experience.ts`). */
+  employer: Localised
+  title: Localised
+  start: string
+  end?: string
+  summary?: Localised
+}
+
+/** A course. Shown by year; the months are there so the order is exact. */
+export interface Education {
+  school: Localised
+  course: Localised
+  start: string
+  end: string
+  note?: Localised
+}
+
 export type NowCategory = 'building' | 'playing' | 'learning' | 'listening'
 
 export interface NowEntry {

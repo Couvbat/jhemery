@@ -83,8 +83,9 @@ prints), the printable `/resume.html` and `/resume.fr.html`, and `/content.json`
 CV has exactly one source. `content.json` is fetched at runtime by the **backend's** MCP endpoint
 from `${FRONTEND_URL}`. That is the one place the two apps depend on each other, and the shape is
 mirrored rather than shared (`backend/src/mcp/mcp.types.ts`), with the backend refusing any
-`version` but 1. So a change to its shape needs a new `version` and a backend change that deploys
-with it.
+`version` it doesn't list in `CONTENT_VERSIONS` (1 and 2 today). So a change to its shape needs a
+new `version`, and a backend that accepts both the old and the new one: the two apps deploy from
+the same push in no fixed order.
 
 `sections.ts` defines the six sections once; the navbar, terminal `ls`/`cd`/`pwd`, command palette
 and every section header consume it.

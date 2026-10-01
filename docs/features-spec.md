@@ -54,7 +54,10 @@ src/content/
   music.ts       genres, tools, blurb, playlist URL
   gaming.ts      genres, platforms, fallback game log, blurb
   hardware.ts    machines[] + peripherals[]
-  contact.ts     socials, availability line
+  contact.ts     socials
+  experience.ts  dated roles and courses, newest first; the current role names profile.employer
+  dates.ts       the date maths: daysSince, monthsBetween (both ends count), durationLabel, periodLabel
+  now.ts         the /now list and its staleness rule
   sections.ts    section ids, nav labels, per-section shell prompt lines
   views.ts       the routes (home, tools, watch, radio) in prism order — §11
   index.ts       re-exports
@@ -616,6 +619,12 @@ a frontend deploy, which is fine for a résumé.
 The same plugin emits `resume.html` and `resume.fr.html` (static, script-free, with `resume.css` as
 a sibling file so the CSP needs nothing new) and `content.json`, which the MCP endpoint reads (§8).
 All three are on `navigateFallbackDenylist` and served by the plugin's dev middleware too.
+
+Every résumé, and the `resume` command, has an experience and an education section read from
+`content/experience.ts`. No duration is typed anywhere: each is worked out from the months, at
+build time for the files and at run time for the command, counting both the first and the last
+month as LinkedIn does, so the CV and the profile agree. `content.json` is version 2 since those
+sections were added, and the backend accepts 1 and 2.
 
 ---
 

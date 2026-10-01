@@ -5,6 +5,8 @@ import { projects } from '../src/content/projects'
 import { socials } from '../src/content/contact'
 import { music } from '../src/content/music'
 import { now, staleDays } from '../src/content/now'
+import { durationLabel, periodLabel, yearSpan } from '../src/content/dates'
+import { education, experience } from '../src/content/experience'
 import { sectionIds } from '../src/content/sections'
 import { isExternal, pick, type Locale, type Localised } from '../src/content/types'
 
@@ -60,7 +62,8 @@ function wrap(text: string, indent = 2, width = WIDTH - 2): string {
   return out.join('\n')
 }
 
-export function buildResume(): string {
+/** `at` fixes "present" for the durations; a build passes nothing and gets its own date. */
+export function buildResume(at = new Date()): string {
   const lines: string[] = []
 
   lines.push('')
@@ -80,6 +83,22 @@ export function buildResume(): string {
   }
   lines.push(`  ${DIM}Languages:${RESET} ${profile.languages.en}`)
   lines.push('')
+
+  lines.push(section('experience'))
+  for (const role of experience) {
+    lines.push(`  ${CYAN}${role.employer.en}${RESET} ${DIM}·${RESET} ${role.title.en}`)
+    lines.push(`    ${DIM}${periodLabel(role.start, role.end).en} · ${durationLabel(role.start, role.end, at).en}${RESET}`)
+    if (role.summary) lines.push(wrap(role.summary.en, 4))
+    lines.push('')
+  }
+
+  lines.push(section('education'))
+  for (const course of education) {
+    lines.push(`  ${CYAN}${course.school.en}${RESET} ${DIM}· ${yearSpan(course.start, course.end)}${RESET}`)
+    lines.push(wrap(course.course.en, 4))
+    if (course.note) lines.push(`    ${DIM}${course.note.en}${RESET}`)
+    lines.push('')
+  }
 
   lines.push(section('stack'))
   lines.push(wrap(skillNames.join('  ·  ')))
@@ -131,6 +150,8 @@ const HTML_LABELS = {
   title: { en: 'Résumé', fr: 'CV' },
   about: { en: 'About', fr: 'À propos' },
   languages: { en: 'Languages', fr: 'Langues' },
+  experience: { en: 'Experience', fr: 'Expérience' },
+  education: { en: 'Education', fr: 'Formation' },
   stack: { en: 'Stack', fr: 'Compétences' },
   projects: { en: 'Projects', fr: 'Projets' },
   music: { en: 'Music', fr: 'Musique' },
@@ -174,7 +195,7 @@ function link(href: string, text: string): string {
   return `<a href="${escapeHtml(href)}">${escapeHtml(text)}</a>`
 }
 
-export function buildResumeHtml(locale: Locale): string {
+export function buildResumeHtml(locale: Locale, at = new Date()): string {
   const t = <T>(value: Localised<T>): T => pick(value, locale)
   const other: Locale = locale === 'fr' ? 'en' : 'fr'
   const base = `https://${profile.domain}`
@@ -192,6 +213,26 @@ export function buildResumeHtml(locale: Locale): string {
         <p class="meta">${e(project.stack.join(' · '))}${links.length ? ` — ${links.join(' · ')}` : ''}</p>
       </li>`
     })
+    .join('\n')
+
+  const roleItems = experience
+    .map(
+      (role) => `      <li>
+        <h3>${e(t(role.employer))} <span class="status">${e(t(periodLabel(role.start, role.end)))} · ${e(t(durationLabel(role.start, role.end, at)))}</span></h3>
+        <p class="title">${e(t(role.title))}</p>${role.summary ? `
+        <p>${e(t(role.summary))}</p>` : ''}
+      </li>`,
+    )
+    .join('\n')
+
+  const courseItems = education
+    .map(
+      (course) => `      <li>
+        <h3>${e(t(course.school))} <span class="status">${e(yearSpan(course.start, course.end))}</span></h3>
+        <p>${e(t(course.course))}</p>${course.note ? `
+        <p class="meta">${e(t(course.note))}</p>` : ''}
+      </li>`,
+    )
     .join('\n')
 
   const socialItems = socials
@@ -228,6 +269,20 @@ export function buildResumeHtml(locale: Locale): string {
       <h2>${e(t(HTML_LABELS.about))}</h2>
 ${t(profile.bio).map((paragraph) => `      <p>${e(paragraph)}</p>`).join('\n')}
       <p><span class="label">${e(t(HTML_LABELS.languages))}</span> ${e(t(profile.languages))}</p>
+    </section>
+
+    <section>
+      <h2>${e(t(HTML_LABELS.experience))}</h2>
+      <ul class="experience">
+${roleItems}
+      </ul>
+    </section>
+
+    <section>
+      <h2>${e(t(HTML_LABELS.education))}</h2>
+      <ul class="education">
+${courseItems}
+      </ul>
     </section>
 
     <section>
@@ -300,7 +355,8 @@ p { margin: 0.35rem 0; }
 .label { display: inline-block; min-width: 6.5rem; }
 .availability.open { color: var(--accent); }
 ul { list-style: none; margin: 0; padding: 0; }
-.projects li { margin: 0 0 0.9rem; break-inside: avoid; }
+.projects li, .experience li, .education li { margin: 0 0 0.9rem; break-inside: avoid; }
+.title { font-weight: bold; }
 a { color: inherit; }
 @page { size: A4; margin: 16mm 18mm; }
 @media print {
@@ -332,11 +388,13 @@ function siteUrl(where: string): string {
  * has one source. Both languages go out; the tool asked picks one.
  *
  * `version` is the shape's, not the content's: the backend refuses a file whose
- * version it does not know rather than guessing at fields.
+ * version it does not know rather than guessing at fields. Version 2 added
+ * `experience` and `education`; the backend accepts 1 and 2, so either app may deploy
+ * first. Durations are worked out at `at`, the build, as `now.staleDays` is.
  */
 export function buildContentJson(at = new Date()): string {
   return JSON.stringify({
-    version: 1,
+    version: 2,
     generatedAt: at.toISOString(),
     site: `https://${profile.domain}`,
     profile: {
@@ -350,6 +408,23 @@ export function buildContentJson(at = new Date()): string {
       bio: profile.bio,
       availability: profile.availability,
     },
+    experience: experience.map((role) => ({
+      employer: role.employer,
+      title: role.title,
+      start: role.start,
+      ...(role.end ? { end: role.end } : {}),
+      period: periodLabel(role.start, role.end),
+      duration: durationLabel(role.start, role.end, at),
+      ...(role.summary ? { summary: role.summary } : {}),
+    })),
+    education: education.map((course) => ({
+      school: course.school,
+      course: course.course,
+      start: course.start,
+      end: course.end,
+      years: yearSpan(course.start, course.end),
+      ...(course.note ? { note: course.note } : {}),
+    })),
     skills: skills.map((skill) => ({
       name: skill.name,
       usedIn: (skill.usedIn ?? []).map((evidence) => ({ what: evidence.what, url: siteUrl(evidence.where) })),
@@ -374,7 +449,7 @@ interface EmittedFile {
 }
 
 const files: EmittedFile[] = [
-  { fileName: 'resume.txt', contentType: 'text/plain; charset=utf-8', build: buildResume },
+  { fileName: 'resume.txt', contentType: 'text/plain; charset=utf-8', build: () => buildResume() },
   { fileName: resumeHtmlFile('en'), contentType: 'text/html; charset=utf-8', build: () => buildResumeHtml('en') },
   { fileName: resumeHtmlFile('fr'), contentType: 'text/html; charset=utf-8', build: () => buildResumeHtml('fr') },
   { fileName: 'resume.css', contentType: 'text/css; charset=utf-8', build: () => RESUME_CSS },

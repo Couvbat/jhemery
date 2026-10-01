@@ -55,16 +55,42 @@ const CONTENT: SiteContent = {
   },
 };
 
+/** The same content as a version 2 file, which adds experience and education. */
+const CONTENT_V2: SiteContent = {
+  ...CONTENT,
+  version: 2,
+  experience: [
+    {
+      employer: { en: 'In-Leed', fr: 'In-Leed' },
+      title: { en: 'Full-Stack Developer', fr: 'Développeur Full-Stack' },
+      start: '2023-11',
+      period: { en: 'Nov 2023 – present', fr: 'nov. 2023 – aujourd’hui' },
+      duration: { en: '3 years', fr: '3 ans' },
+      summary: { en: 'Web apps.', fr: 'Applications web.' },
+    },
+  ],
+  education: [
+    {
+      school: { en: 'A school', fr: 'Une école' },
+      course: { en: 'Web developer', fr: 'Développeur web' },
+      start: '2021-10',
+      end: '2022-06',
+      years: '2021 – 2022',
+    },
+  ],
+};
+
 function build(
   env: Record<string, string> = {
     MCP_ENABLED: 'true',
     FRONTEND_URL: 'https://jhemery.xyz',
   },
   fail = false,
+  site: SiteContent = CONTENT,
 ) {
   const config = { get: (key: string) => env[key] } as unknown as ConfigService;
   const content = jest.fn(() =>
-    fail ? Promise.reject(new Error('down')) : Promise.resolve(CONTENT),
+    fail ? Promise.reject(new Error('down')) : Promise.resolve(site),
   );
   const source = { content, age: null } as unknown as McpContentService;
   return { service: new McpService(config, source), content };
@@ -136,6 +162,35 @@ describe('McpService', () => {
     );
     expect(JSON.stringify(en)).toContain('Full-Stack Developer');
     expect(JSON.stringify(fr)).toContain('Développeur Full-Stack');
+  });
+
+  it('puts experience and education in the résumé once the file carries them', async () => {
+    const resume = async (site: SiteContent, locale: string) => {
+      const { service } = build(undefined, false, site);
+      const reply = (await service.handle(
+        rpc('tools/call', { name: 'get_resume', arguments: { locale } }),
+      )) as { result: { content: Array<{ text: string }> } };
+      return reply.result.content[0].text;
+    };
+
+    const en = await resume(CONTENT_V2, 'en');
+    expect(en).toContain('EXPERIENCE');
+    expect(en).toContain(
+      'In-Leed — Full-Stack Developer (Nov 2023 – present · 3 years)',
+    );
+    expect(en).toContain('EDUCATION');
+    expect(en).toContain('A school — Web developer (2021 – 2022)');
+
+    const fr = await resume(CONTENT_V2, 'fr');
+    expect(fr).toContain('EXPÉRIENCE');
+    expect(fr).toContain('FORMATION');
+    expect(fr).toContain('3 ans');
+    expect(fr).toContain('Une école — Développeur web');
+
+    // A version 1 file has neither section, and the résumé still renders.
+    const v1 = await resume(CONTENT, 'en');
+    expect(v1).not.toContain('EXPERIENCE');
+    expect(v1).toContain('PROJECTS');
   });
 
   it('shows the evidence behind each skill', async () => {

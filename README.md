@@ -70,6 +70,8 @@ tools, watch-party and radio rooms, and 38 hidden achievements. English and Fren
 - 📄 **One source for the CV.** `curl jhemery.xyz` returns an ANSI-coloured résumé, and
   `/resume.html` a printable one in either language, both generated at build time from the same
   content the page renders. So is `content.json`, which a read-only MCP endpoint serves to agents.
+  Experience and education are dated, never typed as durations: every résumé works out "3 years"
+  from the months, counted the way LinkedIn counts them.
 
 ## Quick start
 
@@ -235,7 +237,7 @@ never show two different contents.
 | `hardware` | | `hardware [pc\|nas\|peripherals]` |
 | `contact` | `links` | How to reach me |
 | `neofetch` | `fetch` | System summary with an ASCII logo, an "uptime" counted from the first commit and whether I'm open to work |
-| `resume` | `cv` | Condensed résumé, with a link to the printable one |
+| `resume` | `cv` | Condensed résumé (experience, education, stack, links), with a link to the printable one |
 | `curl` | | `curl jhemery.xyz` fetches the résumé the way a real curl would |
 
 </details>
