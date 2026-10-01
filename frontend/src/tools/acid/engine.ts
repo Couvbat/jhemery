@@ -214,6 +214,12 @@ export function createEngine(
   const engine: AcidEngine = {
     start() {
       if (playing || disposed) return
+      // Already in the background (the shell's chunks loaded after the visitor switched
+      // tabs): no `visibilitychange` is coming to stop it, so it never starts.
+      if (document.hidden) {
+        options.onStop?.('hidden')
+        return
+      }
       if (sounding) sounding.halt('replaced')
       sounding = { halt }
       window.clearTimeout(suspendTimer)

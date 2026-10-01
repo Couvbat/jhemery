@@ -87,8 +87,9 @@ function toggle() {
   }
   notice.value = null
   engine.start()
-  playing.value = true
-  if (follows) follow()
+  // Read back rather than assumed: a start refused (a hidden tab) has already said why.
+  playing.value = engine.playing
+  if (playing.value && follows) follow()
 }
 
 onBeforeUnmount(() => {

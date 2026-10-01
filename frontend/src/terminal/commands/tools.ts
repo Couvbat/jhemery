@@ -89,6 +89,7 @@ const ACID = {
     fr: 'pas un code de motif — le lien copié par l’outil acid en donne un',
   },
   pressKey: { en: 'press any key to start sound', fr: 'appuyez sur une touche pour lancer le son' },
+  wave: { saw: { en: 'saw', fr: 'scie' }, square: { en: 'square', fr: 'carrée' } },
   legend: { en: '● accent  ─── slide', fr: '● accent  ─── slide' },
   hint: { en: 'q, Esc or Ctrl+C stops · edit it at', fr: 'q, Échap ou Ctrl+C arrête · le modifier sur' },
   ended: {
@@ -330,7 +331,7 @@ export const toolCommands: Command[] = [
 
         const shared = `/tools/acid?p=${acid.encode(pattern)}`
         ctx.print(
-          line(`acid · ${pattern.bpm} bpm · ${pattern.wave} · ${acid.NOTE_NAMES[pattern.root]}`, 'primary'),
+          line(`acid · ${pattern.bpm} bpm · ${t(ACID.wave[pattern.wave])} · ${acid.NOTE_NAMES[pattern.root]}`, 'primary'),
         )
         const playhead = !prefersReducedMotion()
         const draw = ctx.frame()

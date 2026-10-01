@@ -368,6 +368,17 @@ describe('the engine', () => {
     Object.defineProperty(document, 'hidden', { configurable: true, get: () => false })
   })
 
+  it('never starts in a tab that is already in the background', () => {
+    const onStop = vi.fn()
+    const engine = engineOn(DEFAULT_PATTERN, onStop)
+    Object.defineProperty(document, 'hidden', { configurable: true, get: () => true })
+    engine.start()
+    Object.defineProperty(document, 'hidden', { configurable: true, get: () => false })
+    expect(engine.playing).toBe(false)
+    expect(onStop).toHaveBeenCalledWith('hidden')
+    expect(gate()).toEqual([])
+  })
+
   it('lets one sequencer sound at a time', () => {
     const first = vi.fn()
     const a = engineOn(DEFAULT_PATTERN, first)

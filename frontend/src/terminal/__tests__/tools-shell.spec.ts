@@ -215,6 +215,7 @@ describe('acid', () => {
     const run = start([code])
     await vi.waitFor(() => expect(engine.started).toBe(1))
     expect(run.text()).toContain('acid · 250 bpm · saw · A')
+    expect(run.printed.find((l) => l.href)?.text).toBe(`/tools/acid?p=${code}`)
     expect(run.printed.find((l) => l.href)).toMatchObject({ href: `/tools/acid?p=${code}` })
     run.press('q')
     await run.running
