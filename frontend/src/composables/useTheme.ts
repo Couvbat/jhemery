@@ -1,4 +1,5 @@
 import { computed, ref, shallowRef } from 'vue'
+import { EMBED_FALLBACK_COLOUR } from '@/content/music'
 import {
   CUSTOM_THEME,
   DEFAULT_THEME,
@@ -155,9 +156,23 @@ function spread(next: Theme, origin: ThemeOrigin | undefined, pick: number) {
 }
 
 function apply(next: Theme) {
+  // A pick that doesn't circle (dark to light, calm, the prism turning) still ends a circle
+  // in flight: the rest of it would show the old snapshot around the new scheme.
+  spreading?.skipTransition()
   paint(next)
   shown.value = null
   current.value = next
+}
+
+/**
+ * The colour a third-party embed (the SoundCloud widget) is drawn in: the scheme's green,
+ * unless the scheme is a forged one. A forged colour is near-unique to one visitor and
+ * lives in their storage, so sent on every visit it would let SoundCloud link their
+ * sessions; a shipped scheme's green is shared by everyone who picked it.
+ */
+export function embedColour(): string {
+  if (current.value.id === 'custom' || typeof document === 'undefined') return EMBED_FALLBACK_COLOUR
+  return getComputedStyle(document.documentElement).getPropertyValue('--neon-green')
 }
 
 /**
@@ -197,6 +212,7 @@ export function setTheme(id: string, { origin }: { origin?: ThemeOrigin } = {}):
 export function previewTheme(id: string): (() => void) | null {
   const next = findTheme(id)
   if (!next) return null
+  spreading?.skipTransition()
   paint(next)
   shown.value = next
   return () => {

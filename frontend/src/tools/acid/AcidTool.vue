@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, reactive, ref, toRaw, watch } from 'vue'
 import { useRoute } from 'vue-router'
-import { prefersReducedMotion } from '@/composables/useCrt'
+import { decorativeMotion } from '@/composables/useMotion'
 import { useLocale } from '@/i18n'
 import { copyText } from '../clipboard'
 import ToolFrame from '../ToolFrame.vue'
@@ -48,8 +48,9 @@ const pattern = reactive(clonePattern(DEFAULT_PATTERN))
 const playing = ref(false)
 const playhead = ref(-1)
 // The playhead jumps up to twenty times a second at the top of the tempo range, so it is
-// left out under reduced motion; the status still says the pattern is playing.
-const follows = !prefersReducedMotion()
+// left out when motion is paused (the OS setting included), read when play is pressed;
+// the status still says the pattern is playing.
+const follows = () => decorativeMotion() !== 'paused'
 
 let context: AudioContext | null = null
 let engine: AcidEngine | null = null
@@ -89,7 +90,7 @@ function toggle() {
   engine.start()
   // Read back rather than assumed: a start refused (a hidden tab) has already said why.
   playing.value = engine.playing
-  if (playing.value && follows) follow()
+  if (playing.value && follows()) follow()
 }
 
 onBeforeUnmount(() => {

@@ -248,6 +248,15 @@ describe('the theme circle', () => {
     expect(useTheme().theme.value.id).toBe('dracula')
   })
 
+  // Found in review: a pick that didn't circle left the first circle running over it.
+  it('ends a circle in flight on any later paint, circling or not', async () => {
+    const { setTheme } = await load()
+    const { skipped } = stubTransitions()
+    setTheme('dracula')
+    setTheme('gruvbox-light')
+    expect(skipped).toEqual([0])
+  })
+
   it('leaves dark to light to the flashbang', async () => {
     const { setTheme } = await load()
     const { start } = stubTransitions()
@@ -359,5 +368,15 @@ describe('previewTheme', () => {
   it('refuses an unknown scheme', async () => {
     const { previewTheme } = await load()
     expect(previewTheme('nope')).toBeNull()
+  })
+})
+
+// Found in review: a forged colour is near-unique, and the embed sent it to SoundCloud.
+describe('embedColour', () => {
+  it('never hands an embed a forged scheme’s colour', async () => {
+    const { applyForgedTheme, embedColour } = await load()
+    const { forgeScheme } = await import('@/lib/forge')
+    applyForgedTheme(forgeScheme('#3a7bd5', 'dark')!.theme)
+    expect(embedColour()).toBe('#00ff41')
   })
 })

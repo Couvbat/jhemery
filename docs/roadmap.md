@@ -561,6 +561,8 @@ Recorded as each row ships.
     pulsed with no guard at all, beside the `motion-safe:` ones.
   - Outside the census: scrolling to a section (`scrollToSection()` and the router's hash
     scroll) was smooth even under reduced motion. It jumps with motion `paused` now.
+  - Found in review: `acid`'s playhead, in the shell and on the tool, is a typed animation like
+    `sl`'s, so `paused` stills it, the OS setting included.
 - **Theme transitions:**
   - Beside dark → light, the circle is also skipped below `full` motion and while the prism
     turns, and a new pick cuts one in flight short.
@@ -585,6 +587,9 @@ Recorded as each row ships.
     blue and magenta the nearest tone by hue, so two slots can share a colour.
   - `theme export` prints the scheme on screen, whatever it is, and saves nothing; it is
     `local` only because everything after `theme` is.
+  - Found in review: a forged scheme's colour never reaches the SoundCloud widget, which gets
+    the default green instead. A colour that is near-unique and kept in the visitor's storage
+    would let SoundCloud link their visits. A seed with a non-finite number is not a colour.
 
 ## Build order
 

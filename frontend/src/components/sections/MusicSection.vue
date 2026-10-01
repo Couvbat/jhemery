@@ -7,20 +7,20 @@ import WindowDots from '@/components/WindowDots.vue'
 import { music, soundcloudEmbedSrc } from '@/content'
 import { useLocale } from '@/i18n'
 import { useMusicPlayer } from '@/composables/useMusicPlayer'
+import { embedColour } from '@/composables/useTheme'
 
 const { t, m } = useLocale()
 const { autoplayNonce } = useMusicPlayer()
 
-function neonGreen(): string {
-  return getComputedStyle(document.documentElement).getPropertyValue('--neon-green')
-}
 
 // The player is drawn in the scheme's green, read when the frame mounts and again on each
 // `play` remount — never on a scheme change: a new `src` reloads the cross-origin player
 // and stops whatever it was playing. During setup, so the first `src` is already right.
-const colour = ref(neonGreen())
+// `embedColour()` is the scheme's green, but never a forged one's: that would follow the
+// visitor to SoundCloud on every visit.
+const colour = ref(embedColour())
 watch(autoplayNonce, () => {
-  colour.value = neonGreen()
+  colour.value = embedColour()
 })
 const src = computed(() => soundcloudEmbedSrc(colour.value, autoplayNonce.value > 0))
 </script>

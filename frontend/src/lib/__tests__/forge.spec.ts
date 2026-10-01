@@ -54,7 +54,7 @@ describe('forgeScheme', () => {
   })
 
   it('refuses what is not a colour, and a mode that is not one of the two', () => {
-    for (const seed of ['', 'orange-ish', '#12345', 'rgb(1, 2)', 'url(x)', '#d65d0e; color: red']) {
+    for (const seed of ['', 'orange-ish', '#12345', 'rgb(1, 2)', 'url(x)', '#d65d0e; color: red', 'oklch(0.5 1e999 0)', 'hsl(1e999 50% 50%)', 'oklch(0.5 0.1 1e999)']) {
       expect(forgeScheme(seed), seed).toBeNull()
     }
     expect(forgeScheme('#d65d0e', 'dim' as never)).toBeNull()

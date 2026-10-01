@@ -253,6 +253,22 @@ describe('acid', () => {
     expect(run.text()).not.toContain('▲')
   })
 
+  // Found in review: the playhead ignored the site's own motion setting.
+  it('draws no playhead with motion paused, whatever the OS says', async () => {
+    const { setMotion } = await import('@/composables/useMotion')
+    setMotion('paused')
+    try {
+      const run = start()
+      await vi.waitFor(() => expect(engine.started).toBe(1))
+      engine.position = 3
+      run.press('q')
+      await run.running
+      expect(run.text()).not.toContain('▲')
+    } finally {
+      setMotion('full')
+    }
+  })
+
   it('stops after two minutes', async () => {
     vi.useFakeTimers()
     const run = start()

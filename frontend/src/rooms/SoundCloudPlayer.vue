@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref } from 'vue'
 import type { PlayerProps, PlayerReading } from './players'
+import { embedColour } from '@/composables/useTheme'
 import { SOUNDCLOUD_ORIGIN, soundcloudEmbed } from './sync'
 
 /**
@@ -17,7 +18,8 @@ const frame = ref<HTMLIFrameElement | null>(null)
 // The colour is read when the source is built — a new item, or autoplay switching —
 // and not on a scheme change: a new `src` reloads the cross-origin player and stops it.
 const src = computed(() => {
-  const colour = getComputedStyle(document.documentElement).getPropertyValue('--neon-green')
+  // Never a forged scheme's colour, which would identify the visitor to SoundCloud.
+  const colour = embedColour()
   return soundcloudEmbed(props.media, colour, props.autoplay)
 })
 

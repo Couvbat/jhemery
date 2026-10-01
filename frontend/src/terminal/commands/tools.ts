@@ -1,4 +1,4 @@
-import { prefersReducedMotion } from '@/composables/useCrt'
+import { decorativeMotion } from '@/composables/useMotion'
 import { terminalOpen } from '@/composables/useTerminalShell'
 import { closeAfterFade, openAudioContext } from '@/tools/acid/audio'
 import type { AcidEngine } from '@/tools/acid/engine'
@@ -333,7 +333,8 @@ export const toolCommands: Command[] = [
         ctx.print(
           line(`acid · ${pattern.bpm} bpm · ${t(ACID.wave[pattern.wave])} · ${acid.NOTE_NAMES[pattern.root]}`, 'primary'),
         )
-        const playhead = !prefersReducedMotion()
+        // A typed animation, as `sl` and `top` are: paused (the OS setting included) stills it.
+        const playhead = decorativeMotion() !== 'paused'
         const draw = ctx.frame()
         let shown = Number.NaN
         const paint = (at: number) => {
