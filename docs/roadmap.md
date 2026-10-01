@@ -624,8 +624,10 @@ Recorded as each row ships.
     followed by a note that a wave carries nothing. A wave that lands while the terminal is
     closed isn't kept for later; one that lands mid-command is printed after it.
   - The ripple only plays at `full` motion with the loop running.
-  - Slice 4's request observer hadn't landed, so the POST and the `wave` event don't go
-    through it yet.
+  - Integrated onto slice 4: `api.wall()` goes through `request()`, so `strace wall` shows the
+    POST, and the presence stream is opened by `openEventSource()`, which strace reports once.
+    A wave is an event on that stream, not a request. A wave that couldn't be sent is a
+    `fail()`, so `wall && …` stops on it.
 
 ## Build order
 

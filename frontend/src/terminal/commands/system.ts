@@ -248,7 +248,9 @@ export const systemCommands: Command[] = [
         ? [line(t({ en: 'messages are not carried — only the wave', fr: 'les messages ne sont pas transmis — seulement le signe' }), 'muted')]
         : []
       const reply = WAVE_REPLIES[await sendWave(signal)]
-      return [...dropped, line(t(reply.text), reply.tone)]
+      // A wave that couldn't leave is the one failure: `wall && …` stops on it, as on any
+      // other fail(); off, limited and alone are answers, not errors.
+      return [...dropped, reply.tone === 'error' ? fail(t(reply.text)) : line(t(reply.text), reply.tone)]
     },
   },
   {
