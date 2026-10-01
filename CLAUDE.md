@@ -125,9 +125,11 @@ argument completion, and `manual` for what its man page adds to the generated on
 its `usage` needs OPTIONS text there, which `manual.spec.ts` checks); the shell handles prefix filtering, common-prefix insertion and ambiguity
 listing generically. Anything that runs a command the visitor didn't type must ask
 `isLinkable(command, args)`: opted in, not hidden, writes `none`, and every argument one the
-command offers for Tab. `runLink` does today; `tour`, pipe stages and history expansion must when
-they land. `ctx.run` checks nothing, so only pass it fixed command lines. Read `writes` through
-`writesOf()`; `registry.spec.ts` pins the whole classification, so a new writer or a quiet
+command offers for Tab. `runLink` and `tour` do, and so does every stage of a linked pipe.
+History expansion follows its own rule, read off the same `writes`: a line naming a
+server-writing command (through an alias too) is never expanded, and an expansion that would
+write anything waits in history for the visitor to send it. `ctx.run` checks nothing, so only
+pass it fixed command lines. Read `writes` through `writesOf()`; `registry.spec.ts` pins the whole classification, so a new writer or a quiet
 downgrade fails it.
 
 A line is read by `terminal/parse.ts` (pipes, `;`, `&&`, `||`, `NAME=value`): quotes only group

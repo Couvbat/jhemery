@@ -22,6 +22,17 @@ describe('expandHistory', () => {
     expect((result as { line: string }).line).toBe(line.replace('\\!', '!'))
   })
 
+  it('reads !N in the numbering history prints once old lines have been dropped', () => {
+    // 40 lines dropped: the first kept entry is printed as 41.
+    expect(expandHistory('!42', entries, isServerBound, 40)).toEqual({ line: 'cat about.txt', expanded: true })
+    expect(expandHistory('!2', entries, isServerBound, 40)).toEqual({ error: '!2: event not found' })
+  })
+
+  it('takes a ^a^b replacement as text, not a replacement pattern', () => {
+    expect(expandHistory('^three^$$5', entries, isServerBound)).toEqual({ line: 'echo one two $$5', expanded: true })
+    expect(expandHistory('^three^$&$&', entries, isServerBound)).toEqual({ line: 'echo one two $&$&', expanded: true })
+  })
+
   it('says which event is missing, or which substitution failed', () => {
     expect(expand('!9')).toEqual({ error: '!9: event not found' })
     expect(expand('!!', [])).toEqual({ error: '!!: event not found' })

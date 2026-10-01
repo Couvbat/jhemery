@@ -83,26 +83,37 @@ test.describe('terminal', () => {
       await terminal.input.press('q')
       await expect(status).toBeHidden()
       await expect(terminal.output).not.toContainText('cancelled')
+    })
+  })
 
   // What jsdom can't show: that the browser's own Ctrl+R never fires, and that the ghost
   // lines up with real text in a real input.
   test.describe('history', () => {
-    test('Ctrl+R searches instead of reloading, and → takes the ghost', async ({ page, terminal }) => {
+    test('Ctrl+R searches instead of reloading, again for older, and → takes the ghost', async ({ page, terminal }) => {
       await terminal.open()
       await terminal.run('theme nord')
+      await terminal.run('theme dracula')
       await terminal.run('whoami')
-      const navigations: string[] = []
-      page.on('framenavigated', (frame) => {
-        if (frame === page.mainFrame()) navigations.push(frame.url())
+      // The reload is the browser's default action: what proves it never happens is that
+      // the shell prevented it, seen after the input's own handler has run.
+      await page.evaluate(() => {
+        const w = window as unknown as { __reloads: boolean[] }
+        w.__reloads = []
+        document.addEventListener('keydown', (event) => {
+          if (event.key === 'r' && event.ctrlKey) w.__reloads.push(!event.defaultPrevented)
+        })
       })
 
       await terminal.input.press('Control+r')
-      await terminal.input.pressSequentially('nor')
-      await expect(page.getByText("(reverse-i-search)'nor':")).toBeVisible()
+      await terminal.input.pressSequentially('theme')
+      await expect(page.getByText("(reverse-i-search)'theme':")).toBeVisible()
+      await expect(terminal.input).toHaveValue('theme dracula')
+      // A second Ctrl+R goes further back, which it can't if the Control keydown ends the search.
+      await terminal.input.press('Control+r')
       await expect(terminal.input).toHaveValue('theme nord')
       await terminal.input.press('Escape')
       await expect(terminal.input).toHaveValue('theme nord')
-      expect(navigations).toEqual([])
+      expect(await page.evaluate(() => (window as unknown as { __reloads: boolean[] }).__reloads)).toEqual([false, false])
 
       await terminal.input.fill('')
       await terminal.input.pressSequentially('who')

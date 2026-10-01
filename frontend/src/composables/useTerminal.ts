@@ -2,7 +2,7 @@ import { computed, nextTick, ref, shallowRef, watch } from 'vue'
 import { currentLocale } from '@/i18n'
 import { messages } from '@/i18n/messages'
 import { expandAliases } from '@/terminal/aliases'
-import { expandHistory, history, pushHistory } from '@/terminal/history'
+import { expandHistory, history, historyBase, prefixMatches, pushHistory } from '@/terminal/history'
 import { pick, type Locale } from '@/content/types'
 import { fail } from '@/terminal/format'
 import { completableFlags, renderUsage } from '@/terminal/manual'
@@ -52,7 +52,6 @@ const busy = ref(false)
 const vimBuffer = ref<VimBufferState | null>(null)
 
 const buffer = ref<OutputLine[]>([])
-const historyIndex = ref(-1)
 const draft = ref('')
 
 /** Set while a command is waiting on `ctx.prompt()`. */
@@ -481,16 +480,9 @@ export async function run(input: string): Promise<void> {
   // again, because what it holds may be another alias. Each stage is replaced in place,
   // so env words and quoting stay as typed. `alias` itself is never expanded — it reads
   // its own raw line — because it is a real command and aliases cannot shadow those.
-  let line = input
-  let chain = parsed.chain
-  for (let round = 0; round < EXPANSION_ROUNDS; round++) {
-    const next = replaceStages(line, chain, (stage) => expandAliases(stage.raw, namesCommand))
-    if (next === line) break
-    const again = parseLine(next)
-    if (!again.ok) return void append(fail(again.error))
-    line = next
-    chain = again.chain
-  }
+  const expanded = expandLine(input, parsed.chain)
+  if ('error' in expanded) return void append(fail(expanded.error))
+  const { line, chain } = expanded
 
   // Every stage resolves before any runs: an unknown one runs nothing, so a line the
   // visitor meant as text never half-runs.
@@ -512,6 +504,21 @@ export async function run(input: string): Promise<void> {
 
 /** Rounds of alias expansion a line may take; each also re-reads it, and MAX_STAGES bounds what it grows to. */
 const EXPANSION_ROUNDS = 8
+
+/** A line with the visitor's aliases expanded, stage by stage and round after round, as it will run. */
+function expandLine(input: string, parsed: Link[]): { line: string; chain: Link[] } | { error: string } {
+  let line = input
+  let chain = parsed
+  for (let round = 0; round < EXPANSION_ROUNDS; round++) {
+    const next = replaceStages(line, chain, (stage) => expandAliases(stage.raw, namesCommand))
+    if (next === line) break
+    const again = parseLine(next)
+    if (!again.ok) return { error: again.error }
+    line = next
+    chain = again.chain
+  }
+  return { line, chain }
+}
 
 /** A server-bound stage whose text isn't one quoted group, in a line with an operator in it. */
 function unquotedMessage(links: ResolvedLink[], chain: Link[]): { name: string; stage: Stage } | undefined {
@@ -544,11 +551,13 @@ export async function submit(value: string): Promise<void> {
   }
 
   append({ text: value, prompt: true })
-  historyIndex.value = -1
-  recallPrefix = null
+  resetRecall()
 
   // `!!`, `!$`, `!N`, `^a^b`: typed lines only, never a link, a nested run or an answer.
-  const expansion = expandHistory(value, history.value, isServerBound)
+  // Alias-aware, as the line will run: `alias s=sign` must not make `s Great site!!` expandable.
+  const serverBound = (word: string) =>
+    isServerBound(word) || isServerBound(expandAliases(word, namesCommand).split(/\s+/)[0] ?? '')
+  const expansion = expandHistory(value, history.value, serverBound, historyBase.value)
   if ('error' in expansion) return void append(fail(`couvsh: ${expansion.error}`))
   const line = expansion.line
   if (expansion.expanded) {
@@ -561,17 +570,22 @@ export async function submit(value: string): Promise<void> {
       return
     }
   }
-  // Into history once it has run, so `history | grep …` lists what came before it.
+  // Into history once it has run, so `history | grep …` lists what came before it; as
+  // typed when nothing expanded, so a recalled `\!!` is still a literal `!!`.
   await run(line)
-  pushHistory(line)
+  pushHistory(expansion.expanded ? line : value)
 }
 
 /** Whether any stage of a line would write, by the same `writes` links and pipes read. */
 function writesAnything(line: string): boolean {
   const parsed = parseLine(line)
   if (!parsed.ok) return false
-  const resolved = resolveChain(parsed.chain)
-  return 'links' in resolved && resolved.links.some((link) => link.stages.some((s) => writesOf(s.command, s.args) !== 'none'))
+  const expanded = expandLine(line, parsed.chain)
+  if ('error' in expanded) return false
+  const resolved = resolveChain(expanded.chain)
+  // A stage that doesn't resolve can't be vouched for: hold it back too.
+  if ('unknown' in resolved) return true
+  return resolved.links.some((link) => link.stages.some((s) => writesOf(s.command, s.args) !== 'none'))
 }
 
 /** A link's command can never be longer than this, or carry control characters. */
@@ -614,7 +628,7 @@ export async function runLink(input: string): Promise<void> {
   }
 
   append({ text: line, prompt: true })
-  historyIndex.value = -1
+  resetRecall()
   await runChain(links)
   pushHistory(line)
 }
@@ -633,8 +647,18 @@ export function cancel() {
   if (!running) append({ text: messages.terminal.cancelled[currentLocale()], tone: 'muted' })
 }
 
-/** What ↑ was pressed on, when there was text: the walk only stops on lines starting with it. */
-let recallPrefix: string | null = null
+/**
+ * What ↑/↓ walk, newest first: every entry from an empty line, or, with text, the lines
+ * that start with it, each once (`prefixMatches`). Null when no walk is under way.
+ */
+let recallList: string[] | null = null
+let recallAt = -1
+
+/** Forgets the walk: typing, Ctrl+C and a submitted line all start the next ↑ afresh. */
+export function resetRecall(): void {
+  recallList = null
+  recallAt = -1
+}
 
 /**
  * ↑/↓ through submitted commands. Returns the value the input should show. With text in
@@ -645,25 +669,20 @@ export function recallHistory(direction: -1 | 1, current: string): string {
   const entries = history.value
   if (entries.length === 0) return current
 
-  if (historyIndex.value === -1) {
+  if (!recallList) {
     if (direction === 1) return current
     draft.value = current
-    recallPrefix = current.trim() ? current : null
+    recallList = current.trim() ? prefixMatches(entries, current) : [...entries].reverse()
   }
-  const fits = (i: number) => recallPrefix === null || entries[i]!.startsWith(recallPrefix)
-
-  let i = historyIndex.value === -1 ? entries.length : historyIndex.value
-  for (i += direction; i >= 0 && i < entries.length; i += direction) if (fits(i)) break
-
-  if (i >= entries.length) {
-    historyIndex.value = -1
-    recallPrefix = null
+  const next = recallAt - direction
+  if (next < 0) {
+    resetRecall()
     return draft.value
   }
   // Past the oldest match: stay on it (or on the text, if nothing ever matched).
-  if (i < 0) return historyIndex.value === -1 ? current : entries[historyIndex.value]!
-  historyIndex.value = i
-  return entries[i]!
+  if (next >= recallList.length) return recallAt === -1 ? current : recallList[recallAt]!
+  recallAt = next
+  return recallList[recallAt]!
 }
 
 /** Resolves which command owns a half-typed line, and where its arguments start. */

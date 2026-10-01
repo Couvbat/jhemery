@@ -2,7 +2,7 @@
 import { computed, nextTick, onMounted, ref, watch } from 'vue'
 import { profile } from '@/content'
 import { useLocale } from '@/i18n'
-import { useTerminal } from '@/composables/useTerminal'
+import { resetRecall, useTerminal } from '@/composables/useTerminal'
 import { usePromptSuggestion } from '@/composables/usePromptSuggestion'
 import { autosuggest, searchBackward } from '@/terminal/history'
 import { suggestionPool } from '@/terminal/registry'
@@ -87,8 +87,12 @@ function endSearch(keep: boolean) {
   input.value = keep && current.found ? current.found : current.saved
 }
 
+/** A modifier pressed on its own: the first half of Ctrl+R, Ctrl+C or a capital, not a key. */
+const MODIFIER_KEYS = new Set(['Control', 'Shift', 'Alt', 'AltGraph', 'Meta', 'CapsLock', 'Dead', 'Process'])
+
 /** The keys Ctrl+R's search takes for itself. Returns whether it took this one. */
 function searchKeydown(event: KeyboardEvent): boolean {
+  if (MODIFIER_KEYS.has(event.key)) return true
   const current = search.value!
   if ((event.key === 'c' || event.key === 'g') && event.ctrlKey) {
     endSearch(false)
@@ -115,6 +119,12 @@ function searchKeydown(event: KeyboardEvent): boolean {
 /** Where the caret is and whether the input has scrolled: the ghost only fits at the end of an unscrolled line. */
 const caretAtEnd = ref(true)
 const inputScrolled = ref(false)
+/** Typing starts the next ↑ afresh, from what is now in the input. */
+function onTyped() {
+  resetRecall()
+  measure()
+}
+
 function measure() {
   const el = inputEl.value
   if (!el) return
@@ -126,6 +136,12 @@ function measure() {
 const ghost = computed(() =>
   ownsKeyboard.value && !search.value && caretAtEnd.value && !inputScrolled.value ? autosuggest(input.value, history.value) : '',
 )
+
+// A search belongs to the shell's own prompt: a prompt, a game or a command taking the
+// keyboard ends it, and so does closing the panel, which leaves this component mounted.
+watch(ownsKeyboard, (owns) => {
+  if (!owns) endSearch(false)
+})
 
 const promptLabel = computed(() => {
   if (search.value) return `(reverse-i-search)'${search.value.query}':`
@@ -158,6 +174,7 @@ watch(open, (isOpen) => {
   if (isOpen) {
     void handleOpened()
   } else {
+    endSearch(false)
     previouslyFocused?.focus()
     previouslyFocused = null
   }
@@ -227,7 +244,7 @@ function onKeydown(event: KeyboardEvent) {
     else if (search.value.query) findInSearch(search.value.query, search.value.index)
     return
   }
-  if (search.value && searchKeydown(event)) return
+  if (search.value && ownsKeyboard.value && searchKeydown(event)) return
 
   // → or End at the end of the line takes the ghost.
   if ((event.key === 'ArrowRight' || event.key === 'End') && ghost.value) {
@@ -257,6 +274,7 @@ function onKeydown(event: KeyboardEvent) {
   } else if (event.key === 'c' && event.ctrlKey) {
     event.preventDefault()
     input.value = ''
+    resetRecall()
     cancel()
   }
 }
@@ -423,7 +441,7 @@ function onPanelKeydown(event: KeyboardEvent) {
               :placeholder="placeholder"
               class="w-full bg-transparent outline-none text-foreground caret-primary aria-disabled:opacity-50 placeholder:text-muted-foreground/50"
               @keydown="onKeydown"
-              @input="measure"
+              @input="onTyped"
               @keyup="measure"
               @click="measure"
               @scroll="measure"

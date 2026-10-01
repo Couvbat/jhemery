@@ -1,6 +1,8 @@
 import { ref } from 'vue'
 
 const STORAGE_KEY = 'couvbat:history'
+/** How many entries have been dropped off the front, so `history` numbers stay put (`!57` is 57). */
+const BASE_KEY = 'couvbat:history:base'
 const MAX_ENTRIES = 100
 
 function load(): string[] {
@@ -13,16 +15,36 @@ function load(): string[] {
   }
 }
 
+function loadBase(): number {
+  if (typeof window === 'undefined') return 0
+  try {
+    const n = Number(window.localStorage.getItem(BASE_KEY))
+    return Number.isInteger(n) && n > 0 ? n : 0
+  } catch {
+    return 0
+  }
+}
+
 /** Shared by the session composable and the `history` command. */
 export const history = ref<string[]>(load())
+/**
+ * The number before the first entry: `history` prints `base + i + 1`, and `!N` reads the
+ * same numbering, so a full history dropping its oldest line doesn't shift every number
+ * the visitor was just shown.
+ */
+export const historyBase = ref(loadBase())
 
 export function pushHistory(entry: string) {
   const trimmed = entry.trim()
   if (!trimmed || history.value[history.value.length - 1] === trimmed) return
 
-  history.value = [...history.value, trimmed].slice(-MAX_ENTRIES)
+  const next = [...history.value, trimmed]
+  const dropped = Math.max(0, next.length - MAX_ENTRIES)
+  history.value = next.slice(dropped)
+  historyBase.value += dropped
   try {
     window.localStorage.setItem(STORAGE_KEY, JSON.stringify(history.value))
+    window.localStorage.setItem(BASE_KEY, String(historyBase.value))
   } catch {
     // Private browsing or a full quota — history just won't persist.
   }
@@ -50,6 +72,8 @@ export function expandHistory(
   line: string,
   entries: readonly string[],
   isServerBound: (word: string) => boolean,
+  /** `historyBase`: `!N` counts as `history` prints. */
+  base = 0,
 ): Expansion {
   if (line.split(/\s+/).some(isServerBound)) return { line, expanded: false }
   const last = entries[entries.length - 1]
@@ -57,7 +81,8 @@ export function expandHistory(
   const quick = /^\^([^^]+)\^([^^]*)\^?$/.exec(line)
   if (quick) {
     if (!last || !last.includes(quick[1]!)) return { error: `:s^${quick[1]}^${quick[2]}^: substitution failed` }
-    return { line: last.replace(quick[1]!, quick[2]!), expanded: true }
+    // A function, so `$&` and `$$` in the replacement are text, not replacement patterns.
+    return { line: last.replace(quick[1]!, () => quick[2]!), expanded: true }
   }
 
   let out = ''
@@ -84,7 +109,7 @@ export function expandHistory(
     const number = /^-?\d+/.exec(line.slice(i + 1))?.[0]
     if (number) {
       const n = Number(number)
-      const entry = n > 0 ? entries[n - 1] : n < 0 ? entries[entries.length + n] : undefined
+      const entry = n > 0 ? entries[n - 1 - base] : n < 0 ? entries[entries.length + n] : undefined
       if (!entry) return { error: `!${number}: event not found` }
       out += entry
       i += number.length
