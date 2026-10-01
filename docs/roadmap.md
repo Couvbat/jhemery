@@ -297,7 +297,7 @@ them.
 |---|---|---|---|---|
 | [x] | Queue as a sidebar | The queue exists (50 items, visible to guests) but sits under the host's controls, listed by raw video id or track path, so nobody can see what's coming. On wide screens the room becomes two columns, the player and an *up next* sidebar with the current item on top and the queue numbered under it; on a phone the sidebar stacks under the player. The host removes and reorders from the sidebar, and "next" moves there too; guests read it. Reordering needs no backend: a queue update already replaces the whole array. | `rooms/RoomPage.vue`, `i18n/messages.ts` | S |
 | [x] | YouTube in radio | A YouTube id (eleven characters) and a SoundCloud item (an https URL) can't be mistaken for each other, so the queue stays `string[]`. `validMedia()` accepts either for `radio` (watch stays YouTube-only), `parseMedia()` tries both, and the page picks the player per *item* rather than per room. The sync logic already drives both through one `PlayerHandle` and both emit `finished`, so a mixed queue hands over between them with no new sync code. YouTube's embed terms don't allow hiding the video to keep the audio, so a YouTube item in radio plays in a small but visible player. What keeps the two rooms distinct: watch is a big video player, radio a mixed playlist. | `backend/src/rooms/rooms.service.ts`, `rooms/sync.ts`, `rooms/RoomPage.vue`, `i18n/messages.ts` | S–M |
-| [ ] | Titles in the queue (follow-up) | "Artist — Track" instead of an id. The backend resolves a title once, when the host adds the item, through YouTube's and SoundCloud's oEmbed endpoints, and keeps it beside the item. Fetching from the browser would mean widening `connect-src`, which is the reason not to. The queue becomes `{ media, title? }[]`, a change to the shape both apps read, so they deploy together; a failed lookup keeps the id, never blocks the add. | `backend/src/rooms/*`, `lib/api.ts`, `rooms/RoomPage.vue` | M |
+| [x] | Titles in the queue (follow-up) | "Artist — Track" instead of an id. The backend resolves a title once, when the host adds the item, through YouTube's and SoundCloud's oEmbed endpoints, and keeps it beside the item. Fetching from the browser would mean widening `connect-src`, which is the reason not to. The queue becomes `{ media, title? }[]`, a change to the shape both apps read, so they deploy together; a failed lookup keeps the id, never blocks the add. | `backend/src/rooms/*`, `lib/api.ts`, `rooms/RoomPage.vue` | M |
 
 ### The shell, deeper
 
@@ -500,6 +500,25 @@ Recorded as each row ships.
     titles land.
   - An old backend answers a YouTube item in a radio with a 400 until it deploys; nothing else
     depends on the order.
+- **Titles in the queue:**
+  - The queue stays `string[]`. Titles travel beside it as `titles?: Record<string, string>`,
+    with `state.title` for the current item, rather than turning it into `{ media, title? }[]`.
+    Bundles cached by the service worker call `.replace` on each item and post the queue back
+    into a `string[]` DTO, so the new shape would have broken them. The change is additive, so
+    nothing deploys together and either app may be the older one.
+  - The title is the oEmbed `title` as given, not reshaped into "Artist — Track" (SoundCloud's
+    reads "Track by Artist"). Control and bidi characters are stripped and it is capped at 120
+    code points.
+  - Titles are looked up on any update, not only when the host adds the item: for every item the
+    room holds without one. A cache shared by every room (an LRU of 500) means a promotion by
+    `next`, a reorder or a second room holding the same item costs no request. A miss is asked
+    again after 10 minutes, and a lookup the budget refused on the next update.
+  - Not in the approach: a global budget of 30 lookups a minute and 4 at once, each one request
+    (3 s, 16 kB, no redirects). Without it, a host posting 50 ids at the state route's limit
+    would make the server hammer YouTube, which has blocked this host once already.
+  - A title that lands late is published only to a room that is still open and still holds the
+    item, and titles for items a room no longer holds are pruned on every update.
+  - The page renders a title by interpolation only, with the item itself as the tooltip.
 
 ## Build order
 

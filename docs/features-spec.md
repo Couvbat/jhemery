@@ -995,6 +995,18 @@ stay rejected. Rules the code cites:
 - **State is anchored to the server clock.** `{ media, position, playing, at }`; guests compute
   `position + (now − at)` and seek when more than two seconds out. A patch without a position
   recomputes it to now, so a bare pause lands where the item actually is.
+- **Titles are the server's, never the host's** (`room-titles.ts`). A title in the host's patch
+  would be any text the host liked, broadcast to every guest; fetching it in the browser would
+  widen `connect-src` for two third parties. So `update()` looks up what it doesn't know through
+  YouTube's or SoundCloud's oEmbed in the background (the add never waits, a failure leaves the
+  bare item), keeps only the `title`, stripped of control and bidi characters and capped at 120,
+  and publishes it only to a room that still exists and still holds the item. One request per
+  lookup (3 s, 16 kB, no redirects), an LRU of 500 shared by every room, misses remembered for
+  10 minutes, and a global budget of 30 a minute and 4 at once: a host posting 50 ids at the
+  state route's limit would otherwise make the server hammer YouTube, which has blocked this host
+  once already. They travel beside the queue as `titles?: Record<item, title>` (plus
+  `state.title`), and the queue stays `string[]`, so a bundle cached before titles existed reads
+  the same snapshot and either app may deploy first.
 
 **Game rooms** (`connect4`). The one change to the rooms' trust model: a game room issues a
 second token, the seat token, on its first `POST /rooms/:code/join`, and refuses a third caller.

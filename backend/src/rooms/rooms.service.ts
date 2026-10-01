@@ -17,6 +17,7 @@ import {
   RoomSnapshot,
 } from './rooms.types';
 import { UnitHealth } from '../common/health';
+import { RoomTitles } from './room-titles';
 
 /**
  * No 0/O, no 1/I/L: a code is read out loud across a room as often as it is
@@ -30,7 +31,8 @@ export const CODE_PATTERN = /^[A-Z0-9]{5}$/;
 
 /** A room dies this long after its last host action or arrival/departure. */
 export const IDLE_TTL_MS = 2 * 60 * 60 * 1000;
-/** Rooms are memory; this bounds it. Each is a few hundred bytes plus its connections. */
+/** Rooms are memory; this bounds it. Each is a few hundred bytes, plus at most 51
+ *  titles of 120 characters, plus its connections. */
 export const MAX_ROOMS = 200;
 export const MAX_QUEUE = 50;
 /** Apache closes idle connections; a frame every 25 s keeps the stream open. Same
@@ -85,6 +87,11 @@ interface Room {
   hostToken: string;
   state: PlaybackState;
   queue: string[];
+  /**
+   * Titles the server found for the items this room holds, current one included —
+   * never one a host sent. Pruned to what the room still holds on every update.
+   */
+  titles: Map<string, string>;
   members: number;
   expiresAt: number;
   /** Every change, pushed to every open stream. Completed when the room ends. */
@@ -107,7 +114,10 @@ interface Room {
 export class RoomsService {
   private readonly rooms = new Map<string, Room>();
 
-  constructor(private readonly config: ConfigService) {}
+  constructor(
+    private readonly config: ConfigService,
+    private readonly titles: RoomTitles,
+  ) {}
 
   get enabled(): boolean {
     return this.config.get<string>('ROOMS_ENABLED') === 'true';
@@ -129,6 +139,7 @@ export class RoomsService {
       hostToken: randomBytes(24).toString('base64url'),
       state: { media: null, position: 0, playing: false, at: now },
       queue: [],
+      titles: new Map(),
       members: 0,
       expiresAt: now + IDLE_TTL_MS,
       updates: new Subject<RoomSnapshot>(),
@@ -192,9 +203,38 @@ export class RoomsService {
       at: now,
     };
     if (patch.queue) room.queue = [...patch.queue];
+    this.resolveTitles(room, now);
     this.touch(room, now);
     this.publish(room);
     return this.snapshotOf(room);
+  }
+
+  /**
+   * Fills in the titles the cache already knows, drops the ones for items the room no
+   * longer holds, and asks for the rest in the background: never awaited, so an add
+   * answers before its lookup does, and a lookup that fails leaves the bare item. A
+   * title that lands later is published only if its room is still open and still
+   * holds the item; a room that has ended, or a code since reused, hears nothing.
+   */
+  private resolveTitles(room: Room, now: number): void {
+    const held = itemsOf(room);
+    for (const media of room.titles.keys()) {
+      if (!held.has(media)) room.titles.delete(media);
+    }
+    for (const media of held) {
+      if (room.titles.has(media)) continue;
+      const known = this.titles.peek(media, now);
+      if (typeof known === 'string') room.titles.set(media, known);
+      if (known !== undefined) continue;
+      void this.titles.lookup(media, now).then((title) => {
+        if (title === null || this.rooms.get(room.code) !== room) return;
+        if (!itemsOf(room).has(media) || room.titles.get(media) === title) {
+          return;
+        }
+        room.titles.set(media, title);
+        this.publish(room);
+      });
+    }
   }
 
   /** Closes the room for everyone: every stream completes, the code stops resolving. */
@@ -351,11 +391,18 @@ export class RoomsService {
     room.updates.next(this.snapshotOf(room));
   }
 
+  /**
+   * `titles` and `state.title` are additive: the queue stays `string[]`, so a bundle
+   * cached by the service worker before titles existed reads the same snapshot it
+   * always did and ignores the rest, and neither app has to deploy first.
+   */
   private snapshotOf(room: Room): RoomSnapshot {
+    const title =
+      room.state.media === null ? undefined : room.titles.get(room.state.media);
     return {
       code: room.code,
       kind: room.kind,
-      state: { ...room.state },
+      state: { ...room.state, ...(title ? { title } : {}) },
       queue: [...room.queue],
       members: room.members,
       ...(room.game
@@ -366,7 +413,7 @@ export class RoomsService {
               starter: room.game.starter,
             },
           }
-        : {}),
+        : { titles: Object.fromEntries(room.titles) }),
     };
   }
 
@@ -386,6 +433,13 @@ export class RoomsService {
       ? { unit: 'rooms', state: 'active', detail: { rooms: this.rooms.size } }
       : { unit: 'rooms', state: 'inactive', reason: 'disabled' };
   }
+}
+
+/** Every item a room holds: the current one and the queue. */
+function itemsOf(room: Room): Set<string> {
+  const items = new Set(room.queue);
+  if (room.state.media !== null) items.add(room.state.media);
+  return items;
 }
 
 /** Where the item is at `now`, given the last state the host reported. */

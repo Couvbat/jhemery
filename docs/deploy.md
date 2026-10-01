@@ -362,6 +362,16 @@ Reproduce with the two `curl` commands in [Known gaps](#known-gaps). If they sti
 
 Note `curl -X POST` does **not** reproduce a browser here: it sends the POST directly, while a browser preflights it first because of the JSON content type. Testing only the POST leaves the half that actually fails untested.
 
+## Outbound calls from rooms
+
+With `ROOMS_ENABLED=true` the backend also calls out, from the server's IP, to
+`https://www.youtube.com/oembed` and `https://soundcloud.com/oembed`, to find the title of each
+item a room queues. Nothing needs configuring and nothing about a visitor is sent, only the
+item's own URL. It is the one feature besides the downloader that makes YouTube and SoundCloud
+see this IP, which is why it is held to a global budget of 30 lookups a minute and four at once,
+with misses remembered for 10 minutes ([room-titles.ts](../backend/src/rooms/room-titles.ts)).
+If either site starts refusing the server, rooms keep working and the queue shows bare IDs.
+
 ## What the shell can run — facts for the downloader
 
 Measured on the o2switch shell (`cronos`) on 22 September 2026, for the admin-only yt-dlp

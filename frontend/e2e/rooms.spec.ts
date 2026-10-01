@@ -129,18 +129,26 @@ test.describe('rooms', () => {
   test('the host reorders and removes from the sidebar, each button naming its item', async ({ page, api }) => {
     const [a, b, c] = ['aaaaaaaaaaa', 'bbbbbbbbbbb', 'ccccccccccc']
     const button = (verb: string, item: string, tail = '') => new RegExp(`^${verb} .*${item}${tail}$`, 'i')
-    api.room({ ...ROOM, state: { media: null, position: 0, playing: false, at: Date.now() }, queue: [a, b, c], members: 1 })
+    // A title is someone else's text, `$` patterns included, and the label names it as written.
+    const cash = 'Cash $& $$ money'
+    api.room({
+      ...ROOM,
+      state: { media: null, position: 0, playing: false, at: Date.now() },
+      queue: [a, b, c],
+      titles: { [c]: cash },
+      members: 1,
+    })
     await page.goto('/watch')
     await page.getByRole('button', { name: /start a room/i }).click()
 
     const aside = page.getByRole('complementary', { name: /up next/i })
     await expect(aside.getByRole('button', { name: button('move', a, ' up') })).toHaveAttribute('aria-disabled', 'true')
     await aside.getByRole('button', { name: button('move', b, ' up') }).click()
-    await expect(aside.getByRole('listitem')).toHaveText([new RegExp(b), new RegExp(a), new RegExp(c)])
+    await expect(aside.getByRole('listitem')).toHaveText([new RegExp(b), new RegExp(a), /Cash \$& \$\$ money/])
     // Focus follows the item, so a keyboard user's next press acts on the same one.
     await expect(aside.getByRole('button', { name: button('move', b, ' up') })).toBeFocused()
 
-    await aside.getByRole('button', { name: button('remove', c) }).click()
+    await aside.getByRole('button', { name: `remove ${cash}`, exact: true }).click()
     await expect(aside.getByRole('listitem')).toHaveText([new RegExp(b), new RegExp(a)])
     expect(api.sent('POST', '/rooms/AB3DE/state').map((r) => r.body)).toEqual([{ queue: [b, a, c] }, { queue: [b, a] }])
   })
@@ -200,6 +208,29 @@ test.describe('rooms', () => {
         playing: true,
       })
     })
+  })
+
+  test('a guest sees the titles the server found, with the item itself as the tooltip', async ({
+    page,
+    api,
+    pageErrors,
+  }) => {
+    api.room({
+      ...ROOM,
+      kind: 'radio',
+      state: { ...ROOM.state, title: 'Big Buck Bunny' },
+      queue: [TRACK, 'zyxwvutsrq9'],
+      // A title is a third party's text: markup in it must arrive as text.
+      titles: { 'aqz-KE-bpKQ': 'Big Buck Bunny', [TRACK]: 'Abysses by <b>couvbat</b>' },
+    })
+    await page.goto('/radio/AB3DE')
+
+    const aside = page.getByRole('complementary', { name: /up next/i })
+    await expect(aside.getByText('Big Buck Bunny')).toHaveAttribute('title', 'aqz-KE-bpKQ')
+    await expect(aside.getByRole('listitem')).toHaveText([/Abysses by <b>couvbat<\/b>/, /youtube:zyxwvutsrq9/])
+    await expect(aside.getByText('Abysses by <b>couvbat</b>')).toHaveAttribute('title', TRACK)
+    await expect(aside.locator('b')).toHaveCount(0)
+    expect(pageErrors).toEqual([])
   })
 
   test('a code nobody has is reported as such', async ({ page, api }) => {
