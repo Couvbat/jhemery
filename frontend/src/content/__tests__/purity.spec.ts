@@ -59,3 +59,44 @@ describe('content layer purity', () => {
     }
   })
 })
+
+/**
+ * The same constraint for the few modules outside `src/content` that the build imports:
+ * the résumé plugin takes its palette from `terminal/ansi.ts`, which draws on
+ * `lib/colour.ts`, and the curl pages are rendered with `terminal/format.ts`. Their
+ * value imports are walked to the bottom; type imports vanish at build time and are free.
+ */
+describe('build-time modules outside content', () => {
+  const src = fileURLToPath(new URL('../..', import.meta.url))
+  const roots = ['terminal/ansi.ts', 'lib/colour.ts', 'terminal/format.ts']
+
+  /** Value imports only: `import type …` and `export type …` are erased by the build. */
+  function valueImports(source: string): string[] {
+    const pattern = /(?:^|\n)\s*(import|export)\s+(?!type\b)[^'"]*?\bfrom\s*['"]([^'"]+)['"]|(?:^|\n)\s*import\s+['"]([^'"]+)['"]/g
+    return [...source.matchAll(pattern)].map((match) => (match[2] ?? match[3])!)
+  }
+
+  function walk(file: string, seen = new Set<string>()): Set<string> {
+    if (seen.has(file)) return seen
+    seen.add(file)
+    const source = readFileSync(join(src, file), 'utf8')
+    for (const specifier of valueImports(source)) {
+      expect(specifier.startsWith('./') || specifier.startsWith('../'), `${file} imports "${specifier}"`).toBe(true)
+      walk(join(file, '..', `${specifier}.ts`).replace(/\.ts\.ts$/, '.ts'), seen)
+    }
+    return seen
+  }
+
+  it('follows the imports it finds', () => {
+    expect([...walk('terminal/ansi.ts')]).toEqual(['terminal/ansi.ts', 'lib/colour.ts'])
+  })
+
+  it.each(roots)('%s reaches only relative, DOM-free modules', (root) => {
+    for (const file of walk(root)) {
+      const source = readFileSync(join(src, file), 'utf8')
+      for (const forbidden of ['window.', 'document.', 'localStorage', 'navigator.', "from 'vue'"]) {
+        expect(source.includes(forbidden), `${file} references ${forbidden}`).toBe(false)
+      }
+    }
+  })
+})

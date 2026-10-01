@@ -51,6 +51,14 @@ cd frontend && npx playwright test --project=chromium -g 'graceful'
 cd backend && npx jest src/ask/ask.service.spec.ts -t 'rate limit'
 ```
 
+Two kinds of committed output are vitest snapshots, which CI only ever compares: the curl pages
+in `frontend/public/run/` (`curl jhemery.xyz/neofetch`) and the résumé's exact bytes. A change to a
+command's output or to the content fails CI until they are rewritten:
+
+```bash
+cd frontend && npx vitest run src/terminal/__tests__/curl-pages.spec.ts src/content/__tests__/resume.spec.ts -u
+```
+
 ### Two test suites, with a line between them
 
 `src/**/__tests__/` (vitest, jsdom) owns behaviour: the command registry, every
@@ -173,7 +181,9 @@ erroring, and the frontend renders that state. Preserve this when adding integra
 
 Privacy is a design constraint, not an afterthought: `/presence` pushes one integer over SSE with
 no visitor id, `/stats` counts sessions not commands, `/weather` uses server-side coordinates so
-every visitor gets the same answer, and `ask` never logs questions or answers.
+every visitor gets the same answer, and `ask` never logs questions or answers. `strace` shows the
+shape of a request's bodies, never their values, and never a header; anything new fed to the
+request observer in `lib/api.ts` must keep it that way.
 
 ### API base URL
 

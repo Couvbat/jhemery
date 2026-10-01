@@ -116,10 +116,19 @@ resolver, and the side-effect handles a command may use: `print()`, `clear()`, `
 user types, rejects on `Ctrl+C`), `capture(handler)` (holds the raw keyboard for the games — §3 —
 and is released unconditionally when the command settles), `run(input)` (runs another command
 *inside* this one: the same signal, keyboard and busy state, and never the visitor's aliases —
-`git log` is a two-word alias of `gitlog`, not a delegation), a `signal: AbortSignal` so animated commands stop
+`git log` is a two-word alias of `gitlog`, not a delegation; `tour` and `strace` are built on it), a `signal: AbortSignal` so animated commands stop
 cleanly when cancelled, and `effects`: `matrix`, `reboot`, `crt`, `vim`/`vimIsDirty`/`vimMessage`
 (§5.1), `glitch` and `playMusic`. `terminal/types.ts` documents each; read it before adding a
 primitive.
+
+**The request observer.** `lib/api.ts` reports every request to whoever called
+`observeRequests()`: method, path, status, body size, time, and the parsed bodies sent and
+received. Never a header, because `x-admin-password` and `x-room-token` travel in them. It is fed
+by `request()`, `askStream()` (once, at the end), `openEventSource()` (once, when the stream opens),
+`fetchSite()` and `fetchJobFile()`. With nobody watching, `request()` takes exactly the path it took
+before there was an observer. The two pollers the visitor didn't ask for, the guestbook ticker and
+the download tool's interval, mark themselves `background`. `strace` is the only observer, and it
+prints shapes: keys two levels deep, arrays as their length, and query values masked.
 
 `OutputLine` is `{ text; tone?; segments?; href?; pre?; prompt? }`, where `Tone` is
 `default|muted|primary|accent|secondary|error|success|warning`. `segments` splits a line into
@@ -232,6 +241,7 @@ Grouped as they appear in `help`.
 | `theme [name\|random]` (alias `colorscheme`) | Lists the colour schemes with a swatch strip each, or applies one |
 | `alias` / `unalias` | Session-persistent command renames, expanded before anything else parses the line |
 | `sha256sum` (aliases `sha1sum`, `sha512sum`) · `base64 [-d]` · `uuidgen` · `jq .` | The shell versions of the hash, encode and JSON tools, each importing the pure module its panel uses. No pipes: a fake-filesystem name is read as that file, anything else as literal text |
+| `strace <command>` | Runs the command inside itself (`ctx.run`, so without the visitor's aliases) and then lists the non-background requests made meanwhile, as `GET /weather = 200 · 1.10 kB · 84 ms` with the shapes of the bodies below, and `+++ exited with 0 +++`. No request, no trailer, so `strace ls` is `ls`. Its `writes` is the traced command's, so `?run=strace sign x` is refused like `sign x`; `strace strace` is refused |
 | `exit` (aliases `quit`, `logout`) | Closes the overlay |
 
 **Colour schemes.** `theme` offers the site's own neon (*cyberpunk*, the default) and the palettes
@@ -307,9 +317,9 @@ URL), and `neofetch` has a `Status` row from `profile.availability`, the same fl
 both résumés read. `now.txt` is the `/now` list, with the same 90-day staleness rule.
 
 `neofetch` renders an ASCII logo beside a spec block — stack, locale, "uptime" since the first
-commit, and the live Steam status if available. `curl <domain>` re-runs `resume` when pointed at
-this site (or `localhost`), mirroring what a real `curl jhemery.xyz` returns (§7); any other host
-gets `curl: (6) Could not resolve host` and a note that a browser tab cannot open a raw socket.
+commit, and the live Steam status if available. `curl [-I] <domain>[/path]` is a real request to
+this origin, under any name it answers to (§7); any other host gets `curl: (6) Could not resolve
+host` and a note that a browser tab can only reach this site.
 
 `why <topic>` (`commands/work.ts`) prints one entry of `content/decisions.ts`: what was chosen,
 each rejected option with its reason in one sentence, any hindsight, the PR, and a link to the
@@ -654,8 +664,37 @@ shapes are the accent colour; clicking one of those is the `cyanSpotter` achieve
 **Where:** `frontend/vite-plugins/resume.ts`, `frontend/public/.htaccess`
 
 A Vite plugin imports `src/content/*` and emits `dist/resume.txt` — an ANSI-coloured plain-text
-résumé — at build time. `.htaccess` rewrites requests whose `User-Agent` matches
-`curl|wget|httpie|lynx` to that file.
+résumé — at build time. `.htaccess` rewrites requests for `/` whose `User-Agent` matches the
+command-line clients (`curl`, `wget`, `httpie`, `lynx`, `links`) or the LLM crawlers (GPTBot,
+ClaudeBot, PerplexityBot and the rest listed there) to that file.
+
+The terminal's own `curl` is a real client of this origin (`fetchSite()`): `GET` or `-I`'s `HEAD`,
+`cache: 'no-store'` so the HTTP cache stays out of it, a body read to 256 kB at most, and the
+printable ones (text, JSON, no NUL byte) shown through `terminal/ansi.ts`'s `parseSgr()`. That maps
+the résumé's palette to tones and drops a concealed run, so the CTF's stage 3 still needs a real
+terminal and `cat -v`. The bare host is `/resume.txt` rather than `/`, because the service worker
+answers `/` from its precache with the app's `index.html`, which no header can change. `-I` shows
+the real response headers, CSP and HSTS included, since a same-origin fetch may read all but
+`Set-Cookie`. Any other host is curl's `(6) Could not resolve host`; a network failure is `(7)`.
+A link may only pass it the arguments its Tab offers: the domain, `-I` and the site's plain files.
+
+**The shell over curl.** `curl jhemery.xyz/neofetch` in a real terminal gets that command's output:
+`public/run/<locale>/<name>.txt`, rendered by `terminal/ansi.ts`'s `toAnsi()` (tones and swatch
+colours as SGR, links as OSC 8, prompt lines dropped) with a footer, plus a generated `help.txt`
+index. The pages are vitest snapshots (`curl-pages.spec.ts`), committed and never written by CI,
+so a change to a command or the content fails CI until they are regenerated with `-u`. A page is
+any command a link could run with no arguments that isn't hidden, live or a game (by module); the
+spec names a reason for each other exclusion (`curl`, `ctf`, `achievements`, `games`, `tour`,
+`resume`, `help`). Each runs in both locales under two clocks years apart, and any line that
+differs is dropped, which removes the uptimes and durations that would otherwise go stale between
+regenerations; `resume` is excluded for that reason, since its durations are the point and the
+bare host already serves them fresh. A harness option makes `capture` and `prompt` throw, so a
+page can never be half of an interactive command. `.htaccess` serves the pages only to `curl`,
+`wget` and `httpie`, not the crawler list `/` uses (a crawler asking for `/about` wants what a
+browser gets), French when `Accept-Language` starts with `fr`, and only when the file exists.
+They carry `Vary: User-Agent, Accept-Language` and `no-cache`, and `/` now says `Vary: User-Agent`,
+since it was always the résumé to curl and the app to a browser. The résumé plugin takes its
+colours from the same palette, and `resume.spec.ts` pins its bytes.
 
 **Decision:** this is served entirely from the static frontend, with no backend involvement. The
 obvious alternative — a Nest `GET /resume` endpoint — would mean the résumé content lives in the

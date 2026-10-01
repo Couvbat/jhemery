@@ -66,8 +66,8 @@ test.describe('the résumé', () => {
   /**
    * `/resume.txt` is generated at build time by `vite-plugins/resume.ts` from
    * `src/content/`, which is the whole point: the CV has exactly one source, and the
-   * terminal's `curl` serves the same bytes. If this drifts, the site and the résumé
-   * are telling different stories about the same person.
+   * terminal's `curl` fetches the very same file. If this drifts, the site and the
+   * résumé are telling different stories about the same person.
    */
   test('is generated from the content modules', async ({ request }) => {
     const body = await (await request.get('/resume.txt')).text()
@@ -75,6 +75,18 @@ test.describe('the résumé', () => {
     expect(body).toContain(profile.name)
     expect(body).toContain(profile.email)
     expect(body).toContain(profile.role.en)
+  })
+
+  // `.htaccess` hands these to curl for `/neofetch` and friends; `vite preview` can't
+  // run that rewrite, so this checks the files themselves (and the live check in
+  // docs/deploy.md the rest).
+  test('the curl pages are real files, each locale with its index', async ({ request }) => {
+    for (const locale of ['en', 'fr']) {
+      const res = await request.get(`/run/${locale}/help.txt`)
+      expect(res.status()).toBe(200)
+      expect(res.headers()['content-type']).toContain('text/plain')
+      expect(await res.text()).toContain(`curl ${profile.domain}/neofetch`)
+    }
   })
 
   test('reads the same through the terminal', async ({ page, terminal }) => {
