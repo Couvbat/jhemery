@@ -21,6 +21,7 @@ import {
   reconcile,
 } from './sync'
 import { useRoom } from './useRoom'
+import WindowDots from '@/components/WindowDots.vue'
 
 /**
  * Both room pages. The `kind` decides what a host may load and the words, and each
@@ -360,9 +361,7 @@ const badLink = computed(() => t(props.kind === 'watch' ? m.rooms.badLinkWatch :
       <section v-else :aria-label="`${t(view.heading)} ${code}`" class="space-y-4">
         <div class="rounded border border-border bg-card overflow-hidden border-glow">
           <div class="flex flex-wrap items-center gap-2 px-4 py-2 bg-muted border-b border-border">
-            <span class="w-3 h-3 rounded-full bg-red-500/80"></span>
-            <span class="w-3 h-3 rounded-full bg-yellow-500/80"></span>
-            <span class="w-3 h-3 rounded-full bg-green-500/80"></span>
+            <WindowDots />
             <span class="ml-3 font-mono text-sm text-foreground tracking-widest">{{ code }}</span>
             <CopyButton :text="link" />
             <span

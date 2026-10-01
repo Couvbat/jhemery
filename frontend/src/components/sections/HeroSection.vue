@@ -6,6 +6,7 @@ import { isExternal, profile, skills } from '@/content'
 import { useLocale } from '@/i18n'
 import { goTo } from '@/composables/useViewSwing'
 import { decorativeMotion } from '@/composables/useMotion'
+import WindowDots from '@/components/WindowDots.vue'
 
 const { t, m, locale } = useLocale()
 
@@ -56,9 +57,7 @@ onUnmounted(() => clearInterval(timer))
       <div class="rounded border border-border bg-card overflow-hidden border-glow">
         <!-- Title bar -->
         <div class="flex items-center gap-2 px-4 py-2 bg-muted border-b border-border">
-          <span class="w-3 h-3 rounded-full bg-red-500/80"></span>
-          <span class="w-3 h-3 rounded-full bg-yellow-500/80"></span>
-          <span class="w-3 h-3 rounded-full bg-green-500/80"></span>
+          <WindowDots />
           <span class="ml-3 text-xs text-muted-foreground">{{ profile.handle }}@{{ profile.host }} ~ bash</span>
         </div>
 

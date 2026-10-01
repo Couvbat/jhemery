@@ -4,6 +4,7 @@ import { RouterLink, useRoute } from 'vue-router'
 import { findView, profile } from '@/content'
 import { useLocale } from '@/i18n'
 import { findTool, visibleTools, type ToolMeta, type ToolTier } from '@/tools/registry'
+import WindowDots from '@/components/WindowDots.vue'
 
 const route = useRoute()
 const { t, m } = useLocale()
@@ -73,9 +74,7 @@ const TIER_LABEL: Record<ToolTier, keyof typeof m.tools> = {
             :aria-current="entry.id === tool?.id ? 'page' : undefined"
           >
             <div class="flex items-center gap-2 px-4 py-2 bg-muted border-b border-border">
-              <span class="w-3 h-3 rounded-full bg-red-500/80"></span>
-              <span class="w-3 h-3 rounded-full bg-yellow-500/80"></span>
-              <span class="w-3 h-3 rounded-full bg-green-500/80"></span>
+              <WindowDots />
               <span class="ml-3 text-xs text-muted-foreground">{{ entry.id }}.sh</span>
               <span class="ml-auto text-[10px] uppercase tracking-wider text-muted-foreground">
                 {{ t(m.tools[TIER_LABEL[entry.tier]]) }}

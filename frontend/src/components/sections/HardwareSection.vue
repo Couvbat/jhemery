@@ -7,6 +7,7 @@ import { nas, pcs, peripherals } from '@/content'
 import { useLocale } from '@/i18n'
 // Module-level so the terminal's `hardware nas` command can select a tab from outside.
 import { hardwareTab as active } from '@/composables/useHardwareTab'
+import WindowDots from '@/components/WindowDots.vue'
 
 const { t, m } = useLocale()
 
@@ -53,9 +54,7 @@ const osColor: Record<string, string> = {
           class="bg-card border-border overflow-hidden border-glow gap-0 py-0"
         >
           <div class="flex items-center gap-2 px-4 py-2 bg-muted border-b border-border">
-            <span class="w-3 h-3 rounded-full bg-red-500/80"></span>
-            <span class="w-3 h-3 rounded-full bg-yellow-500/80"></span>
-            <span class="w-3 h-3 rounded-full bg-green-500/80"></span>
+            <WindowDots />
             <span class="ml-3 text-xs text-muted-foreground font-mono flex-1"
               >{{ machine.name.toLowerCase() }}@pc</span
             >
@@ -85,9 +84,7 @@ const osColor: Record<string, string> = {
           style="box-shadow: 0 0 8px color-mix(in srgb, var(--neon-purple) 15%, transparent)"
         >
           <div class="flex items-center gap-2 px-4 py-2 bg-muted border-b border-border">
-            <span class="w-3 h-3 rounded-full bg-red-500/80"></span>
-            <span class="w-3 h-3 rounded-full bg-yellow-500/80"></span>
-            <span class="w-3 h-3 rounded-full bg-green-500/80"></span>
+            <WindowDots />
             <span class="ml-3 text-xs text-muted-foreground font-mono flex-1"
               >{{ machine.name.toLowerCase() }}@nas</span
             >
@@ -112,9 +109,7 @@ const osColor: Record<string, string> = {
       <div v-if="active === 'peripherals'">
         <Card class="bg-card border-border overflow-hidden border-glow-cyan gap-0 py-0">
           <div class="flex items-center gap-2 px-4 py-2 bg-muted border-b border-border">
-            <span class="w-3 h-3 rounded-full bg-red-500/80"></span>
-            <span class="w-3 h-3 rounded-full bg-yellow-500/80"></span>
-            <span class="w-3 h-3 rounded-full bg-green-500/80"></span>
+            <WindowDots />
             <span class="ml-3 text-xs text-muted-foreground">peripherals.conf</span>
           </div>
           <CardContent class="p-4 font-mono text-xs">
