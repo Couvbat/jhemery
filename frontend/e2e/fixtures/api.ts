@@ -28,8 +28,11 @@ export type ApiPreset =
 export interface RoomFixture {
   code: string
   kind: 'watch' | 'radio'
-  state: { media: string | null; position: number; playing: boolean; at: number }
+  state: { media: string | null; position: number; playing: boolean; at: number; title?: string }
   queue: string[]
+  /** The server's titles, beside the queue. Left out, the room is one from a backend
+   *  that predates them. */
+  titles?: Record<string, string>
   members: number
 }
 
@@ -236,6 +239,7 @@ export class ApiStub {
           queue?: string[]
         }
         const media = patch.media === undefined ? current.state.media : patch.media
+        const title = media === null ? undefined : current.titles?.[media]
         current = {
           ...current,
           state: {
@@ -243,6 +247,7 @@ export class ApiStub {
             position: patch.position ?? (media === current.state.media ? current.state.position : 0),
             playing: patch.playing ?? current.state.playing,
             at: Date.now(),
+            ...(title ? { title } : {}),
           },
           queue: patch.queue ?? current.queue,
         }

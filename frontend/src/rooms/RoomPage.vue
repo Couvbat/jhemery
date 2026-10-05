@@ -2,6 +2,7 @@
 import { computed, nextTick, onUnmounted, ref, watch } from 'vue'
 import { RouterLink, useRoute, useRouter } from 'vue-router'
 import { findView, profile } from '@/content'
+import type { Localised } from '@/content/types'
 import { useLocale } from '@/i18n'
 import type { RoomKind, RoomPatch } from '@/lib/api'
 import CopyButton from '@/tools/CopyButton.vue'
@@ -12,7 +13,7 @@ import {
   expectedPosition,
   formatClock,
   isSeek,
-  mediaLabel,
+  itemLabel,
   mediaSource,
   moveItem,
   normaliseCode,
@@ -46,6 +47,12 @@ const room = useRoom(props.kind, code)
 const { status, snapshot, isHost, error } = room
 const state = computed(() => snapshot.value?.state ?? null)
 const queue = computed(() => snapshot.value?.queue ?? [])
+/** Titles render by interpolation only, never as markup: they are a third party's text. */
+const titles = computed(() => snapshot.value?.titles)
+const label = (media: string) => itemLabel(media, titles.value)
+/** A button's label naming its item. The replacer is a function so a `$&` or `$$` in a
+ *  title is printed as written rather than read as a replacement pattern. */
+const naming = (message: Localised<string>, media: string) => t(message).replace('{item}', () => label(media))
 const members = computed(() => snapshot.value?.members ?? 0)
 /** The current item's embed. Per item, not per room: a radio queue mixes the two. */
 const source = computed(() => (state.value?.media ? mediaSource(state.value.media) : null))
@@ -469,8 +476,9 @@ const badLink = computed(() => t(props.kind === 'watch' ? m.rooms.badLinkWatch :
                   <div class="space-y-1">
                     <h2 class="text-muted-foreground">--{{ t(m.rooms.nowPlaying) }}</h2>
                     <template v-if="state?.media">
-                      <p class="font-mono text-sm text-foreground truncate" :title="state.media">
-                        {{ mediaLabel(state.media) }}
+                      <!-- One item, so a long title wraps here rather than being cut as in the list. -->
+                      <p class="font-mono text-sm text-foreground break-words" :title="state.media">
+                        {{ label(state.media) }}
                       </p>
                       <p class="flex items-center gap-2 text-muted-foreground tabular-nums">
                         <span :class="state.playing ? 'text-primary' : ''">{{ state.playing ? '▶' : '❚❚' }}</span>
@@ -496,13 +504,13 @@ const badLink = computed(() => t(props.kind === 'watch' ? m.rooms.badLinkWatch :
                     <ol v-if="queue.length" ref="queueList" class="font-mono space-y-1">
                       <li v-for="(item, index) in queue" :key="`${index}-${item}`" class="flex items-center gap-1">
                         <span class="text-muted-foreground tabular-nums">{{ index + 1 }}.</span>
-                        <span class="flex-1 min-w-0 truncate" :title="item">{{ mediaLabel(item) }}</span>
+                        <span class="flex-1 min-w-0 truncate" :title="item">{{ label(item) }}</span>
                         <template v-if="isHost">
                           <button
                             type="button"
                             data-action="up"
                             :aria-disabled="queueBusy || index === 0"
-                            :aria-label="t(m.rooms.moveUp).replace('{item}', mediaLabel(item))"
+                            :aria-label="naming(m.rooms.moveUp, item)"
                             class="w-6 h-6 shrink-0 grid place-items-center rounded text-muted-foreground hover:text-foreground aria-disabled:opacity-40 aria-disabled:cursor-not-allowed"
                             @click="moveAt(index, index - 1)"
                           >
@@ -512,7 +520,7 @@ const badLink = computed(() => t(props.kind === 'watch' ? m.rooms.badLinkWatch :
                             type="button"
                             data-action="down"
                             :aria-disabled="queueBusy || index === queue.length - 1"
-                            :aria-label="t(m.rooms.moveDown).replace('{item}', mediaLabel(item))"
+                            :aria-label="naming(m.rooms.moveDown, item)"
                             class="w-6 h-6 shrink-0 grid place-items-center rounded text-muted-foreground hover:text-foreground aria-disabled:opacity-40 aria-disabled:cursor-not-allowed"
                             @click="moveAt(index, index + 1)"
                           >
@@ -522,7 +530,7 @@ const badLink = computed(() => t(props.kind === 'watch' ? m.rooms.badLinkWatch :
                             type="button"
                             data-action="remove"
                             :aria-disabled="queueBusy"
-                            :aria-label="t(m.rooms.remove).replace('{item}', mediaLabel(item))"
+                            :aria-label="naming(m.rooms.remove, item)"
                             class="w-6 h-6 shrink-0 grid place-items-center rounded text-muted-foreground hover:text-destructive aria-disabled:opacity-40 aria-disabled:cursor-not-allowed"
                             @click="removeAt(index)"
                           >

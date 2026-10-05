@@ -83,6 +83,17 @@ export function mediaLabel(media: string): string {
 }
 
 /**
+ * What the pages print for an item: the server's title when it found one, the bare
+ * item otherwise. Read with `hasOwn`, since a YouTube id may be any eleven characters
+ * from its alphabet — `constructor` is one — and a plain object answers that key
+ * from its prototype.
+ */
+export function itemLabel(media: string, titles: Readonly<Record<string, string>> | undefined): string {
+  const title = titles && Object.hasOwn(titles, media) ? titles[media] : undefined
+  return typeof title === 'string' && title !== '' ? title : mediaLabel(media)
+}
+
+/**
  * The queue with one item moved from `from` to `to`, as a new array — the state route
  * replaces the whole queue, so a reorder is just this sent back. An index off either
  * end moves nothing: a click on a list that has since changed under it is a no-op,

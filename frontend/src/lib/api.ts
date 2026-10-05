@@ -226,13 +226,15 @@ export interface GameState {
 
 /** The host's playback, anchored to the server clock — see `rooms/sync.ts` for the maths. */
 export interface PlaybackState {
-  /** A YouTube video id (`watch`) or a soundcloud.com URL (`radio`); null when nothing is loaded. */
+  /** A YouTube video id (`watch`), or that or a soundcloud.com URL (`radio`); null when nothing is loaded. */
   media: string | null
   /** Seconds into the item as of `at`. */
   position: number
   playing: boolean
   /** Server time in ms when the state was set. */
   at: number
+  /** The current item's title, once the server has found one; absent from an older backend. */
+  title?: string
 }
 
 /** One frame of a room's event stream. `members` is a count, as in `/presence`. */
@@ -241,6 +243,12 @@ export interface RoomSnapshot {
   kind: RoomKind
   state: PlaybackState
   queue: string[]
+  /**
+   * Item → title, found by the server through oEmbed — never text a host typed. Beside
+   * the queue rather than in it, so the queue stays `string[]` for bundles that predate
+   * it, and absent from a backend that predates it.
+   */
+  titles?: Record<string, string>
   members: number
   /** Only on a game room. */
   game?: GameState

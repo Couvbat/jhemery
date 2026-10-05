@@ -5,6 +5,7 @@ import {
   expectedPosition,
   formatClock,
   isSeek,
+  itemLabel,
   mediaLabel,
   mediaSource,
   moveItem,
@@ -106,6 +107,28 @@ describe('rooms sync', () => {
     it('prints a track by its path and marks a video as YouTube’s', () => {
       expect(mediaLabel('https://soundcloud.com/couvbat/abysses')).toBe('couvbat/abysses')
       expect(mediaLabel('aqz-KE-bpKQ')).toBe('youtube:aqz-KE-bpKQ')
+    })
+  })
+
+  describe('itemLabel', () => {
+    const track = 'https://soundcloud.com/couvbat/abysses'
+
+    it('prints the server’s title when there is one', () => {
+      expect(itemLabel('aqz-KE-bpKQ', { 'aqz-KE-bpKQ': 'Big Buck Bunny' })).toBe('Big Buck Bunny')
+      expect(itemLabel(track, { [track]: 'Abysses by couvbat' })).toBe('Abysses by couvbat')
+    })
+
+    it('falls back to mediaLabel without one, or without titles at all', () => {
+      expect(itemLabel('aqz-KE-bpKQ', { [track]: 'Abysses by couvbat' })).toBe(mediaLabel('aqz-KE-bpKQ'))
+      expect(itemLabel(track, undefined)).toBe(mediaLabel(track))
+      expect(itemLabel(track, {})).toBe('couvbat/abysses')
+      expect(itemLabel(track, { [track]: '' })).toBe('couvbat/abysses')
+    })
+
+    it('never answers from the prototype: `constructor` is a valid video id', () => {
+      expect(itemLabel('constructor', {})).toBe('youtube:constructor')
+      expect(itemLabel('constructor', JSON.parse('{"__proto__": {"constructor": "x"}}'))).toBe('youtube:constructor')
+      expect(itemLabel('constructor', { constructor: 'A real title' } as Record<string, string>)).toBe('A real title')
     })
   })
 
