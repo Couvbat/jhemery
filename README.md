@@ -164,7 +164,10 @@ work badly with mobile virtual keyboards, and the page itself shows the same con
 |---|---|
 | `\|` `;` `&&` `\|\|` | Pipes and chains: `fortune \| cowsay`, `history \| grep theme`, `cat about.txt \| sha256sum`, `projects --json \| jq .`, `cat nope && pwd`. A stage keeps its colours across a pipe. Quote text that holds an operator (`sign "great site; love it"`): an apostrophe inside a word is a letter, so `c'est` needs nothing. `LANG=fr neofetch` runs one command in French |
 | <kbd>Tab</kbd> | Completes to the longest common prefix. First commands and your own aliases, then their arguments: filenames for `cat`/`vim`/`diff`, sections and pages for `cd`/`ping`, tool names, scheme names for `theme`, `on`/`off` for the background toggles |
-| <kbd>↑</kbd> / <kbd>↓</kbd> | Command history (saved between visits) |
+| <kbd>↑</kbd> / <kbd>↓</kbd> | Command history (saved between visits). With text in the input, ↑ walks only the lines that start with it |
+| <kbd>Ctrl</kbd>+<kbd>R</kbd> | Reverse search through history: type to narrow, <kbd>Ctrl</kbd>+<kbd>R</kbd> again for an older match, Enter to run it, Esc, → or Tab to edit it, <kbd>Ctrl</kbd>+<kbd>C</kbd> to give up. Cmd+R still reloads |
+| <kbd>→</kbd> / <kbd>End</kbd> | Takes the faded suggestion after the caret, which only ever comes from your own history |
+| `!!` `!$` `!N` `^a^b` | The last line, its last word, line N of `history`, and the last line with `a` replaced by `b`. The expansion is shown before it runs, and one that would change something is put in history for ↑ and Enter instead. A line with `sign`, `mail` or `ask` in it is never expanded, so `sign Great site!!` posts what you typed, and `:q!` is just `:q!` |
 | `--help` | As the first argument, any command's usage and flags: `ls --help` |
 | `-`<kbd>Tab</kbd> | Completes a flag, listing what each does when several are left: `grep -`<kbd>Tab</kbd> |
 | <kbd>Ctrl</kbd>+<kbd>L</kbd> | Clear |

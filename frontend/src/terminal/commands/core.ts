@@ -3,7 +3,7 @@ import type { Locale } from '@/content/types'
 import { profile } from '@/content'
 import { announce } from '../achievements'
 import { aliases, parseDefinition, removeAlias, setAlias } from '../aliases'
-import { history } from '../history'
+import { history, historyBase } from '../history'
 import { allCommands, completionNames, isCommandWord, resolve, visibleCommands } from '../registry'
 import { findPage, renderManual } from '../manual'
 import { page } from '../pager'
@@ -156,9 +156,11 @@ export const coreCommands: Command[] = [
     run() {
       const entries = history.value
       if (!entries.length) return [line('(empty)', 'muted')]
-      const width = String(entries.length).length
+      // Numbered from the first line ever kept, so `!N` still means what was printed here.
+      const base = historyBase.value
+      const width = String(base + entries.length).length
       return entries.map((entry, i) =>
-        line(`${String(i + 1).padStart(width)}  ${entry}`, 'muted'),
+        line(`${String(base + i + 1).padStart(width)}  ${entry}`, 'muted'),
       )
     },
   },

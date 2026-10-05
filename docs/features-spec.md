@@ -158,6 +158,16 @@ page all talk to the same session, so history survives closing the panel).
 
 - `lines`: rendered output buffer, capped at 500 entries.
 - `history`: submitted commands, capped at 100, persisted to `localStorage`.
+- **History expansion** (`terminal/history.ts`, `expandHistory`): `!!`, `!$`, `!N` and `!-N` as
+  `history` numbers them, and a leading `^old^new`, on typed lines only (never a link, a nested
+  run or a prompt's answer). A `!` before a space, the end, `=` or `(` is a letter, and `\!`
+  always is, so `:q!` survives. A line naming a server-writing command (`isServerBound`, read
+  off `writes`) is never expanded. An expansion is echoed, muted; one that would write anything
+  goes into history with "press ↑ then Enter to send", as zsh's `histverify`, and doesn't run.
+- ↑ with text in the input walks only the lines that start with it. Ctrl+R is a reverse search,
+  taken only while the shell owns the keyboard (never in a game, a prompt, a running command or
+  vim), so Cmd+R still reloads. A faded suggestion after the caret (`autosuggest`) comes only
+  from the visitor's own history, never from the command list, and → or End takes it.
 - ↑/↓ walk history, `Tab` completes (common prefix first, then lists candidates),
   `Ctrl+L` clears, `Ctrl+C` cancels an in-flight command or interactive prompt. The input is
   never `disabled` while a command runs, only `readonly` + `aria-disabled`: a disabled input

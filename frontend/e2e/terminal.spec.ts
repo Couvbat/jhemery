@@ -86,6 +86,43 @@ test.describe('terminal', () => {
     })
   })
 
+  // What jsdom can't show: that the browser's own Ctrl+R never fires, and that the ghost
+  // lines up with real text in a real input.
+  test.describe('history', () => {
+    test('Ctrl+R searches instead of reloading, again for older, and → takes the ghost', async ({ page, terminal }) => {
+      await terminal.open()
+      await terminal.run('theme nord')
+      await terminal.run('theme dracula')
+      await terminal.run('whoami')
+      // The reload is the browser's default action: what proves it never happens is that
+      // the shell prevented it, seen after the input's own handler has run.
+      await page.evaluate(() => {
+        const w = window as unknown as { __reloads: boolean[] }
+        w.__reloads = []
+        document.addEventListener('keydown', (event) => {
+          if (event.key === 'r' && event.ctrlKey) w.__reloads.push(!event.defaultPrevented)
+        })
+      })
+
+      await terminal.input.press('Control+r')
+      await terminal.input.pressSequentially('theme')
+      await expect(page.getByText("(reverse-i-search)'theme':")).toBeVisible()
+      await expect(terminal.input).toHaveValue('theme dracula')
+      // A second Ctrl+R goes further back, which it can't if the Control keydown ends the search.
+      await terminal.input.press('Control+r')
+      await expect(terminal.input).toHaveValue('theme nord')
+      await terminal.input.press('Escape')
+      await expect(terminal.input).toHaveValue('theme nord')
+      expect(await page.evaluate(() => (window as unknown as { __reloads: boolean[] }).__reloads)).toEqual([false, false])
+
+      await terminal.input.fill('')
+      await terminal.input.pressSequentially('who')
+      await expect(page.getByTestId('terminal-ghost')).toHaveText('whoami')
+      await terminal.input.press('ArrowRight')
+      await expect(terminal.input).toHaveValue('whoami')
+    })
+  })
+
   test.describe('the shell loop', () => {
     test('help lists commands and an unknown one is reported, not swallowed', async ({
       terminal,
