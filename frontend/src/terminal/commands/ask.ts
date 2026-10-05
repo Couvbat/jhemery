@@ -1,4 +1,4 @@
-import { prefersReducedMotion } from '@/composables/useCrt'
+import { decorativeMotion } from '@/composables/useMotion'
 import { messages as m } from '@/i18n/messages'
 import { api, ApiError } from '@/lib/api'
 import type { Localised } from '@/content/types'
@@ -70,8 +70,9 @@ export const askCommands: Command[] = [
       draw([line(t(m.ask.thinking), 'muted')])
 
       // Text appearing character by character is motion, and the rule has no
-      // exception for text — buffer the whole thing and print it once instead.
-      const animate = !prefersReducedMotion()
+      // exception for text — with motion paused, buffer the whole thing and print it
+      // once instead. `calm` keeps it: the visitor asked for this answer by name.
+      const animate = decorativeMotion() !== 'paused'
       let answer = ''
 
       try {

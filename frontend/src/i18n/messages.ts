@@ -9,6 +9,9 @@ export const messages = {
     toggleMenu: { en: 'Toggle menu', fr: 'Ouvrir le menu' },
     language: { en: 'Switch language', fr: 'Changer de langue' },
     theme: { en: 'Colour scheme', fr: 'Thème de couleurs' },
+    // The 🎨 menu's way to `theme forge`: opens the system colour picker.
+    forge: { en: 'make one…', fr: 'en créer un…' },
+    forgeFrom: { en: 'Seed colour for a new scheme', fr: 'Couleur de départ d’un nouveau thème' },
   },
   hero: {
     aboutFile: { en: 'cat about.txt', fr: 'cat about.txt' },
@@ -803,6 +806,18 @@ export const messages = {
   },
   // The wireframe background: the click-to-inspect label on a visitor's shape, and
   // the one line the screensaver leaves on screen.
+  // Motion control: the 🎨 menu's group and `motion`. The settings themselves (`full`,
+  // `calm`, `paused`) are the command's arguments, so they stay as typed.
+  motion: {
+    label: { en: 'Motion', fr: 'Animations' },
+    full: { en: 'everything moves', fr: 'tout bouge' },
+    calm: { en: 'slower, nothing swings or bursts', fr: 'plus lent, rien ne pivote ni n’éclate' },
+    paused: { en: 'nothing moves', fr: 'rien ne bouge' },
+    os: {
+      en: 'Your system asks for reduced motion, so nothing moves here whatever is picked.',
+      fr: 'Votre système demande moins d’animations : rien ne bouge ici, quel que soit le choix.',
+    },
+  },
   scene: {
     visitor: { en: 'someone else, here now', fr: 'quelqu’un d’autre, ici en ce moment' },
     wake: { en: 'move the mouse or press a key', fr: 'bougez la souris ou appuyez sur une touche' },
@@ -830,6 +845,9 @@ export const messages = {
   },
   boot: {
     skip: { en: 'press any key to skip', fr: 'appuyez sur une touche pour passer' },
+  },
+  matrix: {
+    wake: { en: 'press any key to wake up', fr: 'appuyez sur une touche pour vous réveiller' },
   },
   achievements: {
     title: { en: 'Achievements', fr: 'Succès' },

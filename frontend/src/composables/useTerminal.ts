@@ -39,6 +39,7 @@ import {
 } from './useTerminalShell'
 import { goTo } from './useViewSwing'
 import { setCrt, glitch } from './useCrt'
+import { decorativeMotion } from './useMotion'
 import { showMatrix } from './useMatrix'
 import { triggerBoot } from './useBoot'
 import { requestPlayback } from './useMusicPlayer'
@@ -128,7 +129,9 @@ const effects: TerminalEffects = {
   vimMessage: (text: string) => {
     if (vimBuffer.value) vimBuffer.value.statusMessage = text
   },
-  glitch,
+  // The screen-tear is decoration on top of the joke, so only at `full` motion. The
+  // check is here rather than in `glitch()` itself: `useMotion` imports `useCrt`.
+  glitch: (durationMs: number) => (decorativeMotion() === 'full' ? glitch(durationMs) : Promise.resolve()),
   playMusic: () => {
     requestPlayback()
     goTo('music')

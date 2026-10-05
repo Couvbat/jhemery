@@ -42,9 +42,13 @@ export interface Theme {
   name: string
   mode: ThemeMode
   colours: ThemeColours
+  /** Only on a forged scheme: the colour it was grown from, as `#rrggbb`. */
+  seed?: string
 }
 
 export const DEFAULT_THEME = 'cyberpunk'
+/** The id of the one scheme a visitor can make (`theme forge`, the 🎨 menu's "make one…"). */
+export const CUSTOM_THEME = 'custom'
 
 const schemes: Theme[] = [
   {
@@ -291,8 +295,25 @@ function readable(theme: Theme): Theme {
 
 export const themes: Theme[] = schemes.map(readable)
 
+/**
+ * The visitor's forged scheme, if they have made one. A slot beside `themes` rather than
+ * an entry in it: `themes` stays the eleven that ship, so the specs hold those to their
+ * floors and never a visitor's forge, while everything that looks a scheme up by id
+ * (`findTheme`) or lists what can be picked (`allThemes`) sees both. `useTheme` fills it.
+ */
+let custom: Theme | null = null
+
+export function setCustomTheme(theme: Theme | null): void {
+  custom = theme
+}
+
+export function allThemes(): Theme[] {
+  return custom ? [...themes, custom] : themes
+}
+
 export function findTheme(id: string): Theme | undefined {
-  return themes.find((theme) => theme.id === id.toLowerCase())
+  const wanted = id.toLowerCase()
+  return allThemes().find((theme) => theme.id === wanted)
 }
 
 /** A scheme's colours in the order its swatch strip shows them: `theme`'s listing and the

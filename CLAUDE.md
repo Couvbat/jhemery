@@ -205,8 +205,12 @@ previously-shipped bugs.
 ### Performance constraints worth not breaking
 
 `ThreeBackground.vue` (~520 kB of three.js) is `defineAsyncComponent`'d, loaded on
-`requestIdleCallback`, skipped entirely under `prefers-reduced-motion`, and **excluded from the PWA
-precache** — with a runtime StaleWhileRevalidate rule instead. The API is deliberately absent from
+`requestIdleCallback`, never fetched while motion is `paused` (`composables/useMotion.ts`, which
+`prefers-reduced-motion` holds at `paused`), and **excluded from the PWA precache** — with a
+runtime StaleWhileRevalidate rule instead. Its loop runs on elapsed time, not frames, under a
+60 fps governor (30 under `calm` or with the terminal open): a new term in it scales by `f` or
+eases with `ease(k, f)`, and allocates nothing. Animations read `decorativeMotion()`, not
+`prefersReducedMotion()`, except the games, whose stepped mode is a rule change. The API is deliberately absent from
 `runtimeCaching`: a stale "in game" is worse than an honest "unavailable". `navigateFallbackDenylist`
 protects the real files (`/resume.txt`, `/llms.txt`, `/sitemap.xml`, …) from the SPA fallback.
 The frontend PR check enforces Lighthouse budgets (`lighthouserc.yml`, median of five runs).

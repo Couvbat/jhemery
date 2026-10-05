@@ -211,11 +211,22 @@ describe('rooms sync', () => {
     })
 
     it('embeds the widget with the shop closed', () => {
-      const url = new URL(soundcloudEmbed('https://soundcloud.com/couvbat/abysses'))
+      const url = new URL(soundcloudEmbed('https://soundcloud.com/couvbat/abysses', '#fe8019'))
       expect(url.origin).toBe('https://w.soundcloud.com')
       expect(url.searchParams.get('url')).toBe('https://soundcloud.com/couvbat/abysses')
       expect(url.searchParams.get('buying')).toBe('false')
       expect(url.searchParams.get('sharing')).toBe('false')
+    })
+
+    // The scheme's colour, never whatever string the property held, and one `auto_play`.
+    it('draws it in the scheme, falls back on anything but hex, and asks to play once', () => {
+      const track = 'https://soundcloud.com/couvbat/abysses'
+      expect(new URL(soundcloudEmbed(track, ' #FE8019 ')).searchParams.get('color')).toBe('#fe8019')
+      for (const odd of ['oklch(0.85 0.3 145)', 'red', '', '#fe80', '#fe8019&auto_play=true']) {
+        expect(new URL(soundcloudEmbed(track, odd)).searchParams.get('color'), odd).toBe('#00ff41')
+      }
+      expect(new URL(soundcloudEmbed(track, '#fe8019', true)).searchParams.getAll('auto_play')).toEqual(['true'])
+      expect(new URL(soundcloudEmbed(track, '#fe8019')).searchParams.getAll('auto_play')).toEqual(['false'])
     })
   })
 

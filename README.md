@@ -132,14 +132,15 @@ Each app has its own README for working on its code:
 | — screensaver | After three idle minutes with the tab visible, the page fades and the field has the screen to itself; any key or pointer movement brings the page back, and the waking key does nothing else. It never starts during a game or while a room is playing. |
 | — weather mood | The real weather nudges it: a storm speeds the wireframes up, fog dims them, snow slows them and night dims them a little more. These are small multipliers on the section palette, never a replacement for it. |
 | — view swing | Changing page rotates the wireframe field about its centre while the camera pulls back and every shape moves to a new position. The rotation runs on a `THREE.Group`, not the camera, and is folded back into the positions at the end so the gravity maths stays correct. |
-| — performance | The component is `defineAsyncComponent`'d and only loaded on `requestIdleCallback`, so ~520 kB of three.js never competes with first paint. It is excluded from the PWA precache for the same reason. |
-| — accessibility | `prefers-reduced-motion` skips loading it entirely. WebGL failures are caught and leave the canvas blank. Geometries, materials and the renderer are disposed on unmount. |
+| — performance | The component is `defineAsyncComponent`'d and only loaded on `requestIdleCallback`, so ~520 kB of three.js never competes with first paint. It is excluded from the PWA precache for the same reason. The loop runs on elapsed time rather than counting frames, so a 120 Hz screen no longer spins it twice as fast, and it draws at most 60 frames a second, 30 while the terminal is open. |
+| — accessibility | It isn't loaded while motion is paused, which `prefers-reduced-motion` forces; pausing later stops the loop and leaves one still frame. WebGL failures are caught and leave the canvas blank. Geometries, materials and the renderer are disposed on unmount. |
 | **Sections** | about · projects · music · gaming · hardware · contact. They are defined once in `src/content/sections.ts` and read by the navbar, the terminal's `ls`/`cd`/`pwd`, the command palette and every section header. |
 | **Views** | home · tools · watch · radio. These are the routes, defined once in `src/content/views.ts` in the order they sit on the prism. The navbar, `cd` and <kbd>Ctrl</kbd>+<kbd>K</kbd> all navigate through the same `goTo()`, which goes home first when you ask for a section from another page. |
-| **Prism swing** | Changing view turns the page like a face of a prism whose axis runs through the centre of the three.js scene. The old page rotates out and the new one rotates in from the same side, in 3D CSS on a fixed, clipped stage, over 650 ms. The navbar and launcher stay put. Going back turns the other way. Under `prefers-reduced-motion` the pages simply swap. It works without three.js loaded. |
+| **Prism swing** | Changing view turns the page like a face of a prism whose axis runs through the centre of the three.js scene. The old page rotates out and the new one rotates in from the same side, in 3D CSS on a fixed, clipped stage, over 650 ms. The navbar and launcher stay put. Going back turns the other way. It only turns at full motion: under *calm*, *paused* or `prefers-reduced-motion` the pages simply swap. It works without three.js loaded. |
+| **Motion control** | *full · calm · paused*, in the 🎨 menu and as `motion`, saved in `localStorage` and applied before the app mounts. *calm* slows the wireframes to a third of their speed at 30 fps, stops them following the pointer, and drops the swing, the confetti, the glitch, the flashbang and the theme circle; prompt hints, the tagline and the animations of commands you type stay. *paused* stops everything, and the three.js chunk isn't fetched at all. Your system's reduced-motion setting is a floor this can't lift: it holds the page at *paused*, and the menu says so. The games ignore it, since their stepped mode changes the rules. |
 | **CRT overdrive** | `crt` in the terminal, or the Konami code anywhere on the page, toggles scanlines and flicker, and speeds up the wireframes. The setting is saved in `localStorage`. |
-| **Colour schemes** | `theme` lists eleven schemes with a swatch strip each, and `theme <name>` (or `theme random`) applies one: the site's own *cyberpunk* default, plus Gruvbox (dark and light), Nord, Dracula, Catppuccin (Mocha and Latte), Tokyo Night, Rosé Pine, Everforest and Solarized. A scheme is a table of a dozen colours in `src/lib/themes.ts`, and every CSS token is derived from it. That means the glows, the three.js wireframes, the confetti and `neofetch`'s colour strip all follow along. Going back to the default removes every override, so the stylesheet stays the default's only definition. Switching from a dark scheme to a light one whites the screen out for a moment (skipped under reduced motion). The choice is saved in `localStorage` and applied before the app mounts. Muted and body text are lifted to 4.5:1 on every surface by one rule, and a unit test holds every scheme to the same WCAG floors. The 🎨 button in the navbar opens the same list as a menu, drawing each scheme's strip on its own background. It's the only way to switch on a phone, which has no terminal. It stays open while you pick, so the page behind it is the preview. |
-| **Boot sequence** | A fake `couvsh 1.0` kernel log plays on your first visit. `reboot` replays it on demand, and `ssh` ends by triggering it. Skipped under reduced motion. |
+| **Colour schemes** | `theme` lists eleven schemes with a swatch strip each, and `theme <name>` (or `theme random`) applies one: the site's own *cyberpunk* default, plus Gruvbox (dark and light), Nord, Dracula, Catppuccin (Mocha and Latte), Tokyo Night, Rosé Pine, Everforest and Solarized. A scheme is a table of a dozen colours in `src/lib/themes.ts`, and every CSS token is derived from it. That means the glows, the three.js wireframes, the confetti, the matrix rain, the SoundCloud players, the CRT fringe, every window's title-bar dots and `neofetch`'s colour strip all follow along. Going back to the default removes every override, so the stylesheet stays the default's only definition. A switch spreads the new scheme in a circle from where you picked it (`document.startViewTransition`, 450 ms; the terminal's start from the middle) while the wireframes ease to their new colours, except from a dark scheme to a light one, which whites the screen out for a moment instead. Both only at full motion: otherwise the page simply repaints. The choice is saved in `localStorage` and applied before the app mounts. Muted and body text are lifted to 4.5:1 on every surface by one rule, and a unit test holds every scheme to the same WCAG floors. The 🎨 button in the navbar opens the same list as a menu, drawing each scheme's strip on its own background. It's the only way to switch on a phone, which has no terminal. It stays open while you pick, so the page behind it is the preview. **Forge your own**: `theme forge #d65d0e` (add `light` for a light one, or use *make one…* in the menu) grows a twelve-colour scheme in OKLCH around that colour and steps each tone's lightness until it passes the same floors, warning about any it can't. It becomes the one `custom` scheme, saved as its finished colours and restored before mount. `theme export alacritty`, `kitty` or `base16` prints the scheme on screen as a config for a real terminal. |
+| **Boot sequence** | A fake `couvsh 1.0` kernel log plays on your first visit. `reboot` replays it on demand, and `ssh` ends by triggering it. Skipped with motion paused (reduced motion forces that). |
 | **Status ticker** | The footer shows the uptime `neofetch` reports (days since the first commit), how long ago this build shipped, and whether I'm open to work. It refreshes slowly, so a tab left open stays accurate. |
 | **Skills with evidence** | Under the skill badges, `skills --why` links each claim to where it's actually used: SSE to the presence stream and the watch parties, WebAssembly to the ffmpeg tool, GraphQL to the heatmap. Skills with nothing to show stay plain badges. |
 | **`/now`** | What I'm doing at the moment, dated. Past 90 days old, the page says how old it is instead of passing for current. It's also `cat now.txt`, and it's a route outside the prism so the navbar stays at four faces. |
@@ -164,7 +165,7 @@ work badly with mobile virtual keyboards, and the page itself shows the same con
 | Key | Does |
 |---|---|
 | `\|` `;` `&&` `\|\|` | Pipes and chains: `fortune \| cowsay`, `history \| grep theme`, `cat about.txt \| sha256sum`, `projects --json \| jq .`, `cat nope && pwd`. A stage keeps its colours across a pipe. Quote text that holds an operator (`sign "great site; love it"`): an apostrophe inside a word is a letter, so `c'est` needs nothing. `LANG=fr neofetch` runs one command in French |
-| <kbd>Tab</kbd> | Completes to the longest common prefix. First commands and your own aliases, then their arguments: filenames for `cat`/`vim`/`diff`, sections and pages for `cd`/`ping`, tool names, scheme names for `theme`, `on`/`off` for the background toggles |
+| <kbd>Tab</kbd> | Completes to the longest common prefix. First commands and your own aliases, then their arguments: filenames for `cat`/`vim`/`diff`, sections and pages for `cd`/`ping`, tool names, scheme names for `theme`, the three settings for `motion`, `on`/`off` for the background toggles |
 | <kbd>↑</kbd> / <kbd>↓</kbd> | Command history (saved between visits). With text in the input, ↑ walks only the lines that start with it |
 | <kbd>Ctrl</kbd>+<kbd>R</kbd> | Reverse search through history: type to narrow, <kbd>Ctrl</kbd>+<kbd>R</kbd> again for an older match, Enter to run it, Esc, → or Tab to edit it, <kbd>Ctrl</kbd>+<kbd>C</kbd> to give up. Cmd+R still reloads |
 | <kbd>→</kbd> / <kbd>End</kbd> | Takes the faded suggestion after the caret, which only ever comes from your own history |
@@ -177,7 +178,7 @@ work badly with mobile virtual keyboards, and the page itself shows the same con
 | traffic lights | The title-bar dots really do close, minimise and maximise |
 
 An empty prompt suggests a command in faded text (`try: neofetch`), cycling every few seconds
-until you type anything, and then not again that session. Under reduced motion it shows one.
+until you type anything, and then not again that session. With motion paused it shows one.
 
 **Links that run a command.** `https://jhemery.xyz/?run=neofetch` opens the shell and runs
 `neofetch` once (`?run=tour` is the one to put in a bio), then drops the parameter from the URL. A command has to opt in (`linkable`), and
@@ -203,7 +204,7 @@ never show two different contents.
 ## Commands
 
 <details>
-<summary><b>shell</b>: help, clear, history, echo, lang, theme, sha256sum, base64, jq, exit…</summary>
+<summary><b>shell</b>: help, clear, history, echo, lang, theme, motion, sha256sum, base64, jq, exit…</summary>
 
 | Command | Aliases | Usage |
 |---|---|---|
@@ -215,7 +216,8 @@ never show two different contents.
 | `date` | | Current date |
 | `whoami` | | Print the current user |
 | `lang` | | `lang [en\|fr]`: show or switch language |
-| `theme` | `colorscheme` | `theme [name\|random]`: list the colour schemes, or switch to one |
+| `theme` | `colorscheme` | `theme [name\|random]`: list the colour schemes, or switch to one. `theme forge <colour> [light]` grows one of your own from a colour, and `theme export <alacritty\|kitty\|base16>` prints the scheme on screen as a terminal config |
+| `motion` | | `motion [full\|calm\|paused]`: show or set how much the page moves. Never runs from a link |
 | `sha256sum` | `sha1sum`, `sha512sum` | `sha256sum <file\|text>`: the digest of a file in the fake filesystem, or of some text, as the hash tool computes it |
 | `base64` | | `base64 [-d] <file\|text>`: encode or decode, as the encode tool does |
 | `uuidgen` | | A random v4 UUID |
@@ -385,7 +387,7 @@ Rooms are off unless the API sets `ROOMS_ENABLED`.
 There are 38 achievements, tracked in `localStorage` (`couvbat:achievements`, plus
 `couvbat:achievements:sections` for the exploration one and `couvbat:achievements:themes` for the
 colour-scheme one). Unlocking one shows a floating toast with a burst of monospace-glyph confetti
-(skipped under `prefers-reduced-motion`) and prints a line in the terminal. The trophy button in
+(only at full motion) and prints a line in the terminal. The trophy button in
 the navbar opens a modal listing all 38: locked ones show `???` and a vague hint, and unlocked
 ones show their title and how you got them. `achievements` (`trophies`) prints the same progress
 in the terminal.
@@ -532,8 +534,8 @@ This is a personal site, but the workflow is written down so it stays consistent
 - **The registry is the API.** A new terminal command is one object in `src/terminal/commands/`,
   and a new tool is one entry in `src/tools/registry.ts`. `help`, Tab, the palette and `ls` pick
   them up automatically.
-- **Every user-visible string is `Localised<{ en, fr }>`**, and every animation checks
-  `prefers-reduced-motion`.
+- **Every user-visible string is `Localised<{ en, fr }>`**, and every animation checks the motion
+  level (`decorativeMotion()`, which `prefers-reduced-motion` holds at `paused`).
 - **`src/content/` is imported at build time** and must stay free of Vue, the `@` alias and
   browser globals. `purity.spec.ts` enforces this.
 - **Update this README** when you change a command, achievement or API route it documents.

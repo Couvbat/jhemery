@@ -6,6 +6,7 @@ import { resetRecall, useTerminal } from '@/composables/useTerminal'
 import { usePromptSuggestion } from '@/composables/usePromptSuggestion'
 import { autosuggest, searchBackward } from '@/terminal/history'
 import { suggestionPool } from '@/terminal/registry'
+import { WINDOW_DOTS } from '@/components/WindowDots.vue'
 import TerminalOutput from './TerminalOutput.vue'
 import VimPane from './VimPane.vue'
 
@@ -31,11 +32,15 @@ const {
   history,
 } = useTerminal()
 
-/** Shared chrome for the three title-bar dots (they only differ by colour). */
+/** Shared chrome for the three title-bar dots (they only differ by colour, which is
+ *  `WindowDots`' — the same three tokens every other window's bar uses). */
 const BUTTON_CLASS =
   'w-3 h-3 rounded-full flex items-center justify-center transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-primary focus-visible:ring-offset-1 focus-visible:ring-offset-muted'
+const [CLOSE_DOT, MINIMISE_DOT, MAXIMISE_DOT] = WINDOW_DOTS.map((dot) => [dot.fill, dot.hover])
+// The page's background on the dot, as text on a filled `primary` is: dark on a dark
+// scheme's bright dots, light on a light scheme's dark ones.
 const GLYPH_CLASS =
-  'text-[8px] leading-none text-black/70 opacity-0 group-hover:opacity-100 transition-opacity'
+  'text-[8px] leading-none text-background/80 opacity-0 group-hover:opacity-100 transition-opacity'
 
 const input = ref('')
 const inputEl = ref<HTMLInputElement | null>(null)
@@ -355,7 +360,7 @@ function onPanelKeydown(event: KeyboardEvent) {
           <div class="group flex items-center gap-2">
             <button
               type="button"
-              :class="[BUTTON_CLASS, 'bg-red-500/80 hover:bg-red-500']"
+              :class="[BUTTON_CLASS, CLOSE_DOT]"
               :aria-label="t(m.terminal.close)"
               :title="t(m.terminal.close)"
               @click="requestClose()"
@@ -364,7 +369,7 @@ function onPanelKeydown(event: KeyboardEvent) {
             </button>
             <button
               type="button"
-              :class="[BUTTON_CLASS, 'bg-yellow-500/80 hover:bg-yellow-500']"
+              :class="[BUTTON_CLASS, MINIMISE_DOT]"
               :aria-label="t(m.terminal.minimise)"
               :title="t(m.terminal.minimise)"
               @click="maximised = false"
@@ -373,7 +378,7 @@ function onPanelKeydown(event: KeyboardEvent) {
             </button>
             <button
               type="button"
-              :class="[BUTTON_CLASS, 'bg-green-500/80 hover:bg-green-500']"
+              :class="[BUTTON_CLASS, MAXIMISE_DOT]"
               :aria-label="t(m.terminal.maximise)"
               :title="t(m.terminal.maximise)"
               @click="maximised = true"

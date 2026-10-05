@@ -1,5 +1,5 @@
 import { decisions, findDecision, profile, type Decision, type Localised } from '@/content'
-import { prefersReducedMotion } from '@/composables/useCrt'
+import { decorativeMotion } from '@/composables/useMotion'
 import { previewTheme, useTheme } from '@/composables/useTheme'
 import { findTheme } from '@/lib/themes'
 import { docUrl } from '@/lib/source'
@@ -103,7 +103,7 @@ const SCHEMES = ['gruvbox', 'nord'] as const
 const STOP_MS = 6000
 const SCHEME_MS = 3000
 
-async function tourStop(ctx: CommandContext, stop: (typeof TOUR_STOPS)[number], still: boolean): Promise<void> {
+async function tourStop(ctx: CommandContext, stop: (typeof TOUR_STOPS)[number], repaint: boolean): Promise<void> {
   const { t, print, signal } = ctx
   print([blank, line(`» ${t(stop.caption)}`, 'accent')])
   if ('run' in stop) {
@@ -126,9 +126,10 @@ async function tourStop(ctx: CommandContext, stop: (typeof TOUR_STOPS)[number], 
     )
     return
   }
-  // A scheme shown, not saved, and put back however the tour ends. Under reduced motion
-  // a whole-page repaint is exactly the kind of change to leave out.
-  if (still) {
+  // A scheme shown, not saved, and put back however the tour ends. A whole-page repaint
+  // that undoes itself is decoration, so it needs `full` motion: `calm` leaves it out,
+  // and so does reduced motion, which forces `paused`.
+  if (!repaint) {
     print(line(`  ${t({ en: '`theme` lists them.', fr: '`theme` les liste.' })}`, 'muted'))
     return
   }
@@ -183,11 +184,13 @@ export const workCommands: Command[] = [
     linkable: true,
     palette: true,
     async run(ctx) {
-      // Under reduced motion it prints everything at once rather than pacing itself.
-      const still = prefersReducedMotion()
+      // With motion paused it prints everything at once rather than pacing itself; the
+      // pauses are the pacing of something typed, so `calm` keeps them.
+      const motion = decorativeMotion()
+      const still = motion === 'paused'
       for (const [i, stop] of TOUR_STOPS.entries()) {
         if (i > 0 && !still) await sleep(STOP_MS, ctx.signal)
-        await tourStop(ctx, stop, still)
+        await tourStop(ctx, stop, motion === 'full')
       }
       ctx.print([blank, line(ctx.t({ en: 'End of the tour. Ctrl+C stops one, `tour` starts another.', fr: 'Fin de la visite. Ctrl+C en arrête une, `tour` en relance une.' }), 'muted')])
     },

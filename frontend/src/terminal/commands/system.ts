@@ -1,5 +1,6 @@
 import { profile } from '@/content'
-import { prefersReducedMotion, useCrt } from '@/composables/useCrt'
+import { useCrt } from '@/composables/useCrt'
+import { decorativeMotion } from '@/composables/useMotion'
 import { useMusicPlayer } from '@/composables/useMusicPlayer'
 import { observeRequests, type RequestTrace } from '@/lib/api'
 import { achievementList, announce, isUnlocked, unlockedCount } from '../achievements'
@@ -177,7 +178,9 @@ export const systemCommands: Command[] = [
     writes: 'none',
     hidden: true,
     async run(ctx) {
-      const frames = prefersReducedMotion() ? 1 : 6
+      // One frame with motion paused (reduced motion forces that); `calm` keeps a typed
+      // command's own animation.
+      const frames = decorativeMotion() === 'paused' ? 1 : 6
       // Redraws one table in place. It used to `clear()` between frames, which
       // stopped the frames stacking but took the whole scrollback with them.
       const draw = ctx.frame()
@@ -189,7 +192,7 @@ export const systemCommands: Command[] = [
         const procs = processes()
         // Stage 6 of the CTF chain (terminal/ctf.ts): a process that only exists on
         // the last frame, so only someone who watched `top` to the end sees it —
-        // never `ps`. Under reduced motion there is one frame, which is the last.
+        // never `ps`. With motion paused there is one frame, which is the last.
         if (i === frames - 1) procs.push(GHOST)
         const load = (Math.random() * 1.5).toFixed(2)
         draw([

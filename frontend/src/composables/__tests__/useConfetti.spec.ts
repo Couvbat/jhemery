@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { confettiQueue, drainConfetti, fireConfetti } from '../useConfetti'
+import { setMotion } from '../useMotion'
 
 function setReducedMotion(reduce: boolean) {
   vi.stubGlobal(
@@ -10,6 +11,7 @@ function setReducedMotion(reduce: boolean) {
 
 afterEach(() => {
   drainConfetti()
+  setMotion('full')
   vi.unstubAllGlobals()
 })
 
@@ -34,5 +36,15 @@ describe('useConfetti', () => {
     fireConfetti({ x: 10, y: 20, intensity: 1 })
 
     expect(confettiQueue.value).toEqual([])
+  })
+
+  // A burst is decoration on top of the toast, which `calm` keeps.
+  it('drops bursts below full motion too', () => {
+    setReducedMotion(false)
+    for (const level of ['calm', 'paused'] as const) {
+      setMotion(level)
+      fireConfetti({ x: 10, y: 20, intensity: 1 })
+      expect(confettiQueue.value, level).toEqual([])
+    }
   })
 })
