@@ -2,13 +2,15 @@ import { profile } from '@/content'
 import { useCrt } from '@/composables/useCrt'
 import { decorativeMotion } from '@/composables/useMotion'
 import { useMusicPlayer } from '@/composables/useMusicPlayer'
+import { sendWave, whenPresent, type WaveResult } from '@/composables/usePresence'
+import type { Localised } from '@/content/types'
 import { observeRequests, type RequestTrace } from '@/lib/api'
 import { achievementList, announce, isUnlocked, unlockedCount } from '../achievements'
 import { blank, fail, line } from '../format'
 import { isLinkable, resolveLink, visibleCommands, writesOf } from '../registry'
 import { traceLines } from '../strace'
 import { sleep } from '../timing'
-import type { Command, OutputLine, Tone } from '../types'
+import type { Command, CommandContext, OutputLine, Tone } from '../types'
 import { uptime } from './content'
 import { ENV_FILE, envAssignments } from './env-file'
 import { systemctl } from './systemctl'
@@ -156,9 +158,106 @@ const strace: Command = {
   },
 }
 
+/**
+ * `who` lists one row per other visitor and stops here, the same twelve the field draws
+ * a shape for; the rest are one line, so the rows and the line still add up to the count.
+ */
+export const WHO_ROWS = 12
+
+const UNAVAILABLE: Localised = {
+  en: 'presence is unavailable right now — the count needs the live API.',
+  fr: 'la présence est indisponible pour l’instant — le compte a besoin de l’API en direct.',
+}
+
+/**
+ * Everyone on the site as an anonymous tty: `you` first, then `somebody` for each
+ * other connection. There is nothing else to show — the stream is one integer — so
+ * the rows are the count, drawn the way `who` would.
+ */
+async function who({ t, signal }: CommandContext): Promise<OutputLine[]> {
+  const count = await whenPresent(signal)
+  if (count === null) return [line(`who: ${t(UNAVAILABLE)}`, 'muted')]
+
+  const others = Math.max(0, count - 1)
+  const shown = Math.min(others, WHO_ROWS)
+  const rows: OutputLine[] = [
+    { text: 'you       pts/0', tone: 'primary', pre: true },
+    ...Array.from({ length: shown }, (_, i) => ({ text: `somebody  pts/${i + 1}`, pre: true })),
+  ]
+  if (others > shown) {
+    rows.push(line(t({ en: `… and ${others - shown} more`, fr: `… et ${others - shown} de plus` }), 'muted'))
+  }
+  const total =
+    others === 0
+      ? // Not "whoever arrives": a wave is a moment, and nobody who comes later hears it.
+        t({
+          en: 'just you here. `wall` waves at whoever is on the site when you send it.',
+          fr: 'vous seul ici. `wall` fait signe à qui est sur le site quand vous l’envoyez.',
+        })
+      : t({
+          en: `${count} here now, you included. \`wall\` waves at them.`,
+          fr: `${count} personnes ici, vous compris. \`wall\` leur fait signe.`,
+        })
+  return [...rows, blank, line(total, 'muted')]
+}
+
+const WAVE_REPLIES: Record<WaveResult, { text: Localised; tone: Tone }> = {
+  sent: {
+    text: {
+      // "May": the server spaces waves site-wide, and a page standing still shows no ripple.
+      en: 'waved. Anyone else here may see their wireframes ripple, or a line in an open terminal.',
+      fr: 'signe envoyé. Les autres ici verront peut-être leurs formes onduler, ou une ligne dans un terminal ouvert.',
+    },
+    tone: 'success',
+  },
+  alone: {
+    text: { en: 'wall: nobody else is here to wave at.', fr: 'wall : personne d’autre ici à qui faire signe.' },
+    tone: 'muted',
+  },
+  limited: {
+    text: { en: 'wall: that is enough waving for a while.', fr: 'wall : assez de signes pour le moment.' },
+    tone: 'warning',
+  },
+  off: {
+    text: { en: 'wall: broadcasts are switched off here.', fr: 'wall : les diffusions sont désactivées ici.' },
+    tone: 'muted',
+  },
+  unavailable: {
+    text: { en: 'wall: the wave could not be sent right now.', fr: 'wall : le signe n’a pas pu partir pour l’instant.' },
+    tone: 'error',
+  },
+}
+
 export const systemCommands: Command[] = [
   systemctl,
   strace,
+  {
+    name: 'who',
+    description: { en: 'Who else is on the site, as anonymous ttys', fr: 'Qui d’autre est sur le site, en ttys anonymes' },
+    group: 'live',
+    writes: 'none',
+    linkable: true,
+    run: who,
+  },
+  {
+    name: 'wall',
+    usage: 'wall',
+    description: { en: 'Wave at everyone else on the site', fr: 'Faire signe à tout le monde sur le site' },
+    group: 'live',
+    // A POST that makes every other visitor's page react: never from a link.
+    writes: 'server',
+    async run({ args, t, signal }) {
+      // A real `wall` broadcasts its arguments. This one carries no text at all, so
+      // any it was given are named as dropped rather than silently ignored.
+      const dropped = args.length
+        ? [line(t({ en: 'messages are not carried — only the wave', fr: 'les messages ne sont pas transmis — seulement le signe' }), 'muted')]
+        : []
+      const reply = WAVE_REPLIES[await sendWave(signal)]
+      // A wave that couldn't leave is the one failure: `wall && …` stops on it, as on any
+      // other fail(); off, limited and alone are answers, not errors.
+      return [...dropped, reply.tone === 'error' ? fail(t(reply.text)) : line(t(reply.text), reply.tone)]
+    },
+  },
   {
     name: 'ps',
     aliases: ['ps aux', 'ps -ef'],

@@ -43,7 +43,8 @@ unconfigured rather than failing.
 | `GET /github/workflow-status` | `github` | Four latest Actions runs for `GITHUB_REPO`; public REST, token optional. 60 s cache. |
 | `GET /weather` | `weather` | Open-Meteo for the coordinates in config (never the caller's). 10-minute cache. |
 | `GET /markets` | `markets` | CoinGecko quotes + 7-day series for `MARKETS_COINS`. 5-minute cache. |
-| `GET /presence` | `presence` | SSE: one integer, the number of open connections. 25 s heartbeat. |
+| `GET /presence` | `presence` | SSE: one integer, the number of open connections. 25 s heartbeat. With `wall` on, also a named `wave` event with `{}`. |
+| `POST /presence/wall` | `presence` | A wave to every connection, one every 3 s site-wide at most. 204, or `{ configured: false }` when off. 6/min per IP. Off by default (`WALL_ENABLED`). |
 | `GET /stats` | `stats` | `{ sessions }` — terminal sessions ever opened. |
 | `POST /stats/session` | `stats` | Count one session. 5/hour per IP. |
 | `GET /stats/wordle` | `stats` | `?day=YYYY-MM-DD&locale=en\|fr` → the daily wordle's seven counts (solved in 1–6, or not). |
@@ -72,10 +73,10 @@ Every optional integration degrades instead of erroring — endpoints report `co
 `enabled: false`) and the frontend renders that state: no Steam key hides live activity, no GitHub
 token drops the heatmap and pinned repos, no weather coordinates hide `weather`, an unreachable
 model makes the terminal say the model is asleep and point at `mail`. `ask`, `guestbook`, `rooms`,
-`jobs` and `mcp` are **off by default**; with MCP off, `/mcp` is a plain 404.
+`jobs`, `mcp` and `wall` are **off by default**; with MCP off, `/mcp` is a plain 404.
 
 Privacy is a constraint on every module, not a policy on top: `/presence` pushes one integer with
-no visitor id, `/stats` counts sessions rather than commands, `/weather` uses server-side
+no visitor id (and a contentless `wave` when `wall` is on), `/stats` counts sessions rather than commands, `/weather` uses server-side
 coordinates so everyone gets the same answer, and `ask` never logs questions or answers.
 
 ## Cross-cutting bits

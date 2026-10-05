@@ -185,15 +185,15 @@ whitelisting `ValidationPipe`.
 
 **Everything optional degrades gracefully.** No Steam key → live activity hidden; no GitHub token
 → heatmap dropped; unreachable LLM → the terminal says it's asleep. `ask`, `guestbook`, `rooms`,
-`jobs` and `mcp` are **off by default**. Endpoints report `configured: false` rather than
+`jobs`, `mcp` and `wall` are **off by default**. Endpoints report `configured: false` rather than
 erroring, and the frontend renders that state. Preserve this when adding integrations.
 `backend/.env.example` documents every variable and why the risky ones are off.
 
 Privacy is a design constraint, not an afterthought: `/presence` pushes one integer over SSE with
-no visitor id, `/stats` counts sessions not commands, `/weather` uses server-side coordinates so
-every visitor gets the same answer, and `ask` never logs questions or answers. `strace` shows the
-shape of a request's bodies, never their values, and never a header; anything new fed to the
-request observer in `lib/api.ts` must keep it that way.
+no visitor id (and a contentless `wave` when `wall` is on), `/stats` counts sessions not commands,
+`/weather` uses server-side coordinates so every visitor gets the same answer, and `ask` never logs
+questions or answers. `strace` shows the shape of a request's bodies, never their values, and never
+a header; anything new fed to the request observer in `lib/api.ts` must keep it that way.
 
 ### API base URL
 

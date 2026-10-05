@@ -66,9 +66,10 @@ tools, watch-party and radio rooms, and 38 hidden achievements. English and Fren
 - 🌐 **Live data** from Steam, GitHub, CI runs, the weather and crypto prices, plus live presence,
   a guestbook and a self-hosted LLM behind `ask`. Every integration degrades gracefully when it's
   switched off.
-- 🔒 **Privacy by construction.** Presence is one anonymous integer, stats count sessions rather
-  than commands, `ask` logs nothing, analytics are self-hosted and cookieless. `strace <cmd>`
-  shows every request a command makes and the shape of what it carries, never a value.
+- 🔒 **Privacy by construction.** Presence is one anonymous integer (and `wall`'s wave carries
+  nothing at all), stats count sessions rather than commands, `ask` logs nothing, analytics are
+  self-hosted and cookieless. `strace <cmd>` shows every request a command makes and the shape of
+  what it carries, never a value.
 - 📄 **One source for the CV.** `curl jhemery.xyz` returns an ANSI-coloured résumé (and
   `curl jhemery.xyz/help` the shell's other pages), and
   `/resume.html` a printable one in either language, both generated at build time from the same
@@ -147,7 +148,7 @@ Each app has its own README for working on its code:
 | **Printable résumé** | `/resume.html` and `/resume.fr.html`: static, script-free, with a print stylesheet, so "Save as PDF" gives a clean CV. Linked from the contact section and `resume`. |
 | **Case studies** | `/work/<part>`: eight parts of this site, from the vim pane and the QR encoder to the rooms and the word lists. Each has what was hard, its numbers, the code at the build's commit and its design, and most have a *try it* link and the `why` behind them. They're linked from a "How this site is built" grid in the projects section, and say the same as `projects <part>`. A test holds every number to the line of code it comes from, or marks it as measured. |
 | **Design notes** | [`/notes/`](https://jhemery.xyz/notes/): the design specs in `docs/superpowers/specs`, published as static, script-free pages by a small hand-written markdown renderer. Each one says which language it is in (one is French). `why` links into them. |
-| **Live presence** | The footer also shows how many people are on the site right now, over SSE. It's a single count and nothing else (see [the API](#the-api)). |
+| **Live presence** | The footer also shows how many people are on the site right now, over SSE. It's a single count and nothing else (see [the API](#the-api)). `who` draws the same count as anonymous ttys, and `wall` sends everyone else a wave with no content: their wireframes ripple outward and an open terminal says *Broadcast message from somebody@jhemery.xyz*. The stream starts with the footer on the home page, or when `who` or `wall` asks for it. |
 | **Live cards** | Steam "currently playing", recent GitHub commits, the latest CI runs, a contribution heatmap and pinned repos, a SoundCloud player and the guestbook. |
 | **Guestbook ticker** | A 20 s poll (not SSE; see [the spec](docs/features-spec.md#8-backend-additions)) shows a floating notice when someone signs while you're on the page. Clicking it opens `guestbook`. It pauses while the tab is hidden and stops if the guestbook is off. |
 | **Command palette** | <kbd>Ctrl</kbd>/<kbd>⌘</kbd>+<kbd>K</kbd> opens a fuzzy list of views, sections and palette-flagged commands. It's keyboard-navigable and keeps the selection in view. |
@@ -268,7 +269,7 @@ never show two different contents.
 </details>
 
 <details>
-<summary><b>live data</b>: steam, gitlog, weather, btc, guestbook, mail, ask, systemctl</summary>
+<summary><b>live data</b>: steam, gitlog, weather, btc, guestbook, mail, ask, systemctl, who, wall</summary>
 
 | Command | Aliases | Does |
 |---|---|---|
@@ -281,6 +282,8 @@ never show two different contents.
 | `mail` | `sendmail`, `write` | Send me a message without leaving the terminal |
 | `ask` | | `ask <question>` streams an answer from a self-hosted LLM |
 | `systemctl` | | `systemctl status [unit]`: what the API is running, one unit per module, from `GET /health`. With the API down every unit reads `unknown` |
+| `who` | | Everyone on the site right now, as anonymous ttys: `you pts/0`, then `somebody pts/N` for each other visitor, twelve at most and then "… and N more" |
+| `wall` | | Wave at everyone else on the site. It carries no message (any you type are dropped, and it says so), never runs from a link, and says so when the server has broadcasts switched off |
 
 </details>
 
@@ -459,7 +462,8 @@ uses the front of `X-Forwarded-For`, which any client can write.
 | `GET /github/workflow-status` | The four most recent Actions runs for `GITHUB_REPO`. Uses the public REST API, so the token is optional. Cached for only 60 s, because a build in progress is the one case where a stale answer is wrong. |
 | `GET /weather` | Current conditions and a short forecast from Open-Meteo (no key, no account). The coordinates are **mine**, from server config. Nothing about the visitor is read or sent, so everyone gets the same answer and one 10-minute cache serves them all. |
 | `GET /markets` | Crypto quotes and a 7-day series from CoinGecko (no key, no account). It's a proxy only because CORS blocks the browser from calling CoinGecko directly. The coin list is server config, so no visitor data is forwarded. Cached for 5 min. |
-| `GET /presence` | Server-sent events giving how many people are on the site right now. It's one integer, pushed as visitors arrive and leave. No visitor ID is sent or assigned, and nothing is stored. |
+| `GET /presence` | Server-sent events giving how many people are on the site right now. It's one integer, pushed as visitors arrive and leave. No visitor ID is sent or assigned, and nothing is stored. With `wall` on, the same stream also carries a named `wave` event whose data is `{}`. |
+| `POST /presence/wall` | `wall`'s wave to every connection, coalesced to one every 15 s across the site. Takes `application/json` only (415 otherwise), so other sites can't send it unseen. Always a bare 204 when enabled, so it says nothing about anyone else; `{ configured: false }` when not. 2 per 10 min per IP. **Off by default** (`WALL_ENABLED`). |
 | `GET /stats` · `POST /stats/session` | A single running total of terminal sessions. Counted once when you open the shell, never per command, so the server never learns which commands anyone runs. 5/hour per IP. |
 | `GET /stats/wordle` · `POST /stats/wordle` | The daily wordle's distribution: seven counts per day and language (solved in 1–6, or not), today and yesterday (UTC) only, two weeks kept. A report is `{ day, locale, guesses }` and nothing else. 5/hour per IP. |
 | `GET /health` | One line per module for `systemctl status`: active or inactive and why, how old its cache is, a count it already keeps. Each module reads only what it already holds, so this never calls Steam, GitHub or the model on anyone's behalf. |
@@ -482,6 +486,7 @@ uses the front of `X-Forwarded-For`, which any client can write.
 - With rooms off, the watch and radio pages say so.
 - With the downloader off, its panel says so once unlocked.
 - With MCP off, `/mcp` is a 404.
+- With `wall` off, it says broadcasts are switched off here; `who` works either way.
 - With the whole API down, `systemctl status` shows every unit as `unknown`.
 
 Endpoints report `configured: false` rather than returning an error.

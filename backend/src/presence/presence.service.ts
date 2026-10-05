@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
-import { BehaviorSubject, merge, Observable } from 'rxjs';
+import { BehaviorSubject, merge, Observable, Subject } from 'rxjs';
 import { map } from 'rxjs/operators';
-import { PresenceUpdate } from './presence.types';
+import { PresenceFrame, WaveFrame } from './presence.types';
 import { UnitHealth } from '../common/health';
 
 /**
@@ -9,6 +9,14 @@ import { UnitHealth } from '../common/health';
  * every 25 seconds keeps the stream alive without being chatty.
  */
 const HEARTBEAT_MS = 25_000;
+
+/**
+ * However many visitors run `wall`, the site ripples at most this often: once
+ * every 15 s, the most any visitor's tab shows anyway (`SHOW_EVERY_MS` in the
+ * frontend), so this is the ceiling that holds whoever is sending, from however
+ * many addresses.
+ */
+export const WAVE_EVERY_MS = 15_000;
 
 /**
  * A count of open SSE connections, and nothing else — see `presence.types.ts`
@@ -26,20 +34,30 @@ export class PresenceService {
     const timer = setInterval(() => subscriber.next(this.online), HEARTBEAT_MS);
     return () => clearInterval(timer);
   });
+  /** Not replayed: a wave is a moment, and someone arriving after it missed it. */
+  private readonly waves = new Subject<void>();
+  private lastWave = -Infinity;
 
   /**
    * One subscription per connected visitor. Arriving and leaving both push a
    * new count to everyone, so the number moves the moment someone opens or
-   * closes the page rather than on the next heartbeat.
+   * closes the page rather than on the next heartbeat. A wave rides the same
+   * connection as a named event.
    */
-  stream(): Observable<{ data: PresenceUpdate }> {
-    return new Observable<{ data: PresenceUpdate }>((subscriber) => {
+  stream(): Observable<PresenceFrame> {
+    return new Observable<PresenceFrame>((subscriber) => {
       this.online += 1;
       this.counts.next(this.online);
 
-      const sub = merge(this.counts, this.heartbeat)
-        .pipe(map((online) => ({ data: { online } })))
-        .subscribe(subscriber);
+      const sub = merge(
+        merge(this.counts, this.heartbeat).pipe(
+          map((online): PresenceFrame => ({ data: { online } })),
+        ),
+        // A fresh frame for each connection, never one shared object: Nest stamps a
+        // connection's own frame counter onto a frame with no id, in place, so a shared
+        // one would carry the first visitor's counter to everybody, for good.
+        this.waves.pipe(map((): WaveFrame => ({ type: 'wave', data: {} }))),
+      ).subscribe(subscriber);
 
       return () => {
         sub.unsubscribe();
@@ -49,6 +67,19 @@ export class PresenceService {
         this.counts.next(this.online);
       };
     });
+  }
+
+  /**
+   * `wall`: every connection gets an empty `wave` event, the sender's included —
+   * nothing here can tell connections apart, which is the point, so the tab that
+   * sent it ignores its own echo. Coalesced site-wide: a wave inside
+   * `WAVE_EVERY_MS` of the last one is dropped, and the caller is not told, so
+   * the route says nothing about anyone else's waves either.
+   */
+  wave(now = Date.now()): void {
+    if (now - this.lastWave < WAVE_EVERY_MS) return;
+    this.lastWave = now;
+    this.waves.next();
   }
 
   /** Exposed for the test; nothing in the app reads it. */

@@ -166,6 +166,9 @@ export const messages = {
     },
     // Faded placeholder text at an empty prompt; `{command}` is from the registry.
     suggestion: { en: 'try: {command}', fr: 'essayez : {command}' },
+    // Someone else ran `wall`. The sender is always `somebody`: there is no one to name.
+    broadcast: { en: 'Broadcast message from', fr: 'Message diffusé par' },
+    broadcastNote: { en: '(a wave, and nothing else: no message, no name)', fr: '(un signe de la main, rien d’autre : ni message, ni nom)' },
   },
   // Chrome around `ask` only. The *answer* is generated in the requested locale
   // by the model itself and is never translated client-side.

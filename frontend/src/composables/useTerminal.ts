@@ -43,7 +43,9 @@ import { decorativeMotion } from './useMotion'
 import { showMatrix } from './useMatrix'
 import { triggerBoot } from './useBoot'
 import { requestPlayback } from './useMusicPlayer'
+import { usePresence } from './usePresence'
 import { recordSession } from './useStats'
+import { profile } from '@/content'
 
 const MAX_LINES = 500
 
@@ -541,6 +543,35 @@ function quoteExample(line: string, stage: Stage): string {
   const quote = rest.includes('"') ? "'" : '"'
   return `${command} ${quote}${rest}${quote}`
 }
+
+/**
+ * `wall` from someone else, as a real terminal shows it — but only when it is open and
+ * idle. A running command may be drawing a `frame()`, which assumes it owns the tail of
+ * the buffer, so a wave that lands mid-command waits for it to finish; one that lands
+ * while the terminal is closed is the field's alone, and isn't kept for later.
+ */
+const { wave } = usePresence()
+let waveWaiting = false
+
+function printWave() {
+  const locale = currentLocale()
+  append([
+    { text: '' },
+    { text: `${messages.terminal.broadcast[locale]} somebody@${profile.domain}`, tone: 'accent' },
+    { text: messages.terminal.broadcastNote[locale], tone: 'muted' },
+  ])
+}
+
+watch(wave, () => {
+  if (!open.value) return
+  if (busy.value) waveWaiting = true
+  else printWave()
+})
+watch(busy, (running) => {
+  if (running || !waveWaiting) return
+  waveWaiting = false
+  if (open.value) printWave()
+})
 
 /** Handles the Enter key: either answers a pending prompt or runs a command. */
 export async function submit(value: string): Promise<void> {
