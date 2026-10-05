@@ -240,10 +240,99 @@ export const messages = {
       en: 'That is not an image this browser can decode.',
       fr: "Ce n'est pas une image que ce navigateur sait décoder.",
     },
+    // Claims only what the check under the result proves: the blocks it looks for, in this
+    // browser, on this file.
     privacy: {
-      en: 'Re-encoding through a canvas drops every metadata block — EXIF, GPS, colour profile — by construction, not by option.',
-      fr: 'Repasser par un canvas supprime tous les blocs de métadonnées — EXIF, GPS, profil colorimétrique — par construction, pas par option.',
+      en: "The line under the result is a check, not a promise: the tool reads its own output back with the same inspector, looking for Exif (GPS included), XMP, ICC, IPTC, comments and PNG text. A colour profile the browser's encoder writes itself counts as one field. Anything outside that list is not looked for.",
+      fr: "La ligne sous le résultat est une vérification, pas une promesse : l'outil relit sa propre sortie avec le même inspecteur, à la recherche d'Exif (GPS compris), de XMP, d'ICC, d'IPTC, de commentaires et de texte PNG. Un profil colorimétrique écrit par l'encodeur du navigateur lui-même compte pour un champ. Ce qui sort de cette liste n'est pas cherché.",
     },
+    givesAway: { en: 'what this file gives away', fr: 'ce que ce fichier révèle' },
+    fieldsOne: { en: '1 field', fr: '1 champ' },
+    fieldsMany: { en: '{n} fields', fr: '{n} champs' },
+    nothing: {
+      en: 'Nothing the inspector looks for: no Exif, XMP, ICC, IPTC, comment or PNG text.',
+      fr: "Rien de ce que l'inspecteur cherche : ni Exif, ni XMP, ni ICC, ni IPTC, ni commentaire, ni texte PNG.",
+    },
+    // Never "0 fields": a format the inspector can't read is not a clean one.
+    unreadable: {
+      en: 'The inspector does not read {format} files, so it cannot say what this one gives away.',
+      fr: "L'inspecteur ne lit pas les fichiers {format} : il ne peut pas dire ce que celui-ci révèle.",
+    },
+    unreadableUnknown: {
+      en: 'The inspector does not read this kind of file, so it cannot say what it gives away.',
+      fr: "L'inspecteur ne lit pas ce type de fichier : il ne peut pas dire ce qu'il révèle.",
+    },
+    truncated: {
+      en: 'Only the first 64 MB was read: anything after it is not listed.',
+      fr: "Seuls les 64 premiers Mo ont été lus : ce qui suit n'est pas listé.",
+    },
+    whereYouStood: { en: 'this says where you stood', fr: 'ceci dit où vous vous teniez' },
+    moreOne: { en: '+ 1 more field, not named here', fr: '+ 1 autre champ, non nommé ici' },
+    moreMany: { en: '+ {n} more fields, not named here', fr: '+ {n} autres champs, non nommés ici' },
+    present: { en: 'present', fr: 'présent' },
+    verified: { en: '0 fields — verified', fr: '0 champ — vérifié' },
+    // An output past the read cap: what was read is clean, the rest was never looked at.
+    verifiedHead: {
+      en: '0 fields in the first 64 MB — the rest was not read',
+      fr: "0 champ dans les 64 premiers Mo — le reste n'a pas été lu",
+    },
+    survivedOne: { en: '1 field survived re-encoding', fr: '1 champ a survécu au réencodage' },
+    survivedMany: { en: '{n} fields survived re-encoding', fr: '{n} champs ont survécu au réencodage' },
+    // Which ones, when the inspector can name them.
+    survivors: { en: '{verdict}: {list}', fr: '{verdict} : {list}' },
+    unverified: {
+      en: 'The result could not be read back, so nothing is verified.',
+      fr: "Le résultat n'a pas pu être relu : rien n'est vérifié.",
+    },
+  },
+  toolImageGroups: {
+    where: { en: 'where', fr: 'où' },
+    device: { en: 'device', fr: 'appareil' },
+    people: { en: 'people', fr: 'personnes' },
+    time: { en: 'when', fr: 'quand' },
+    embedded: { en: 'embedded', fr: 'intégré' },
+  },
+  // One per `FieldKey` in tools/image/metadata.ts; a PNG text chunk's own keyword follows `text`.
+  toolImageFields: {
+    gps: { en: 'GPS position', fr: 'position GPS' },
+    make: { en: 'camera maker', fr: 'fabricant' },
+    model: { en: 'camera model', fr: 'modèle' },
+    serial: { en: 'serial number', fr: 'numéro de série' },
+    lensMake: { en: 'lens maker', fr: "fabricant de l'objectif" },
+    lensModel: { en: 'lens', fr: 'objectif' },
+    lensSerial: { en: 'lens serial number', fr: "numéro de série de l'objectif" },
+    makerNote: { en: 'maker note', fr: 'note du fabricant' },
+    orientation: { en: 'orientation', fr: 'orientation' },
+    software: { en: 'software', fr: 'logiciel' },
+    owner: { en: 'camera owner', fr: "propriétaire de l'appareil" },
+    artist: { en: 'artist', fr: 'auteur' },
+    copyright: { en: 'copyright', fr: 'copyright' },
+    taken: { en: 'taken', fr: 'prise' },
+    digitised: { en: 'digitised', fr: 'numérisée' },
+    modified: { en: 'modified', fr: 'modifiée' },
+    pngTime: { en: 'last modified', fr: 'dernière modification' },
+    xmp: { en: 'XMP packet', fr: 'paquet XMP' },
+    icc: { en: 'colour profile', fr: 'profil colorimétrique' },
+    iptc: { en: 'IPTC record', fr: 'fiche IPTC' },
+    comment: { en: 'comment', fr: 'commentaire' },
+    text: { en: 'text', fr: 'texte' },
+  },
+  // TIFF 6.0's Orientation, 1–8: what the stored rows need to be shown upright.
+  toolImageOrientation: {
+    1: { en: 'upright', fr: "à l'endroit" },
+    2: { en: 'shown mirrored', fr: 'affichée en miroir' },
+    3: { en: 'shown turned 180°', fr: 'affichée tournée de 180°' },
+    4: { en: 'shown flipped top to bottom', fr: 'affichée retournée de haut en bas' },
+    5: {
+      en: 'shown mirrored and turned 90° anticlockwise',
+      fr: 'affichée en miroir et tournée de 90° dans le sens antihoraire',
+    },
+    6: { en: 'shown turned 90° clockwise', fr: 'affichée tournée de 90° dans le sens horaire' },
+    7: {
+      en: 'shown mirrored and turned 90° clockwise',
+      fr: 'affichée en miroir et tournée de 90° dans le sens horaire',
+    },
+    8: { en: 'shown turned 90° anticlockwise', fr: 'affichée tournée de 90° dans le sens antihoraire' },
   },
   toolHash: {
     text: { en: 'text', fr: 'texte' },

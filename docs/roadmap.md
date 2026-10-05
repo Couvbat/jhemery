@@ -289,7 +289,7 @@ them.
 | ✔ | Feature | Approach | Files | Effort |
 |---|---|---|---|---|
 | [x] | `strace` and a real `curl` | `strace <cmd>` lists every request the command made (`GET /weather = 200 · 1.1 kB · 84 ms`) and the shape of each JSON body, never its values: `strace wordle daily` shows `{ day, locale, guesses }` and nothing else, and `strace ls` shows nothing at all. One observer set in `lib/api.ts`, a no-op when empty, fed by `request()`, `askStream()` and `usePresence`'s EventSource, subscribed for exactly the inner command's lifetime. `curl` becomes a same-origin GET/HEAD client: `-I` prints the real response headers (CSP, HSTS) with `cache: 'no-store'` so the service worker can't answer, and bare `curl jhemery.xyz` fetches the real `resume.txt` through an SGR-to-tone parser that drops concealed runs, so CTF stage 3 still needs a real terminal. Other hosts get "Could not resolve host". | `lib/api.ts`, `composables/usePresence.ts`, `commands/system.ts`, `commands/content.ts` | S |
-| [ ] | Image metadata inspector | Before re-encoding, `image` lists what the file gives away: camera and serial number, lens, software, timestamps, GPS as decimal degrees ("this says where you stood"). Afterwards it parses its own output with the same parser and shows "0 fields — verified", which turns "strips by construction" into a check a browser change would fail on screen. A bounds-checked `DataView` walker written from TIFF 6.0 and CIPA DC-008, over JPEG APP1, PNG chunks and WebP RIFF, reading only the first 256 kB; a spec slices a fixture at every offset and expects a partial result, never a throw. `createImageBitmap` gets `imageOrientation: 'from-image'` explicitly, with an Orientation=6 fixture, so stripping never leaves a phone photo sideways. | `tools/image/metadata.ts` (new), `tools/image/ImageTool.vue`, `tools/__tests__/image.spec.ts` | S |
+| [x] | Image metadata inspector | Before re-encoding, `image` lists what the file gives away: camera and serial number, lens, software, timestamps, GPS as decimal degrees ("this says where you stood"). Afterwards it parses its own output with the same parser and shows "0 fields — verified", which turns "strips by construction" into a check a browser change would fail on screen. A bounds-checked `DataView` walker written from TIFF 6.0 and CIPA DC-008, over JPEG APP1, PNG chunks and WebP RIFF, reading only the first 256 kB; a spec slices a fixture at every offset and expects a partial result, never a throw. `createImageBitmap` gets `imageOrientation: 'from-image'` explicitly, with an Orientation=6 fixture, so stripping never leaves a phone photo sideways. | `tools/image/metadata.ts` (new), `tools/image/ImageTool.vue`, `tools/__tests__/image.spec.ts` | S |
 
 ### Rooms
 
@@ -454,6 +454,28 @@ Recorded as each row ships.
   - `!word` (a search by prefix) is a letter: nobody types it here, and every `!` that expands is
     one more way for a typed line to surprise.
   - ↑ past the oldest prefix match stays on it.
+- **Image metadata inspector:**
+  - It reads the whole file, up to 64 MB, not the first 256 kB: WebP's extended format puts
+    EXIF and XMP after the image data, and PNG text chunks may follow IDAT. That made it M, not S.
+  - It reads more than JPEG APP1. In JPEG: XMP, ICC (APP2), IPTC (inside APP13's Photoshop
+    resources) and comments. In PNG: text, `tIME`, `iCCP` and `eXIf`. In WebP: ICC, EXIF and
+    XMP. HEIC, AVIF and GIF are reported as unreadable, never as "0 fields".
+  - A field is defined: each Exif tag, each PNG text chunk, the PNG time, and each XMP, ICC, IPTC
+    and comment block. JFIF, VP8X, the IFD pointers and the image data are structure, and GPS's
+    four tags show as one position.
+  - "0 fields — verified" holds only for PNG in Chromium. Its JPEG and WebP encoders write an
+    sRGB colour profile of their own, which the check counts, so those outputs read "1 field
+    survived re-encoding: colour profile". The privacy copy says so. The e2e asserts "0 fields"
+    on PNG, and on the default WebP only that nothing from the photo came through.
+  - The Orientation=6 check is an e2e, since jsdom has no `createImageBitmap`. A browser that
+    predates `imageOrientation: 'from-image'` rejects the option with a TypeError, so it gets its
+    default rather than "not an image".
+  - Beyond the list: the camera owner's name is read with the artist, a maker note shows its
+    size, bidi overrides are stripped as well as control characters, PNG text and JPEG comments
+    list the first 32 (the rest are counted), and only the first Exif block is walked.
+  - `inspectBytes` has no catch-all. It never throws because nothing in it can, so the slicing
+    and fuzzing specs see a bounds bug rather than a swallowed one. `inspectFile` is the catch,
+    at the I/O edge, and it answers "can't read" rather than "clean".
 
 ## Build order
 

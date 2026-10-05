@@ -1101,6 +1101,22 @@ this section only fixes the rules the code cites.
   `ls tools`, `cd tools/<id>`, the `tools` command and Tab derive from one array. Metas are plain
   data in both locales; each tool's maths lives in a pure `.ts` beside its panel and is tested in
   jsdom. Client-side tools never send a file anywhere; the page says so once.
+- **The image tool checks its own claim** (`tools/image/metadata.ts`). Before converting, it lists
+  what the file gives away; afterwards it runs the same parser on its output and shows "0 fields —
+  verified" or "N fields survived re-encoding", so stripping is a check a browser change would
+  fail on screen, not a promise. The parser is written from TIFF 6.0 and CIPA DC-008 and walks
+  JPEG markers up to SOS, PNG chunks and WebP RIFF chunks. It reads the whole file, up to 64 MB,
+  because WebP's extended format puts Exif and XMP after the image data and PNG text may follow
+  IDAT. Every read is bounds-checked and returns `null` past the end; IFDs are capped at 512
+  entries and walked once each; values are stripped of control and bidi characters and capped at
+  120 characters; a truncated file reads as a subset of the whole one, and `inspectBytes` never
+  throws. **What counts:** each Exif/TIFF tag, each PNG text chunk, the PNG time, and the XMP,
+  ICC, IPTC and comment blocks; JFIF, VP8X, the IFD pointers and the image data are structure.
+  GPS reads four tags and shows one position. So an encoder that writes a colour profile (Chromium
+  does, into JPEG and WebP) honestly shows one field. HEIC, AVIF and GIF are `unsupported`, never
+  "0 fields". The bitmap is decoded with `imageOrientation: 'from-image'`, so dropping the tag
+  never leaves a phone photo on its side. Every string from the file reaches the page through
+  text interpolation only.
 - **Tier `wasm` downloads only on a click** (`tools/ffmpeg/`). The 32 MB core is served from our own
   `/assets/`, so the CSP keeps `'self'` for scripts and connections; `'wasm-unsafe-eval'` is the one
   addition, and it reaches the worker because the worker's own script response carries the header.
