@@ -99,6 +99,8 @@ export default defineConfig({
           // The curl pages (`curl jhemery.xyz/neofetch`), served to terminals rather than
           // navigated to, but a browser opening one should get the file.
           /^\/run\//,
+          // The manual page, in roff (vite-plugins/resume.ts).
+          /^\/jules(\.fr)?\.1$/,
           /^\/llms\.txt$/,
           /^\/robots\.txt$/,
           /^\/sitemap\.xml$/,

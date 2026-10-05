@@ -89,6 +89,15 @@ test.describe('the résumé', () => {
     }
   })
 
+  // `curl -s jhemery.xyz/jules.1 | man -l -`: roff, in both languages, from the content.
+  test('jules.1 and jules.fr.1 are manual pages, not the app', async ({ request }) => {
+    for (const [file, heading] of [['jules.1', '.SH NAME'], ['jules.fr.1', '.SH NOM']]) {
+      const body = await (await request.get(`/${file}`)).text()
+      expect(body.startsWith('.TH JULES 1 '), file).toBe(true)
+      expect(body, file).toContain(heading)
+    }
+  })
+
   test('reads the same through the terminal', async ({ page, terminal }) => {
     test.skip(test.info().project.name === 'mobile', 'No terminal on a phone.')
 

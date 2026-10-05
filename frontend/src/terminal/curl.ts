@@ -7,7 +7,7 @@ import { profile } from '@/content'
  */
 
 /** The site's own plain files, offered for Tab and the only paths a `?run=` link may name. */
-export const SITE_FILES = ['/resume.txt', '/llms.txt', '/content.json', '/robots.txt', '/sitemap.xml'] as const
+export const SITE_FILES = ['/resume.txt', '/llms.txt', '/content.json', '/robots.txt', '/sitemap.xml', '/jules.1'] as const
 
 /** About a screenful and a half of scrollback; more and the terminal is the wrong reader. */
 export const MAX_LINES = 400

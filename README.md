@@ -152,7 +152,7 @@ Each app has its own README for working on its code:
 | **Matrix rain** | `matrix` follows the white rabbit. The effect component is lazy-loaded on demand. |
 | **i18n** | English and French. The language comes from `navigator.language` and can be changed with the navbar toggle or `lang en\|fr`. It's saved in `localStorage`. All content and every terminal string is `Localised<T>`. |
 | **PWA** | Installable, with an `autoUpdate` service worker, maskable icons and an offline navigation fallback. |
-| **`curl jhemery.xyz`** | A Vite plugin generates an ANSI-coloured `resume.txt` from `src/content` at build time, so the résumé has exactly one source. LLM crawlers get the same file, and so does the terminal's own `curl`, which fetches it for real and turns its colours into the scheme's. `curl jhemery.xyz/help` lists the other pages a real terminal can read, one per command (`/neofetch`, `/skills`, `/why`…), in English or, with `Accept-Language: fr`, French. |
+| **`curl jhemery.xyz`** | A Vite plugin generates an ANSI-coloured `resume.txt` from `src/content` at build time, so the résumé has exactly one source. LLM crawlers get the same file, and so does the terminal's own `curl`, which fetches it for real and turns its colours into the scheme's. `curl jhemery.xyz/help` lists the other pages a real terminal can read, one per command (`/neofetch`, `/skills`, `/why`…), in English or, with `Accept-Language: fr`, French. `/jules.1` and `/jules.fr.1` are the person as a roff manual page. |
 
 ## The terminal
 
@@ -165,6 +165,8 @@ work badly with mobile virtual keyboards, and the page itself shows the same con
 | `\|` `;` `&&` `\|\|` | Pipes and chains: `fortune \| cowsay`, `history \| grep theme`, `cat about.txt \| sha256sum`, `projects --json \| jq .`, `cat nope && pwd`. A stage keeps its colours across a pipe. Quote text that holds an operator (`sign "great site; love it"`): an apostrophe inside a word is a letter, so `c'est` needs nothing. `LANG=fr neofetch` runs one command in French |
 | <kbd>Tab</kbd> | Completes to the longest common prefix. First commands and your own aliases, then their arguments: filenames for `cat`/`vim`/`diff`, sections and pages for `cd`/`ping`, tool names, scheme names for `theme`, `on`/`off` for the background toggles |
 | <kbd>↑</kbd> / <kbd>↓</kbd> | Command history (saved between visits) |
+| `--help` | As the first argument, any command's usage and flags: `ls --help` |
+| `-`<kbd>Tab</kbd> | Completes a flag, listing what each does when several are left: `grep -`<kbd>Tab</kbd> |
 | <kbd>Ctrl</kbd>+<kbd>L</kbd> | Clear |
 | <kbd>Ctrl</kbd>+<kbd>C</kbd> | Cancel a running command |
 | <kbd>Esc</kbd> | Close the overlay (focus goes back where it was) |
@@ -201,7 +203,8 @@ never show two different contents.
 
 | Command | Aliases | Usage |
 |---|---|---|
-| `help` | `?`, `man` | `help [command] [--all]`: list commands, or explain one |
+| `help` | `?` | `help [command] [--all]`: list commands, or explain one |
+| `man` | | `man [section] <page>`: a command's manual page, in a `less`-style pager (space and `b` to turn, `/` to search, `q` to quit). Every command has one; section 6 is the games and the rest of the fun. `man jules` is the person, and `curl -s jhemery.xyz/jules.1 \| man -l -` reads the same page in a real `man` |
 | `clear` | `cls` | Clear the screen |
 | `history` | | Show command history |
 | `echo` | | `echo <text>` |

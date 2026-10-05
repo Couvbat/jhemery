@@ -121,9 +121,11 @@ export interface CommandContext {
    * so a command that throws cannot wedge the keyboard. For a command run through
    * `ctx.run`, "settles" means when it returns: the caller's own capture comes back. Only one capture is
    * active at a time: a second call replaces the first. Modifier combos never
-   * reach the handler, so `Ctrl+C` and `Ctrl+L` keep working throughout.
+   * reach the handler, so `Ctrl+C` and `Ctrl+L` keep working throughout. Escape stops the
+   * command too, unless `escape` hands it to the handler: the pager's search uses it to
+   * give up the search rather than the page.
    */
-  capture: (handler: (key: string) => void) => () => void
+  capture: (handler: (key: string) => void, options?: { escape?: boolean }) => () => void
   /**
    * Runs another command inside this one: the same signal (Ctrl+C stops both), the same
    * keyboard (the caller's capture is handed back when the child is done), and never the
@@ -217,5 +219,16 @@ export interface Command {
    * the shell needs a table of special cases.
    */
   complete?: (ctx: CompleteContext) => string[]
+  /**
+   * What `man <name>` adds to the page generated from this command (`terminal/manual.ts`):
+   * a longer DESCRIPTION, the OPTIONS text for the flags in `usage` (`manual.spec.ts` holds
+   * every flag to one), more EXAMPLES, and SEE ALSO, which may point somewhere oblique.
+   */
+  manual?: {
+    description?: Localised<string[]>
+    options?: Record<string, Localised>
+    examples?: { command: string; text?: Localised }[]
+    seeAlso?: string[]
+  }
   run: (ctx: CommandContext) => OutputLine[] | void | Promise<OutputLine[] | void>
 }

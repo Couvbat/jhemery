@@ -90,6 +90,20 @@ export const textCommands: Command[] = [
     name: 'grep',
     usage: 'grep [-i -v -n -c] <text> [file]',
     description: { en: 'Lines that contain some text', fr: 'Les lignes qui contiennent un texte' },
+    manual: {
+      options: {
+        '-i': { en: 'Ignore case.', fr: 'Ignorer la casse.' },
+        '-v': { en: 'Keep the lines that do not contain it.', fr: 'Garder les lignes qui ne le contiennent pas.' },
+        '-n': { en: 'Number each line kept, as it was numbered coming in.', fr: 'Numéroter chaque ligne gardée, comme à l’arrivée.' },
+        '-c': { en: 'Print how many lines matched, instead of the lines.', fr: 'Afficher combien de lignes correspondent, au lieu des lignes.' },
+      },
+      description: {
+        en: ['Prints the lines of a file, or of what came in through a pipe, that contain the text. The text is matched as it is, never as a regular expression.'],
+        fr: ['Affiche les lignes d’un fichier, ou de ce qui arrive par un pipe, qui contiennent le texte. Le texte est cherché tel quel, jamais comme une expression régulière.'],
+      },
+      examples: [{ command: 'history | grep theme' }, { command: 'grep -in jules about.txt' }],
+      seeAlso: ['head(1)', 'wc(1)', 'sort(1)'],
+    },
     complete: ({ index }) => (index === 0 ? ['-i', '-v', '-n', '-c'] : index < 4 ? listFiles() : []),
     run(ctx) {
       const parsed = parse(ctx.args, 'ivnc')
@@ -111,6 +125,14 @@ export const textCommands: Command[] = [
   textCommand({
     name: 'head',
     usage: 'head [-n N | -N] [file]',
+    manual: {
+      options: {
+        '-n': { en: 'How many lines: -n 3.', fr: 'Combien de lignes : -n 3.' },
+        '-N': { en: 'The same, shorter: -3.', fr: 'Pareil, en plus court : -3.' },
+      },
+      examples: [{ command: 'help | head -n 5' }],
+      seeAlso: ['tail(1)', 'grep(1)'],
+    },
     description: { en: 'The first lines', fr: 'Les premières lignes' },
     complete: files,
     run(ctx) {
@@ -123,6 +145,14 @@ export const textCommands: Command[] = [
   textCommand({
     name: 'tail',
     usage: 'tail [-n N | -N] [file]',
+    manual: {
+      options: {
+        '-n': { en: 'How many lines: -n 3.', fr: 'Combien de lignes : -n 3.' },
+        '-N': { en: 'The same, shorter: -3.', fr: 'Pareil, en plus court : -3.' },
+      },
+      examples: [{ command: 'help | tail -n 5' }],
+      seeAlso: ['head(1)', 'grep(1)'],
+    },
     description: { en: 'The last lines', fr: 'Les dernières lignes' },
     complete: files,
     run(ctx) {
@@ -138,6 +168,15 @@ export const textCommands: Command[] = [
     name: 'wc',
     usage: 'wc [-l -w -c] [file]',
     description: { en: 'Count lines, words and characters', fr: 'Compter lignes, mots et caractères' },
+    manual: {
+      options: {
+        '-l': { en: 'Lines only.', fr: 'Les lignes seulement.' },
+        '-w': { en: 'Words only.', fr: 'Les mots seulement.' },
+        '-c': { en: 'Bytes only, counted in UTF-8 with a newline after every line, as a file would have.', fr: 'Les octets seulement, comptés en UTF-8 avec un retour après chaque ligne, comme un fichier.' },
+      },
+      examples: [{ command: 'ls | wc -l' }],
+      seeAlso: ['grep(1)'],
+    },
     complete: ({ index }) => (index === 0 ? ['-l', '-w', '-c', ...listFiles()] : index < 4 ? listFiles() : []),
     run(ctx) {
       const parsed = parse(ctx.args, 'lwc')
@@ -162,6 +201,15 @@ export const textCommands: Command[] = [
     name: 'sort',
     usage: 'sort [-r -n -u] [file]',
     description: { en: 'Sort lines', fr: 'Trier les lignes' },
+    manual: {
+      options: {
+        '-r': { en: 'Backwards.', fr: 'À l’envers.' },
+        '-n': { en: 'By the number each line starts with.', fr: 'Selon le nombre par lequel chaque ligne commence.' },
+        '-u': { en: 'Each line once.', fr: 'Chaque ligne une seule fois.' },
+      },
+      examples: [{ command: 'skills | sort -r' }],
+      seeAlso: ['uniq(1)'],
+    },
     complete: ({ index }) => (index === 0 ? ['-r', '-n', '-u', ...listFiles()] : index < 4 ? listFiles() : []),
     run(ctx) {
       const parsed = parse(ctx.args, 'rnu')
@@ -184,6 +232,11 @@ export const textCommands: Command[] = [
     name: 'uniq',
     usage: 'uniq [-c] [file]',
     description: { en: 'Fold repeated neighbouring lines', fr: 'Fusionner les lignes voisines identiques' },
+    manual: {
+      options: { '-c': { en: 'Say how many times each line came.', fr: 'Dire combien de fois chaque ligne est venue.' } },
+      examples: [{ command: 'history | sort | uniq -c' }],
+      seeAlso: ['sort(1)'],
+    },
     complete: ({ index }) => (index === 0 ? ['-c', ...listFiles()] : index < 3 ? listFiles() : []),
     run(ctx) {
       const parsed = parse(ctx.args, 'c')

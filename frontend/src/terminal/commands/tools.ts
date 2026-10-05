@@ -141,6 +141,11 @@ export const toolCommands: Command[] = [
       en: 'Encode or decode base64, as the encode tool does',
       fr: "Encoder ou décoder du base64, comme l'outil encode",
     },
+    manual: {
+      options: { '-d': { en: 'Decode rather than encode. Line breaks in the input are ignored.', fr: 'Décoder plutôt qu’encoder. Les retours à la ligne sont ignorés.' } },
+      examples: [{ command: 'base64 about.txt' }, { command: 'echo aGkK | base64 -d' }],
+      seeAlso: ['sha256sum(1)', 'tools(1)'],
+    },
     group: 'core',
     writes: (args) => (args[0] === '-d' || args[0] === '--decode' ? 'local' : 'none'),
     complete: ({ index, args }) =>

@@ -43,6 +43,9 @@
 <IfModule mod_mime.c>
   AddDefaultCharset UTF-8
   AddCharset UTF-8 .txt
+  # jules.1 and jules.fr.1, the manual page `curl -s jhemery.xyz/jules.1 | man -l -` reads.
+  AddType text/plain .1
+  AddCharset UTF-8 .1
   AddType application/manifest+json .webmanifest
   # Apache's own mime.types has known .wasm for years, but a wrong or missing
   # type here downgrades WebAssembly.instantiateStreaming to a full buffer
@@ -144,7 +147,7 @@
     Header set Cache-Control "public, max-age=0, must-revalidate"
   </FilesMatch>
 
-  <FilesMatch "^(index\.html|resume\.txt|resume(\.fr)?\.html|resume\.css|content\.json|notes\.css)$">
+  <FilesMatch "^(index\.html|resume\.txt|resume(\.fr)?\.html|resume\.css|content\.json|notes\.css|jules(\.fr)?\.1)$">
     Header set Cache-Control "no-cache"
   </FilesMatch>
 
