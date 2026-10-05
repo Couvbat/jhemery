@@ -5,7 +5,7 @@ import { enforceProductionCsp } from './csp'
 import { Terminal } from './terminal'
 
 export { expect } from '@playwright/test'
-export type { ApiPreset, RecordedRequest } from './api'
+export type { ApiPreset, RecordedRequest, RoomFixture } from './api'
 export type { SeedState } from './app'
 
 interface Fixtures {

@@ -644,8 +644,8 @@ export const messages = {
       fr: "Une soirée vidéo : un code, une vidéo YouTube, tout le monde à la même seconde. L'hôte appuie sur lecture ; tous les autres lecteurs suivent.",
     },
     introRadio: {
-      en: 'A shared radio: a queue of SoundCloud tracks the host runs, and every listener hears the same one at the same time.',
-      fr: "Une radio partagée : une file de morceaux SoundCloud que l'hôte enchaîne, et chaque auditeur entend le même au même moment.",
+      en: 'A shared radio: a queue of SoundCloud tracks and YouTube videos the host runs, and every listener hears the same one at the same time. A video plays in a small player, never a hidden one.',
+      fr: "Une radio partagée : une file de morceaux SoundCloud et de vidéos YouTube que l'hôte enchaîne, et chaque auditeur entend le même au même moment. Une vidéo passe dans un petit lecteur, jamais dans un lecteur caché.",
     },
     lobby: { en: 'Rooms', fr: 'Salons' },
     host: { en: 'host', fr: 'hôte' },
@@ -687,22 +687,36 @@ export const messages = {
       fr: "L'hôte pilote ; votre lecteur suit. S'il ne démarre pas, appuyez une fois sur lecture.",
     },
     inputWatch: { en: 'YouTube link or video id', fr: 'lien YouTube ou identifiant de vidéo' },
-    inputRadio: { en: 'soundcloud.com track or set link', fr: 'lien soundcloud.com (morceau ou playlist)' },
+    inputRadio: {
+      en: 'soundcloud.com track or set link, or a YouTube link',
+      fr: 'lien soundcloud.com (morceau ou playlist) ou lien YouTube',
+    },
     badLinkWatch: {
       en: 'That is not a YouTube link or video id.',
       fr: "Ce n'est pas un lien YouTube ni un identifiant de vidéo.",
     },
     badLinkRadio: {
-      en: 'That is not a soundcloud.com track or set link.',
-      fr: "Ce n'est pas un lien soundcloud.com de morceau ou de playlist.",
+      en: 'That is neither a soundcloud.com track or set link nor a YouTube link or video id.',
+      fr: "Ce n'est ni un lien soundcloud.com de morceau ou de playlist, ni un lien YouTube ou un identifiant de vidéo.",
     },
     playNow: { en: 'play now', fr: 'lire maintenant' },
     enqueue: { en: 'queue', fr: 'en file' },
     next: { en: 'next', fr: 'suivant' },
     upNext: { en: 'up next', fr: 'à suivre' },
+    nowPlaying: { en: 'now playing', fr: 'en cours' },
+    nothingPlaying: { en: 'Nothing playing.', fr: 'Rien en cours.' },
+    queueEmptyHost: {
+      en: 'Nothing queued. Paste a link and press queue.',
+      fr: 'File vide. Collez un lien et appuyez sur « en file ».',
+    },
+    queueEmptyGuest: { en: 'Nothing queued yet.', fr: "Rien dans la file pour l'instant." },
     play: { en: 'play', fr: 'lecture' },
     pause: { en: 'pause', fr: 'pause' },
-    remove: { en: 'remove', fr: 'retirer' },
+    // `{item}` is the item as the queue shows it, so a screen reader hears which one
+    // each of the three buttons acts on.
+    moveUp: { en: 'move {item} up', fr: 'monter {item}' },
+    moveDown: { en: 'move {item} down', fr: 'descendre {item}' },
+    remove: { en: 'remove {item}', fr: 'retirer {item}' },
     nothing: { en: 'Nothing loaded yet — paste a link below.', fr: 'Rien de chargé — collez un lien ci-dessous.' },
     waiting: { en: 'Waiting for the host…', fr: "En attente de l'hôte…" },
     privacy: {
