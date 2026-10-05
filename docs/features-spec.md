@@ -109,7 +109,9 @@ interface Command {
 }
 ```
 
-`CommandContext` carries the parsed `args`, the `raw` input, the current `locale`, the `t()`
+`CommandContext` carries the parsed `args`, the stage's own `raw` text, `stdin` (what a `|`
+handed it), `tty` (false on the left of a `|`, where `capture` and `prompt` throw), the current
+`locale`, the `t()`
 resolver, and the side-effect handles a command may use: `print()`, `clear()`, `close()`,
 `frame()` (a redrawable output region — animations and game boards), `navigate(target)` (anything
 `cd` accepts, through `goTo()` — §11), `prompt(question, { mask })` (resolves to the next line the
@@ -130,7 +132,7 @@ before there was an observer. The two pollers the visitor didn't ask for, the gu
 the download tool's interval, mark themselves `background`. `strace` is the only observer, and it
 prints shapes: keys two levels deep, arrays as their length, and query values masked.
 
-`OutputLine` is `{ text; tone?; segments?; href?; pre?; prompt? }`, where `Tone` is
+`OutputLine` is `{ text; tone?; segments?; href?; pre?; prompt?; stderr? }`, where `Tone` is
 `default|muted|primary|accent|secondary|error|success|warning`. `segments` splits a line into
 differently-toned runs (a game board needs a colour per cell) while `text` stays their plain
 concatenation; `pre` preserves runs of spaces for ASCII art and tables; `prompt` marks an echoed
@@ -161,15 +163,59 @@ page all talk to the same session, so history survives closing the panel).
   never `disabled` while a command runs, only `readonly` + `aria-disabled`: a disabled input
   drops focus to `<body>`, and Ctrl+C would have nowhere to land.
 
+### The shell language
+
+`terminal/parse.ts` reads a line as a chain of pipelines joined by `;`, `&&` and `||`, each
+pipeline stages joined by `|`, at most 16 stages a line. Leading `NAME=value` words are the
+stage's env: `LANG=fr` (or `LC_ALL`) runs that stage in French and never touches the visitor's
+setting. A single `&` and `>` are literal; an empty stage is `couvsh: syntax error near
+unexpected token '|'`.
+
+**Quotes only group.** French is typed here (`c'est`, `qu'est-ce`, `sign l'un et l'autre`), so a
+quote opens a group only at the start of a word and closes only on the same quote followed by a
+space, the end of the line or an operator; anything else is a letter. Inside a group the
+operators are text (`sign "great site; love it"`). That is all a group does: a stage's words are
+its text split on spaces, quotes and all, as every line was before there were pipes, so a line
+with no operator runs exactly as it did. `useTerminal.quoting.spec.ts` pins that for `echo`,
+`sign` and `ask`.
+
+**Running a line.** Aliases are expanded per stage and the line is read again, since an alias may
+hold a pipe. Then every stage resolves (`registry.resolveStage`, the rule the shell and links share)
+before any runs: an unknown stage runs nothing, and when it follows a command that took free text
+the shell suggests quoting. A command that writes to the server with text of its own (`sign`,
+`ask`) must have that text quoted when the line holds an operator, or nothing runs: otherwise
+`sign love it; why not` would post "love it" and run `why`. `sign` drops one pair of outer
+quotes, as `ask` does. Aliases expand in place, stage by stage and round after round, so an alias
+can pipe into another and env words stay as typed. A link may carry no env words at all. Stages run one after
+another, because commands return arrays rather than streams. A stage's output, minus its
+`stderr` lines, is the next stage's `stdin`, `OutputLine`s and their colours included; its
+`stderr` lines (`fail()`, achievement toasts) go to the screen wherever it stands, so
+`fortune | cowsay` keeps the toast outside the cow. A stage on the left of a `|` has `tty`
+false, and its `capture` and `prompt` throw "not a tty". `&&` and `||` read a pipeline as failed
+when a stage throws or prints a failing `stderr` line, which is what `fail()` makes; the error
+*tone* alone counts for nothing, because `btc`'s red sparkline and `diff`'s removed lines are
+colour. One Ctrl+C stops the whole line, with one `^C`. A link runs a pipe or a chain only if
+every stage, resolved without aliases, passes `isLinkable`.
+
+**The text commands** (`commands/text.ts`) are what a pipe is for: `grep [-i -v -n -c]`, `head`
+and `tail [-n N | -N]`, `wc [-l -w -c]`, `sort [-r -n -u]` and `uniq [-c]`. Each reads the file
+it names, else its stdin, else fails. `grep` matches a literal substring and never builds a
+`RegExp` from input. `sha256sum`, `base64` and `jq` read their stdin as a file's bytes when they
+have no argument, so `cat about.txt | sha256sum` is `sha256sum about.txt`; `cat` passes its stdin
+on, and `cowsay` says it.
+
 ### Tab completion
 
-One routine handles both halves of a line. It splits on whitespace, works out which word the
+One routine handles both halves of a line, counting words from the stage being typed: after
+`ls | gr`, `gr` is a command again. It splits on whitespace, works out which word the
 cursor is on, collects candidates for that position, then filters by prefix, inserts the single
 match (or the longest common prefix) and prints the list when the choice is still ambiguous.
 Only the *source* of the candidates changes:
 
 - **the first word** — every visible command and alias, plus whatever the visitor named with
-  `alias`. Hidden commands stay out, same as in `help`.
+  `alias`. Hidden commands stay out, same as in `help`. Tab
+  resolves two-word names only once a third word is typed (`git lo<Tab>` is still a command
+  word), which is where it differs from `registry.resolveStage`.
 - **anything after it** — the command's own `complete()`. Keeping it on the command is what keeps
   the registry the API: `cd` knows it takes a section, `unalias` knows it takes an alias name, and
   the shell needs no table of special cases. It receives the arguments, the index of the word being
@@ -185,8 +231,6 @@ join it as soon as `guestbook` has cached them.
 
 An alias in the first position is expanded before the owning command is resolved, so `zz ab`
 completes against whatever `zz` will actually run.
-
-`run(input)` handles `&&`-free single commands only — chaining is out of scope (§10).
 
 ### Chrome
 
@@ -240,7 +284,7 @@ Grouped as they appear in `help`.
 | `lang [en\|fr]` | Prints or switches locale |
 | `theme [name\|random]` (alias `colorscheme`) | Lists the colour schemes with a swatch strip each, or applies one |
 | `alias` / `unalias` | Session-persistent command renames, expanded before anything else parses the line |
-| `sha256sum` (aliases `sha1sum`, `sha512sum`) · `base64 [-d]` · `uuidgen` · `jq .` | The shell versions of the hash, encode and JSON tools, each importing the pure module its panel uses. No pipes: a fake-filesystem name is read as that file, anything else as literal text |
+| `sha256sum` (aliases `sha1sum`, `sha512sum`) · `base64 [-d]` · `uuidgen` · `jq .` | The shell versions of the hash, encode and JSON tools, each importing the pure module its panel uses. A fake-filesystem name is read as that file, other text as literal text, and with no argument they read what a `\|` hands them |
 | `strace <command>` | Runs the command inside itself (`ctx.run`, so without the visitor's aliases) and then lists the non-background requests made meanwhile, as `GET /weather = 200 · 1.10 kB · 84 ms` with the shapes of the bodies below, and `+++ exited with 0 +++`. No request, no trailer, so `strace ls` is `ls`. Its `writes` is the traced command's, so `?run=strace sign x` is refused like `sign x`; `strace strace` is refused |
 | `exit` (aliases `quit`, `logout`) | Closes the overlay |
 
@@ -683,7 +727,7 @@ A link may only pass it the arguments its Tab offers: the domain, `-I` and the s
 colours as SGR, links as OSC 8, prompt lines dropped) with a footer, plus a generated `help.txt`
 index. The pages are vitest snapshots (`curl-pages.spec.ts`), committed and never written by CI,
 so a change to a command or the content fails CI until they are regenerated with `-u`. A page is
-any command a link could run with no arguments that isn't hidden, live or a game (by module); the
+any command a link could run with no arguments that isn't hidden, live, a game or a text command (both by module); the
 spec names a reason for each other exclusion (`curl`, `ctf`, `achievements`, `games`, `tour`,
 `resume`, `help`). Each runs in both locales under two clocks years apart, and any line that
 differs is dropped, which removes the uptimes and durations that would otherwise go stale between
@@ -991,7 +1035,6 @@ Retrofitting these is painful, so they are part of the definition of done:
   schemes exist only as opt-in choices, through `theme` or the navbar's scheme menu (§3 core), and the achievement for picking one is
   called Flashbang. That is this entry's position, stated as a joke.
 - **Blog** — infrastructure without content is worse than no infrastructure.
-- **Command chaining / pipes** — `ls | grep` is a lot of parser for a joke nobody will run twice.
 - **Terminal on mobile** — see §9.
 
 ## 11. Views, the prism swing and the tools page

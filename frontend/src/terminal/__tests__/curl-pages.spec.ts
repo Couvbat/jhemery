@@ -12,6 +12,7 @@ import type { Locale, Localised } from '@/content/types'
 import { setLocale } from '@/i18n'
 import { toAnsi } from '../ansi'
 import { gameCommands } from '../commands/games'
+import { textCommands } from '../commands/text'
 import { allCommands, isLinkable } from '../registry'
 import type { Command, OutputLine } from '../types'
 import { runCommand } from './context'
@@ -28,8 +29,8 @@ import { runCommand } from './context'
  * content fails this spec until the pages are regenerated.
  *
  * Which commands: anything a link could run with no arguments (`isLinkable`), that isn't
- * hidden, live (a page can't be live) or a game (by module, so a new game is left out
- * without anyone remembering to). And none of these:
+ * hidden, live (a page can't be live), a game or a text command (by module). And none of
+ * these:
  */
 const EXCLUDED: Record<string, string> = {
   curl: 'the visitor’s own requests',
@@ -50,9 +51,11 @@ const CLOCKS = [new Date('2026-10-01T12:00:00Z'), new Date('2031-03-15T08:30:00Z
 // From the working directory: under jsdom `import.meta.url` is an http: URL.
 const pagesDir = join(process.cwd(), 'public/run/')
 
-const games = new Set(gameCommands.map((c) => c.name))
+// By module, so a new game or text command is left out without anyone remembering to:
+// a game needs a player, and a text command (`grep`, `head`…) a pipe.
+const byModule = new Set([...gameCommands, ...textCommands].map((c) => c.name))
 const pages = allCommands()
-  .filter((c) => !c.hidden && c.group !== 'live' && !games.has(c.name) && !(c.name in EXCLUDED) && isLinkable(c, []))
+  .filter((c) => !c.hidden && c.group !== 'live' && !byModule.has(c.name) && !(c.name in EXCLUDED) && isLinkable(c, []))
   .sort((a, b) => a.name.localeCompare(b.name))
 
 const footer = (name: string, locale: Locale): string => {

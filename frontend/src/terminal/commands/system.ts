@@ -3,7 +3,7 @@ import { prefersReducedMotion, useCrt } from '@/composables/useCrt'
 import { useMusicPlayer } from '@/composables/useMusicPlayer'
 import { observeRequests, type RequestTrace } from '@/lib/api'
 import { achievementList, announce, isUnlocked, unlockedCount } from '../achievements'
-import { blank, line } from '../format'
+import { blank, fail, line } from '../format'
 import { isLinkable, resolveLink, visibleCommands, writesOf } from '../registry'
 import { traceLines } from '../strace'
 import { sleep } from '../timing'
@@ -122,9 +122,9 @@ const strace: Command = {
   },
   async run(ctx) {
     const inner = traced(ctx.args)
-    if (!ctx.args.length) return [line('strace: must have PROG [ARGS] or -p PID', 'error')]
-    if (!inner) return [line(`strace: Can't stat '${ctx.args[0]}': No such file or directory`, 'error')]
-    if (inner.command.name === 'strace') return [line('strace: one at a time: it would only trace itself', 'error')]
+    if (!ctx.args.length) return [fail('strace: must have PROG [ARGS] or -p PID')]
+    if (!inner) return [fail(`strace: Can't stat '${ctx.args[0]}': No such file or directory`)]
+    if (inner.command.name === 'strace') return [fail('strace: one at a time: it would only trace itself')]
 
     // Only what the visitor's command asked for: the two pollers mark themselves.
     const traces: RequestTrace[] = []
@@ -137,7 +137,7 @@ const strace: Command = {
       await ctx.run(ctx.args.join(' '))
     } catch (error) {
       if ((error as Error)?.name !== 'AbortError') {
-        ctx.print(line(String((error as Error)?.message ?? error), 'error'))
+        ctx.print(fail(String((error as Error)?.message ?? error)))
         exit = 1
       }
       killed = (error as Error)?.name === 'AbortError'
@@ -226,7 +226,7 @@ export const systemCommands: Command[] = [
       // rather than silently printing the list it was not asked for.
       if (raw.trim().startsWith('export') && args.length > 0) {
         return [
-          line('export: this environment is read-only.', 'error'),
+          fail('export: this environment is read-only.'),
           line(`(it is also entirely made up — see \`cat ${ENV_FILE}\`)`, 'muted'),
         ]
       }

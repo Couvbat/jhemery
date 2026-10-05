@@ -6,7 +6,7 @@ import { aliases, parseDefinition, removeAlias, setAlias } from '../aliases'
 import { history } from '../history'
 import { allCommands, completionNames, isCommandWord, resolve, visibleCommands } from '../registry'
 import type { Command, CommandGroup, OutputLine } from '../types'
-import { blank, line, pre, segmented } from '../format'
+import { blank, fail, line, pre, segmented } from '../format'
 
 const GROUP_LABELS: Record<CommandGroup, { en: string; fr: string }> = {
   core: { en: 'shell', fr: 'shell' },
@@ -37,7 +37,7 @@ export const coreCommands: Command[] = [
       if (first && first !== '--all') {
         const command = resolve(first)
         if (!command) {
-          return [line(`help: no entry for \`${first}\``, 'error')]
+          return [fail(`help: no entry for \`${first}\``)]
         }
         return [
           line(command.name, 'primary'),
@@ -143,7 +143,7 @@ export const coreCommands: Command[] = [
       }
       const next = requested.toLowerCase()
       if (next !== 'en' && next !== 'fr') {
-        return [line(`lang: unsupported locale \`${requested}\``, 'error')]
+        return [fail(`lang: unsupported locale \`${requested}\``)]
       }
       setLocale(next as Locale)
       return [
@@ -189,7 +189,7 @@ export const coreCommands: Command[] = [
       const parsed = parseDefinition(definition)
       if (!parsed) {
         return [
-          line(`alias: ${args[0] ?? definition}: not found`, 'error'),
+          fail(`alias: ${args[0] ?? definition}: not found`),
           line("usage: alias <name>='<command>'", 'muted'),
         ]
       }
@@ -200,7 +200,7 @@ export const coreCommands: Command[] = [
       // faithful reimplementation of bash.
       // `git` too, the first word of `git log`: the alias would hide it all the same.
       if (isCommandWord(name)) {
-        return [line(`alias: \`${name}\` is already a command — pick another name.`, 'error')]
+        return [fail(`alias: \`${name}\` is already a command — pick another name.`)]
       }
 
       setAlias(name, parsed.value)
@@ -220,10 +220,10 @@ export const coreCommands: Command[] = [
     complete: ({ index }) => (index === 0 ? Object.keys(aliases.value) : []),
     run({ args }) {
       const [name] = args
-      if (!name) return [line('unalias: missing operand', 'error')]
+      if (!name) return [fail('unalias: missing operand')]
       return removeAlias(name.toLowerCase())
         ? [line(`removed alias \`${name}\``, 'success')]
-        : [line(`unalias: ${name}: not found`, 'error')]
+        : [fail(`unalias: ${name}: not found`)]
     },
   },
   {

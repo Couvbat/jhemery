@@ -54,7 +54,8 @@ export function writesOf(command: Command, args: readonly string[] = []): Writes
  * `?run=whoami your session expired, sign in at …` would print that line on the page.
  * A command that takes arguments from links declares them in `complete()`.
  */
-function argsOffered(command: Command, args: readonly string[]): boolean {
+/** Whether every argument is one the command offers for Tab: the test for free text a link (or a hint) needs. */
+export function argsOffered(command: Command, args: readonly string[]): boolean {
   return args.every((arg, index) => {
     const offered = command.complete?.({ args: [...args], index, word: arg }) ?? []
     return offered.some((candidate) => candidate.toLowerCase() === arg.toLowerCase())
@@ -93,7 +94,16 @@ export function isCommandWord(name: string): boolean {
  * have named `ls`. Two-word names (`git log`) resolve as they do when typed.
  */
 export function resolveLink(input: string): { command: Command; args: string[] } | undefined {
-  const [name = '', ...args] = input.trim().split(/\s+/)
+  return resolveStage(input.trim().split(/\s+/))
+}
+
+/**
+ * The command a stage's words name, and its arguments: the first word, or the first two
+ * for a two-word name (`git log`). Never through an alias. One rule for the shell, for
+ * links and for Tab, so the three can't disagree about what a stage will run.
+ */
+export function resolveStage(argv: readonly string[]): { command: Command; args: string[] } | undefined {
+  const [name = '', ...args] = argv
   const direct = resolve(name)
   if (direct) return { command: direct, args }
   const twoWord = resolve(`${name} ${args[0] ?? ''}`.trim())
