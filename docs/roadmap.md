@@ -288,7 +288,7 @@ them.
 
 | ✔ | Feature | Approach | Files | Effort |
 |---|---|---|---|---|
-| [ ] | `strace` and a real `curl` | `strace <cmd>` lists every request the command made (`GET /weather = 200 · 1.1 kB · 84 ms`) and the shape of each JSON body, never its values: `strace wordle daily` shows `{ day, locale, guesses }` and nothing else, and `strace ls` shows nothing at all. One observer set in `lib/api.ts`, a no-op when empty, fed by `request()`, `askStream()` and `usePresence`'s EventSource, subscribed for exactly the inner command's lifetime. `curl` becomes a same-origin GET/HEAD client: `-I` prints the real response headers (CSP, HSTS) with `cache: 'no-store'` so the service worker can't answer, and bare `curl jhemery.xyz` fetches the real `resume.txt` through an SGR-to-tone parser that drops concealed runs, so CTF stage 3 still needs a real terminal. Other hosts get "Could not resolve host". | `lib/api.ts`, `composables/usePresence.ts`, `commands/system.ts`, `commands/content.ts` | S |
+| [x] | `strace` and a real `curl` | `strace <cmd>` lists every request the command made (`GET /weather = 200 · 1.1 kB · 84 ms`) and the shape of each JSON body, never its values: `strace wordle daily` shows `{ day, locale, guesses }` and nothing else, and `strace ls` shows nothing at all. One observer set in `lib/api.ts`, a no-op when empty, fed by `request()`, `askStream()` and `usePresence`'s EventSource, subscribed for exactly the inner command's lifetime. `curl` becomes a same-origin GET/HEAD client: `-I` prints the real response headers (CSP, HSTS) with `cache: 'no-store'` so the service worker can't answer, and bare `curl jhemery.xyz` fetches the real `resume.txt` through an SGR-to-tone parser that drops concealed runs, so CTF stage 3 still needs a real terminal. Other hosts get "Could not resolve host". | `lib/api.ts`, `composables/usePresence.ts`, `commands/system.ts`, `commands/content.ts` | S |
 | [ ] | Image metadata inspector | Before re-encoding, `image` lists what the file gives away: camera and serial number, lens, software, timestamps, GPS as decimal degrees ("this says where you stood"). Afterwards it parses its own output with the same parser and shows "0 fields — verified", which turns "strips by construction" into a check a browser change would fail on screen. A bounds-checked `DataView` walker written from TIFF 6.0 and CIPA DC-008, over JPEG APP1, PNG chunks and WebP RIFF, reading only the first 256 kB; a spec slices a fixture at every offset and expects a partial result, never a throw. `createImageBitmap` gets `imageOrientation: 'from-image'` explicitly, with an Orientation=6 fixture, so stripping never leaves a phone photo sideways. | `tools/image/metadata.ts` (new), `tools/image/ImageTool.vue`, `tools/__tests__/image.spec.ts` | S |
 
 ### Rooms
@@ -407,6 +407,17 @@ Recorded as each row ships.
     estimated. The projects grid and the tab title read it. The home page measured 278 KiB of the
     300 KiB budget (median of five), so nothing was split. The decisions, the other half of the
     copy, ride in the lazy terminal chunk.
+- **`strace` and a real `curl`:**
+  - An event stream is reported once, as `= stream` when it opens (or `error` before it does),
+    with no size: what arrives afterwards is the stream's, not one request's.
+  - `strace wordle daily` only shows a request once a board finishes; the tests read a sent body's
+    shape through `sign` instead, which proves the same thing: `{ name, message }`, and neither.
+  - A failing command exits 1, and Ctrl+C ends with `+++ killed by SIGINT +++` and the requests
+    made so far.
+  - `curl` takes from a link only what its Tab offers (the domain, `-I` and the site's plain
+    files), so a link can't make the terminal print a host or path of its author's choosing.
+    Typed, any path on this origin works.
+  - A body past 256 kB is not printed: the warning says how to save it in a real terminal.
 
 ## Build order
 

@@ -173,7 +173,9 @@ erroring, and the frontend renders that state. Preserve this when adding integra
 
 Privacy is a design constraint, not an afterthought: `/presence` pushes one integer over SSE with
 no visitor id, `/stats` counts sessions not commands, `/weather` uses server-side coordinates so
-every visitor gets the same answer, and `ask` never logs questions or answers.
+every visitor gets the same answer, and `ask` never logs questions or answers. `strace` shows the
+shape of a request's bodies, never their values, and never a header; anything new fed to the
+request observer in `lib/api.ts` must keep it that way.
 
 ### API base URL
 

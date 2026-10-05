@@ -66,8 +66,8 @@ test.describe('the résumé', () => {
   /**
    * `/resume.txt` is generated at build time by `vite-plugins/resume.ts` from
    * `src/content/`, which is the whole point: the CV has exactly one source, and the
-   * terminal's `curl` serves the same bytes. If this drifts, the site and the résumé
-   * are telling different stories about the same person.
+   * terminal's `curl` fetches the very same file. If this drifts, the site and the
+   * résumé are telling different stories about the same person.
    */
   test('is generated from the content modules', async ({ request }) => {
     const body = await (await request.get('/resume.txt')).text()

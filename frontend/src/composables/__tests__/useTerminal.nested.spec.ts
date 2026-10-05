@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { Command } from '@/terminal/types'
 
 /**
- * `ctx.run` runs one command inside another: what `curl` does with `resume` today,
+ * `ctx.run` runs one command inside another: what `tour` does between its stops,
  * and what `tour` and pipes are built on. The parent is still running throughout, so
  * the child must not look like a command of its own: when it finishes, the shell has
  * to stay busy, Ctrl+C has to still reach the parent, and the keyboard must stay the
