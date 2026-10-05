@@ -1152,6 +1152,20 @@ Retrofitting these is painful, so they are part of the definition of done:
   games (`snake`, `tetris`) keep reading `prefersReducedMotion()`, because their stepped mode
   changes the rules.
 - Every other animated feature honours the same level, and so `prefers-reduced-motion`.
+- **Page changes** (`composables/usePageFocus.ts`). The SPA swaps its page without the browser
+  saying so, so once a change of face has settled — the swing over, or the pages swapped at once
+  — focus moves to the new page's `<h1>` (the one in the `<main>` that isn't `inert`), and one
+  `role="status"` node in `App.vue` announces `pageLabel(path)`, cleared and then set so the
+  same page twice is heard twice. With a hash, the section's own heading takes focus instead,
+  with `preventScroll`, since `useViewSwing` has just scrolled there. Not while the terminal or
+  the palette is open: the visitor is typing there. The first navigation and changes inside a
+  face (a hash on the home page, a tool inside `/tools`) never move it — the last is a known
+  gap, and a follow-up. `pageLabel()` is the tab title except on the 404, whose tab keeps the
+  site's title for crawlers but which is announced as "Page not found". Every view's heading is
+  `<h1 tabindex="-1">` with a `:focus-visible` ring, the 404's "404" included, and so is
+  `SectionHeader`'s `<h2>`; a source-scan spec (`views/__tests__/headings.spec.ts`) holds every
+  view to exactly one. A *Skip to content* link comes first in the page and focuses the heading
+  itself, so its hash never goes through the router.
 - The launcher is `hidden` below `md`. Mobile virtual keyboards fight fixed-position input panels
   badly enough that a bad terminal is worse than none; mobile users get the full rendered page,
   which carries the same information. `Ctrl+K` remains available for anyone on a tablet with a
@@ -1184,6 +1198,9 @@ this section only fixes the rules the code cites.
   `ThreeBackground` yaws the wireframe *field* (not the camera — see the spec for why), re-homes
   every shape on the first frame and bakes the rotation away on the last. Below *full* motion
   (§9) nothing moves and the pages swap. The transition is complete with no three.js present.
+  The leaving face is `inert` from the `<Transition>`'s `leave` to its removal, so in every frame
+  exactly one `<main>` can be reached; and `settled`, a counter bumped when a swing ends or the
+  pages swap, is what `usePageFocus` waits on (§9).
 - **Pages outside the prism.** `/now` and `/work/<id>` are routes but not views: they are reached
   from links, not the navbar, so the prism keeps its four faces, and `viewIndex()` puts them after
   the faces so a swing to one still has a direction. `cd` doesn't reach them, because

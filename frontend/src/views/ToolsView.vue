@@ -47,7 +47,7 @@ const TIER_LABEL: Record<ToolTier, keyof typeof m.tools> = {
           ><span class="text-muted-foreground">:~$</span>
           <span class="ml-2 text-foreground">{{ view.prompt }}</span>
         </p>
-        <h1 class="text-2xl md:text-3xl font-bold glow-cyan text-accent">
+        <h1 tabindex="-1" class="text-2xl md:text-3xl font-bold glow-cyan text-accent rounded-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-4 focus-visible:ring-offset-background">
           <span class="text-accent">#</span> {{ t(view.heading) }}
         </h1>
         <p class="mt-3 text-sm text-muted-foreground max-w-2xl">{{ t(m.tools.subtitle) }}</p>

@@ -186,6 +186,75 @@ describe('installViewSwing', () => {
     expect(useViewSwing().swinging.value).toBe(false)
   })
 
+  // What `usePageFocus` waits on: a change of face that has finished, and only that.
+  describe('settled', () => {
+    it('counts a swing once it has finished, not when it starts', () => {
+      const { router, push } = fakeRouter('/')
+      installViewSwing(router)
+      const { settled } = useViewSwing()
+      const before = settled.value
+
+      void push('/tools')
+      advance(0)
+      advance(SWING_MS / 2)
+      expect(settled.value).toBe(before)
+
+      advance(SWING_MS)
+      expect(settled.value).toBe(before + 1)
+    })
+
+    // Found in review: /work/a to /work/b turned nothing, so nothing settled.
+    it('counts a change of page off the prism at once, and a hash change not at all', () => {
+      const { router, push } = fakeRouter('/work/vim')
+      installViewSwing(router)
+      const { settled } = useViewSwing()
+      const before = settled.value
+      void push('/work/qr')
+      expect(settled.value).toBe(before + 1)
+      void push({ path: '/work/qr', hash: '#numbers' })
+      expect(settled.value).toBe(before + 1)
+    })
+
+    it('counts an instant swap at once, under reduced motion or calm', () => {
+      for (const level of ['paused', 'calm'] as const) {
+        setMotion(level)
+        const { router, push } = fakeRouter('/')
+        installViewSwing(router)
+        const { settled } = useViewSwing()
+        const before = settled.value
+        void push('/tools')
+        expect(settled.value, level).toBe(before + 1)
+      }
+    })
+
+    it('counts one for a swing cut short by the next, when that one ends', () => {
+      const { router, push } = fakeRouter('/')
+      installViewSwing(router)
+      const { settled } = useViewSwing()
+      const before = settled.value
+      void push('/tools')
+      advance(0)
+      advance(SWING_MS / 2)
+      void push('/watch')
+      advance(SWING_MS)
+      advance(SWING_MS * 2)
+      expect(settled.value).toBe(before + 1)
+    })
+
+    it('never counts the first navigation, or a change inside one face', () => {
+      const { router, hook, push } = fakeRouter('/')
+      installViewSwing(router)
+      const { settled } = useViewSwing()
+      const before = settled.value
+
+      const start = { ...route('/'), matched: [] } as unknown as RouteLocationNormalizedLoaded
+      hook()(route('/tools'), start, undefined)
+      void push('/tools/image')
+      void push('/tools/json')
+      expect(settled.value).toBe(before)
+    })
+  })
+
   it('treats an unknown route as the face after the last one', () => {
     const { router, push } = fakeRouter('/tools')
     installViewSwing(router)

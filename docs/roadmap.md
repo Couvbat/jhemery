@@ -317,7 +317,7 @@ them.
 | [x] | Scheme forge and export | `theme forge #d65d0e` (or *make one* in the 🎨 menu) grows a twelve-colour scheme in OKLCH around one seed, then steps lightness until it passes the floors every shipped scheme is held to, reporting any it can't meet. The floors move from `themes.spec.ts` into `lib/themeRules.ts` so the test and the forge share one rule; colours go through `toHex`, so typed input never reaches a style attribute verbatim. A forged scheme is one extra theme, `custom`, restored before mount. `theme export alacritty\|kitty\|base16` prints the scheme on screen as a config for a real terminal; start with those three. | `lib/themeRules.ts` (new), `lib/forge.ts` (new), `lib/themes.ts`, `composables/useTheme.ts`, `commands/theme.ts`, `components/ThemeMenu.vue` | M |
 | [x] | Theme transitions | A new scheme spreads in a circle from the swatch clicked (`document.startViewTransition`, a clip-path on `::view-transition-new(root)`, ~450 ms; skipped for dark → light so the Flashbang plays as today), and the wireframes ease to their new colour with a preallocated lerp. Fixes three things that ignore the scheme: `MatrixRain.vue`'s hard-coded greens and English-only hint, the `.crt-overdrive` fringe, and the SoundCloud colour baked into `content/music.ts`. | `composables/useTheme.ts`, `components/ThreeBackground.vue`, `components/effects/MatrixRain.vue`, `assets/main.css`, `content/music.ts`, `sections/MusicSection.vue` | S |
 | [x] | Motion control | *Full · calm · paused* in the 🎨 menu and a `motion` command, persisted as `couvbat:motion`. Today only the OS setting stops the field (WCAG 2.2.2). The OS setting is a floor the row can't lift. Decorative surfaces read a `decorativeMotion()` (field, confetti, glitch, boot replay, prompt cycling, swing), while the games keep reading `prefersReducedMotion()`. Also a frame governor: 60 fps at most, 30 while the terminal's blurred panel is open. Not linkable, since it writes a setting. | `composables/useMotion.ts` (new), `components/ThemeMenu.vue`, `components/ThreeBackground.vue`, the effect components | S |
-| [ ] | Accessible page changes | After the prism swing settles, focus the new view's `<h1 tabindex="-1">` and announce its `tabTitle()` in one `role="status"` node; the leaving face is `inert` for the swing (two `<main>`s overlap today); a skip link comes first. Tested in e2e, because focus after a real transition is what jsdom can't see. | `App.vue`, `composables/useViewSwing.ts`, `composables/useTabTitle.ts`, `e2e/navigation.spec.ts` | M |
+| [x] | Accessible page changes | After the prism swing settles, focus the new view's `<h1 tabindex="-1">` and announce its `tabTitle()` in one `role="status"` node; the leaving face is `inert` for the swing (two `<main>`s overlap today); a skip link comes first. Tested in e2e, because focus after a real transition is what jsdom can't see. | `App.vue`, `composables/useViewSwing.ts`, `composables/useTabTitle.ts`, `e2e/navigation.spec.ts` | M |
 | [ ] | `who` and `wall` | `who` lists everyone on the site as anonymous ttys (`somebody pts/3`). `wall` sends a wave with no content: every other visitor's wireframes ripple outward, and an open terminal prints "Broadcast message from somebody@jhemery.xyz". Rides the existing presence stream, so no new connection; the server coalesces waves to one per 3 s. No text, no id, and the count is the one already sent. After the rate-limit fix. | `backend/src/presence/*`, `composables/usePresence.ts`, `components/ThreeBackground.vue`, `commands/system.ts` | S |
 
 ### Departures from the approach column
@@ -590,6 +590,21 @@ Recorded as each row ships.
   - Found in review: a forged scheme's colour never reaches the SoundCloud widget, which gets
     the default green instead. A colour that is near-unique and kept in the visitor's storage
     would let SoundCloud link their visits. A seed with a non-finite number is not a colour.
+- **Accessible page changes:**
+  - It announces `pageLabel()`, the tab title except on the 404, rather than `tabTitle()`
+    itself: the 404's tab keeps the site title for crawlers, and announcing that would call it
+    the home page.
+  - The palette's open state moved out of `CommandPalette.vue` into `composables/usePalette.ts`,
+    so the focus can leave it alone without importing a component.
+  - `SectionHeader`'s `<h2>` takes `tabindex="-1"` too, since a hash from another page focuses
+    the section's heading.
+  - `cd` closes the terminal, so after `cd tools` the keyboard goes to the tools page's
+    heading. The case the guard covers, a page changing under an open terminal, is tested with
+    Back instead.
+  - The tests live in `e2e/views.spec.ts` beside the prism's, not in `navigation.spec.ts`.
+  - Found in review: a change of page off the prism (`/work/a` to `/work/b`, `/now` to the 404)
+    turns no face but still settles, so it is focused and announced. The hero's `<h1>` is named
+    by the whole tagline, since focus can land on it while it is still typing.
 
 ## Build order
 

@@ -10,6 +10,8 @@ import { restoreCrt, setCrt } from '@/composables/useCrt'
 import { useMatrix } from '@/composables/useMatrix'
 import { useMotion } from '@/composables/useMotion'
 import { useTabTitle } from '@/composables/useTabTitle'
+import { focusPageHeading, pageAnnouncement, usePageFocus } from '@/composables/usePageFocus'
+import { useLocale } from '@/i18n'
 import { terminalOpen } from '@/composables/useTerminalShell'
 import { installViewSwing, untilSettled, useViewSwing } from '@/composables/useViewSwing'
 import { consumeRunParam } from '@/composables/useRunLink'
@@ -70,6 +72,15 @@ const stageStyle = computed(() => ({
 }))
 
 useTabTitle()
+usePageFocus(router)
+const { t, m } = useLocale()
+
+/** The leaving face is `inert` for its turn: two `<main>`s overlap while the prism
+ *  swings, and only the arriving one may be reached, read or clicked. */
+function onLeave(el: Element, done: () => void) {
+  el.setAttribute('inert', '')
+  untilSettled(el, done)
+}
 
 // Once true, stays true — TerminalOverlay is mounted for the rest of the session
 // (its own internal `open`/Transition handles every close/reopen after that) so
@@ -103,6 +114,16 @@ onMounted(() => {
 </script>
 
 <template>
+  <!-- First in the page, so it is the first Tab. It focuses the heading itself rather
+       than following its hash, which the router would treat as a section to scroll to;
+       the href is there so it is a real link, and names a node that exists. -->
+  <a
+    href="#content"
+    class="sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-2 focus:z-[200] focus:rounded focus:border focus:border-primary focus:bg-background focus:px-3 focus:py-2 focus:text-sm focus:text-primary"
+    @click.prevent="focusPageHeading"
+  >
+    {{ t(m.nav.skip) }}
+  </a>
   <ThreeBackground v-if="showThreeBackground" />
   <NavBar />
 
@@ -111,10 +132,10 @@ onMounted(() => {
     the visitor does not turn, the world does. Nothing inside a view may be
     `position: fixed` — a transformed ancestor becomes its containing block.
   -->
-  <div class="view-stage" :class="{ 'is-swinging': swinging }" :style="stageStyle">
+  <div id="content" class="view-stage" :class="{ 'is-swinging': swinging }" :style="stageStyle">
     <div class="view-prism">
       <RouterView v-slot="{ Component }">
-        <Transition name="view" :css="motion === 'full'" @enter="untilSettled" @leave="untilSettled">
+        <Transition name="view" :css="motion === 'full'" @enter="untilSettled" @leave="onLeave">
           <component :is="Component" />
         </Transition>
       </RouterView>
@@ -130,4 +151,7 @@ onMounted(() => {
 
   <MatrixRain v-if="matrixActive" />
   <BootSequence />
+
+  <!-- The one place a page change is announced (`usePageFocus`). -->
+  <p class="sr-only" role="status" aria-live="polite" data-testid="page-announcement">{{ pageAnnouncement }}</p>
 </template>
