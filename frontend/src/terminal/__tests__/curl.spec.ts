@@ -125,6 +125,18 @@ describe('curl', () => {
     expect(fetchMock).not.toHaveBeenCalled()
   })
 
+  // Found in review: the résumé's tip, `curl jhemery.xyz/help`, printed index.html here.
+  it('reads a one-word path as its curl page, in the reader’s language, as a real terminal is served', async () => {
+    fetchMock.mockImplementation(async (url: string) =>
+      url === '/run/fr/help.txt' ? text('Ce qu’un terminal peut lire ici') : text('<!doctype html>', 'text/html'),
+    )
+    expect((await runCommand(curl, ['jhemery.xyz/help'], { locale: 'fr' })).text).toContain('Ce qu’un terminal')
+    // Not a page: the path itself, as a browser would get it.
+    fetchMock.mockClear()
+    await runCommand(curl, ['jhemery.xyz/nope'])
+    expect(fetchMock.mock.calls.map((c) => c[0])).toEqual(['/run/en/nope.txt', '/nope'])
+  })
+
   it('passes unknown flags back as curl would, without fetching', async () => {
     const { lines } = await runCommand(curl, ['-d', 'x'])
     expect(lines[0]).toMatchObject({ text: 'curl: option -d: is unknown', tone: 'error' })

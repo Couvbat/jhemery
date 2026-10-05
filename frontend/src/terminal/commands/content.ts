@@ -34,6 +34,22 @@ import { blank, heading, keyValues, line, pre, segmented, tags, wrap } from '../
 import type { Command, OutputLine } from '../types'
 import { swatches } from './theme'
 
+/**
+ * What a real terminal gets for this path: `/neofetch` is the curl page
+ * `/run/<locale>/neofetch.txt` there, which `.htaccess` hands to curl by its user agent,
+ * a header a page's `fetch` can't set. So a one-word path tries that page first, in the
+ * reader's language, and falls back to the path itself (whose answer is then the app's
+ * `index.html`, as a browser would get).
+ */
+async function fetchCurlPath(path: string, method: 'GET' | 'HEAD', locale: string, signal: AbortSignal): Promise<SiteResponse> {
+  const page = /^\/([a-z0-9-]+)\/?$/.exec(path)?.[1]
+  if (page) {
+    const run = await fetchSite(`/run/${locale}/${page}.txt`, method, { signal })
+    if (run.status === 200 && (run.headers.get('content-type') ?? '').startsWith('text/plain')) return run
+  }
+  return fetchSite(path, method, { signal })
+}
+
 /** The printable résumé `vite-plugins/resume.ts` emits, in the reader's language. */
 export function resumeHtmlPath(locale: string): string {
   return locale === 'fr' ? '/resume.fr.html' : '/resume.html'
@@ -377,6 +393,7 @@ export const contentCommands: Command[] = [
           tone: 'accent',
         },
         line(`tip: curl ${profile.domain}`, 'muted'),
+        line(`tip: curl ${profile.domain}/help`, 'muted'),
       ]
     },
   },
@@ -418,7 +435,7 @@ export const contentCommands: Command[] = [
 
         let res: SiteResponse
         try {
-          res = await fetchSite(resolved.path, parsed.head ? 'HEAD' : 'GET', { signal: ctx.signal })
+          res = await fetchCurlPath(resolved.path, parsed.head ? 'HEAD' : 'GET', ctx.locale, ctx.signal)
         } catch (error) {
           if ((error as Error)?.name === 'AbortError') throw error
           out.push(line(`curl: (7) Failed to connect to ${profile.domain} port 443: Couldn't connect to server`, 'error'))

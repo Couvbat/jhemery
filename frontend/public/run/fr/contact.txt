@@ -1,0 +1,11 @@
+[38;5;46mcontact[0m
+[2m───────[0m
+]8;;https://github.com/Couvbat\[38;5;51mGitHub       @Couvbat[0m]8;;\
+]8;;https://www.linkedin.com/in/jules-h%C3%A9mery-338134195/\[38;5;51mLinkedIn     Jules Hémery[0m]8;;\
+]8;;https://soundcloud.com/couvbat\[38;5;51mSoundCloud   @couvbat[0m]8;;\
+]8;;mailto:contact@jhemery.xyz\[38;5;51mEmail        contact@jhemery.xyz[0m]8;;\
+
+[2mPas à la recherche de nouvelles opportunités pour le moment[0m
+[2mrun `mail` to send me a message from here.[0m
+
+[2mcurl jhemery.xyz/help pour les autres pages · en direct dans un navigateur : https://jhemery.xyz/?run=contact[0m

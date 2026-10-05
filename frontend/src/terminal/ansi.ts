@@ -1,21 +1,27 @@
+import { parseColour } from '../lib/colour'
 import type { OutputLine, OutputSegment, Tone } from './types'
 
 /**
- * The one ANSI palette: which SGR code stands for which tone. `curl` reads the real
- * `resume.txt` through `parseSgr()`, and the résumé plugin writes it with the same
- * codes, so a colour can't mean one thing in a real terminal and another in this one.
+ * The one ANSI palette: which SGR code stands for which tone. The résumé plugin writes
+ * `resume.txt` with it, the curl pages (`/run/…`) are written with it through `toAnsi()`,
+ * and the terminal's `curl` reads them back through `parseSgr()`, so a colour can't mean
+ * one thing in a real terminal and another in this one.
  *
- * Relative imports only, and types at that: `vite-plugins/` reaches this file from
- * outside the app's module graph, as it does `src/content/`.
+ * Relative imports only (`purity.spec.ts` walks them): `vite-plugins/` reaches this file
+ * from outside the app's module graph, as it does `src/content/`.
  */
 export const SGR_TONES = {
   primary: '38;5;46',
+  success: '38;5;46',
   accent: '38;5;51',
+  secondary: '38;5;201',
+  warning: '38;5;220',
+  error: '38;5;196',
   muted: '2',
 } as const satisfies Partial<Record<Tone, string>>
 
 /** The 256-colour indexes the palette uses, read back. Any other colour is plain text. */
-const INDEXED: Record<number, Tone> = { 46: 'primary', 51: 'accent' }
+const INDEXED: Record<number, Tone> = { 46: 'primary', 51: 'accent', 201: 'secondary', 220: 'warning', 196: 'error' }
 
 /**
  * Every escape a text file might carry: CSI sequences (`ESC [ … m` and the cursor
@@ -87,4 +93,38 @@ export function parseSgr(text: string): OutputLine[] {
       if (!segments.length) return { text: '', pre: true }
       return { text: segments.map((s) => s.text).join(''), segments, pre: true }
     })
+}
+
+const ESC = '\u001b['
+const RESET = `${ESC}0m`
+/** OSC 8, the hyperlink escape: a terminal that knows it makes the text clickable. */
+const link = (href: string, text: string) => `\u001b]8;;${href}\u001b\\${text}\u001b]8;;\u001b\\`
+
+function sgrOf(run: { tone?: Tone; colour?: string }): string | undefined {
+  if (run.colour) {
+    const rgb = parseColour(run.colour)
+    if (rgb) return `38;2;${Math.round(rgb.r)};${Math.round(rgb.g)};${Math.round(rgb.b)}`
+  }
+  return run.tone ? SGR_TONES[run.tone as keyof typeof SGR_TONES] : undefined
+}
+
+function paint(text: string, code: string | undefined): string {
+  return code && text ? `${ESC}${code}m${text}${RESET}` : text
+}
+
+/**
+ * Output lines as a terminal would print them: tones and literal colours as SGR, a link
+ * as OSC 8 to its absolute URL (relative ones resolve against `origin`), and echoed prompt
+ * lines left out, since a page of output has no one typing.
+ */
+export function toAnsi(lines: readonly OutputLine[], { origin }: { origin: string }): string {
+  return lines
+    .filter((row) => !row.prompt)
+    .map((row) => {
+      const body = row.segments?.length
+        ? row.segments.map((segment) => paint(segment.text, sgrOf(segment))).join('')
+        : paint(row.text, sgrOf(row))
+      return row.href ? link(new URL(row.href, origin).href, body) : body
+    })
+    .join('\n')
 }

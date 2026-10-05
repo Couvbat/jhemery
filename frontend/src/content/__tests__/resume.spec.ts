@@ -75,6 +75,14 @@ describe('resume.txt', () => {
   it('points at the printable version', () => {
     expect(buildResume()).toContain(`https://${profile.domain}/resume.html`)
   })
+
+  // Every byte, escapes included, at a fixed date: the palette is shared with the
+  // terminal (`terminal/ansi.ts`), and only the CTF's concealed run is checked anywhere
+  // else, so a changed colour code would get through without this. Rewrite it with
+  // `npx vitest run src/content/__tests__/resume.spec.ts -u` when the CV really changes.
+  it('keeps its exact bytes, colours included', async () => {
+    await expect(buildResume(new Date('2026-10-01T12:00:00Z'))).toMatchFileSnapshot('./__snapshots__/resume.txt')
+  })
 })
 
 describe('resume.html', () => {

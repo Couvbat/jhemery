@@ -20,7 +20,17 @@ export interface Recorded {
 export function recordingContext(
   name: string,
   args: string[] = [],
-  options: { locale?: Locale; navigate?: (target: string) => boolean; signal?: AbortSignal } = {},
+  options: {
+    locale?: Locale
+    navigate?: (target: string) => boolean
+    signal?: AbortSignal
+    /**
+     * False for output with nobody at the keyboard (the curl pages): `capture` and
+     * `prompt` throw, so a command that needs a visitor fails the spec rather than
+     * writing half a page.
+     */
+    interactive?: boolean
+  } = {},
 ): Recorded {
   const locale = options.locale ?? 'en'
   const printed: OutputLine[] = []
@@ -50,8 +60,12 @@ export function recordingContext(
       navigated.push(target)
       return options.navigate ? options.navigate(target) : true
     },
-    prompt: () => Promise.resolve(''),
+    prompt: () => {
+      if (options.interactive === false) throw new Error(`${name}: prompt with nobody at the keyboard`)
+      return Promise.resolve('')
+    },
     capture: (handler) => {
+      if (options.interactive === false) throw new Error(`${name}: capture with nobody at the keyboard`)
       captured = handler
       return () => {
         if (captured === handler) captured = null

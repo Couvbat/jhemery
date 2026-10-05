@@ -678,6 +678,24 @@ the real response headers, CSP and HSTS included, since a same-origin fetch may 
 `Set-Cookie`. Any other host is curl's `(6) Could not resolve host`; a network failure is `(7)`.
 A link may only pass it the arguments its Tab offers: the domain, `-I` and the site's plain files.
 
+**The shell over curl.** `curl jhemery.xyz/neofetch` in a real terminal gets that command's output:
+`public/run/<locale>/<name>.txt`, rendered by `terminal/ansi.ts`'s `toAnsi()` (tones and swatch
+colours as SGR, links as OSC 8, prompt lines dropped) with a footer, plus a generated `help.txt`
+index. The pages are vitest snapshots (`curl-pages.spec.ts`), committed and never written by CI,
+so a change to a command or the content fails CI until they are regenerated with `-u`. A page is
+any command a link could run with no arguments that isn't hidden, live or a game (by module); the
+spec names a reason for each other exclusion (`curl`, `ctf`, `achievements`, `games`, `tour`,
+`resume`, `help`). Each runs in both locales under two clocks years apart, and any line that
+differs is dropped, which removes the uptimes and durations that would otherwise go stale between
+regenerations; `resume` is excluded for that reason, since its durations are the point and the
+bare host already serves them fresh. A harness option makes `capture` and `prompt` throw, so a
+page can never be half of an interactive command. `.htaccess` serves the pages only to `curl`,
+`wget` and `httpie`, not the crawler list `/` uses (a crawler asking for `/about` wants what a
+browser gets), French when `Accept-Language` starts with `fr`, and only when the file exists.
+They carry `Vary: User-Agent, Accept-Language` and `no-cache`, and `/` now says `Vary: User-Agent`,
+since it was always the résumé to curl and the app to a browser. The résumé plugin takes its
+colours from the same palette, and `resume.spec.ts` pins its bytes.
+
 **Decision:** this is served entirely from the static frontend, with no backend involvement. The
 obvious alternative — a Nest `GET /resume` endpoint — would mean the résumé content lives in the
 backend too, duplicating §1 across two deploy units that release independently. Generating from

@@ -51,6 +51,14 @@ cd frontend && npx playwright test --project=chromium -g 'graceful'
 cd backend && npx jest src/ask/ask.service.spec.ts -t 'rate limit'
 ```
 
+Two kinds of committed output are vitest snapshots, which CI only ever compares: the curl pages
+in `frontend/public/run/` (`curl jhemery.xyz/neofetch`) and the résumé's exact bytes. A change to a
+command's output or to the content fails CI until they are rewritten:
+
+```bash
+cd frontend && npx vitest run src/terminal/__tests__/curl-pages.spec.ts src/content/__tests__/resume.spec.ts -u
+```
+
 ### Two test suites, with a line between them
 
 `src/**/__tests__/` (vitest, jsdom) owns behaviour: the command registry, every

@@ -1,4 +1,5 @@
-import type { Locale, Localised } from '@/content/types'
+// Relative: `vite-plugins/resume.ts` reaches this file through `ansi.ts`, outside the alias.
+import type { Locale, Localised } from '../content/types'
 
 export type Tone =
   | 'default'
