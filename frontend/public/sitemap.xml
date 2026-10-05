@@ -76,6 +76,11 @@
     <priority>0.3</priority>
   </url>
   <url>
+    <loc>https://jhemery.xyz/tools/acid</loc>
+    <changefreq>monthly</changefreq>
+    <priority>0.3</priority>
+  </url>
+  <url>
     <loc>https://jhemery.xyz/tools/ffmpeg</loc>
     <changefreq>monthly</changefreq>
     <priority>0.3</priority>

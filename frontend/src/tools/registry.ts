@@ -169,6 +169,17 @@ export const tools: ToolMeta[] = [
     load: () => import('./diff/DiffTool.vue'),
   },
   {
+    id: 'acid',
+    name: { en: 'Acid sequencer', fr: 'Séquenceur acid' },
+    description: {
+      en: 'A 16-step TB-303-style bassline in plain Web Audio, saved in its own link',
+      fr: 'Une ligne de basse façon TB-303 en 16 pas, en Web Audio pur, enregistrée dans son propre lien',
+    },
+    keywords: ['303', 'tb-303', 'sequencer', 'synth', 'bassline', 'web audio', 'music', 'phrygian'],
+    tier: 'client',
+    load: () => import('./acid/AcidTool.vue'),
+  },
+  {
     id: 'ffmpeg',
     name: { en: 'Audio & video converter', fr: 'Convertisseur audio & vidéo' },
     description: {

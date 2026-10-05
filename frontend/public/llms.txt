@@ -55,6 +55,7 @@ Parts of the site, each with what was hard, its numbers, the code and the design
 - [Cron explainer](https://jhemery.xyz/tools/cron): A cron expression as a sentence, and its next five runs in your time zone
 - [QR code](https://jhemery.xyz/tools/qr): Text or a URL as a QR code, as PNG or SVG — encoded here, from the standard
 - [Text diff](https://jhemery.xyz/tools/diff): Two texts and a unified diff, from the same code as the terminal’s `diff`
+- [Acid sequencer](https://jhemery.xyz/tools/acid): A 16-step TB-303-style bassline in plain Web Audio, saved in its own link
 - [Audio & video converter](https://jhemery.xyz/tools/ffmpeg): mp3, m4a, ogg, wav, flac, mp4 or gif; trim; extract audio without re-encoding. ffmpeg in WebAssembly, 32 MB on first use
 
 ## Design notes

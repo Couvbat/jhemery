@@ -313,7 +313,7 @@ them.
 
 | ✔ | Feature | Approach | Files | Effort |
 |---|---|---|---|---|
-| [ ] | `acid` | A 16-step TB-303-style sequencer on `/tools` in plain Web Audio: saw or square into a resonant low-pass, accent, slide and drive, a tempo that reaches hardcore speeds, and "randomise in phrygian". The link is the save file: the pattern packs to about 30 bytes behind a version byte into `?p=`, decoded defensively (every field clamped). One persistent oscillator → `BiquadFilter` (resonance capped short of self-oscillation) → `tanh` shaper → gain, a lookahead scheduler against `AudioContext.currentTime`, master at −12 dB into a limiter, nothing sounds without a gesture. `acid <code>` plays it from the shell and is **not** linkable: a link that starts sound is hostile. If the site ever gets more sound, it starts from this engine. | `tools/acid/` (new), `tools/registry.ts`, `commands/tools.ts` | M |
+| [x] | `acid` | A 16-step TB-303-style sequencer on `/tools` in plain Web Audio: saw or square into a resonant low-pass, accent, slide and drive, a tempo that reaches hardcore speeds, and "randomise in phrygian". The link is the save file: the pattern packs to about 30 bytes behind a version byte into `?p=`, decoded defensively (every field clamped). One persistent oscillator → `BiquadFilter` (resonance capped short of self-oscillation) → `tanh` shaper → gain, a lookahead scheduler against `AudioContext.currentTime`, master at −12 dB into a limiter, nothing sounds without a gesture. `acid <code>` plays it from the shell and is **not** linkable: a link that starts sound is hostile. If the site ever gets more sound, it starts from this engine. | `tools/acid/` (new), `tools/registry.ts`, `commands/tools.ts` | M |
 | [ ] | Scheme forge and export | `theme forge #d65d0e` (or *make one* in the 🎨 menu) grows a twelve-colour scheme in OKLCH around one seed, then steps lightness until it passes the floors every shipped scheme is held to, reporting any it can't meet. The floors move from `themes.spec.ts` into `lib/themeRules.ts` so the test and the forge share one rule; colours go through `toHex`, so typed input never reaches a style attribute verbatim. A forged scheme is one extra theme, `custom`, restored before mount. `theme export alacritty\|kitty\|base16` prints the scheme on screen as a config for a real terminal; start with those three. | `lib/themeRules.ts` (new), `lib/forge.ts` (new), `lib/themes.ts`, `composables/useTheme.ts`, `commands/theme.ts`, `components/ThemeMenu.vue` | M |
 | [ ] | Theme transitions | A new scheme spreads in a circle from the swatch clicked (`document.startViewTransition`, a clip-path on `::view-transition-new(root)`, ~450 ms; skipped for dark → light so the Flashbang plays as today), and the wireframes ease to their new colour with a preallocated lerp. Fixes three things that ignore the scheme: `MatrixRain.vue`'s hard-coded greens and English-only hint, the `.crt-overdrive` fringe, and the SoundCloud colour baked into `content/music.ts`. | `composables/useTheme.ts`, `components/ThreeBackground.vue`, `components/effects/MatrixRain.vue`, `assets/main.css`, `content/music.ts`, `sections/MusicSection.vue` | S |
 | [ ] | Motion control | *Full · calm · paused* in the 🎨 menu and a `motion` command, persisted as `couvbat:motion`. Today only the OS setting stops the field (WCAG 2.2.2). The OS setting is a floor the row can't lift. Decorative surfaces read a `decorativeMotion()` (field, confetti, glitch, boot replay, prompt cycling, swing), while the games keep reading `prefersReducedMotion()`. Also a frame governor: 60 fps at most, 30 while the terminal's blurred panel is open. Not linkable, since it writes a setting. | `composables/useMotion.ts` (new), `components/ThemeMenu.vue`, `components/ThreeBackground.vue`, the effect components | S |
@@ -519,6 +519,28 @@ Recorded as each row ships.
   - A title that lands late is published only to a room that is still open and still holds the
     item, and titles for items a room no longer holds are pruned on every update.
   - The page renders a title by interpolation only, with the item itself as the tooltip.
+- **`acid`:**
+  - The pattern is 27 bytes (36 characters), not "about 30": the version byte, 16 × 9-bit steps
+    (on, accent, slide, octave, note), one tempo byte (`bpm = 60 + byte`, up to 300), the wave and
+    root sharing a byte, and six knobs. A code cut short or carrying an unknown version is
+    refused, and bytes past the 27th are ignored.
+  - The `AudioContext` is opened by a small module the shell imports eagerly,
+    `tools/acid/audio.ts`, rather than by the engine. The shell loads the engine lazily, and by
+    the time that import resolves the keystroke is over. The engine only takes the context it is
+    handed.
+  - `acid` with no code plays the tool's default pattern. The row only had `acid <code>`.
+  - The shell's `acid` also stops when the overlay closes. Closing doesn't cancel a running
+    command, so without this the stop keys would go and the bassline would stay.
+  - One sequencer sounds at a time: the tool and the shell stop each other rather than play two
+    patterns over each other.
+  - A stopped engine suspends its context once the release has faded, so a silent sequencer holds
+    no audio thread.
+  - Under reduced motion neither the panel nor the shell draws the playhead, which jumps up to
+    twenty times a second at 300 bpm. The status still says it is playing.
+  - The share link, and the `acid <code>` that plays it in the shell, are shown only after *copy
+    link*, and cleared on the next edit, so a stale code is never on screen.
+  - One e2e plays it from a click under the production CSP (`tools-csp.spec.ts`), because only a
+    real browser has an audio clock to move the playhead.
 
 ## Build order
 
