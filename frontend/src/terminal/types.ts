@@ -145,19 +145,41 @@ export interface VimCursor {
 
 export type VimMode = 'normal' | 'insert'
 
+/** The buffer's text and cursor at one moment. */
+export interface VimSnapshot {
+  lines: string[]
+  cursor: VimCursor
+}
+
+/** One change `u` can take back: the buffer as it was before it, the number
+ *  vim gives it (counting from 1), and when it was made, both for the message
+ *  undoing it shows. */
+export interface VimChange extends VimSnapshot {
+  seq: number
+  time: number
+}
+
 export interface VimBufferState {
   name: string
   lines: string[]
   cursor: VimCursor
   mode: VimMode
   dirty: boolean
-  /** A refused `:q`/`:wq` shows its error here — VimPane is the only visible
-   *  surface while it's open, so the terminal's own scrollback won't do. */
+  /** A refused `:q`/`:wq` shows its error here, and `u` what it undid —
+   *  VimPane is the only visible surface while it's open, so the terminal's own
+   *  scrollback won't do. An error is one with vim's `E` number. */
   statusMessage: string | null
   /** What has been typed in normal mode towards a command that isn't complete
    *  yet, '' when nothing has: a count, the `d` operator, and a count for its
    *  motion (`2d3`). Kept as typed because that is what vim's 'showcmd' shows. */
   pending: string
+  /** The changes `u` can take back, oldest first. */
+  changes: VimChange[]
+  /** The number the last change got. Vim's keep counting up through undos. */
+  lastSeq: number
+  /** The buffer as the open insert session found it: the session is one
+   *  change, recorded when it ends. Null outside insert mode. */
+  insertFrom: VimSnapshot | null
 }
 
 export interface VimFile {

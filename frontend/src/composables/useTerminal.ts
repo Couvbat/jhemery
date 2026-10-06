@@ -124,6 +124,9 @@ const effects: TerminalEffects = {
             dirty: false,
             statusMessage: null,
             pending: '',
+            changes: [],
+            lastSeq: 0,
+            insertFrom: null,
           }
         : null
   },

@@ -15,6 +15,14 @@ const statusText = computed(() => {
   const modified = props.buffer.dirty ? ' [+]' : ''
   return `"${props.buffer.name}" [readonly]${modified} ${props.buffer.lines.length}L, ${byteCount}B`
 })
+
+/** A message reads as an error only when it carries vim's `E` number, as the
+ *  refusals of `:q` and `:wq` do; what `u` reports is an ordinary message. */
+const messageClass = computed(() => {
+  const message = props.buffer.statusMessage
+  if (message === null) return ''
+  return /^E\d+:/.test(message) ? 'text-destructive' : 'text-foreground'
+})
 </script>
 
 <template>
@@ -38,9 +46,10 @@ const statusText = computed(() => {
     </div>
     <!-- The command typed so far (a count, `d`) sits at the right, where vim's
          'showcmd' puts it: without it a lone `d` looks like a key the editor
-         ignored. -->
+         ignored. `whitespace-pre`, not `truncate`, so the two spaces vim puts
+         before the time in an undo message survive. -->
     <p class="flex gap-4 px-4 py-1 border-t border-border shrink-0 bg-muted text-muted-foreground">
-      <span class="flex-1 truncate" :class="{ 'text-destructive': buffer.statusMessage }">{{
+      <span class="flex-1 overflow-hidden text-ellipsis whitespace-pre" :class="messageClass">{{
         buffer.statusMessage ?? statusText
       }}</span>
       <span v-if="buffer.pending">{{ buffer.pending }}</span>
