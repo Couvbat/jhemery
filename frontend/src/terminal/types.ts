@@ -155,7 +155,7 @@ export interface VimBufferState {
    *  surface while it's open, so the terminal's own scrollback won't do. */
   statusMessage: string | null
   /** An operator typed in normal mode and waiting for the key that completes
-   *  it. Only `d` exists so far, completed by `d`, `j`, `k`, `$` or `w`. */
+   *  it. Only `d` exists so far; `applyDelete` in vimEditor.ts has its motions. */
   pending: 'd' | null
 }
 

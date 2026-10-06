@@ -196,7 +196,7 @@ into *shell · navigation · content · live data · misc* and only hints that "
 listed here". `help --all` reveals the hidden ones.
 
 **vim.** `vim` (or `vi`, `nvim`, `emacs`) opens a real modal editor pane with normal and insert
-modes, `hjkl` and the arrows, `i`/`a`/`A`/`o`, `x`, and `d` with `d`/`j`/`k`/`$`/`w`. And yes, `:q!` gets you out. `:q`
+modes, `hjkl` and the arrows, `i`/`a`/`A`/`o`, `x`, and `d` with `d`/`hjkl`/`0`/`$`/`w`/`e`. And yes, `:q!` gets you out. `:q`
 refuses once you've typed something, just like the real thing (and at the prompt, with no vim
 open, it only notes the reflex). The red title-bar dot always works
 if you'd rather not play along. `cat` and `vim` read from the same fake filesystem, so a file can

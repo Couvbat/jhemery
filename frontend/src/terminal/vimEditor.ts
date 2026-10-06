@@ -1,4 +1,4 @@
-import type { VimBufferState } from './types'
+import type { VimBufferState, VimCursor } from './types'
 
 const MODIFIER_KEYS = new Set(['Shift', 'Control', 'Alt', 'AltGraph', 'Meta', 'CapsLock'])
 
@@ -57,21 +57,82 @@ function deleteLines(state: VimBufferState, from: number, to: number) {
   firstNonBlank(state)
 }
 
-/** `d$`. Vim's `$` is inclusive, so the character under the cursor goes too. */
-function deleteToEnd(state: VimBufferState) {
+/** Deletes columns `from` up to, not including, `to` on the cursor's line and
+ *  leaves the cursor at `from`: every charwise delete that stays on one line.
+ *  An empty span changes nothing, so it doesn't dirty the buffer either. */
+function deleteSpan(state: VimBufferState, from: number, to: number) {
+  if (to <= from) return
   const line = currentLine(state)
-  if (line === '') return
-  state.lines[state.cursor.row] = line.slice(0, state.cursor.col)
+  state.lines[state.cursor.row] = line.slice(0, from) + line.slice(to)
+  state.cursor.col = from
   state.dirty = true
   clampCol(state, false)
 }
 
-/** Vim's character classes for `w`: blanks, word characters, and everything
- *  else. Its default 'iskeyword' takes Latin-1's accented letters, and vim
- *  classes any other Unicode letter as a word character too, hence `\p{L}`. */
+/** Vim's character classes for `w` and `e`: blanks, word characters, and
+ *  everything else. Its default 'iskeyword' takes Latin-1's accented letters,
+ *  and vim classes any other Unicode letter as a word character too, hence
+ *  `\p{L}`. */
 function charClass(char: string): 0 | 1 | 2 {
   if (/\s/.test(char)) return 0
   return /[\p{L}\p{N}_]/u.test(char) ? 2 : 1
+}
+
+/** The class at `p`, where a line's end counts as a blank: that is how `e`
+ *  sees the break between two lines. */
+function classAt(state: VimBufferState, p: VimCursor) {
+  const line = state.lines[p.row] ?? ''
+  return p.col < line.length ? charClass(line.charAt(p.col)) : 0
+}
+
+/** Vim's `inc()`: one character on, stopping on a line's end before the next
+ *  line's first character. False at the end of the buffer. */
+function step(state: VimBufferState, p: VimCursor): boolean {
+  if (p.col < (state.lines[p.row] ?? '').length) p.col += 1
+  else if (p.row < state.lines.length - 1) {
+    p.row += 1
+    p.col = 0
+  } else return false
+  return true
+}
+
+/** Where `e` lands from the cursor, following vim's `end_word()`: the end of
+ *  the word under the cursor, or from the end of one (or a blank) the end of
+ *  the next, across lines if need be. With only blanks left it stops on the
+ *  buffer's last character. Null when there is nowhere to go at all. */
+function wordEnd(state: VimBufferState): VimCursor | null {
+  const p = { ...state.cursor }
+  const startClass = classAt(state, p)
+  if (!step(state, p)) return null
+  if (startClass === 0 || classAt(state, p) !== startClass) {
+    while (classAt(state, p) === 0) {
+      if (!step(state, p)) {
+        if (p.col > 0) p.col -= 1
+        return p
+      }
+    }
+  }
+  const wordClass = classAt(state, p)
+  while (classAt(state, p) === wordClass) step(state, p)
+  // One past the word, and always still on its line: a line's end is a blank.
+  p.col -= 1
+  return p
+}
+
+/** `de`: a charwise delete from the cursor through `end`, inclusive, and the
+ *  only one that can span lines. Vim turns such a delete linewise when it
+ *  starts within the indent and leaves nothing but blanks on its last line. */
+function deleteThrough(state: VimBufferState, end: VimCursor) {
+  const { row, col } = state.cursor
+  const line = currentLine(state)
+  const rest = (state.lines[end.row] ?? '').slice(end.col + 1)
+  if (end.row > row && rest.trim() === '' && col <= line.length - line.trimStart().length) {
+    deleteLines(state, row, end.row)
+    return
+  }
+  state.lines.splice(row, end.row - row + 1, line.slice(0, col) + rest)
+  state.dirty = true
+  clampCol(state, false)
 }
 
 /** `dw`: the rest of the word under the cursor and the blanks after it. Under
@@ -95,16 +156,15 @@ function deleteWord(state: VimBufferState) {
   }
   while (end < line.length && charClass(line.charAt(end)) === 0) end += 1
 
-  state.lines[row] = line.slice(0, col) + line.slice(end)
-  state.dirty = true
-  clampCol(state, false)
+  deleteSpan(state, col, end)
 }
 
 /** Completes a pending `d` with the key that followed it. A key that isn't one
  *  of these motions cancels the operator and is itself dropped, as in vim; so
- *  does a motion that can't move (`j` on the last line, `k` on the first). */
+ *  does a motion that can't move (`j` on the last line, `k` on the first, `h`
+ *  and `0` in column 0). */
 function applyDelete(key: string, state: VimBufferState) {
-  const { row } = state.cursor
+  const { row, col } = state.cursor
   switch (key) {
     case 'd':
       deleteLines(state, row, row)
@@ -117,12 +177,31 @@ function applyDelete(key: string, state: VimBufferState) {
     case 'ArrowUp':
       if (row > 0) deleteLines(state, row - 1, row)
       return
+    case 'h':
+    case 'ArrowLeft':
+      deleteSpan(state, Math.max(0, col - 1), col)
+      return
+    // `l` can't move off the last character, but under an operator vim lets it
+    // take that character anyway.
+    case 'l':
+    case 'ArrowRight':
+      deleteSpan(state, col, Math.min(col + 1, currentLine(state).length))
+      return
+    case '0':
+      deleteSpan(state, 0, col)
+      return
+    // `$` is inclusive: the character under the cursor goes too.
     case '$':
-      deleteToEnd(state)
+      deleteSpan(state, col, currentLine(state).length)
       return
     case 'w':
       deleteWord(state)
       return
+    case 'e': {
+      const end = wordEnd(state)
+      if (end) deleteThrough(state, end)
+      return
+    }
   }
 }
 
@@ -184,16 +263,10 @@ function handleNormalKey(key: string, state: VimBufferState): void {
       state.mode = 'insert'
       state.dirty = true
       return
-    case 'x': {
-      const line = currentLine(state)
-      if (line.length > 0 && state.cursor.col < line.length) {
-        state.lines[state.cursor.row] =
-          line.slice(0, state.cursor.col) + line.slice(state.cursor.col + 1)
-        state.dirty = true
-        clampCol(state, false)
-      }
+    // Vim defines `x` as `dl`.
+    case 'x':
+      applyDelete('l', state)
       return
-    }
     case 'd':
       state.pending = 'd'
       return

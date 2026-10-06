@@ -156,6 +156,122 @@ describe('d$', () => {
   })
 })
 
+describe('dh', () => {
+  it('deletes the character before the cursor, and the cursor takes its place', () => {
+    const state = press(buffer(['hello'], 0, 2), 'd', 'h')
+    expect(state.lines).toEqual(['hllo'])
+    expect(state.cursor.col).toBe(1)
+    expect(state.dirty).toBe(true)
+  })
+
+  it('does nothing in column 0, where `h` cannot move', () => {
+    const state = press(buffer(['hello']), 'd', 'h')
+    expect(state.lines).toEqual(['hello'])
+    expect(state.dirty).toBe(false)
+  })
+
+  it('takes the left arrow too', () => {
+    expect(press(buffer(['hello'], 0, 2), 'd', 'ArrowLeft').lines).toEqual(['hllo'])
+  })
+})
+
+describe('dl', () => {
+  it('deletes the character under the cursor, which is all `x` is', () => {
+    const state = press(buffer(['hello'], 0, 1), 'd', 'l')
+    expect(state.lines).toEqual(['hllo'])
+    expect(state.cursor.col).toBe(1)
+    expect(press(buffer(['hello'], 0, 1), 'x').lines).toEqual(['hllo'])
+  })
+
+  // `l` cannot move off the last character, but under an operator vim lets it
+  // take that character anyway — otherwise `x` could never delete it.
+  it('deletes the last character, and steps back onto the new one', () => {
+    const state = press(buffer(['hello'], 0, 4), 'd', 'l')
+    expect(state.lines).toEqual(['hell'])
+    expect(state.cursor.col).toBe(3)
+  })
+
+  it('does nothing on an empty line', () => {
+    const state = press(buffer(['', 'two']), 'd', 'l')
+    expect(state.lines).toEqual(['', 'two'])
+    expect(state.dirty).toBe(false)
+  })
+
+  it('takes the right arrow too', () => {
+    expect(press(buffer(['hello'], 0, 1), 'd', 'ArrowRight').lines).toEqual(['hllo'])
+  })
+})
+
+describe('d0', () => {
+  it('deletes from the start of the line up to, not including, the cursor', () => {
+    const state = press(buffer(['hello world'], 0, 6), 'd', '0')
+    expect(state.lines).toEqual(['world'])
+    expect(state.cursor.col).toBe(0)
+    expect(state.dirty).toBe(true)
+  })
+
+  it('does nothing in column 0', () => {
+    const state = press(buffer(['hello']), 'd', '0')
+    expect(state.lines).toEqual(['hello'])
+    expect(state.dirty).toBe(false)
+  })
+})
+
+describe('de', () => {
+  // `e` is inclusive where `w` is exclusive: the word goes, the blank after it stays.
+  it('deletes to the end of the word, keeping the blank after it', () => {
+    const state = press(buffer(['foo bar']), 'd', 'e')
+    expect(state.lines).toEqual([' bar'])
+    expect(state.cursor.col).toBe(0)
+    expect(state.dirty).toBe(true)
+  })
+
+  it('runs to the end of the next word from the end of one', () => {
+    const state = press(buffer(['foo bar baz'], 0, 2), 'd', 'e')
+    expect(state.lines).toEqual(['fo baz'])
+    expect(state.cursor.col).toBe(2)
+  })
+
+  it('skips blanks to reach the end of the next word', () => {
+    const state = press(buffer(['foo   bar'], 0, 3), 'd', 'e')
+    expect(state.lines).toEqual(['foo'])
+    expect(state.cursor.col).toBe(2)
+  })
+
+  it('uses the same word classes as `w`', () => {
+    expect(press(buffer(['foo.bar']), 'd', 'e').lines).toEqual(['.bar'])
+    expect(press(buffer(['foo.bar'], 0, 3), 'd', 'e').lines).toEqual(['foo'])
+    expect(press(buffer(['déjà vu']), 'd', 'e').lines).toEqual([' vu'])
+  })
+
+  // Unlike `w`, `e` has no end-of-line special case: from a line's last word
+  // it goes on to the next line's first, and the two lines join.
+  it('crosses into the next line from the end of the last word', () => {
+    const state = press(buffer(['foo', 'bar baz', 'qux'], 0, 2), 'd', 'e')
+    expect(state.lines).toEqual(['fo baz', 'qux'])
+    expect(state.cursor).toEqual({ row: 0, col: 2 })
+  })
+
+  // Vim's rule for a charwise delete over several lines: one that starts in the
+  // indent and leaves only blanks after it becomes linewise.
+  it('deletes whole lines when it starts in the indent and ends a line', () => {
+    const state = press(buffer(['', 'bar', '  baz']), 'd', 'e')
+    expect(state.lines).toEqual(['  baz'])
+    expect(state.cursor).toEqual({ row: 0, col: 2 })
+  })
+
+  it('takes what is left at the end of the buffer', () => {
+    expect(press(buffer(['foo  '], 0, 3), 'd', 'e').lines).toEqual(['foo'])
+    expect(press(buffer(['foo'], 0, 2), 'd', 'e').lines).toEqual(['fo'])
+  })
+
+  it('does nothing on an empty last line', () => {
+    const state = press(buffer(['foo', ''], 1), 'd', 'e')
+    expect(state.lines).toEqual(['foo', ''])
+    expect(state.dirty).toBe(false)
+  })
+})
+
 describe('dw', () => {
   it('deletes the word and the blanks after it', () => {
     const state = press(buffer(['foo bar baz']), 'd', 'w')
