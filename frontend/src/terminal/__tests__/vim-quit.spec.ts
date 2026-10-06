@@ -23,6 +23,7 @@ function buffer(overrides: Partial<VimBufferState> = {}): VimBufferState {
     mode: 'normal',
     dirty: false,
     statusMessage: null,
+    pending: null,
     ...overrides,
   }
 }
@@ -130,8 +131,12 @@ describe('typing in the pane', () => {
     expect(state.mode).toBe('normal')
   })
 
-  it('lets Escape through in normal mode, so it reaches the close path', () => {
-    expect(handleVimKey(buffer(), new KeyboardEvent('keydown', { key: 'Escape' }))).toBe(false)
+  // It used to fall through to the overlay's close path, which submits `:q!`:
+  // the reflexive Escape threw away the edits and unlocked the achievement.
+  it('swallows Escape in normal mode, as real vim does, so it never quits', () => {
+    const state = buffer({ dirty: true, cursor: { row: 0, col: 2 } })
+    expect(handleVimKey(state, new KeyboardEvent('keydown', { key: 'Escape' }))).toBe(true)
+    expect(state).toEqual(buffer({ dirty: true, cursor: { row: 0, col: 2 } }))
   })
 
   it('lets `:` through, so the command line is typed in the shell input', () => {

@@ -512,7 +512,12 @@ editor, because a fake one that ignores `hjkl` is a worse joke than no joke.
   fake-filesystem resolver knows (the same resolver `cat` uses, so the two can't disagree).
   A missing file errors in the normal buffer and the pane never opens.
 - Normal mode: `hjkl` and arrow keys move within bounds, `0`/`$` jump to line start/end,
-  `x` deletes under the cursor, `i`/`I`/`a`/`A`/`o`/`O` enter insert mode.
+  `x` deletes under the cursor, `i`/`I`/`a`/`A`/`o`/`O` enter insert mode. Escape in normal mode
+  does nothing.
+- The `d` operator takes `d` (the line), `j`/`k` or the arrows (this line and the next or
+  previous), `$` (to the end of the line) and `w` (to the next word, which under an operator
+  stops at the end of the line). A lone `d` waits, shown at the status line's right as vim's
+  `showcmd` does; any other key, or a motion that can't move, cancels it.
 - Insert mode: real text entry, `Enter` splits the line, `Backspace` merges into the previous
   line at the right join column, `Esc` returns to normal mode and steps the cursor back one
   column. The status line gains `[+]` once the buffer is dirty.
