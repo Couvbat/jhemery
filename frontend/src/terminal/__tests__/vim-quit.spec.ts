@@ -139,10 +139,16 @@ describe('typing in the pane', () => {
     expect(state).toEqual(buffer({ dirty: true, cursor: { row: 0, col: 2 } }))
   })
 
-  it('lets `:` through, so the command line is typed in the shell input', () => {
-    expect(handleVimKey(buffer({ mode: 'insert' }), new KeyboardEvent('keydown', { key: ':' }))).toBe(
-      false,
-    )
+  it('lets `:` through in normal mode, so the command line is typed in the shell input', () => {
+    expect(handleVimKey(buffer(), new KeyboardEvent('keydown', { key: ':' }))).toBe(false)
+  })
+
+  // It used to be let through in insert mode too, so `a:b` put `a` in the file
+  // and `:b` on the command line.
+  it('types `:` into the file in insert mode, like any other character', () => {
+    const state = buffer({ mode: 'insert', cursor: { row: 0, col: 5 } })
+    expect(handleVimKey(state, new KeyboardEvent('keydown', { key: ':' }))).toBe(true)
+    expect(state.lines).toEqual(['hello:'])
   })
 })
 

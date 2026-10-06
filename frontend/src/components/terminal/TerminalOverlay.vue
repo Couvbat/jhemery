@@ -223,14 +223,11 @@ function onKeydown(event: KeyboardEvent) {
     return
   }
 
-  if (
-    vimBuffer.value &&
-    input.value === '' &&
-    !event.ctrlKey &&
-    !event.altKey &&
-    !event.metaKey &&
-    event.key !== ':'
-  ) {
+  // `:` goes to the editor too, which hands it back in normal mode to be typed
+  // here as the command line, and keeps it in insert mode as a character. This
+  // used to skip the editor for `:` in every mode, so a colon could never be
+  // typed into a file.
+  if (vimBuffer.value && input.value === '' && !event.ctrlKey && !event.altKey && !event.metaKey) {
     if (handleVimKeydown(event)) {
       // Escape must not also reach onPanelKeydown's Escape handling — a key the
       // vim editor consumed is fully consumed, not just its default action.

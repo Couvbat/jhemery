@@ -123,6 +123,26 @@ test.describe('terminal', () => {
     })
   })
 
+  // Which keys reach the editor is decided in the overlay, where jsdom has no harness to
+  // mount it: the overlay kept `:` from the editor in every mode, so the editor's own
+  // tests passed while a colon could never be typed into a file.
+  test.describe('vim', () => {
+    test('a colon is text in insert mode and the command line in normal mode', async ({ terminal }) => {
+      await terminal.open()
+      await terminal.run('vim')
+      await terminal.input.press('i')
+      await terminal.input.pressSequentially('a:b')
+      await terminal.input.press('Escape')
+      await expect(terminal.panel).toContainText('a:b')
+      await expect(terminal.input).toHaveValue('')
+
+      await terminal.input.pressSequentially(':q!')
+      await expect(terminal.input).toHaveValue(':q!')
+      await terminal.input.press('Enter')
+      await terminal.expectOutput('you are free')
+    })
+  })
+
   test.describe('the shell loop', () => {
     test('help lists commands and an unknown one is reported, not swallowed', async ({
       terminal,
