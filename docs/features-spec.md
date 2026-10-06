@@ -655,6 +655,10 @@ editor, because a fake one that ignores `hjkl` is a worse joke than no joke.
   stops at the end of the line) and `e` (through the end of the word, which can join the next
   line, as in vim). A lone `d` waits, shown at the status line's right as vim's `showcmd` does;
   any other key, or a motion that can't move, cancels it.
+- Counts work as in vim: on the motions, on `x`, and on either side of `d`, where they multiply
+  (`2d3w` deletes six words). `0` is a digit only once a count has started. A count that runs past
+  the buffer stops at its edge, except that `Ndd`/`N$` from the last line do nothing, as vim's
+  `cursor_down()` refuses there. The insert commands ignore theirs.
 - Insert mode: real text entry, `Enter` splits the line, `Backspace` merges into the previous
   line at the right join column, `Esc` returns to normal mode and steps the cursor back one
   column. The status line gains `[+]` once the buffer is dirty.

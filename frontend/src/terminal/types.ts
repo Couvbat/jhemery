@@ -154,9 +154,10 @@ export interface VimBufferState {
   /** A refused `:q`/`:wq` shows its error here — VimPane is the only visible
    *  surface while it's open, so the terminal's own scrollback won't do. */
   statusMessage: string | null
-  /** An operator typed in normal mode and waiting for the key that completes
-   *  it. Only `d` exists so far; `applyDelete` in vimEditor.ts has its motions. */
-  pending: 'd' | null
+  /** What has been typed in normal mode towards a command that isn't complete
+   *  yet, '' when nothing has: a count, the `d` operator, and a count for its
+   *  motion (`2d3`). Kept as typed because that is what vim's 'showcmd' shows. */
+  pending: string
 }
 
 export interface VimFile {

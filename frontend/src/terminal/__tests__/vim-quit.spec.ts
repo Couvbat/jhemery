@@ -23,7 +23,7 @@ function buffer(overrides: Partial<VimBufferState> = {}): VimBufferState {
     mode: 'normal',
     dirty: false,
     statusMessage: null,
-    pending: null,
+    pending: '',
     ...overrides,
   }
 }
