@@ -1,4 +1,3 @@
-import { execSync } from 'node:child_process'
 import { fileURLToPath, URL } from 'node:url'
 
 import { defineConfig } from 'vite'
@@ -6,20 +5,11 @@ import vue from '@vitejs/plugin-vue'
 import vueDevTools from 'vite-plugin-vue-devtools'
 import tailwindcss from '@tailwindcss/vite'
 import { VitePWA } from 'vite-plugin-pwa'
+import { commitSha } from './vite-plugins/git'
+import { notesPlugin } from './vite-plugins/notes'
 import { resumePlugin } from './vite-plugins/resume'
 import { thirdPartyPlugin } from './vite-plugins/third-party'
 import { profile } from './src/content/profile'
-
-/** Short commit SHA for the footer. Falls back to `dev` outside a git checkout. */
-function commitSha(): string {
-  try {
-    return execSync('git rev-parse --short HEAD', { stdio: ['ignore', 'pipe', 'ignore'] })
-      .toString()
-      .trim()
-  } catch {
-    return 'dev'
-  }
-}
 
 // https://vite.dev/config/
 export default defineConfig({
@@ -28,6 +18,7 @@ export default defineConfig({
     vueDevTools(),
     tailwindcss(),
     resumePlugin(),
+    notesPlugin(),
     thirdPartyPlugin(),
     VitePWA({
       registerType: 'autoUpdate',
@@ -87,6 +78,12 @@ export default defineConfig({
           // `/assets/` header in public/.htaccess, not on the service worker.
           '**/ffmpeg-core-*.js',
           '**/ffmpeg.worker-*.js',
+          // The printable résumés and the design notes: documents a few visitors read,
+          // matched by the html and css globs above. Precaching them would charge every
+          // install for pages almost nobody opens.
+          'resume*.html',
+          'notes/**',
+          'notes.css',
         ],
         navigateFallback: '/index.html',
         navigateFallbackDenylist: [
@@ -99,6 +96,11 @@ export default defineConfig({
           /^\/resume(\.fr)?\.html$/,
           // Read by the backend's MCP endpoint (vite-plugins/resume.ts), not by the app.
           /^\/content\.json$/,
+          // The curl pages (`curl jhemery.xyz/neofetch`), served to terminals rather than
+          // navigated to, but a browser opening one should get the file.
+          /^\/run\//,
+          // The manual page, in roff (vite-plugins/resume.ts).
+          /^\/jules(\.fr)?\.1$/,
           /^\/llms\.txt$/,
           /^\/robots\.txt$/,
           /^\/sitemap\.xml$/,
@@ -107,6 +109,9 @@ export default defineConfig({
           // They have to be reachable in the *deployed* copy, not just the
           // repository, because that is what the licences require.
           /^\/THIRD-PARTY\.txt$/,
+          // The design notes (`vite-plugins/notes.ts`): static documents, like the résumés.
+          /^\/notes(\/.*)?$/,
+          /^\/notes\.css$/,
         ],
         cleanupOutdatedCaches: true,
         clientsClaim: true,

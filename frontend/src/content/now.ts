@@ -1,3 +1,4 @@
+import { daysSince } from './dates'
 import type { Localised, NowCategory, NowEntry } from './types'
 
 /**
@@ -56,12 +57,6 @@ export const nowCategories: Record<NowCategory, Localised> = {
   playing: { en: 'playing', fr: 'je joue à' },
   learning: { en: 'learning', fr: 'j’apprends' },
   listening: { en: 'listening', fr: 'j’écoute' },
-}
-
-/** Whole days between `updated` (a `YYYY-MM-DD` date, read as UTC) and `at`. */
-export function daysSince(updated: string, at: Date): number {
-  const then = Date.parse(`${updated}T00:00:00Z`)
-  return Math.max(0, Math.floor((at.getTime() - then) / 86_400_000))
 }
 
 /** How old the list is when it is too old to pass as current; `null` while it is fresh. */

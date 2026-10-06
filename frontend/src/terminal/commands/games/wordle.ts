@@ -164,17 +164,23 @@ export function histogramLines(histogram: WordleHistogram, mine: number | null, 
 }
 
 /**
- * Reports a finished board once (`reported` in storage), or reads the day's tallies if
- * it already has been. Never throws: the histogram is a garnish, and the board is the
- * meal.
+ * Reports a finished board once (`reported` in storage), or reads the day's tallies.
+ * The report goes out only from the keystroke that finished the board (`report`): a
+ * board reopened later, perhaps from a `?run=wordle daily` link, only reads, so a
+ * link can never make a POST, which is what keeps `wordle` at `writes: 'none'`. A
+ * board whose report failed at the time stays uncounted, which costs one tally.
+ * Never throws: the histogram is a garnish, and the board is the meal.
  */
-async function everyone(ctx: CommandContext, result: DailyResult): Promise<OutputLine[]> {
+async function everyone(ctx: CommandContext, result: DailyResult, report: boolean): Promise<OutputLine[]> {
   const mine = result.won ? result.guesses.length - 1 : 6
+  // Re-read storage: another tab may have finished and reported this day's board while
+  // this one sat open with its own copy, and a day is counted once.
+  const sending = report && !result.reported && !dailyResult(ctx.locale, result.day)?.reported
   try {
-    const histogram = result.reported
-      ? await api.wordleHistogram(result.day, ctx.locale)
-      : await api.recordWordle(result.day, ctx.locale, result.won ? result.guesses.length : 0)
-    if (!result.reported) recordDaily(ctx.locale, { ...result, reported: true })
+    const histogram = sending
+      ? await api.recordWordle(result.day, ctx.locale, result.won ? result.guesses.length : 0)
+      : await api.wordleHistogram(result.day, ctx.locale)
+    if (sending) recordDaily(ctx.locale, { ...result, reported: true })
     return histogramLines(histogram, mine, ctx.t)
   } catch {
     return []
@@ -287,7 +293,7 @@ function daily(ctx: CommandContext) {
 
     if (state.status !== 'playing') {
       paint(ctx.t(DAILY_AGAIN))
-      ctx.print(await everyone(ctx, saved!))
+      ctx.print(await everyone(ctx, saved!, false))
       return
     }
 
@@ -304,7 +310,8 @@ function daily(ctx: CommandContext) {
             continue
           }
           state = result.state
-          recordDaily(ctx.locale, snapshot(state, day))
+          // Keep a `reported` another tab set: this tab's copy of the board doesn't know it.
+          recordDaily(ctx.locale, { ...snapshot(state, day), reported: dailyResult(ctx.locale, day)?.reported })
           if (state.status === 'won') session.announce('wordle')
           paint(ctx.t(state.status === 'playing' ? HINT : DAILY_DONE))
           continue
@@ -318,7 +325,7 @@ function daily(ctx: CommandContext) {
     } finally {
       keys.release()
     }
-    ctx.print(await everyone(ctx, snapshot(state, day)))
+    ctx.print(await everyone(ctx, snapshot(state, day), true))
   })
 }
 
@@ -336,6 +343,7 @@ export const command: Command = {
   usage: 'wordle [daily|share]',
   description: { en: 'Guess the five-letter word', fr: 'Devinez le mot de cinq lettres' },
   group: 'fun',
+  writes: (args) => (args[0]?.toLowerCase() === 'share' ? 'local' : 'none'),
   linkable: true,
   complete: ({ index }) => (index === 0 ? ['daily', 'share'] : []),
   run: (ctx: CommandContext) => {

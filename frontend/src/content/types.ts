@@ -100,6 +100,81 @@ export interface Availability {
   note: Localised
 }
 
+/** A job. Months are `YYYY-MM`; an `end` left out means it is the current one. */
+export interface Role {
+  /** Localised so an employer can be described rather than named (see `experience.ts`). */
+  employer: Localised
+  title: Localised
+  start: string
+  end?: string
+  summary?: Localised
+}
+
+/** A course. Shown by year; the months are there so the order is exact. */
+export interface Education {
+  school: Localised
+  course: Localised
+  start: string
+  end: string
+  note?: Localised
+}
+
+/**
+ * A place in the repository's docs: a file, and a heading inside it by its GitHub
+ * anchor (`githubSlug` in `./docs`). The spec stays the authority; whatever links to
+ * it carries a pointer, never a copy.
+ */
+export interface DocRef {
+  /** Repo-relative, e.g. `docs/superpowers/specs/2026-09-22-tools-and-views-design.md`. */
+  doc: string
+  anchor?: string
+}
+
+/** One choice the site made, and what it turned down — what `why <topic>` prints. */
+export interface Decision {
+  id: string
+  topic: Localised
+  chose: Localised
+  /** Each `because` is one sentence: the spec has the long version. */
+  rejected: Array<{ what: Localised; because: Localised }>
+  /** The PR that shipped it. */
+  pr?: number
+  /** Always to a heading: the anchor is what keeps the decision tied to its spec. */
+  source: Required<DocRef>
+  /** What it looks like now, when that is worth saying. */
+  hindsight?: Localised
+}
+
+/** A figure on a case study: a fact that doesn't drift, like a standard's limits. */
+export interface WorkNumber {
+  label: Localised
+  /** A figure, or a localised one where it carries a word or a thousands separator. */
+  value: string | Localised
+}
+
+/**
+ * A short study of one of the site's own parts, at `/work/<id>`: what it is, what was
+ * hard, a few numbers, and where its code and its design note are.
+ */
+export interface WorkPart {
+  id: string
+  name: Localised
+  summary: Localised
+  /** A few short paragraphs, the same number in each language. */
+  hard: Localised<string[]>
+  numbers: WorkNumber[]
+  /**
+   * Somewhere to see it: a path `goTo()` accepts (`tools/qr`), or a command line a link
+   * could run (`why mcp-sdk`). A hidden command can't be one.
+   */
+  try?: string
+  /** Repo-relative paths, linked at the build's commit. */
+  code: string[]
+  spec: Required<DocRef>
+  /** `why` topics that belong to this part. */
+  decisions?: string[]
+}
+
 export type NowCategory = 'building' | 'playing' | 'learning' | 'listening'
 
 export interface NowEntry {

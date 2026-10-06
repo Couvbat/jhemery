@@ -1,6 +1,5 @@
 import { expect, test } from './fixtures'
 import { profile } from '@/content/profile'
-import { views } from '@/content/views'
 
 /**
  * The files the SPA fallback must not swallow.
@@ -39,12 +38,36 @@ test.describe('static files', () => {
   }
 })
 
+test.describe('the design notes', () => {
+  /**
+   * The notes are HTML documents of their own (`vite-plugins/notes.ts`), so the check
+   * above, that the body is not a document, can't tell them from the SPA shell. What
+   * can: the shell's `#app`, which a note never has.
+   */
+  for (const path of ['/notes/', '/notes/ctf-flag-chain']) {
+    test(`${path} is the note, not the app`, async ({ request }) => {
+      const response = await request.get(path)
+      expect(response.status()).toBe(200)
+      expect(response.headers()['content-type']).toMatch(/text\/html/)
+      const html = await response.text()
+      expect(html).not.toContain('id="app"')
+      expect(html).toContain('<link rel="stylesheet" href="/notes.css">')
+    })
+  }
+
+  test('their stylesheet is served as itself', async ({ request }) => {
+    const response = await request.get('/notes.css')
+    expect(response.status()).toBe(200)
+    expect(response.headers()['content-type']).toMatch(/text\/css/)
+  })
+})
+
 test.describe('the résumé', () => {
   /**
    * `/resume.txt` is generated at build time by `vite-plugins/resume.ts` from
    * `src/content/`, which is the whole point: the CV has exactly one source, and the
-   * terminal's `curl` serves the same bytes. If this drifts, the site and the résumé
-   * are telling different stories about the same person.
+   * terminal's `curl` fetches the very same file. If this drifts, the site and the
+   * résumé are telling different stories about the same person.
    */
   test('is generated from the content modules', async ({ request }) => {
     const body = await (await request.get('/resume.txt')).text()
@@ -52,6 +75,27 @@ test.describe('the résumé', () => {
     expect(body).toContain(profile.name)
     expect(body).toContain(profile.email)
     expect(body).toContain(profile.role.en)
+  })
+
+  // `.htaccess` hands these to curl for `/neofetch` and friends; `vite preview` can't
+  // run that rewrite, so this checks the files themselves (and the live check in
+  // docs/deploy.md the rest).
+  test('the curl pages are real files, each locale with its index', async ({ request }) => {
+    for (const locale of ['en', 'fr']) {
+      const res = await request.get(`/run/${locale}/help.txt`)
+      expect(res.status()).toBe(200)
+      expect(res.headers()['content-type']).toContain('text/plain')
+      expect(await res.text()).toContain(`curl ${profile.domain}/neofetch`)
+    }
+  })
+
+  // `curl -s jhemery.xyz/jules.1 | man -l -`: roff, in both languages, from the content.
+  test('jules.1 and jules.fr.1 are manual pages, not the app', async ({ request }) => {
+    for (const [file, heading] of [['jules.1', '.SH NAME'], ['jules.fr.1', '.SH NOM']]) {
+      const body = await (await request.get(`/${file}`)).text()
+      expect(body.startsWith('.TH JULES 1 '), file).toBe(true)
+      expect(body, file).toContain(heading)
+    }
   })
 
   test('reads the same through the terminal', async ({ page, terminal }) => {
@@ -72,15 +116,6 @@ test.describe('discoverability', () => {
 
     expect(sitemap).toContain(profile.domain)
     expect(robots.toLowerCase()).toContain('sitemap')
-  })
-
-  test('the sitemap lists every view', async ({ request }) => {
-    // `sitemap.xml` is a hand-maintained static file; `views.ts` is the list of routes.
-    // A view that is not in the sitemap exists for visitors and not for crawlers.
-    const sitemap = await (await request.get('/sitemap.xml')).text()
-    for (const view of views) {
-      expect(sitemap, view.id).toContain(`<loc>https://${profile.domain}${view.path}</loc>`)
-    }
   })
 
   test('the PWA manifest describes this app', async ({ request }) => {

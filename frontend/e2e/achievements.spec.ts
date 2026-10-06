@@ -28,9 +28,10 @@ const byId = (id: string) => achievementList.find((a) => a.id === id)!
 function watchForToast(page: import('@playwright/test').Page) {
   // The rule's advice — prefer a web-first locator assertion — is right everywhere
   // except here: an auto-retrying assertion cannot catch an element that has already
-  // been removed, which is the exact case this helper exists for.
+  // been removed, which is the exact case this helper exists for. Not the page's own
+  // status line (`usePageFocus`), which is always there, and empty.
   // eslint-disable-next-line playwright/no-wait-for-selector
-  const handle = page.waitForSelector('[role="status"]')
+  const handle = page.waitForSelector('[role="status"]:not([data-testid="page-announcement"])')
   return async () => (await (await handle).textContent()) ?? ''
 }
 

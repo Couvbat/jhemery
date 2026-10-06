@@ -1,14 +1,18 @@
+import { liftToFloor, TEXT_FLOOR } from './themeRules'
+
 /**
  * The colour schemes `theme` switches between: the site's own neon, plus the palettes
  * r/unixporn keeps coming back to. A scheme names a dozen colours and every CSS token is
  * derived from them (`themeTokens`), so adding one is a single object here — nothing in
  * the stylesheet or the components needs to know it exists.
  *
- * The values are the upstream palettes, with three deliberate exceptions, each a text
- * colour that would otherwise sit under the contrast floor `themes.spec.ts` enforces:
- * Dracula's comment grey is lifted from #6272a4 (3.0:1) to #8490c0, Tokyo Night's muted
- * text borrows the Moon variant's `fg_dark`, and Catppuccin Latte's yellow — 2.3:1 on its
- * own base — is replaced by a darker amber in the same family.
+ * The values are the upstream palettes. Muted and body text are then lifted by rule
+ * (`readable` below, floors in `themeRules.ts`) until they reach 4.5:1 on every surface
+ * text is drawn on, so a new scheme passes by construction. Three hand adjustments
+ * predate the rule and stay: Dracula's comment grey (#6272a4, 3.0:1) is #8490c0, Tokyo
+ * Night's muted text borrows the Moon variant's `fg_dark`, and Catppuccin Latte's yellow
+ * — 2.3:1 on its own base, and not a tone the rule lifts — is a darker amber in the same
+ * family.
  */
 
 export type ThemeMode = 'dark' | 'light'
@@ -38,11 +42,15 @@ export interface Theme {
   name: string
   mode: ThemeMode
   colours: ThemeColours
+  /** Only on a forged scheme: the colour it was grown from, as `#rrggbb`. */
+  seed?: string
 }
 
 export const DEFAULT_THEME = 'cyberpunk'
+/** The id of the one scheme a visitor can make (`theme forge`, the 🎨 menu's "make one…"). */
+export const CUSTOM_THEME = 'custom'
 
-export const themes: Theme[] = [
+const schemes: Theme[] = [
   {
     id: DEFAULT_THEME,
     name: 'Cyberpunk',
@@ -58,7 +66,7 @@ export const themes: Theme[] = [
       raised: 'oklch(0.18 0.01 145)',
       border: 'oklch(0.28 0.08 145)',
       foreground: 'oklch(0.85 0.18 145)',
-      muted: 'oklch(0.55 0.1 145)',
+      muted: 'oklch(0.58 0.1 145)',
       primary: 'oklch(0.85 0.3 145)',
       accent: 'oklch(0.85 0.2 200)',
       secondary: 'oklch(0.6 0.3 300)',
@@ -262,8 +270,50 @@ export const themes: Theme[] = [
   },
 ]
 
+/**
+ * Muted and body text, lifted to `TEXT_FLOOR` against background, surface and raised.
+ * Done when the table is built rather than in `themeTokens()`, because the swatches, the
+ * scheme menu and `theme`'s listing read `colours.muted` too, and they must show the
+ * colour that is painted. The default passes untouched (`main.css` is its only
+ * definition, and Lighthouse only ever measures it), which a spec holds.
+ *
+ * Solarized sits near 4.5:1 by design, so lifting both of its text colours brings them
+ * close together there. Readability is the floor; the hierarchy between the two is not.
+ */
+function readable(theme: Theme): Theme {
+  const c = theme.colours
+  const on = [c.background, c.surface, c.raised]
+  return {
+    ...theme,
+    colours: {
+      ...c,
+      foreground: liftToFloor(c.foreground, on, TEXT_FLOOR, theme.mode),
+      muted: liftToFloor(c.muted, on, TEXT_FLOOR, theme.mode),
+    },
+  }
+}
+
+export const themes: Theme[] = schemes.map(readable)
+
+/**
+ * The visitor's forged scheme, if they have made one. A slot beside `themes` rather than
+ * an entry in it: `themes` stays the eleven that ship, so the specs hold those to their
+ * floors and never a visitor's forge, while everything that looks a scheme up by id
+ * (`findTheme`) or lists what can be picked (`allThemes`) sees both. `useTheme` fills it.
+ */
+let custom: Theme | null = null
+
+export function setCustomTheme(theme: Theme | null): void {
+  custom = theme
+}
+
+export function allThemes(): Theme[] {
+  return custom ? [...themes, custom] : themes
+}
+
 export function findTheme(id: string): Theme | undefined {
-  return themes.find((theme) => theme.id === id.toLowerCase())
+  const wanted = id.toLowerCase()
+  return allThemes().find((theme) => theme.id === wanted)
 }
 
 /** A scheme's colours in the order its swatch strip shows them: `theme`'s listing and the

@@ -1,6 +1,23 @@
 import { describe, expect, it } from 'vitest'
 import { resolvePath } from '@/composables/useViewSwing'
-import { daysSince, isExternal, now, nowCategories, profile, skillNames, skills, staleDays, STALE_AFTER_DAYS } from '..'
+import {
+  currentRole,
+  daysSince,
+  durationLabel,
+  education,
+  experience,
+  isExternal,
+  monthsBetween,
+  now,
+  nowCategories,
+  periodLabel,
+  profile,
+  skillNames,
+  skills,
+  staleDays,
+  STALE_AFTER_DAYS,
+  yearSpan,
+} from '..'
 
 describe('skills', () => {
   it('names each skill once', () => {
@@ -60,6 +77,90 @@ describe('/now', () => {
       expect(nowCategories[entry.category]).toBeDefined()
       expect(entry.text.en).toBeTruthy()
       expect(entry.text.fr).toBeTruthy()
+    }
+  })
+})
+
+describe('dates', () => {
+  const at = new Date('2026-10-01T12:00:00Z')
+
+  // LinkedIn's rule, so the CV and the profile agree: both ends count.
+  it('counts both the first and the last month of a span', () => {
+    expect(monthsBetween('2023-05', '2023-11', at)).toBe(7)
+    expect(monthsBetween('2023-11', '2023-11', at)).toBe(1)
+    expect(monthsBetween('2023-11', undefined, at)).toBe(36)
+  })
+
+  it('gives a span that has not started yet no length rather than a negative one', () => {
+    expect(monthsBetween('2027-01', undefined, at)).toBe(0)
+  })
+
+  it('says months below a year and whole years from then on', () => {
+    // December 2025 to October 2026 is eleven months; a month earlier is twelve.
+    expect(durationLabel('2025-12', undefined, at)).toEqual({ en: '11 months', fr: '11 mois' })
+    expect(durationLabel('2025-11', undefined, at)).toEqual({ en: '1 year', fr: '1 an' })
+    expect(durationLabel('2024-10', '2026-10', at)).toEqual({ en: '2 years', fr: '2 ans' })
+    expect(durationLabel('2026-10', undefined, at)).toEqual({ en: '1 month', fr: '1 mois' })
+  })
+
+  it('names months the same way on every engine', () => {
+    expect(periodLabel('2023-05', '2023-11')).toEqual({ en: 'May 2023 – Nov 2023', fr: 'mai 2023 – nov. 2023' })
+    expect(periodLabel('2023-11', undefined)).toEqual({ en: 'Nov 2023 – present', fr: 'nov. 2023 – aujourd’hui' })
+  })
+
+  it('collapses a course that starts and ends in one year', () => {
+    expect(yearSpan('2021-10', '2022-06')).toBe('2021 – 2022')
+    expect(yearSpan('2020-01', '2020-06')).toBe('2020')
+  })
+})
+
+describe('experience and education', () => {
+  const MONTH = /^\d{4}-(0[1-9]|1[0-2])$/
+
+  it('has exactly one current role, and the profile names it', () => {
+    expect(experience.filter((role) => !role.end)).toHaveLength(1)
+    expect(currentRole?.employer).toEqual({ en: profile.employer, fr: profile.employer })
+    expect(currentRole?.title).toEqual(profile.role)
+  })
+
+  it.each([...experience.map((r) => [r.employer.en, r.start, r.end] as const), ...education.map((c) => [c.school.en, c.start, c.end] as const)])(
+    '%s has real months that run forwards',
+    (_name, start, end) => {
+      expect(start).toMatch(MONTH)
+      if (end) {
+        expect(end).toMatch(MONTH)
+        expect(end >= start).toBe(true)
+      }
+    },
+  )
+
+  it('lists each one newest first', () => {
+    for (const list of [experience, education]) {
+      const starts = list.map((item) => item.start)
+      expect(starts).toEqual([...starts].sort().reverse())
+    }
+  })
+
+  // The site names nothing narrower than France (see experience.ts). A list of places
+  // to avoid would itself name them, so this holds the one thing a pattern can: no
+  // registered company form, whose registry entry carries an address.
+  it('names no registered company', () => {
+    const text = JSON.stringify([experience, education])
+    expect(text).not.toMatch(/\b(SARL|SAS|SASU|EURL|SA|SNC)\b/)
+  })
+
+  it('says everything in both languages', () => {
+    for (const role of experience) {
+      for (const value of [role.employer, role.title, role.summary].filter(Boolean)) {
+        expect(value!.en, role.employer.en).toBeTruthy()
+        expect(value!.fr, role.employer.en).toBeTruthy()
+      }
+    }
+    for (const course of education) {
+      for (const value of [course.school, course.course, course.note].filter(Boolean)) {
+        expect(value!.en, course.school.en).toBeTruthy()
+        expect(value!.fr, course.school.en).toBeTruthy()
+      }
     }
   })
 })

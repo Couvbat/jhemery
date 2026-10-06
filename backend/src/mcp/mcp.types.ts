@@ -1,13 +1,14 @@
 /**
- * `content.json` as the frontend's résumé plugin emits it (version 1). Mirrored rather
- * than imported: the two apps deploy separately, and the backend checks `version`
- * before trusting any field.
+ * `content.json` as the frontend's résumé plugin emits it (versions 1 and 2). Mirrored
+ * rather than imported: the two apps deploy separately, and the backend checks
+ * `version` before trusting any field. Version 2 added `experience` and `education`;
+ * both are absent from a version 1 file, so every reader treats them as optional.
  */
 export type Lang = 'en' | 'fr';
 export type Localised<T = string> = Record<Lang, T>;
 
 export interface SiteContent {
-  version: 1;
+  version: 1 | 2;
   generatedAt: string;
   site: string;
   profile: {
@@ -21,6 +22,23 @@ export interface SiteContent {
     bio: Localised<string[]>;
     availability: { open: boolean; note: Localised };
   };
+  experience?: Array<{
+    employer: Localised;
+    title: Localised;
+    start: string;
+    end?: string;
+    period: Localised;
+    duration: Localised;
+    summary?: Localised;
+  }>;
+  education?: Array<{
+    school: Localised;
+    course: Localised;
+    start: string;
+    end: string;
+    years: string;
+    note?: Localised;
+  }>;
   skills: Array<{
     name: string;
     usedIn: Array<{ what: Localised; url: string }>;

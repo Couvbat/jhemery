@@ -5,7 +5,7 @@ import { findSection, findView, sections, viewFor, viewIndex, views } from '@/co
 import { findTool, type ToolMeta } from '@/tools/registry'
 import { normaliseCode } from '@/rooms/sync'
 import { currentSection, scrollToSection } from './useActiveSection'
-import { prefersReducedMotion } from './useCrt'
+import { decorativeMotion } from './useMotion'
 
 /**
  * The prism swing between views — superpowers/specs/2026-09-22-tools-and-views-design.md §3.
@@ -41,6 +41,13 @@ const swinging = ref(false)
  *  showing what the visitor was looking at while the window scrolls to the top of
  *  the new one. */
 const leaveScroll = ref(0)
+/**
+ * Bumped each time a change of face has finished: when a swing settles, or at once when
+ * the pages simply swap. `usePageFocus` moves focus and announces the page on it. The
+ * first navigation (there was no page before) and a change within one face (a hash on
+ * the home page, a tool inside `/tools`) never bump it.
+ */
+const settled = ref(0)
 
 /** Only the three members this module touches, so a test can hand it a stub. */
 export type SwingRouter = Pick<Router, 'afterEach' | 'currentRoute' | 'push'>
@@ -59,14 +66,16 @@ function cancelFrame() {
   frame = null
 }
 
-/** Turns the prism one face in `dir`. Under reduced motion nothing moves: `swing`
- *  stays at rest, `swinging` never becomes true, and the pages simply swap. */
+/** Turns the prism one face in `dir`. Below `full` motion (`calm` skips it, reduced
+ *  motion forces `paused`) nothing moves: `swing` stays at rest, `swinging` never
+ *  becomes true, and the pages simply swap. */
 export function startSwing(dir: 1 | -1): void {
   direction.value = dir
   cancelFrame()
-  if (prefersReducedMotion()) {
+  if (decorativeMotion() !== 'full') {
     swing.value = 1
     rest()
+    settled.value++
     return
   }
 
@@ -99,6 +108,7 @@ export function startSwing(dir: 1 | -1): void {
  *  instead of the window. */
 function settle() {
   rest()
+  settled.value++
   const hash = router?.currentRoute.value.hash
   if (!hash) return
   void nextTick().then(() => scrollToSection(hash.slice(1)))
@@ -147,9 +157,14 @@ export function installViewSwing(instance: SwingRouter): void {
     if (!from.matched.length) return
 
     // Same face: a hash change on the home page, or a tool opening on the tools page.
+    // Off the prism (`/work/a` to `/work/b`, `/now` to the 404) nothing turns either, but the
+    // page is a new one, so it settles at once to be focused and announced.
     const a = viewIndex(from.path)
     const b = viewIndex(to.path)
-    if (a === b) return
+    if (a === b) {
+      if (!viewFor(to.path) && to.path !== from.path) settled.value++
+      return
+    }
 
     startSwing(b > a ? 1 : -1)
   })
@@ -205,6 +220,11 @@ function push(to: RouteLocationRaw): boolean {
   return true
 }
 
+/** Routes to a path of the app as it is (`/now`, `/work/vim`), for a link to one. */
+export function routeTo(path: string): boolean {
+  return push(path)
+}
+
 /**
  * Goes wherever `target` names. A section on the page currently showing scrolls; a
  * section on another view routes home with a hash, and `settle()` scrolls to it once
@@ -235,5 +255,6 @@ export function useViewSwing() {
     swingDirection: computed(() => direction.value),
     swinging: computed(() => swinging.value),
     leaveScroll: computed(() => leaveScroll.value),
+    settled: computed(() => settled.value),
   }
 }

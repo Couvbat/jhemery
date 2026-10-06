@@ -13,6 +13,26 @@
   RewriteCond %{REQUEST_URI} ^/?$
   RewriteRule ^ /resume.txt [L]
 
+  # `curl jhemery.xyz/neofetch`: a command's output as a page, generated into
+  # run/<locale>/<name>.txt by src/terminal/__tests__/curl-pages.spec.ts. Only the
+  # command-line clients, not the crawler list above: a crawler asking for /about
+  # wants the page a browser gets. French when the client asks for it first, and a
+  # name with no page falls through to the SPA like any other path.
+  RewriteCond %{HTTP_USER_AGENT} (curl|wget|httpie) [NC]
+  RewriteCond %{HTTP:Accept-Language} ^fr [NC]
+  RewriteCond %{DOCUMENT_ROOT}/run/fr/$1.txt -f
+  RewriteRule ^([a-z0-9-]+)/?$ /run/fr/$1.txt [L]
+  RewriteCond %{HTTP_USER_AGENT} (curl|wget|httpie) [NC]
+  RewriteCond %{DOCUMENT_ROOT}/run/en/$1.txt -f
+  RewriteRule ^([a-z0-9-]+)/?$ /run/en/$1.txt [L]
+
+  # The design notes (vite-plugins/notes.ts) are real files: /notes/<slug> is
+  # notes/<slug>.html and /notes/ is notes/index.html. An unknown slug has no file,
+  # so it falls through to the SPA's own 404 page below.
+  RewriteRule ^notes/?$ /notes/index.html [L]
+  RewriteCond %{DOCUMENT_ROOT}/notes/$1.html -f
+  RewriteRule ^notes/([a-z0-9-]+)/?$ /notes/$1.html [L]
+
   # SPA fallback: hand every non-file request to index.html so Vue Router owns
   # routing. Without this, a hard refresh on any path other than / 404s.
   RewriteCond %{REQUEST_FILENAME} !-f
@@ -23,6 +43,9 @@
 <IfModule mod_mime.c>
   AddDefaultCharset UTF-8
   AddCharset UTF-8 .txt
+  # jules.1 and jules.fr.1, the manual page `curl -s jhemery.xyz/jules.1 | man -l -` reads.
+  AddType text/plain .1
+  AddCharset UTF-8 .1
   AddType application/manifest+json .webmanifest
   # Apache's own mime.types has known .wasm for years, but a wrong or missing
   # type here downgrades WebAssembly.instantiateStreaming to a full buffer
@@ -101,7 +124,8 @@
   #                'self' covers same-origin builds and the precached assets.
   #   frame-src    w.soundcloud.com is the player embed in MusicSection.vue and
   #                the radio rooms; www.youtube-nocookie.com is the watch-party
-  #                player. Both are driven over postMessage (src/rooms/*), so
+  #                player and the small one for a YouTube item in a radio
+  #                queue. Both are driven over postMessage (src/rooms/*), so
   #                neither needs a script-src entry — no third-party script runs
   #                on this origin for them.
   #   object-src / base-uri / form-action are locked down because nothing here
@@ -124,9 +148,29 @@
     Header set Cache-Control "public, max-age=0, must-revalidate"
   </FilesMatch>
 
-  <FilesMatch "^(index\.html|resume\.txt|resume(\.fr)?\.html|resume\.css|content\.json)$">
+  <FilesMatch "^(index\.html|resume\.txt|resume(\.fr)?\.html|resume\.css|content\.json|notes\.css|jules(\.fr)?\.1)$">
     Header set Cache-Control "no-cache"
   </FilesMatch>
+
+  # `/` is the résumé to curl and the app to a browser, and any path with a curl page
+  # is that page to curl: the same URL, a different body by User-Agent, which a cache
+  # has to be told. Cloudflare doesn't cache HTML by default; this keeps any cache honest.
+  <FilesMatch "^(index\.html|resume\.txt)$">
+    Header merge Vary "User-Agent"
+  </FilesMatch>
+
+  # The curl pages differ by client and by language too.
+  <IfModule mod_setenvif.c>
+    SetEnvIf Request_URI "^/run/" CURL_PAGE=1
+    Header set Cache-Control "no-cache" env=CURL_PAGE
+    Header merge Vary "User-Agent, Accept-Language" env=CURL_PAGE
+  </IfModule>
+
+  # The notes' file names vary, so they are matched by path rather than by name.
+  <IfModule mod_setenvif.c>
+    SetEnvIf Request_URI "^/notes/" DESIGN_NOTE=1
+    Header set Cache-Control "no-cache" env=DESIGN_NOTE
+  </IfModule>
 
   # Unhashed root assets: cached, but not so long that fixing one is impossible.
   <FilesMatch "^(favicon\.ico|icon\.svg|apple-touch-icon\.png|pwa-.*\.png|og-image\.(png|svg))$">

@@ -1,28 +1,100 @@
-import type { Command } from './types'
+import type { Command, Writes } from './types'
 import { aliases } from './aliases'
-import { commands } from './commands'
+import { collectCommands } from './commands'
+import { closest } from './fuzzy'
 
-const byName = new Map<string, Command>()
-for (const command of commands) {
-  byName.set(command.name, command)
-  for (const alias of command.aliases ?? []) byName.set(alias, command)
+/**
+ * Built on first use, not at import. This module, `commands/index.ts` and
+ * `commands/core.ts` import each other, so whichever is entered first, no module in
+ * that cycle may call a registry function at module scope. `registry-load.spec.ts`
+ * enters through every one of them; `import-cycles.spec.ts` keeps the cycle from
+ * reaching outside `terminal/commands/`.
+ */
+let table: { list: Command[]; byName: Map<string, Command> } | undefined
+
+function registry(): { list: Command[]; byName: Map<string, Command> } {
+  if (!table) {
+    const list = collectCommands()
+    const byName = new Map<string, Command>()
+    for (const command of list) {
+      byName.set(command.name, command)
+      for (const alias of command.aliases ?? []) byName.set(alias, command)
+    }
+    table = { list, byName }
+  }
+  return table
 }
 
 export function allCommands(): Command[] {
-  return commands
+  return registry().list
 }
 
 /** Commands that appear in `help` and tab-completion. */
 export function visibleCommands(): Command[] {
-  return commands.filter((c) => !c.hidden)
+  return registry().list.filter((c) => !c.hidden)
 }
 
 export function paletteCommands(): Command[] {
-  return commands.filter((c) => c.palette)
+  return registry().list.filter((c) => c.palette)
 }
 
 export function resolve(name: string): Command | undefined {
-  return byName.get(name.toLowerCase())
+  return registry().byName.get(name.toLowerCase())
+}
+
+/** What `command` changes when run with `args`. */
+export function writesOf(command: Command, args: readonly string[] = []): Writes {
+  return typeof command.writes === 'function' ? command.writes(args) : command.writes
+}
+
+/**
+ * Whether every argument is one the command itself offers for Tab at that position.
+ * A link's author chooses its arguments, and anything after the name is echoed at the
+ * prompt as if the visitor had typed it, so free text must not pass: otherwise
+ * `?run=whoami your session expired, sign in at …` would print that line on the page.
+ * A command that takes arguments from links declares them in `complete()`.
+ */
+/** Whether every argument is one the command offers for Tab: the test for free text a link (or a hint) needs. */
+export function argsOffered(command: Command, args: readonly string[]): boolean {
+  return args.every((arg, index) => {
+    const offered = command.complete?.({ args: [...args], index, word: arg }) ?? []
+    return offered.some((candidate) => candidate.toLowerCase() === arg.toLowerCase())
+  })
+}
+
+/**
+ * Whether `command`, with these arguments, may run without the visitor typing it: it
+ * opted in, it isn't hidden, it writes nothing, and its arguments are ones it offers.
+ * `runLink` is the caller today. The roadmap's `tour`, pipe stages and `strace` are meant
+ * to ask the same question, so none of them keeps its own list of writers. `ctx.run`
+ * does not: its callers pass fixed command lines.
+ */
+export function isLinkable(command: Command, args: readonly string[] = []): boolean {
+  if (command.hidden) return false
+  const opted = typeof command.linkable === 'function' ? command.linkable(args) : command.linkable === true
+  return opted && writesOf(command, args) === 'none' && argsOffered(command, args)
+}
+
+/**
+ * Whether `word` names a command that writes to the server: the line it is on is never
+ * history-expanded (`sign Great site!!` posts what was typed). The same `writes` field
+ * links and pipes read, so there is no second list.
+ */
+export function isServerBound(word: string): boolean {
+  const command = resolve(word)
+  return command !== undefined && writesOf(command, []) === 'server'
+}
+
+/**
+ * Whether `name` is a command, or the first word of a two-word one (`git` of `git log`),
+ * which an alias of that name would hide just the same.
+ */
+export function isCommandWord(name: string): boolean {
+  const word = name.toLowerCase()
+  if (resolve(word)) return true
+  return allCommands().some((command) =>
+    [command.name, ...(command.aliases ?? [])].some((n) => n.startsWith(`${word} `)),
+  )
 }
 
 /**
@@ -32,7 +104,16 @@ export function resolve(name: string): Command | undefined {
  * have named `ls`. Two-word names (`git log`) resolve as they do when typed.
  */
 export function resolveLink(input: string): { command: Command; args: string[] } | undefined {
-  const [name = '', ...args] = input.trim().split(/\s+/)
+  return resolveStage(input.trim().split(/\s+/))
+}
+
+/**
+ * The command a stage's words name, and its arguments: the first word, or the first two
+ * for a two-word name (`git log`). Never through an alias. One rule for the shell, for
+ * links and for Tab, so the three can't disagree about what a stage will run.
+ */
+export function resolveStage(argv: readonly string[]): { command: Command; args: string[] } | undefined {
+  const [name = '', ...args] = argv
   const direct = resolve(name)
   if (direct) return { command: direct, args }
   const twoWord = resolve(`${name} ${args[0] ?? ''}`.trim())
@@ -44,9 +125,8 @@ export function resolveLink(input: string): { command: Command; args: string[] }
  * with no argument — `try: cd` would only teach someone an error message.
  */
 export function suggestionPool(): string[] {
-  return commands
-    .filter((c) => !c.hidden && c.palette && !c.usage?.includes('<'))
-    .map((c) => c.name)
+  const { list } = registry()
+  return list.filter((c) => !c.hidden && c.palette && !c.usage?.includes('<')).map((c) => c.name)
 }
 
 /** Every name and alias that can be tab-completed. */
@@ -91,50 +171,7 @@ export function commonPrefix(candidates: string[]): string {
   return prefix
 }
 
-/**
- * How far a miss may be before it stops being a typo. A flat two let `where` — two
- * substitutions from `theme` — read as a misspelt command, which buried the `ask` hint
- * for anyone typing `where does he work`: in a word that short, two edits make a
- * different word. Longer names keep the slack.
- */
-function allowedEdits(needle: string): number {
-  return needle.length >= 6 ? 2 : 1
-}
-
 /** Edit-distance suggestion for "command not found — did you mean …?". */
 export function suggest(name: string): string | undefined {
-  const needle = name.toLowerCase()
-  let best: { name: string; distance: number } | undefined
-
-  for (const candidate of completionNames()) {
-    const distance = editDistance(needle, candidate)
-    if (distance <= allowedEdits(needle) && (!best || distance < best.distance)) {
-      best = { name: candidate, distance }
-    }
-  }
-  return best?.name
-}
-
-/** Levenshtein plus adjacent swaps at a cost of one (optimal string alignment):
- *  `hlep` is one slip of the fingers, and a one-edit budget has to see it as one. */
-function editDistance(a: string, b: string): number {
-  if (a === b) return 0
-  if (Math.abs(a.length - b.length) > 2) return 99
-
-  let beforePrevious: number[] = []
-  let previous = Array.from({ length: b.length + 1 }, (_, i) => i)
-
-  for (let i = 1; i <= a.length; i++) {
-    const current = [i]
-    for (let j = 1; j <= b.length; j++) {
-      const cost = a[i - 1] === b[j - 1] ? 0 : 1
-      current[j] = Math.min(current[j - 1]! + 1, previous[j]! + 1, previous[j - 1]! + cost)
-      if (i > 1 && j > 1 && a[i - 1] === b[j - 2] && a[i - 2] === b[j - 1]) {
-        current[j] = Math.min(current[j]!, beforePrevious[j - 2]! + 1)
-      }
-    }
-    beforePrevious = previous
-    previous = current
-  }
-  return previous[b.length]!
+  return closest(name, completionNames())
 }

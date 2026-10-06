@@ -6,6 +6,8 @@ on:
       - master
     paths:
       - 'frontend/**'
+      # The design notes are built from the specs, so an edit to one must republish.
+      - 'docs/superpowers/specs/**'
       - '.github/workflows/frontend-*.yml'
   workflow_dispatch:
   workflow_call:

@@ -9,6 +9,12 @@ import { SiteContent } from './mcp.types';
 
 /** The content changes on a frontend deploy, not by the minute. */
 export const CONTENT_TTL_MS = 10 * 60 * 1000;
+
+/**
+ * Every `content.json` shape this code was written for. Accepting the old one beside
+ * the new means the two apps can deploy in either order.
+ */
+export const CONTENT_VERSIONS: readonly number[] = [1, 2];
 const REQUEST_TIMEOUT_MS = 5_000;
 
 /**
@@ -49,7 +55,9 @@ export class McpContentService {
       if (!res.ok) throw new Error(`content.json answered ${res.status}`);
       const data = (await res.json()) as Partial<SiteContent> | null;
       // A shape this code was not written for is refused, not guessed at.
-      if (data?.version !== 1) throw new Error('unknown content.json version');
+      if (!CONTENT_VERSIONS.includes(data?.version as number)) {
+        throw new Error('unknown content.json version');
+      }
       this.cache = {
         data: data as SiteContent,
         expiresAt: Date.now() + CONTENT_TTL_MS,

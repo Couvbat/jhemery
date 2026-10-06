@@ -32,7 +32,7 @@ export const tools: ToolMeta[] = [
       en: 'PNG, JPEG or WebP — resize, recompress, and drop the metadata',
       fr: 'PNG, JPEG ou WebP — redimensionner, recompresser, effacer les métadonnées',
     },
-    keywords: ['png', 'jpeg', 'jpg', 'webp', 'resize', 'exif', 'compress'],
+    keywords: ['png', 'jpeg', 'jpg', 'webp', 'resize', 'exif', 'gps', 'metadata', 'compress'],
     tier: 'client',
     load: () => import('./image/ImageTool.vue'),
   },
@@ -167,6 +167,17 @@ export const tools: ToolMeta[] = [
     keywords: ['diff', 'compare', 'unified', 'patch', 'changes'],
     tier: 'client',
     load: () => import('./diff/DiffTool.vue'),
+  },
+  {
+    id: 'acid',
+    name: { en: 'Acid sequencer', fr: 'Séquenceur acid' },
+    description: {
+      en: 'A 16-step TB-303-style bassline in plain Web Audio, saved in its own link',
+      fr: 'Une ligne de basse façon TB-303 en 16 pas, en Web Audio pur, enregistrée dans son propre lien',
+    },
+    keywords: ['303', 'tb-303', 'sequencer', 'synth', 'bassline', 'web audio', 'music', 'phrygian'],
+    tier: 'client',
+    load: () => import('./acid/AcidTool.vue'),
   },
   {
     id: 'ffmpeg',

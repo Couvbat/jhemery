@@ -1,5 +1,6 @@
 import { ref } from 'vue'
 import { sectionIds } from '@/content'
+import { decorativeMotion } from './useMotion'
 
 /** Tracked by the navbar's scroll listener; read by the terminal's `pwd`. */
 export const activeSection = ref<string>('about')
@@ -7,7 +8,9 @@ export const activeSection = ref<string>('about')
 export function scrollToSection(id: string): boolean {
   const el = document.getElementById(id)
   if (!el) return false
-  el.scrollIntoView({ behavior: 'smooth' })
+  // A smooth scroll is the page moving under the reader; with motion paused (reduced
+  // motion included) it jumps, as the browser would have with no script at all.
+  el.scrollIntoView({ behavior: decorativeMotion() === 'paused' ? 'auto' : 'smooth' })
   activeSection.value = id
   return true
 }

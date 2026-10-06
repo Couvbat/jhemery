@@ -58,13 +58,17 @@ test.describe('the downloader', () => {
   test('starts a job, shows its progress, and saves the file once it is ready', async ({ page, api }) => {
     api.downloader(UNLOCK, [])
     api.post('/jobs', JOB, 202)
-    let polls = 0
+    // The job finishes when the test says so, not when the clock does. This used to
+    // count polls, and the panel polls every 1.5 s from mount, so the job went to done
+    // about three seconds after the page loaded whether or not the test had looked at
+    // the progress bar yet. On a loaded machine it often hadn't. The listing is empty
+    // until the POST lands, so the running job on screen is the one the click started.
+    let finished = false
     await page.route(`**/__e2e-api/jobs`, async (route) => {
       if (route.request().method() !== 'GET') return route.fallback()
       if (route.request().headers()['x-admin-password'] !== UNLOCK) return route.fallback()
-      polls += 1
-      // Running for the first two polls, then done.
-      const jobs = polls > 2 ? [DONE] : polls > 0 ? [JOB] : []
+      const started = api.sent('POST', '/jobs').length > 0
+      const jobs = finished ? [DONE] : started ? [JOB] : []
       await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ configured: true, jobs }) })
     })
     await page.route(`**/__e2e-api/jobs/${JOB.id}/file`, (route) =>
@@ -77,11 +81,14 @@ test.describe('the downloader', () => {
 
     await region.getByLabel(/youtube or soundcloud link/i).fill('https://youtu.be/aqz-KE-bpKQ')
     await region.getByRole('button', { name: /^download$/i }).click()
-    expect(api.sent('POST', '/jobs').map((r) => r.body)).toEqual([{ url: 'https://youtu.be/aqz-KE-bpKQ' }])
+    // Polled: the click settles before the fetch it fired has reached the stub.
+    await expect.poll(() => api.sent('POST', '/jobs').map((r) => r.body)).toEqual([{ url: 'https://youtu.be/aqz-KE-bpKQ' }])
 
     await expect(region.getByText(/downloading/i)).toBeVisible()
     await expect(region.getByRole('progressbar')).toHaveAttribute('aria-valuenow', '42')
 
+    // The POST answered "running", so only a poll can bring this.
+    finished = true
     await expect(region.getByText('Big_Buck_Bunny.mp3')).toBeVisible({ timeout: 10_000 })
     const download = page.waitForEvent('download')
     await region.getByRole('button', { name: /^save$/i }).click()

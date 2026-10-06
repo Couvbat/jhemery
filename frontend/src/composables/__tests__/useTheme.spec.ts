@@ -32,6 +32,7 @@ beforeEach(() => {
 
 afterEach(() => {
   vi.useRealTimers()
+  delete (document as Partial<Document>).startViewTransition
 })
 
 describe('useTheme', () => {
@@ -98,6 +99,68 @@ describe('useTheme', () => {
     expect(root.getAttribute('style')).toBeNull()
   })
 
+  // A forge is stored as its finished colours, so a reload needs no `forge.ts`; and it is
+  // the one stored value written into the inline style, so it has to be exactly hex.
+  describe('a forged scheme', () => {
+    const COLOURS = {
+      background: '#17100c',
+      surface: '#1f1611',
+      raised: '#2c211c',
+      border: '#4e3b32',
+      foreground: '#f0d8ce',
+      muted: '#bb9d90',
+      primary: '#d65d0e',
+      accent: '#00d0d4',
+      secondary: '#da8cfa',
+      highlight: '#c1b600',
+      warning: '#e2a600',
+      destructive: '#ff8078',
+    }
+    const stored = (overrides: Record<string, unknown> = {}) =>
+      JSON.stringify({ seed: '#d65d0e', mode: 'dark', colours: COLOURS, ...overrides })
+
+    it('is saved by its colours and comes back before mount', async () => {
+      const first = await load()
+      first.applyForgedTheme({ id: 'whatever', name: 'Custom', mode: 'dark', colours: COLOURS, seed: '#d65d0e' })
+      expect(JSON.parse(window.localStorage.getItem('couvbat:theme:custom')!)).toEqual({ seed: '#d65d0e', mode: 'dark', colours: COLOURS })
+      expect(window.localStorage.getItem(STORAGE_KEY)).toBe('custom')
+
+      root.removeAttribute('style')
+      const { restoreTheme, useTheme } = await load()
+      restoreTheme()
+
+      expect(useTheme().theme.value).toMatchObject({ id: 'custom', seed: '#d65d0e' })
+      expect(root.style.getPropertyValue('--background')).toBe('#17100c')
+      expect(useTheme().themes.value.map((theme) => theme.id)).toContain('custom')
+    })
+
+    it.each([
+      ['a colour that is not hex', { colours: { ...COLOURS, primary: 'red; background: url(x)' } }],
+      ['a short hex', { colours: { ...COLOURS, muted: '#bbb' } }],
+      ['a missing colour', { colours: { ...COLOURS, warning: undefined } }],
+      ['a seed that is not hex', { seed: 'javascript:' }],
+      ['a mode that is neither', { mode: 'dim' }],
+    ])('ignores a stored forge with %s', async (_, overrides) => {
+      window.localStorage.setItem('couvbat:theme:custom', stored(overrides))
+      window.localStorage.setItem(STORAGE_KEY, 'custom')
+      const { restoreTheme, useTheme } = await load()
+
+      restoreTheme()
+
+      expect(useTheme().theme.value.id).toBe('cyberpunk')
+      expect(root.getAttribute('style')).toBeNull()
+      expect(useTheme().themes.value.map((theme) => theme.id)).not.toContain('custom')
+    })
+
+    it('ignores one that is not JSON at all', async () => {
+      window.localStorage.setItem('couvbat:theme:custom', '{"seed":')
+      window.localStorage.setItem(STORAGE_KEY, 'custom')
+      const { restoreTheme, useTheme } = await load()
+      restoreTheme()
+      expect(useTheme().theme.value.id).toBe('cyberpunk')
+    })
+  })
+
   describe('the flashbang', () => {
     it('whites the page out on a switch from dark to light, then clears', async () => {
       vi.useFakeTimers()
@@ -123,6 +186,18 @@ describe('useTheme', () => {
       expect(root.classList.contains('theme-flash')).toBe(false)
     })
 
+    it('never goes off under calm or paused motion', async () => {
+      const { setTheme } = await load()
+      const { setMotion } = await import('../useMotion')
+      for (const level of ['calm', 'paused'] as const) {
+        setMotion(level)
+        setTheme('nord')
+        setTheme('catppuccin-latte')
+        expect(root.classList.contains('theme-flash'), level).toBe(false)
+      }
+      setMotion('full')
+    })
+
     it('never goes off under reduced motion', async () => {
       motion.reduced = true
       const { setTheme } = await load()
@@ -132,5 +207,176 @@ describe('useTheme', () => {
       expect(root.classList.contains('theme-flash')).toBe(false)
       expect(root.dataset.mode).toBe('light')
     })
+  })
+})
+
+/**
+ * The circle a new scheme spreads in. jsdom has no `startViewTransition`, so it is
+ * stubbed on `document` as a browser that runs the callback when told to: what these
+ * pin is when the circle is asked for at all, and that the page is painted inside it.
+ * That it really draws, leaves no overlay and trips no CSP is the e2e's to show.
+ */
+describe('the theme circle', () => {
+  function stubTransitions() {
+    const callbacks: Array<() => void> = []
+    const skipped: number[] = []
+    const start = vi.fn((callback: () => void) => {
+      const index = callbacks.push(callback) - 1
+      return {
+        ready: Promise.resolve(),
+        finished: Promise.resolve(),
+        updateCallbackDone: Promise.resolve(),
+        skipTransition: () => skipped.push(index),
+      }
+    })
+    ;(document as unknown as { startViewTransition: typeof start }).startViewTransition = start
+    return { start, callbacks, skipped }
+  }
+
+  it('spreads a dark-to-dark switch, painting inside the transition', async () => {
+    const { setTheme, useTheme } = await load()
+    const { start, callbacks } = stubTransitions()
+
+    expect(setTheme('dracula', { origin: { x: 40, y: 12 } })?.id).toBe('dracula')
+    expect(start).toHaveBeenCalledOnce()
+    // Saved at once; painted only when the browser has its snapshot of the old page.
+    expect(window.localStorage.getItem(STORAGE_KEY)).toBe('dracula')
+    expect(root.dataset.theme).toBeUndefined()
+
+    callbacks[0]!()
+    expect(root.dataset.theme).toBe('dracula')
+    expect(useTheme().theme.value.id).toBe('dracula')
+  })
+
+  // Found in review: a pick that didn't circle left the first circle running over it.
+  it('ends a circle in flight on any later paint, circling or not', async () => {
+    const { setTheme } = await load()
+    const { skipped } = stubTransitions()
+    setTheme('dracula')
+    setTheme('gruvbox-light')
+    expect(skipped).toEqual([0])
+  })
+
+  it('leaves dark to light to the flashbang', async () => {
+    const { setTheme } = await load()
+    const { start } = stubTransitions()
+
+    setTheme('gruvbox-light')
+
+    expect(start).not.toHaveBeenCalled()
+    expect(root.dataset.theme).toBe('gruvbox-light')
+    expect(root.classList.contains('theme-flash')).toBe(true)
+  })
+
+  it('spreads a light-to-dark switch, which has no flash to keep', async () => {
+    const { setTheme } = await load()
+    setTheme('catppuccin-latte')
+    const { start } = stubTransitions()
+
+    setTheme('nord')
+
+    expect(start).toHaveBeenCalledOnce()
+  })
+
+  it('never runs under calm, paused or reduced motion, and the page repaints at once', async () => {
+    const { setTheme } = await load()
+    const { setMotion } = await import('../useMotion')
+    const { start } = stubTransitions()
+
+    for (const level of ['calm', 'paused'] as const) {
+      setMotion(level)
+      setTheme(level === 'calm' ? 'nord' : 'dracula')
+      expect(root.dataset.theme, level).toBe(level === 'calm' ? 'nord' : 'dracula')
+    }
+    setMotion('full')
+    motion.reduced = true
+    setTheme('gruvbox')
+    expect(root.dataset.theme).toBe('gruvbox')
+
+    expect(start).not.toHaveBeenCalled()
+  })
+
+  // The swing is motion enough, and a snapshot would freeze its stage mid-turn.
+  it('waits out the prism: no circle while the page is turning', async () => {
+    vi.stubGlobal('requestAnimationFrame', () => 1)
+    vi.stubGlobal('cancelAnimationFrame', () => {})
+    const { setTheme } = await load()
+    const { startSwing, useViewSwing } = await import('../useViewSwing')
+    const { start } = stubTransitions()
+
+    startSwing(1)
+    expect(useViewSwing().swinging.value).toBe(true)
+    setTheme('dracula')
+
+    expect(start).not.toHaveBeenCalled()
+    expect(root.dataset.theme).toBe('dracula')
+    vi.unstubAllGlobals()
+  })
+
+  it('paints synchronously where the API does not exist, as before', async () => {
+    const { setTheme } = await load()
+    setTheme('rose-pine')
+    expect(root.dataset.theme).toBe('rose-pine')
+  })
+
+  // While one runs, hit-testing goes to the root: the next pick cuts it short, and its
+  // late callback must not paint the older scheme over the newer one.
+  it('cuts a circle short for the next pick, and lets the newer scheme win', async () => {
+    const { setTheme, useTheme } = await load()
+    const { start, callbacks, skipped } = stubTransitions()
+
+    setTheme('dracula')
+    setTheme('nord')
+    expect(start).toHaveBeenCalledTimes(2)
+    expect(skipped).toEqual([0])
+
+    callbacks[0]!()
+    expect(root.dataset.theme).toBeUndefined()
+    callbacks[1]!()
+    expect(root.dataset.theme).toBe('nord')
+    expect(useTheme().theme.value.id).toBe('nord')
+  })
+})
+
+// What `tour` uses: a scheme shown without being chosen.
+describe('previewTheme', () => {
+  // A light scheme over the dark default: the one switch that would flash if it were chosen.
+  it('paints a scheme without saving it or flashing, and puts the chosen one back', async () => {
+    const { previewTheme, useTheme } = await load()
+    const restore = previewTheme('gruvbox-light')!
+
+    expect(root.dataset.theme).toBe('gruvbox-light')
+    expect(useTheme().theme.value.id).toBe('gruvbox-light')
+    expect(useTheme().chosen.value.id).toBe('cyberpunk')
+    expect(window.localStorage.getItem(STORAGE_KEY)).toBeNull()
+    expect(root.classList.contains('theme-flash')).toBe(false)
+
+    restore()
+    expect(root.dataset.theme).toBeUndefined()
+    expect(useTheme().theme.value.id).toBe('cyberpunk')
+  })
+
+  it('lets a scheme picked during the preview win', async () => {
+    const { previewTheme, setTheme, useTheme } = await load()
+    const restore = previewTheme('gruvbox')!
+    setTheme('nord')
+    restore()
+    expect(root.dataset.theme).toBe('nord')
+    expect(useTheme().theme.value.id).toBe('nord')
+  })
+
+  it('refuses an unknown scheme', async () => {
+    const { previewTheme } = await load()
+    expect(previewTheme('nope')).toBeNull()
+  })
+})
+
+// Found in review: a forged colour is near-unique, and the embed sent it to SoundCloud.
+describe('embedColour', () => {
+  it('never hands an embed a forged scheme’s colour', async () => {
+    const { applyForgedTheme, embedColour } = await load()
+    const { forgeScheme } = await import('@/lib/forge')
+    applyForgedTheme(forgeScheme('#3a7bd5', 'dark')!.theme)
+    expect(embedColour()).toBe('#00ff41')
   })
 })

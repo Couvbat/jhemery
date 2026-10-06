@@ -1,5 +1,5 @@
 import { profile } from '@/content'
-import { prefersReducedMotion } from '@/composables/useCrt'
+import { decorativeMotion } from '@/composables/useMotion'
 import {
   MAX_SHAPE_COUNT,
   resetScene,
@@ -81,9 +81,16 @@ const VIM_SPLASH: string[] = [
   "(Esc still won't save you)",
 ]
 
-/** Instant when the visitor asked for reduced motion, animated otherwise. */
+/**
+ * Instant with motion paused (reduced motion forces that), animated otherwise. A typed
+ * command's own animation is something the visitor asked for by name, so `calm` keeps it.
+ */
+function still(): boolean {
+  return decorativeMotion() === 'paused'
+}
+
 async function paced(ctx: CommandContext, output: OutputLine[], stepMs: number) {
-  if (prefersReducedMotion()) {
+  if (still()) {
     ctx.print(output)
     return
   }
@@ -156,6 +163,7 @@ export const eggCommands: Command[] = [
     usage: 'sudo <command>',
     description: { en: 'Execute as superuser', fr: 'Exécuter en superutilisateur' },
     group: 'fun',
+    writes: 'server',
     hidden: true,
     async run(ctx) {
       const rest = ctx.args.join(' ')
@@ -206,11 +214,12 @@ export const eggCommands: Command[] = [
     name: 'matrix',
     description: { en: 'Follow the white rabbit', fr: 'Suivre le lapin blanc' },
     group: 'fun',
+    writes: 'none',
     hidden: true,
     run({ effects, close, t }) {
       const toast = announce('matrix', t)
-      if (prefersReducedMotion()) {
-        return [line('Wake up, Neo… (animation skipped: reduced motion)', 'primary'), ...toast]
+      if (still()) {
+        return [line('Wake up, Neo… (animation skipped: motion paused)', 'primary'), ...toast]
       }
       close()
       effects.matrix()
@@ -221,11 +230,12 @@ export const eggCommands: Command[] = [
     aliases: ['restart'],
     description: { en: 'Replay the boot sequence', fr: 'Rejouer la séquence de démarrage' },
     group: 'fun',
+    writes: 'none',
     hidden: true,
     run({ effects, close, t }) {
       const toast = announce('reboot', t)
-      if (prefersReducedMotion()) {
-        return [line('rebooting… (animation skipped: reduced motion)', 'primary'), ...toast]
+      if (still()) {
+        return [line('rebooting… (animation skipped: motion paused)', 'primary'), ...toast]
       }
       close()
       effects.reboot()
@@ -236,6 +246,7 @@ export const eggCommands: Command[] = [
     usage: `ssh ${profile.handle}@${profile.domain}`,
     description: { en: 'Connect to the host', fr: "Se connecter à l'hôte" },
     group: 'fun',
+    writes: 'none',
     hidden: true,
     complete: ({ index }) =>
       index === 0
@@ -274,8 +285,8 @@ export const eggCommands: Command[] = [
       )
 
       const toast = announce('ssh', ctx.t)
-      if (prefersReducedMotion()) {
-        return [blank, line('connected. (boot animation skipped: reduced motion)', 'success'), ...toast]
+      if (still()) {
+        return [blank, line('connected. (boot animation skipped: motion paused)', 'success'), ...toast]
       }
 
       ctx.print([blank, line(`${user}@${host}'s shell is starting…`, 'success')])
@@ -290,6 +301,7 @@ export const eggCommands: Command[] = [
     usage: `whois ${profile.domain}`,
     description: { en: 'Look up a domain record', fr: 'Consulter un enregistrement de domaine' },
     group: 'fun',
+    writes: 'none',
     hidden: true,
     complete: ({ index }) => (index === 0 ? [profile.domain, profile.handle] : []),
     run({ args }) {
@@ -316,6 +328,7 @@ export const eggCommands: Command[] = [
     name: 'crt',
     description: { en: 'Toggle CRT overdrive', fr: 'Basculer le mode CRT' },
     group: 'fun',
+    writes: 'local',
     hidden: true,
     run({ effects, t }) {
       const enabled = effects.crt()
@@ -330,6 +343,7 @@ export const eggCommands: Command[] = [
     aliases: ['vi', 'nvim', 'emacs'],
     description: { en: 'Open the editor', fr: "Ouvrir l'éditeur" },
     group: 'fun',
+    writes: 'local',
     hidden: true,
     complete: ({ index }) => (index === 0 ? listFiles() : []),
     run(ctx) {
@@ -358,9 +372,24 @@ export const eggCommands: Command[] = [
     aliases: [':q!', ':quit', ':quit!', ':wq', ':wq!', ':x'],
     description: { en: 'Escape', fr: 'Sortir' },
     group: 'fun',
+    writes: 'local',
     hidden: true,
     run({ effects, raw, t }) {
       const cmd = raw.trim()
+
+      // Escaping vim is the achievement, so there has to be a vim to escape: typed at
+      // the prompt, `:q` is only a reflex.
+      if (!effects.vimIsOpen()) {
+        return [
+          line(
+            t({
+              en: `${cmd}: you're not in vim. The reflex is noted.`,
+              fr: `${cmd} : vous n'êtes pas dans vim. Le réflexe est noté.`,
+            }),
+            'muted',
+          ),
+        ]
+      }
 
       if (cmd === ':q' || cmd === ':quit') {
         if (effects.vimIsDirty()) {
@@ -390,6 +419,8 @@ export const eggCommands: Command[] = [
     usage: 'hack [target]',
     description: { en: 'Breach the mainframe', fr: 'Pirater le mainframe' },
     group: 'fun',
+    // It prints its target back as output (`nmap -sS -A <target>`).
+    writes: (args) => (args[0] ? 'local' : 'none'),
     hidden: true,
     async run(ctx) {
       const target = ctx.args[0] ?? 'mainframe'
@@ -408,7 +439,7 @@ export const eggCommands: Command[] = [
         line('escalating privileges  [███████▒▒▒]  72%', 'warning'),
       ]
       await paced(ctx, gibson ? [...stages.slice(0, -1), line('escalating privileges  [██████████] 100%', 'primary')] : stages, 260)
-      await sleep(prefersReducedMotion() ? 0 : 600, ctx.signal)
+      await sleep(still() ? 0 : 600, ctx.signal)
       if (gibson) {
         return [
           blank,
@@ -426,6 +457,7 @@ export const eggCommands: Command[] = [
     aliases: ['brew'],
     description: { en: 'Brew a coffee', fr: 'Préparer un café' },
     group: 'fun',
+    writes: 'none',
     hidden: true,
     run({ t }) {
       return [
@@ -439,6 +471,7 @@ export const eggCommands: Command[] = [
     name: 'play',
     description: { en: 'Play my music', fr: 'Lancer ma musique' },
     group: 'fun',
+    writes: 'local',
     palette: true,
     run({ effects, close }) {
       effects.playMusic()
@@ -450,9 +483,12 @@ export const eggCommands: Command[] = [
     usage: 'cowsay <text>',
     description: { en: 'A cow says something', fr: 'Une vache parle' },
     group: 'fun',
+    writes: 'local',
     hidden: true,
-    run({ args, t }) {
-      const text = args.join(' ') || 'moo'
+    run({ args, stdin, t }) {
+      // What came in through a `|`, as one line of speech: `fortune | cowsay`.
+      const piped = stdin?.map((l) => l.text.trim()).filter(Boolean).join(' ')
+      const text = args.join(' ') || piped || 'moo'
       const width = Math.min(text.length, 40)
       const wrapped: string[] = []
       for (let i = 0; i < text.length; i += width) wrapped.push(text.slice(i, i + width))
@@ -478,6 +514,7 @@ export const eggCommands: Command[] = [
     name: 'fortune',
     description: { en: 'A dubious aphorism', fr: 'Un aphorisme douteux' },
     group: 'fun',
+    writes: 'none',
     hidden: true,
     run({ t }) {
       return [
@@ -490,10 +527,11 @@ export const eggCommands: Command[] = [
     name: 'sl',
     description: { en: 'You meant ls', fr: 'Vous vouliez dire ls' },
     group: 'fun',
+    writes: 'none',
     hidden: true,
     async run(ctx) {
       const rows = TRAIN.split('\n')
-      if (prefersReducedMotion()) {
+      if (still()) {
         return [...art(TRAIN, 'accent'), line('(you meant `ls`)', 'muted'), ...announce('sl', ctx.t)]
       }
 
@@ -511,6 +549,7 @@ export const eggCommands: Command[] = [
     name: 'rickroll',
     description: { en: 'Do not', fr: 'Ne faites pas ça' },
     group: 'fun',
+    writes: 'local',
     hidden: true,
     async run({ prompt, t }) {
       const answer = (await prompt('this will open a video. are you sure? [y/N]')).toLowerCase()
@@ -526,6 +565,7 @@ export const eggCommands: Command[] = [
     usage: 'banner <text>',
     description: { en: 'Say it in block letters', fr: 'Le dire en grosses lettres' },
     group: 'fun',
+    writes: 'local',
     hidden: true,
     run({ args, t }) {
       const text = args.join(' ')
@@ -548,6 +588,7 @@ export const eggCommands: Command[] = [
     usage: 'gravity [on|off]',
     description: { en: 'Toggle the background pull', fr: "Basculer l'attraction du fond" },
     group: 'fun',
+    writes: 'local',
     hidden: true,
     complete: ({ index }) => (index === 0 ? ['on', 'off'] : []),
     run({ args, t }) {
@@ -569,6 +610,7 @@ export const eggCommands: Command[] = [
     usage: 'spawn [count]',
     description: { en: 'Add shapes to the background', fr: 'Ajouter des formes au fond' },
     group: 'fun',
+    writes: 'local',
     hidden: true,
     run({ args }) {
       const requested = args[0] ? Number(args[0]) : 1
@@ -597,6 +639,7 @@ export const eggCommands: Command[] = [
     usage: 'constellation [on|off]',
     description: { en: 'Connect the dots', fr: 'Relier les points' },
     group: 'fun',
+    writes: 'local',
     hidden: true,
     complete: ({ index }) => (index === 0 ? ['on', 'off'] : []),
     run({ args, t }) {
@@ -617,6 +660,7 @@ export const eggCommands: Command[] = [
     usage: 'scene [reset]',
     description: { en: 'Inspect or reset the background', fr: 'Inspecter ou réinitialiser le fond' },
     group: 'fun',
+    writes: (args) => (args[0]?.toLowerCase() === 'reset' ? 'local' : 'none'),
     hidden: true,
     complete: ({ index }) => (index === 0 ? ['reset'] : []),
     run({ args }) {
@@ -641,6 +685,7 @@ export const eggCommands: Command[] = [
     name: 'uname',
     description: { en: 'System name', fr: 'Nom du système' },
     group: 'fun',
+    writes: 'none',
     hidden: true,
     run() {
       return [line(`couvsh 1.0 ${profile.domain} x86_64 GNU/Portfolio`, 'muted')]

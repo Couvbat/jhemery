@@ -127,13 +127,17 @@ The model is given the whole corpus in its system prompt, because the whole corp
 > unit hang this one, and it is worth paying — the fallback already existed for the case where the
 > fetch *fails*, so extending it to "has not landed yet" costs one degraded answer per restart.
 
-The source is `https://jhemery.xyz/llms.txt`, fetched at first request and cached for an hour —
-exactly the pattern `github.service.ts` and `steam.service.ts` already use for their upstreams. That
+The source is `${FRONTEND_URL}/llms.txt`, refreshed in the background (see the correction above)
+and cached for an hour — the pattern `github.service.ts` and `steam.service.ts` already use for
+their upstreams. It was hard-coded to production's `https://jhemery.xyz/llms.txt` until roadmap
+§H; reading `FRONTEND_URL`, as MCP does, lets a local or staging install answer from its own copy,
+and with `FRONTEND_URL` unset `ask` answers from the fallback without dialling anything. That
 file already exists and is already *"a machine-readable summary of the site for LLMs and agentic
 browsers"*; it is the artifact this feature would otherwise have to invent.
 
 Fetching it over HTTP rather than importing it is what keeps principle #1 intact across a deploy
-boundary. `src/content/*` is the single source; `llms.txt` is generated from it; the backend consumes
+boundary. `src/content/*` is the single source; `llms.txt` is published beside it (hand-written in
+`frontend/public/` today, not generated — a spec checks it against the content); the backend consumes
 the published output. A build-time artifact copied into the backend would couple two deploy units
 that release independently, and a hand-maintained copy would drift within a month. A small baked-in
 fallback string covers the case where the fetch fails, so a frontend outage does not take `ask` down

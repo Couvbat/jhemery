@@ -146,7 +146,8 @@ Beyond pageviews, [frontend/src/App.vue](../frontend/src/App.vue) sends one cust
 
 cPanel → **Logiciel** → **Setup Node.js App** → **Create Application**:
 
-- Node version: 24 (or closest available)
+- Node version: 24, and never below 20.19: NestJS 12 ships as ES modules only, which the
+  CommonJS build loads through `require()`, and older Node refuses that, so the API would not boot
 - Application mode: Production
 - Application root: e.g. `api.jhemery.xyz` → `BACKEND_REMOTE_PATH` = `/home/<user>/api.jhemery.xyz`
 - Application URL: `api.jhemery.xyz`
@@ -199,6 +200,16 @@ Push a commit touching `frontend/` or `backend/` to `master`, or go to **Actions
 
 ### 3. Verify
 
+After a deploy that touches `frontend/public/.htaccess`, check the rewrites by hand, since
+`vite preview` doesn't run Apache's:
+
+```bash
+curl -sI https://jhemery.xyz/neofetch        # text/plain, Vary: User-Agent, Accept-Language
+curl -s -H 'Accept-Language: fr' https://jhemery.xyz/neofetch   # the French page
+curl -sI -A 'Mozilla/5.0' https://jhemery.xyz/about             # text/html: a browser still gets the SPA
+curl -sI https://jhemery.xyz/ | grep -i vary   # Vary: User-Agent, since / is the résumé to curl
+```
+
 **Actions** tab → open the run → expand each step. Failures are almost always a wrong or missing secret rather than a workflow bug:
 
 | Symptom | Cause |
@@ -215,6 +226,7 @@ Push a commit touching `frontend/` or `backend/` to `master`, or go to **Actions
 | App boots but 404s everything | `.htaccess` was deleted from the app root. Recreate it from [backend/.htaccess](../backend/.htaccess), fixing the paths for your account. |
 | Deploy is green but the API still serves old code | Passenger didn't pick up `tmp/restart.txt` — hit **Restart** in cPanel and see [Known gaps](#known-gaps) |
 | Browsers get a CORS error on `POST`, `curl` gets 200 | o2switch **Tiger Protect** is challenging the POST — see below |
+| A 429 on the first guestbook entry or `ask` from a network that has never used them | Every visitor is landing in one rate-limit bucket, which means Apache's peer is no longer the machine that connected. See the per-IP limits entry in [Known gaps](#known-gaps). |
 
 ### Tiger Protect blocks every cross-origin POST
 
@@ -295,12 +307,13 @@ Setup, if you want this path ready before you need it:
 
 ## Apache config
 
-[frontend/public/.htaccess](../frontend/public/.htaccess) is copied into `dist/` by the build and deployed with everything else — but only because [frontend-build.yml](../.github/workflows/frontend-build.yml) sets `include-hidden-files: true` on the artifact upload. `actions/upload-artifact@v4` drops dotfiles by default, and with `.htaccess` missing from the artifact the deploy's `rsync --delete` removes the copy on the server too. The symptom is easy to misread: the site builds, deploys and renders fine, but deep links 404 and `curl jhemery.xyz` returns HTML instead of the résumé. It needs `mod_rewrite` only — no `mod_proxy` — so it works on o2switch shared hosting. It does six things:
+[frontend/public/.htaccess](../frontend/public/.htaccess) is copied into `dist/` by the build and deployed with everything else — but only because [frontend-build.yml](../.github/workflows/frontend-build.yml) sets `include-hidden-files: true` on the artifact upload. `actions/upload-artifact@v4` drops dotfiles by default, and with `.htaccess` missing from the artifact the deploy's `rsync --delete` removes the copy on the server too. The symptom is easy to misread: the site builds, deploys and renders fine, but deep links 404 and `curl jhemery.xyz` returns HTML instead of the résumé. It needs `mod_rewrite` only — no `mod_proxy` — so it works on o2switch shared hosting. It does seven things:
 
 - **SPA fallback.** Vue Router uses `createWebHistory`, so every non-file request is handed to `index.html`. Without this, a hard refresh on any path other than `/` 404s before Vue Router ever sees the URL.
+- **Design notes.** `/notes/` serves `notes/index.html` and `/notes/<slug>` serves `notes/<slug>.html`, the static pages [vite-plugins/notes.ts](../frontend/vite-plugins/notes.ts) emits from the specs. An unknown slug has no file, so it falls through to the SPA's 404 page. After a deploy that touches them, check `curl -sI https://jhemery.xyz/notes/ctf-flag-chain` answers `200` with `text/html`.
 - **`curl jhemery.xyz` → the ANSI résumé.** Matches on `User-Agent` at the site root and serves `resume.txt`, generated at build time by [vite-plugins/resume.ts](../frontend/vite-plugins/resume.ts). The same rule covers LLM crawlers, which would otherwise fetch an empty `<div id="app">`.
 - **Charset.** `UTF-8` by default, and explicitly for `.txt` so the résumé's box-drawing characters survive.
-- **Caching.** Hashed assets are `immutable` for a year. `index.html` and everything the résumé plugin emits (`resume.txt`, `resume.html`, `resume.fr.html`, `resume.css`, and `content.json`, which the backend's MCP endpoint reads) are `no-cache`, so a deploy takes effect immediately.
+- **Caching.** Hashed assets are `immutable` for a year. `index.html`, everything the résumé plugin emits (`resume.txt`, `resume.html`, `resume.fr.html`, `resume.css`, and `content.json`, which the backend's MCP endpoint reads) and the design notes are `no-cache`, so a deploy takes effect immediately.
 - **WebAssembly.** An explicit `application/wasm` type (so the 32 MB ffmpeg core compiles while streaming) and deflate for it, since cPanel's compression switch only covers text types.
 - **Security headers.** HSTS (no `preload`, deliberately), `X-Frame-Options`, `nosniff`, `Referrer-Policy`, a deny-all `Permissions-Policy` and the Content-Security-Policy. Each CSP source is commented with the feature that needs it — the Umami origin, `'wasm-unsafe-eval'` for the ffmpeg tool, `blob:` in `img-src` and `media-src` for the tools' local previews, the YouTube and SoundCloud `frame-src` for the rooms and the music player. Adding an origin there should mean adding a dependency.
 
@@ -350,6 +363,16 @@ Reproduce with the two `curl` commands in [Known gaps](#known-gaps). If they sti
 
 Note `curl -X POST` does **not** reproduce a browser here: it sends the POST directly, while a browser preflights it first because of the JSON content type. Testing only the POST leaves the half that actually fails untested.
 
+## Outbound calls from rooms
+
+With `ROOMS_ENABLED=true` the backend also calls out, from the server's IP, to
+`https://www.youtube.com/oembed` and `https://soundcloud.com/oembed`, to find the title of each
+item a room queues. Nothing needs configuring and nothing about a visitor is sent, only the
+item's own URL. It is the one feature besides the downloader that makes YouTube and SoundCloud
+see this IP, which is why it is held to a global budget of 30 lookups a minute and four at once,
+with misses remembered for 10 minutes ([room-titles.ts](../backend/src/rooms/room-titles.ts)).
+If either site starts refusing the server, rooms keep working and the queue shows bare IDs.
+
 ## What the shell can run — facts for the downloader
 
 Measured on the o2switch shell (`cronos`) on 22 September 2026, for the admin-only yt-dlp
@@ -369,7 +392,7 @@ job API is the same either way, but it is not needed today.
 | yt-dlp | venv at `~/ytdlp` from `/opt/alt/python312/bin/python3.12`; `pip install "yt-dlp[default,curl-cffi]"`; 2026.08.19 at the time of writing. |
 | `ffmpeg` | Absent from the system. Static 7.0.2 (johnvansickle.com build) in `~/bin/ffmpeg` and `~/bin/ffprobe`; yt-dlp needs `--ffmpeg-location ~/bin`. |
 | `xz` | Absent — `tar xJ` fails. The static ffmpeg tarball was unpacked with `~/ytdlp/bin/python -m tarfile -e`, which has `lzma` built in. |
-| Node | 20, at `/opt/alt/alt-nodejs20/root/usr/bin/node` (the Passenger app's runtime). |
+| Node | 24 for the API's Passenger app, chosen in Setup Node.js App (see step 5 for why at least 20.19). CloudLinux keeps each version under `/opt/alt/alt-nodejs<N>/`; this row first recorded the 20 one, `/opt/alt/alt-nodejs20/root/usr/bin/node`. |
 | `/tmp` | Mounted `noexec`. |
 | CPU time | `ulimit -t` is unlimited, but that is the shell's view; CloudLinux LVE limits still apply and were not measured. |
 
@@ -383,7 +406,7 @@ Three of those rows have teeth:
   binary is not. The static ffmpeg has no shared libraries, so it is unaffected.
 - **YouTube wants a JavaScript runtime.** Without one, yt-dlp warns that extraction "has been
   deprecated, and some formats may be missing". Only deno is enabled by default; the host has
-  node, so the runner passes `--js-runtimes node:/opt/alt/alt-nodejs20/root/usr/bin/node`. With
+  node, so the runner passes the one the API itself runs on (`--js-runtimes node:<process.execPath>`). With
   that, a single video extracts from the host's IP with no bot challenge — which was the open
   question, since YouTube challenges datacentre ranges aggressively and a shared host is one.
 - **SoundCloud rate-limits the IP, hard and for about an hour.** A probe that used a *profile*
@@ -431,6 +454,11 @@ upgrade, and the thing to try first when YouTube starts refusing.
 
   A status inside 45s means the new process is live. A run to the 90s timeout means Passenger is still serving the old one, whatever the deploy said — restart the app from cPanel's Node.js app manager and try again. **This is the cheapest way to tell a stale process from a slow model, and worth reaching for first whenever the backend behaves like a version you did not ship.**
 - **The FTP fallback is unverified.** Written against o2switch's documented FTPS setup, never run against the real account.
+- **Per-IP limits trust Apache's view of who connected.** Cloudflare and Apache both append to `X-Forwarded-For`, so its first entry is whatever the client sent. The guard used to key on that entry, and a random header per request skipped every per-IP limit. Now it keys on the entry Passenger appends, which is Apache's peer (`trust proxy` is 1, and [main.ts](../backend/src/main.ts) explains why not 2). When that peer is in Cloudflare's published ranges it keys on `CF-Connecting-IP` instead. Those ranges are copied into [rate-limit.guard.ts](../backend/src/common/rate-limit.guard.ts), and neither way this can break lets a client through unlimited:
+  - **Cloudflare adds a range.** Visitors arriving through it are limited per edge node until the list is refreshed from <https://www.cloudflare.com/ips/>.
+  - **Something is put in front of Apache.** Then every peer is that proxy and everyone shares one bucket: the 429 in the [troubleshooting table](#3-verify).
+
+  A `mod_remoteip` that rewrites Apache's peer to the visitor is handled already, since the rewritten address is not a Cloudflare one and gets used as it is. The Passenger behaviour, forwarding the client's header and then adding a second `X-Forwarded-For` line, was checked against Passenger's source and replayed against Express on a Unix socket. It has not been observed on the server itself.
 - **The first visitor to a cold `ask` model is told it is asleep, on purpose.** A cold load measures ~34s against a 20s deadline, so that visitor cannot be served. Rather than cancel — which used to abort the load itself and left the model permanently cold, since Ollama drops a load when its client disconnects — the request detaches and finishes loading in the background. The next visitor gets an answer in ~1.4s. Setting `OLLAMA_KEEP_ALIVE=-1` on the model host makes even that first miss a once-per-reboot event rather than once per idle period.
 - **Nothing on the server reports why `ask` failed.** The service logs latency and outcome to stdout, which on Passenger goes to the app's stderr log. When `ask` misbehaves that log is the only account of it, and both diagnoses above had to be reconstructed from black-box probing plus the *model host's* log instead — see [ask-command-design.md](superpowers/specs/2026-08-04-ask-command-design.md).
 - **A backend hang reaches the browser as a CORS error, not a timeout.** Cloudflare gives the origin 100s to send response headers, then substitutes its own 524 — which carries no `Access-Control-Allow-Origin`, so the console reports a missing CORS header against an endpoint whose CORS is fine (verified above, in both directions). Worth knowing before chasing `enableCors` or `FRONTEND_URL`: on `api.jhemery.xyz`, *"CORS header missing"* plus a 5xx status usually means the origin was silent, not misconfigured. `/ask` now bounds its own response at 45s so it cannot produce one; no other endpoint has a slow path long enough to matter.

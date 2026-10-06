@@ -3,10 +3,12 @@ import type { Locale } from '@/content/types'
 import { profile } from '@/content'
 import { announce } from '../achievements'
 import { aliases, parseDefinition, removeAlias, setAlias } from '../aliases'
-import { history } from '../history'
-import { allCommands, completionNames, resolve, visibleCommands } from '../registry'
+import { history, historyBase } from '../history'
+import { allCommands, completionNames, isCommandWord, resolve, visibleCommands } from '../registry'
+import { findPage, renderManual } from '../manual'
+import { page } from '../pager'
 import type { Command, CommandGroup, OutputLine } from '../types'
-import { blank, line, pre } from '../format'
+import { blank, fail, line, pre, segmented } from '../format'
 
 const GROUP_LABELS: Record<CommandGroup, { en: string; fr: string }> = {
   core: { en: 'shell', fr: 'shell' },
@@ -16,14 +18,30 @@ const GROUP_LABELS: Record<CommandGroup, { en: string; fr: string }> = {
   fun: { en: 'misc', fr: 'divers' },
 }
 
+/** `man [section] <page>`: a leading 1 or 6 is a section, as in `man 6 snake`. */
+function manArgs(args: readonly string[]): { name: string | undefined; section: 1 | 6 | undefined } {
+  if (args.length > 1 && /^[16]$/.test(args[0]!)) return { name: args[1], section: Number(args[0]) as 1 | 6 }
+  return { name: args[0], section: undefined }
+}
+
 export const coreCommands: Command[] = [
   {
     name: 'help',
-    aliases: ['?', 'man'],
+    aliases: ['?'],
     usage: 'help [command] [--all]',
     description: { en: 'List commands, or explain one', fr: 'Lister les commandes' },
+    manual: {
+      options: {
+        '--all': { en: 'List the hidden commands too. A link may not ask for this.', fr: 'Lister aussi les commandes cachées. Un lien ne peut pas le demander.' },
+      },
+      examples: [{ command: 'help ls' }, { command: 'help --all' }],
+      seeAlso: ['man(1)', 'jules(1)'],
+    },
     group: 'core',
-    linkable: true,
+    writes: 'none',
+    // Typed, `help --all` and `help vim` are fine. From a link they would hand out the
+    // hidden commands, which is what the link rule exists to stop.
+    linkable: (args) => !args.some((a) => a === '--all' || resolve(a)?.hidden === true),
     palette: true,
     // `completionNames()` and not `allCommands()`: `help vi<Tab>` must not hand
     // out `vim`, for the same reason the command word itself doesn't.
@@ -34,7 +52,7 @@ export const coreCommands: Command[] = [
       if (first && first !== '--all') {
         const command = resolve(first)
         if (!command) {
-          return [line(`help: no entry for \`${first}\``, 'error')]
+          return [fail(`help: no entry for \`${first}\``)]
         }
         return [
           line(command.name, 'primary'),
@@ -43,6 +61,7 @@ export const coreCommands: Command[] = [
           ...(command.aliases?.length
             ? [line(`  aliases: ${command.aliases.join(', ')}`, 'muted')]
             : []),
+          line(`  ${t({ en: 'the whole page:', fr: 'la page entière :' })} man ${command.name}`, 'muted'),
         ]
       }
 
@@ -73,10 +92,58 @@ export const coreCommands: Command[] = [
     },
   },
   {
+    name: 'man',
+    usage: 'man [section] <page>',
+    description: { en: 'Read a command’s manual page', fr: 'Lire la page de manuel d’une commande' },
+    manual: {
+      description: {
+        en: [
+          'Shows the manual page for a command, a page at a time: space and b to turn, / to search, q to quit. Every command has one, built from what it says about itself. Section 1 is the commands, section 6 the games and the rest of the fun.',
+          'There is a page for the person too. A real man can read it: curl -s jhemery.xyz/jules.1 | man -l -',
+        ],
+        fr: [
+          'Affiche la page de manuel d’une commande, une page à la fois : espace et b pour tourner, / pour chercher, q pour quitter. Chaque commande en a une, tirée de ce qu’elle dit d’elle-même. La section 1 est celle des commandes, la 6 celle des jeux et du reste.',
+          'Il y a aussi une page pour la personne. Un vrai man peut la lire : curl -s jhemery.xyz/jules.1 | man -l -',
+        ],
+      },
+      examples: [{ command: 'man ls' }, { command: 'man 6 snake' }, { command: 'man jules' }],
+      seeAlso: ['help(1)', 'jules(1)'],
+    },
+    group: 'core',
+    writes: 'none',
+    // A page that exists and isn't a hidden command's: `man vim` typed is fine, but from a
+    // link it would hand out an easter egg, as `help vim` would.
+    linkable: (args) => {
+      const { name, section } = manArgs(args)
+      if (!name) return false
+      if (name.toLowerCase() === 'jules') return section === undefined || section === 1
+      const command = resolve(name)
+      return !!command && !command.hidden && findPage(name, section, allCommands()) !== undefined
+    },
+    complete: ({ args, index }) => {
+      const pages = [...completionNames(), 'jules']
+      if (index === 0) return [...pages, '1', '6']
+      if (index === 1 && /^[16]$/.test(args[0] ?? '')) {
+        const section = Number(args[0])
+        return pages.filter((name) => findPage(name, section, visibleCommands()) !== undefined)
+      }
+      return []
+    },
+    async run(ctx) {
+      const { name, section } = manArgs(ctx.args)
+      if (!name) return [fail('What manual page do you want?'), line("For example, try 'man man'.", 'muted')]
+      const found = findPage(name, section, allCommands())
+      if (!found) return [fail(`No manual entry for ${name}${section ? ` in section ${section}` : ''}`)]
+      const lines = renderManual(found, ctx.t)
+      return (await page(ctx, lines, `${found.name}(${found.section})`)) ?? undefined
+    },
+  },
+  {
     name: 'clear',
     aliases: ['cls'],
     description: { en: 'Clear the screen', fr: "Effacer l'écran" },
     group: 'core',
+    writes: 'local',
     run({ clear }) {
       clear()
     },
@@ -85,12 +152,15 @@ export const coreCommands: Command[] = [
     name: 'history',
     description: { en: 'Show command history', fr: "Afficher l'historique" },
     group: 'core',
+    writes: 'none',
     run() {
       const entries = history.value
       if (!entries.length) return [line('(empty)', 'muted')]
-      const width = String(entries.length).length
+      // Numbered from the first line ever kept, so `!N` still means what was printed here.
+      const base = historyBase.value
+      const width = String(base + entries.length).length
       return entries.map((entry, i) =>
-        line(`${String(i + 1).padStart(width)}  ${entry}`, 'muted'),
+        line(`${String(base + i + 1).padStart(width)}  ${entry}`, 'muted'),
       )
     },
   },
@@ -99,6 +169,7 @@ export const coreCommands: Command[] = [
     usage: 'echo <text>',
     description: { en: 'Print a line of text', fr: 'Afficher du texte' },
     group: 'core',
+    writes: 'local',
     run({ args }) {
       return [line(args.join(' '))]
     },
@@ -107,6 +178,7 @@ export const coreCommands: Command[] = [
     name: 'date',
     description: { en: 'Show the current date', fr: 'Afficher la date' },
     group: 'core',
+    writes: 'none',
     run({ locale }) {
       return [line(new Date().toLocaleString(locale === 'fr' ? 'fr-FR' : 'en-GB'))]
     },
@@ -114,7 +186,9 @@ export const coreCommands: Command[] = [
   {
     name: 'whoami',
     description: { en: 'Print the current user', fr: "Afficher l'utilisateur" },
+    manual: { seeAlso: ['jules(1)', 'neofetch(1)'] },
     group: 'core',
+    writes: 'none',
     linkable: true,
     run() {
       return [line(profile.handle, 'primary')]
@@ -125,6 +199,7 @@ export const coreCommands: Command[] = [
     usage: 'lang [en|fr]',
     description: { en: 'Show or switch language', fr: 'Afficher ou changer la langue' },
     group: 'core',
+    writes: (args) => (args[0] ? 'local' : 'none'),
     palette: true,
     complete: ({ index }) => (index === 0 ? ['en', 'fr'] : []),
     run({ args, locale, t }) {
@@ -134,7 +209,7 @@ export const coreCommands: Command[] = [
       }
       const next = requested.toLowerCase()
       if (next !== 'en' && next !== 'fr') {
-        return [line(`lang: unsupported locale \`${requested}\``, 'error')]
+        return [fail(`lang: unsupported locale \`${requested}\``)]
       }
       setLocale(next as Locale)
       return [
@@ -148,6 +223,7 @@ export const coreCommands: Command[] = [
     usage: "alias [name='command']",
     description: { en: 'Name your own commands', fr: 'Nommer vos propres commandes' },
     group: 'core',
+    writes: 'local',
     hidden: true,
     run({ args, raw, t }) {
       const definition = raw.trim().slice('alias'.length).trim()
@@ -161,15 +237,25 @@ export const coreCommands: Command[] = [
           ]
         }
         const width = entries.reduce((max, [name]) => Math.max(max, name.length), 0)
+        // An alias stored before a command of the same name existed no longer runs;
+        // say so here rather than interrupting the command when it does.
+        const shadowed = t({ en: '(shadowed by a command)', fr: '(masqué par une commande)' })
         return entries
           .sort(([a], [b]) => a.localeCompare(b))
-          .map(([name, value]) => pre(`${name.padEnd(width)}  →  ${value}`, 'primary'))
+          .map(([name, value]) =>
+            isCommandWord(name)
+              ? segmented([
+                  { text: `${name.padEnd(width)}  →  ${value}`, tone: 'muted' },
+                  { text: `  ${shadowed}`, tone: 'warning' },
+                ])
+              : pre(`${name.padEnd(width)}  →  ${value}`, 'primary'),
+          )
       }
 
       const parsed = parseDefinition(definition)
       if (!parsed) {
         return [
-          line(`alias: ${args[0] ?? definition}: not found`, 'error'),
+          fail(`alias: ${args[0] ?? definition}: not found`),
           line("usage: alias <name>='<command>'", 'muted'),
         ]
       }
@@ -178,8 +264,9 @@ export const coreCommands: Command[] = [
       // Shadowing a real command would let someone lock themselves out of their
       // own shell, and it survives a reload — so this one is a refusal, not a
       // faithful reimplementation of bash.
-      if (resolve(name)) {
-        return [line(`alias: \`${name}\` is already a command — pick another name.`, 'error')]
+      // `git` too, the first word of `git log`: the alias would hide it all the same.
+      if (isCommandWord(name)) {
+        return [fail(`alias: \`${name}\` is already a command — pick another name.`)]
       }
 
       setAlias(name, parsed.value)
@@ -194,14 +281,15 @@ export const coreCommands: Command[] = [
     usage: 'unalias <name>',
     description: { en: 'Remove an alias', fr: 'Supprimer un alias' },
     group: 'core',
+    writes: 'local',
     hidden: true,
     complete: ({ index }) => (index === 0 ? Object.keys(aliases.value) : []),
     run({ args }) {
       const [name] = args
-      if (!name) return [line('unalias: missing operand', 'error')]
+      if (!name) return [fail('unalias: missing operand')]
       return removeAlias(name.toLowerCase())
         ? [line(`removed alias \`${name}\``, 'success')]
-        : [line(`unalias: ${name}: not found`, 'error')]
+        : [fail(`unalias: ${name}: not found`)]
     },
   },
   {
@@ -209,6 +297,7 @@ export const coreCommands: Command[] = [
     aliases: ['quit', 'logout'],
     description: { en: 'Close the terminal', fr: 'Fermer le terminal' },
     group: 'core',
+    writes: 'none',
     run({ close }) {
       close()
     },

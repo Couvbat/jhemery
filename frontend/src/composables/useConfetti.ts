@@ -1,5 +1,5 @@
 import { ref } from 'vue'
-import { prefersReducedMotion } from './useCrt'
+import { decorativeMotion } from './useMotion'
 
 export interface ConfettiBurst {
   /** Viewport coordinates the particles fly out of. */
@@ -13,11 +13,12 @@ export interface ConfettiBurst {
 export const confettiQueue = ref<ConfettiBurst[]>([])
 
 /**
- * Requests a burst. Silently does nothing under `prefers-reduced-motion`, so callers
- * never have to check — and the queue can't grow unbounded when nothing renders it.
+ * Requests a burst. Silently does nothing below `full` motion (reduced motion included,
+ * which forces `paused`), so callers never have to check — and the queue can't grow
+ * unbounded when nothing renders it.
  */
 export function fireConfetti(burst: ConfettiBurst) {
-  if (prefersReducedMotion()) return
+  if (decorativeMotion() !== 'full') return
   confettiQueue.value = [...confettiQueue.value, burst]
 }
 

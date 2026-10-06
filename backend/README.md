@@ -43,7 +43,8 @@ unconfigured rather than failing.
 | `GET /github/workflow-status` | `github` | Four latest Actions runs for `GITHUB_REPO`; public REST, token optional. 60 s cache. |
 | `GET /weather` | `weather` | Open-Meteo for the coordinates in config (never the caller's). 10-minute cache. |
 | `GET /markets` | `markets` | CoinGecko quotes + 7-day series for `MARKETS_COINS`. 5-minute cache. |
-| `GET /presence` | `presence` | SSE: one integer, the number of open connections. 25 s heartbeat. |
+| `GET /presence` | `presence` | SSE: one integer, the number of open connections. 25 s heartbeat. With `wall` on, also a named `wave` event with `{}`. |
+| `POST /presence/wall` | `presence` | A wave to every connection, one every 3 s site-wide at most. 204, or `{ configured: false }` when off. 6/min per IP. Off by default (`WALL_ENABLED`). |
 | `GET /stats` | `stats` | `{ sessions }` — terminal sessions ever opened. |
 | `POST /stats/session` | `stats` | Count one session. 5/hour per IP. |
 | `GET /stats/wordle` | `stats` | `?day=YYYY-MM-DD&locale=en\|fr` → the daily wordle's seven counts (solved in 1–6, or not). |
@@ -72,10 +73,10 @@ Every optional integration degrades instead of erroring — endpoints report `co
 `enabled: false`) and the frontend renders that state: no Steam key hides live activity, no GitHub
 token drops the heatmap and pinned repos, no weather coordinates hide `weather`, an unreachable
 model makes the terminal say the model is asleep and point at `mail`. `ask`, `guestbook`, `rooms`,
-`jobs` and `mcp` are **off by default**; with MCP off, `/mcp` is a plain 404.
+`jobs`, `mcp` and `wall` are **off by default**; with MCP off, `/mcp` is a plain 404.
 
 Privacy is a constraint on every module, not a policy on top: `/presence` pushes one integer with
-no visitor id, `/stats` counts sessions rather than commands, `/weather` uses server-side
+no visitor id (and a contentless `wave` when `wall` is on), `/stats` counts sessions rather than commands, `/weather` uses server-side
 coordinates so everyone gets the same answer, and `ask` never logs questions or answers.
 
 ## Cross-cutting bits
@@ -86,8 +87,12 @@ coordinates so everyone gets the same answer, and `ask` never logs questions or 
 allows the `x-admin-password` and `x-room-token` headers — without which the guestbook DELETE and
 the rooms' host and seat routes fail their preflight in the browser.
 
-**`trust proxy`** is on: Apache fronts the app, so `req.ip` must come from `X-Forwarded-For` or the
-rate limiter would see one client (the proxy) for the whole internet.
+**`trust proxy`** is set to one hop. Apache fronts the app through Passenger, which appends its own
+`X-Forwarded-For` line carrying Apache's peer, so at 1 `req.ip` is that peer: the one entry no
+client can write. Without it the rate limiter would see one client (the proxy) for the whole
+internet; at 2 it would read an entry a direct-to-origin request writes itself. Visitors behind
+Cloudflare are told apart by `CF-Connecting-IP`, honoured only when the peer is in Cloudflare's
+published ranges (`clientIp()` in `common/rate-limit.guard.ts`).
 
 **Validation** is a global `ValidationPipe({ whitelist: true })`; DTOs use `class-validator`.
 
@@ -102,9 +107,10 @@ network, and it spends a private machine's electricity, so it is opt-in by desig
 
 - Works with any OpenAI-compatible runtime — Ollama, llama.cpp, vLLM, LM Studio. Point
   `LLM_BASE_URL` at whatever has `/chat/completions` under it.
-- Grounded on `https://jhemery.xyz/llms.txt`, cached for an hour, capped at 16k chars, with a
-  built-in fallback corpus. **The corpus never blocks an answer** — a cold or unreachable fetch is
-  skipped, not awaited.
+- Grounded on `${FRONTEND_URL}/llms.txt`, so a local or staging install answers from its own
+  copy. Cached for an hour, capped at 16k chars, with a built-in fallback corpus, which is also all
+  it uses when `FRONTEND_URL` is unset: then it fetches nothing. **The corpus never blocks an
+  answer** — a cold or unreachable fetch is skipped, not awaited.
 - Budgets: ~300 output tokens, 20 s to the first token (then it detaches and lets the model warm
   up in the background), 15 s idle timeout, and a 45 s structural silence ceiling in the
   controller.
@@ -171,8 +177,8 @@ SDK to manage.
   `resources/templates/list` and `resources/read`, with `202` for notifications and batches
   accepted. Five tools and six resources: profile, résumé (EN and FR), projects, skills, `/now`.
 - Everything comes from `${FRONTEND_URL}/content.json`, which the frontend build emits beside
-  `resume.txt`. It's cached for 10 minutes with a stale fallback, and anything but `version: 1` is
-  refused. A tool that can't reach it returns `isError` rather than a protocol error.
+  `resume.txt`. It's cached for 10 minutes with a stale fallback, and any `version` not in
+  `CONTENT_VERSIONS` (1 and 2) is refused. A tool that can't reach it returns `isError` rather than a protocol error.
 - Nothing asked of it is logged, same as `ask`.
 
 ## `jobs`

@@ -1,4 +1,5 @@
-import type { Locale, Localised } from '@/content/types'
+// Relative: `vite-plugins/resume.ts` reaches this file through `ansi.ts`, outside the alias.
+import type { Locale, Localised } from '../content/types'
 
 export type Tone =
   | 'default'
@@ -42,15 +43,56 @@ export interface OutputLine {
   pre?: boolean
   /** Echoed prompt line rather than command output. */
   prompt?: boolean
+  /**
+   * Not output but a remark about it, which goes to the screen even from the middle of a
+   * pipeline: an error from `fail()` (which also fails the stage for `&&`/`||`), or an
+   * achievement toast (which doesn't). Without it, `fortune | cowsay` would put the toast
+   * inside the cow.
+   */
+  stderr?: boolean
 }
 
 export type CommandGroup = 'core' | 'navigate' | 'content' | 'live' | 'fun'
 
+/**
+ * What a command changes, which is what decides whether it may run without the visitor
+ * typing it. `?run=` links read it today (`isLinkable`), and the roadmap's `tour`, pipe
+ * stages and history expansion are meant to read this same field, so no rule keeps its
+ * own list.
+ *
+ * - `none`: reads. It may still record the visitor's own progress (achievements, best
+ *   scores, the daily board and its one anonymous report), navigate, or play an
+ *   animation that leaves nothing behind.
+ * - `local`: changes something the visitor would have to put back: a setting, the
+ *   scene, the shell (aliases, the scrollback, the vim trap), a CTF capture. Also
+ *   anything that acts outside the page (a new tab, the clipboard, sound), and printing
+ *   link-supplied text as the command's output (`echo`, `banner`), which a link could
+ *   use to put words in the site's mouth. Quoting an argument back in an error line
+ *   doesn't count.
+ * - `server`: sends anything but a GET to the API, the daily board's report aside.
+ *
+ * Progress has to be carved out: counting it would make every game unlinkable,
+ * `?run=wordle daily` included, which `wordle share` itself hands out.
+ */
+export type Writes = 'none' | 'local' | 'server'
+
 export interface CommandContext {
   /** Arguments after the command name, already split on whitespace. */
   args: string[]
-  /** The full raw line the user submitted. */
+  /** This command's own stage of the line, as typed: its spacing and quotes, not the rest of a pipeline. */
   raw: string
+  /**
+   * The previous stage's output, when this command is on the right of a `|`: its lines,
+   * colours and all, without the stderr ones. Undefined otherwise, which is not the same
+   * as an empty pipe.
+   */
+  stdin?: OutputLine[]
+  /**
+   * Whether anyone is reading this output as it appears: false on the left of a `|`,
+   * where `capture` and `prompt` throw ("not a tty"). A command that needs the keyboard
+   * can say so before it starts rather than fail halfway.
+   */
+  tty: boolean
   locale: Locale
   t: <T>(value: Localised<T>) => T
   /** Append lines to the buffer. Useful for commands that emit progressively. */
@@ -70,18 +112,27 @@ export interface CommandContext {
    * accepts — and closes the overlay on success. Returns false for an unknown target.
    */
   navigate: (target: string) => boolean
-  /** Ask the user for a line of input. Rejects if they hit Ctrl+C. */
+  /** Ask the user for a line of input. Rejects if they hit Ctrl+C, and throws when `tty` is false. */
   prompt: (question: string, options?: { mask?: boolean }) => Promise<string>
   /**
    * Routes raw keys to `handler` while the command runs — the primitive the games
    * need to hold the keyboard for longer than one line. Returns a release
    * function; the release also happens automatically when the command settles,
-   * so a command that throws cannot wedge the keyboard. Only one capture is
+   * so a command that throws cannot wedge the keyboard. For a command run through
+   * `ctx.run`, "settles" means when it returns: the caller's own capture comes back. Only one capture is
    * active at a time: a second call replaces the first. Modifier combos never
-   * reach the handler, so `Ctrl+C` and `Ctrl+L` keep working throughout.
+   * reach the handler, so `Ctrl+C` and `Ctrl+L` keep working throughout. Escape stops the
+   * command too, unless `escape` hands it to the handler: the pager's search uses it to
+   * give up the search rather than the page.
    */
-  capture: (handler: (key: string) => void) => () => void
-  /** Runs another command as if typed — used by aliases like `git log`. */
+  capture: (handler: (key: string) => void, options?: { escape?: boolean }) => () => void
+  /**
+   * Runs another command inside this one: the same signal (Ctrl+C stops both), the same
+   * keyboard (the caller's capture is handed back when the child is done), and never the
+   * visitor's aliases. The shell stays busy until the caller finishes. A throw,
+   * `AbortError` included, propagates to the caller. It checks nothing about the target:
+   * pass a fixed command line, or ask `isLinkable` first if the line came from outside.
+   */
   run: (input: string) => Promise<void>
   effects: TerminalEffects
   signal: AbortSignal
@@ -94,15 +145,41 @@ export interface VimCursor {
 
 export type VimMode = 'normal' | 'insert'
 
+/** The buffer's text and cursor at one moment. */
+export interface VimSnapshot {
+  lines: string[]
+  cursor: VimCursor
+}
+
+/** One change `u` can take back: the buffer as it was before it, the number
+ *  vim gives it (counting from 1), and when it was made, both for the message
+ *  undoing it shows. */
+export interface VimChange extends VimSnapshot {
+  seq: number
+  time: number
+}
+
 export interface VimBufferState {
   name: string
   lines: string[]
   cursor: VimCursor
   mode: VimMode
   dirty: boolean
-  /** A refused `:q`/`:wq` shows its error here — VimPane is the only visible
-   *  surface while it's open, so the terminal's own scrollback won't do. */
+  /** A refused `:q`/`:wq` shows its error here, and `u` what it undid —
+   *  VimPane is the only visible surface while it's open, so the terminal's own
+   *  scrollback won't do. An error is one with vim's `E` number. */
   statusMessage: string | null
+  /** What has been typed in normal mode towards a command that isn't complete
+   *  yet, '' when nothing has: a count, the `d` operator, and a count for its
+   *  motion (`2d3`). Kept as typed because that is what vim's 'showcmd' shows. */
+  pending: string
+  /** The changes `u` can take back, oldest first. */
+  changes: VimChange[]
+  /** The number the last change got. Vim's keep counting up through undos. */
+  lastSeq: number
+  /** The buffer as the open insert session found it: the session is one
+   *  change, recorded when it ends. Null outside insert mode. */
+  insertFrom: VimSnapshot | null
 }
 
 export interface VimFile {
@@ -117,6 +194,8 @@ export interface TerminalEffects {
   crt: (enabled?: boolean) => boolean
   vim: (enabled: boolean, file?: VimFile) => void
   vimIsDirty: () => boolean
+  /** Whether the vim pane is showing: `:q` only means something there. */
+  vimIsOpen: () => boolean
   /** Shows a status-line message in the vim pane (e.g. a refused `:q`). */
   vimMessage: (text: string) => void
   glitch: (durationMs: number) => Promise<void>
@@ -144,12 +223,19 @@ export interface Command {
   /** Surfaced in the Ctrl+K command palette. */
   palette?: boolean
   /**
-   * May be run from a link: `?run=<command>` opens the shell and runs it once. Opt-in,
-   * because a link is written by someone other than the person clicking it — so
-   * nothing that writes (`mail`, `sign`, `alias`, `theme`…) and nothing hidden may set
-   * it. `registry.spec.ts` holds both lines.
+   * What running it changes; see `Writes`. A function when that depends on the
+   * arguments: `theme` lists the schemes, `theme dracula` switches. Read it through
+   * `writesOf()`, never directly.
    */
-  linkable?: boolean
+  writes: Writes | ((args: readonly string[]) => Writes)
+  /**
+   * Worth running from a link: `?run=<command>` opens the shell and runs it once. Opt-in,
+   * because a link is written by someone other than the person clicking it, and only
+   * honoured where `writes` is `none` and the command isn't hidden (`isLinkable()`
+   * checks all three). A function when some arguments must not be linked: `help vim`
+   * would hand out a hidden command, as `ls -a` would the dotfiles.
+   */
+  linkable?: boolean | ((args: readonly string[]) => boolean)
   /**
    * Tab-completion candidates for the argument being typed. Return everything
    * valid at that position — the shell filters by prefix, inserts the common
@@ -159,5 +245,16 @@ export interface Command {
    * the shell needs a table of special cases.
    */
   complete?: (ctx: CompleteContext) => string[]
+  /**
+   * What `man <name>` adds to the page generated from this command (`terminal/manual.ts`):
+   * a longer DESCRIPTION, the OPTIONS text for the flags in `usage` (`manual.spec.ts` holds
+   * every flag to one), more EXAMPLES, and SEE ALSO, which may point somewhere oblique.
+   */
+  manual?: {
+    description?: Localised<string[]>
+    options?: Record<string, Localised>
+    examples?: { command: string; text?: Localised }[]
+    seeAlso?: string[]
+  }
   run: (ctx: CommandContext) => OutputLine[] | void | Promise<OutputLine[] | void>
 }

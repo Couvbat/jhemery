@@ -1,6 +1,10 @@
 import { ExecutionContext, HttpStatus, HttpException } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
-import { RateLimitGuard, RateLimitOptions } from './rate-limit.guard';
+import {
+  MAX_BUCKETS,
+  RateLimitGuard,
+  RateLimitOptions,
+} from './rate-limit.guard';
 
 /**
  * The only thing standing between `POST /contact` / `POST /guestbook` and a bot
@@ -12,22 +16,29 @@ describe('RateLimitGuard', () => {
   let reflector: Reflector;
   let options: RateLimitOptions | undefined;
 
+  /**
+   * `ip` stands in for what Express derives from `trust proxy`: the peer that
+   * connected to Apache. The headers are passed through raw, as a client or
+   * Cloudflare would have written them.
+   */
   function context({
     ip = '1.2.3.4',
     forwarded,
+    cfConnectingIp,
     handler = 'sign',
     controller = 'GuestbookController',
   }: {
     ip?: string;
-    forwarded?: string | string[];
+    forwarded?: string;
+    cfConnectingIp?: string;
     handler?: string;
     controller?: string;
   } = {}): ExecutionContext {
-    const request = {
-      ip,
-      headers: forwarded === undefined ? {} : { 'x-forwarded-for': forwarded },
-      socket: { remoteAddress: ip },
-    };
+    const headers: Record<string, string> = {};
+    if (forwarded !== undefined) headers['x-forwarded-for'] = forwarded;
+    if (cfConnectingIp !== undefined)
+      headers['cf-connecting-ip'] = cfConnectingIp;
+    const request = { ip, headers, socket: { remoteAddress: ip } };
     return {
       switchToHttp: () => ({ getRequest: () => request }),
       getHandler: () => ({ name: handler }),
@@ -122,42 +133,83 @@ describe('RateLimitGuard', () => {
   });
 
   describe('client IP resolution', () => {
-    it('trusts the first hop of x-forwarded-for over the socket address', () => {
-      // Apache fronts the Node app, so the socket address is always the proxy —
-      // without this every visitor would share one bucket.
-      const proxied = (forwarded: string) =>
-        context({ ip: '10.0.0.1', forwarded });
+    // An address in Cloudflare's 172.64.0.0/13 and one outside every range it
+    // publishes, for a request sent straight to the origin.
+    const edge = '172.64.1.1';
+    const direct = '198.51.100.7';
 
-      expect(guard.canActivate(proxied('9.9.9.9, 10.0.0.1'))).toBe(true);
-      expect(guard.canActivate(proxied('8.8.8.8, 10.0.0.1'))).toBe(true);
-      expect(() => guard.canActivate(proxied('9.9.9.9, 10.0.0.1'))).toThrow(
-        HttpException,
-      );
-    });
-
-    it('handles x-forwarded-for arriving as a repeated header', () => {
+    it('does not open a new bucket for a client-supplied x-forwarded-for', () => {
+      // The bypass this guard used to allow: the leftmost entry is the
+      // client's to write, so a random one per request was a fresh bucket each
+      // time.
       expect(
-        guard.canActivate(context({ ip: '10.0.0.1', forwarded: ['7.7.7.7'] })),
+        guard.canActivate(context({ ip: direct, forwarded: '9.9.9.9' })),
       ).toBe(true);
       expect(() =>
-        guard.canActivate(context({ ip: '10.0.0.1', forwarded: ['7.7.7.7'] })),
+        guard.canActivate(context({ ip: direct, forwarded: '8.8.8.8' })),
+      ).toThrow(HttpException);
+      expect(() =>
+        guard.canActivate(
+          context({ ip: direct, forwarded: `7.7.7.7, ${direct}` }),
+        ),
       ).toThrow(HttpException);
     });
 
-    it('falls back to the socket address when the header is absent', () => {
-      expect(guard.canActivate(context({ ip: '5.5.5.5' }))).toBe(true);
-      expect(() => guard.canActivate(context({ ip: '5.5.5.5' }))).toThrow(
+    it('prefers cf-connecting-ip when the request came through Cloudflare', () => {
+      // Without it every visitor behind the same edge node would share a
+      // bucket.
+      const viaEdge = (visitor: string) =>
+        context({ ip: edge, cfConnectingIp: visitor });
+
+      expect(guard.canActivate(viaEdge('203.0.113.1'))).toBe(true);
+      expect(guard.canActivate(viaEdge('203.0.113.2'))).toBe(true);
+      expect(() => guard.canActivate(viaEdge('203.0.113.1'))).toThrow(
         HttpException,
       );
     });
 
-    it('ignores an empty x-forwarded-for rather than bucketing everyone together', () => {
-      expect(guard.canActivate(context({ ip: '5.5.5.5', forwarded: '' }))).toBe(
-        true,
-      );
-      expect(guard.canActivate(context({ ip: '6.6.6.6', forwarded: '' }))).toBe(
-        true,
-      );
+    it('follows a visitor across Cloudflare edges', () => {
+      expect(
+        guard.canActivate(
+          context({ ip: '104.16.0.1', cfConnectingIp: '203.0.113.1' }),
+        ),
+      ).toBe(true);
+      expect(() =>
+        guard.canActivate(
+          context({ ip: '162.158.0.1', cfConnectingIp: '203.0.113.1' }),
+        ),
+      ).toThrow(HttpException);
+    });
+
+    it.each(['2606:4700::1', '::ffff:104.16.0.1'])(
+      'recognises the Cloudflare edge %s',
+      (peer) => {
+        const viaPeer = (visitor: string) =>
+          context({ ip: peer, cfConnectingIp: visitor });
+
+        expect(guard.canActivate(viaPeer('203.0.113.1'))).toBe(true);
+        expect(guard.canActivate(viaPeer('203.0.113.2'))).toBe(true);
+      },
+    );
+
+    it('ignores cf-connecting-ip from a peer that is not Cloudflare', () => {
+      // Anyone who connects to the origin directly can write the header; only
+      // Cloudflare's copy is Cloudflare's.
+      expect(
+        guard.canActivate(context({ ip: direct, cfConnectingIp: '9.9.9.9' })),
+      ).toBe(true);
+      expect(() =>
+        guard.canActivate(context({ ip: direct, cfConnectingIp: '8.8.8.8' })),
+      ).toThrow(HttpException);
+    });
+
+    it('ignores an empty cf-connecting-ip rather than bucketing everyone together', () => {
+      expect(
+        guard.canActivate(context({ ip: '172.64.0.1', cfConnectingIp: '' })),
+      ).toBe(true);
+      expect(
+        guard.canActivate(context({ ip: '172.64.0.2', cfConnectingIp: '' })),
+      ).toBe(true);
     });
   });
 
@@ -172,5 +224,45 @@ describe('RateLimitGuard', () => {
     guard.canActivate(context({ ip: '172.16.0.1' }));
 
     expect(guard['hits'].size).toBe(1);
+  });
+
+  describe('bucket cap', () => {
+    const address = (i: number) =>
+      `10.${(i >> 16) & 255}.${(i >> 8) & 255}.${i & 255}`;
+
+    it('holds at MAX_BUCKETS, dropping the oldest bucket for a new one', () => {
+      // All inside one window, so the sweep has nothing to reclaim.
+      for (let i = 0; i <= MAX_BUCKETS; i++) {
+        guard.canActivate(context({ ip: address(i) }));
+      }
+      expect(guard['hits'].size).toBe(MAX_BUCKETS);
+
+      // The first bucket made room for the last; the last is still counting.
+      expect(guard.canActivate(context({ ip: address(0) }))).toBe(true);
+      expect(() =>
+        guard.canActivate(context({ ip: address(MAX_BUCKETS) })),
+      ).toThrow(HttpException);
+      expect(guard['hits'].size).toBe(MAX_BUCKETS);
+    });
+
+    it('counts a reopened window as new, not as the oldest', () => {
+      // Short enough to expire long before the 60s sweep would drop it.
+      options = { limit: 1, windowMs: 1_000 };
+      guard.canActivate(context({ ip: 'reopened' }));
+      jest.advanceTimersByTime(2_000);
+      for (let i = 1; i < MAX_BUCKETS; i++) {
+        guard.canActivate(context({ ip: address(i) }));
+      }
+      guard.canActivate(context({ ip: 'reopened' }));
+
+      // Full again, so this evicts: address(1), not the window that just
+      // reopened.
+      guard.canActivate(context({ ip: 'newcomer' }));
+
+      expect(() => guard.canActivate(context({ ip: 'reopened' }))).toThrow(
+        HttpException,
+      );
+      expect(guard.canActivate(context({ ip: address(1) }))).toBe(true);
+    });
   });
 });

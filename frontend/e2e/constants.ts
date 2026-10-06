@@ -1,4 +1,9 @@
-export const PREVIEW_PORT = 4173
+/**
+ * The preview server's port. `--strictPort` makes a busy port an error rather than a
+ * second server somewhere else, so two checkouts running the suite at once (worktrees)
+ * pass their own with `E2E_PORT`.
+ */
+export const PREVIEW_PORT = Number(process.env.E2E_PORT) || 4173
 export const BASE_URL = `http://127.0.0.1:${PREVIEW_PORT}`
 
 /**

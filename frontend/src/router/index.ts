@@ -1,11 +1,13 @@
 import { createRouter, createWebHistory } from 'vue-router'
 import HomeView from '../views/HomeView.vue'
+import { decorativeMotion } from '../composables/useMotion'
 
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
   scrollBehavior(to) {
     if (to.hash) {
-      return { el: to.hash, behavior: 'smooth' }
+      // Jumps with motion paused, as `scrollToSection` does.
+      return { el: to.hash, behavior: decorativeMotion() === 'paused' ? 'auto' : 'smooth' }
     }
     return { top: 0 }
   },
@@ -41,6 +43,14 @@ const router = createRouter({
       path: '/now',
       name: 'now',
       component: () => import('../views/NowView.vue'),
+    },
+    {
+      // The case studies (content/work.ts). Like /now, not a face of the prism: they are
+      // reached from the projects section, and `viewIndex()` puts them after the faces.
+      path: '/work/:id',
+      name: 'work',
+      component: () => import('../views/WorkView.vue'),
+      props: true,
     },
     {
       // Needs the .htaccess rewrite in public/ to survive a hard refresh on Apache.

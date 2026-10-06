@@ -102,10 +102,36 @@ function nowText(c: SiteContent, lang: Lang): string {
   ].join('\n');
 }
 
+function experienceText(c: SiteContent, lang: Lang): string[] {
+  if (!c.experience?.length) return [];
+  return [
+    '',
+    lang === 'fr' ? 'EXPÉRIENCE' : 'EXPERIENCE',
+    ...c.experience.flatMap((r) => [
+      `${pick(r.employer, lang)} — ${pick(r.title, lang)} (${pick(r.period, lang)} · ${pick(r.duration, lang)})`,
+      ...(r.summary ? [`  ${pick(r.summary, lang)}`] : []),
+    ]),
+  ];
+}
+
+function educationText(c: SiteContent, lang: Lang): string[] {
+  if (!c.education?.length) return [];
+  return [
+    '',
+    lang === 'fr' ? 'FORMATION' : 'EDUCATION',
+    ...c.education.flatMap((e) => [
+      `${pick(e.school, lang)} — ${pick(e.course, lang)} (${e.years})`,
+      ...(e.note ? [`  ${pick(e.note, lang)}`] : []),
+    ]),
+  ];
+}
+
 function resumeText(c: SiteContent, lang: Lang): string {
   const fr = lang === 'fr';
   return [
     profileText(c, lang),
+    ...experienceText(c, lang),
+    ...educationText(c, lang),
     '',
     fr ? 'COMPÉTENCES' : 'SKILLS',
     c.skills.map((s) => s.name).join(', '),
@@ -130,7 +156,7 @@ export const TOOLS: Tool[] = [
     name: 'get_resume',
     title: 'Résumé',
     description:
-      'The whole résumé as plain text: profile, skills, projects and links.',
+      'The whole résumé as plain text: profile, experience, education, skills, projects and links.',
     render: resumeText,
   },
   {

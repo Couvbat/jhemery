@@ -1,8 +1,9 @@
-import { now, nowCategories, profile, skillNames, socials, staleDays } from '@/content'
+import { findWork, now, nowCategories, profile, skillNames, socials, staleDays } from '@/content'
 import type { Localised } from '@/content/types'
 import { isUnlocked } from '../achievements'
 import { blank, line, pre, segmented, wrap } from '../format'
 import type { OutputLine } from '../types'
+import { workLines } from '../work'
 import { SECRET_FILE, secretContents } from './secret'
 import { ENV_FILE, envFileContents } from './env-file'
 import { guestbookFilenames, resolveGuestbookFile } from './guestbook-fs'
@@ -130,6 +131,12 @@ export function resolveFileLines(file: string, t: TFunction): OutputLine[] | und
       return envFileContents(t)
 
     default: {
+      // The case studies, one file each in the projects directory.
+      const study = /^(?:~\/)?projects\/([a-z0-9-]+)\.md$/.exec(file)
+      if (study) {
+        const part = findWork(study[1]!)
+        return part ? workLines(part, t) : undefined
+      }
       const entry = resolveGuestbookFile(file)
       if (!entry) return undefined
       return [

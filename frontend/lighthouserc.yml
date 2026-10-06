@@ -11,9 +11,11 @@
 ci:
   collect:
     # LHCI serves `dist/` itself, so there is no dev server to start and no port
-    # to coordinate. Only `/` is collected: every other route in this SPA is the
-    # same document with the same bundle, so a second URL would cost a minute of
-    # CI to re-measure identical numbers.
+    # to coordinate. It collects every HTML file it finds there: `/`, plus the two
+    # printable résumés the build emits, which are real documents rather than SPA
+    # routes, so every assertion below applies to them too. Other routes of the SPA
+    # are the same document with the same bundle and would re-measure identical
+    # numbers.
     staticDistDir: ./dist
     # Five, not three, because of what the first CI run actually did: on the
     # GitHub runner run #1 measured 879 ms of blocking time and a 0.61
@@ -45,19 +47,20 @@ ci:
       # more than seven points.
       categories:performance: ['error', { minScore: 0.9 }]
 
-      # Baseline 0.95, held at 0.95 rather than relaxed — the two audits keeping
-      # it off 1.00 are real and known (see below), and nothing should be
-      # allowed to add a third.
-      #
-      # Currently failing, both worth fixing separately:
-      #   color-contrast              `text-muted-foreground` at 12px measures
-      #                               4.04:1 against the panel background, short
-      #                               of the 4.5:1 minimum.
-      #   label-content-name-mismatch the language toggle reads "FR" but its
-      #                               aria-label is "Changer de langue", so
-      #                               voice-control users cannot say what they
-      #                               see.
-      categories:accessibility: ['error', { minScore: 0.95 }]
+      # 1.00, and held there, as SEO is. It sat at 0.95 on two audits, both fixed
+      # in roadmap §H:
+      #   color-contrast              muted text measured 4.04:1 on the raised
+      #                               title bars. Muted and body text are now held
+      #                               to 4.5:1 on every surface by one rule
+      #                               (src/lib/themeRules.ts), which themes.spec.ts
+      #                               checks for all eleven schemes.
+      #   label-content-name-mismatch the language toggle read "FR" under an
+      #                               aria-label of "Changer de langue". Its name now
+      #                               comes from its content, so what a voice-control
+      #                               user sees is what they can say.
+      # Collection also picks up the printable résumés in dist/, which score 1.00
+      # too, so a regression on any of the three pages fails the check.
+      categories:accessibility: ['error', { minScore: 1 }]
 
       # Baseline 0.96, and it cannot reach 1.00 in this harness:
       #   errors-in-console   there is no backend behind the static server, so

@@ -11,7 +11,7 @@ import {
   type WeatherReport,
 } from '@/lib/api'
 import { announce } from '../achievements'
-import { blank, heading, line, pre } from '../format'
+import { blank, fail, heading, line, pre } from '../format'
 import { formatChange, formatPrice, sparkline } from '../sparkline'
 import type { Command, OutputLine } from '../types'
 import { ART_WIDTH, compass, weatherArt, windArrow } from '../weather-art'
@@ -48,7 +48,7 @@ type TFunction = <T>(value: Localised<T>) => T
  */
 function weatherReport(data: WeatherReport, t: TFunction): OutputLine[] {
   const now = data.now
-  if (!now) return [line('weather: no current conditions', 'error')]
+  if (!now) return [fail('weather: no current conditions')]
 
   const art = weatherArt(now.condition, now.isDay)
   const details = [
@@ -107,6 +107,7 @@ export const liveCommands: Command[] = [
     aliases: ['playing'],
     description: { en: 'Live Steam activity', fr: 'Activité Steam en direct' },
     group: 'live',
+    writes: 'none',
     linkable: true,
     palette: true,
     async run({ print, t }) {
@@ -148,6 +149,7 @@ export const liveCommands: Command[] = [
     aliases: ['git log', 'commits'],
     description: { en: 'Recent public commits', fr: 'Commits publics récents' },
     group: 'live',
+    writes: 'none',
     linkable: true,
     palette: true,
     async run({ print }) {
@@ -171,6 +173,7 @@ export const liveCommands: Command[] = [
     aliases: ['wttr'],
     description: { en: 'Current conditions where I am', fr: 'La météo là où je suis' },
     group: 'live',
+    writes: 'none',
     linkable: true,
     palette: true,
     async run({ print, t }) {
@@ -194,6 +197,7 @@ export const liveCommands: Command[] = [
     aliases: ['stonks', 'crypto'],
     description: { en: 'Crypto prices, 7-day trend', fr: 'Cours crypto, tendance 7 jours' },
     group: 'live',
+    writes: 'none',
     linkable: true,
     palette: true,
     async run({ print, t }) {
@@ -235,6 +239,7 @@ export const liveCommands: Command[] = [
     aliases: ['gb'],
     description: { en: 'Read what visitors left', fr: 'Lire les messages des visiteurs' },
     group: 'live',
+    writes: 'none',
     linkable: true,
     palette: true,
     async run({ print }) {
@@ -263,7 +268,7 @@ export const liveCommands: Command[] = [
         )
         return out
       } catch {
-        return [line('guestbook unavailable', 'error')]
+        return [fail('guestbook unavailable')]
       }
     },
   },
@@ -272,12 +277,15 @@ export const liveCommands: Command[] = [
     usage: 'sign <message>',
     description: { en: 'Leave a message in the guestbook', fr: 'Laisser un message' },
     group: 'live',
+    writes: 'server',
     async run({ args, prompt, print, t }) {
-      const message = args.join(' ').trim()
-      if (!message) return [line('sign: usage — sign <message>', 'error')]
+      // One pair of outer quotes is the shell's, not the message's: `sign "great site; love
+      // it"` is how the shell says to pass an operator on, so it must not post the quotes.
+      const message = args.join(' ').trim().replace(/^(["'])([\s\S]*)\1$/, '$2').trim()
+      if (!message) return [fail('sign: usage — sign <message>')]
 
       const name = (await prompt('your name:')).trim()
-      if (!name) return [line('sign: a name is required', 'error')]
+      if (!name) return [fail('sign: a name is required')]
 
       print(line('signing…', 'muted'))
       try {
@@ -285,7 +293,7 @@ export const liveCommands: Command[] = [
         return [line('✓ signed. run `guestbook` to see it.', 'success'), ...announce('sign', t)]
       } catch (error) {
         const detail = error instanceof ApiError ? error.message : 'request failed'
-        return [line(`sign: ${detail}`, 'error')]
+        return [fail(`sign: ${detail}`)]
       }
     },
   },
@@ -294,6 +302,7 @@ export const liveCommands: Command[] = [
     aliases: ['sendmail', 'write'],
     description: { en: 'Send me a message', fr: 'M’envoyer un message' },
     group: 'live',
+    writes: 'server',
     palette: true,
     async run({ prompt, print, t }) {
       print([
@@ -303,16 +312,16 @@ export const liveCommands: Command[] = [
       ])
 
       const name = (await prompt('name:')).trim()
-      if (!name) return [line('mail: name is required', 'error')]
+      if (!name) return [fail('mail: name is required')]
 
       const email = (await prompt('email:')).trim()
       if (!EMAIL_PATTERN.test(email)) {
-        return [line(`mail: \`${email}\` is not a valid address`, 'error')]
+        return [fail(`mail: \`${email}\` is not a valid address`)]
       }
 
       const subject = (await prompt('subject (optional):')).trim()
       const message = (await prompt('message:')).trim()
-      if (!message) return [line('mail: message is required', 'error')]
+      if (!message) return [fail('mail: message is required')]
 
       print([
         blank,
@@ -335,7 +344,7 @@ export const liveCommands: Command[] = [
       } catch (error) {
         const detail = error instanceof ApiError ? error.message : 'request failed'
         return [
-          line(`mail: ${detail}`, 'error'),
+          fail(`mail: ${detail}`),
           line(`you can always reach me at ${profile.email}`, 'muted'),
         ]
       }

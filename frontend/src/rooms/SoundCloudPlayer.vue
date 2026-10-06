@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref } from 'vue'
-import type { PlayerReading } from './players'
+import type { PlayerProps, PlayerReading } from './players'
+import { embedColour } from '@/composables/useTheme'
 import { SOUNDCLOUD_ORIGIN, soundcloudEmbed } from './sync'
 
 /**
@@ -9,13 +10,17 @@ import { SOUNDCLOUD_ORIGIN, soundcloudEmbed } from './sync'
  * as `MusicSection`, which embeds the iframe and not the script: nothing from
  * w.soundcloud.com runs on this origin.
  */
-const props = defineProps<{ media: string; host: boolean; autoplay: boolean }>()
+// `compact` is accepted and ignored: the widget is always the compact one.
+const props = defineProps<PlayerProps>()
 const emit = defineEmits<{ reading: [reading: PlayerReading]; finished: [] }>()
 
 const frame = ref<HTMLIFrameElement | null>(null)
+// The colour is read when the source is built — a new item, or autoplay switching —
+// and not on a scheme change: a new `src` reloads the cross-origin player and stops it.
 const src = computed(() => {
-  const url = soundcloudEmbed(props.media)
-  return props.autoplay ? url.replace('auto_play=false', 'auto_play=true') : url
+  // Never a forged scheme's colour, which would identify the visitor to SoundCloud.
+  const colour = embedColour()
+  return soundcloudEmbed(props.media, colour, props.autoplay)
 })
 
 const EVENTS = ['ready', 'play', 'pause', 'playProgress', 'finish', 'seek']

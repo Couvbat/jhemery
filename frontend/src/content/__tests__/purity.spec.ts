@@ -23,9 +23,14 @@ const files = readdirSync(contentDir)
   .filter((name) => name.endsWith('.ts'))
   .sort()
 
-/** Every module specifier in an `import`/`export … from` statement. */
+/**
+ * Every module specifier in an `import`/`export … from` statement. Nothing before the
+ * `from` may be a quote: otherwise `export const decisions = [` runs on to the first
+ * string that ends in "from" (`'Where the word lists come from'`) and reads the next
+ * one as a specifier.
+ */
 function importSpecifiers(source: string): string[] {
-  const pattern = /(?:^|\n)\s*(?:import|export)[\s\S]*?from\s*['"]([^'"]+)['"]/g
+  const pattern = /(?:^|\n)\s*(?:import|export)\b[^'"]*?\bfrom\s*['"]([^'"]+)['"]/g
   return [...source.matchAll(pattern)].map((match) => match[1]!)
 }
 
@@ -51,6 +56,47 @@ describe('content layer purity', () => {
     // These would throw at build time, where there is no browser and no app runtime.
     for (const forbidden of ['window.', 'document.', 'localStorage', 'navigator.']) {
       expect(source.includes(forbidden), `${file} references ${forbidden}`).toBe(false)
+    }
+  })
+})
+
+/**
+ * The same constraint for the few modules outside `src/content` that the build imports:
+ * the résumé plugin takes its palette from `terminal/ansi.ts`, which draws on
+ * `lib/colour.ts`, and the curl pages are rendered with `terminal/format.ts`. Their
+ * value imports are walked to the bottom; type imports vanish at build time and are free.
+ */
+describe('build-time modules outside content', () => {
+  const src = fileURLToPath(new URL('../..', import.meta.url))
+  const roots = ['terminal/ansi.ts', 'lib/colour.ts', 'terminal/format.ts']
+
+  /** Value imports only: `import type …` and `export type …` are erased by the build. */
+  function valueImports(source: string): string[] {
+    const pattern = /(?:^|\n)\s*(import|export)\s+(?!type\b)[^'"]*?\bfrom\s*['"]([^'"]+)['"]|(?:^|\n)\s*import\s+['"]([^'"]+)['"]/g
+    return [...source.matchAll(pattern)].map((match) => (match[2] ?? match[3])!)
+  }
+
+  function walk(file: string, seen = new Set<string>()): Set<string> {
+    if (seen.has(file)) return seen
+    seen.add(file)
+    const source = readFileSync(join(src, file), 'utf8')
+    for (const specifier of valueImports(source)) {
+      expect(specifier.startsWith('./') || specifier.startsWith('../'), `${file} imports "${specifier}"`).toBe(true)
+      walk(join(file, '..', `${specifier}.ts`).replace(/\.ts\.ts$/, '.ts'), seen)
+    }
+    return seen
+  }
+
+  it('follows the imports it finds', () => {
+    expect([...walk('terminal/ansi.ts')]).toEqual(['terminal/ansi.ts', 'lib/colour.ts'])
+  })
+
+  it.each(roots)('%s reaches only relative, DOM-free modules', (root) => {
+    for (const file of walk(root)) {
+      const source = readFileSync(join(src, file), 'utf8')
+      for (const forbidden of ['window.', 'document.', 'localStorage', 'navigator.', "from 'vue'"]) {
+        expect(source.includes(forbidden), `${file} references ${forbidden}`).toBe(false)
+      }
     }
   })
 })

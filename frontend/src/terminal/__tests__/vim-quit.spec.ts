@@ -23,19 +23,24 @@ function buffer(overrides: Partial<VimBufferState> = {}): VimBufferState {
     mode: 'normal',
     dirty: false,
     statusMessage: null,
+    pending: '',
+    changes: [],
+    lastSeq: 0,
+    insertFrom: null,
     ...overrides,
   }
 }
 
 /** Drives the real `:q` command against a stub of the vim effects, returning
  *  whether the pane was closed and what the status line ended up saying. */
-function run(raw: string, state: VimBufferState) {
-  let open = true
+function run(raw: string, state: VimBufferState, opened = true) {
+  let open = opened
   const effects = {
     vim: (enabled: boolean) => {
       open = enabled
     },
     vimIsDirty: () => state.dirty,
+    vimIsOpen: () => open,
     vimMessage: (text: string) => {
       state.statusMessage = text
     },
@@ -58,11 +63,21 @@ function run(raw: string, state: VimBufferState) {
     signal: new AbortController().signal,
   } as unknown as CommandContext
 
-  quit.run(ctx)
-  return { open, message: state.statusMessage }
+  const lines = quit.run(ctx) as Array<{ text: string }> | undefined
+  return { open, message: state.statusMessage, lines: lines ?? [] }
 }
 
 describe(':q', () => {
+  // The achievement is for escaping vim; typed at the prompt there is nothing to escape.
+  it.each([':q', ':q!', ':wq'])('`%s` with no vim open unlocks nothing', (raw) => {
+    const { lines, open } = run(raw, buffer(), false)
+    const text = lines.map((l) => l.text).join('\n')
+    expect(text).toContain('not in vim')
+    expect(text).not.toContain('you are free')
+    expect(text).not.toContain('🏆')
+    expect(open).toBe(false)
+  })
+
   it('claims every spelling the muscle memory reaches for', () => {
     expect(quit.aliases).toEqual(
       expect.arrayContaining([':q!', ':quit', ':quit!', ':wq', ':wq!', ':x']),
@@ -119,14 +134,24 @@ describe('typing in the pane', () => {
     expect(state.mode).toBe('normal')
   })
 
-  it('lets Escape through in normal mode, so it reaches the close path', () => {
-    expect(handleVimKey(buffer(), new KeyboardEvent('keydown', { key: 'Escape' }))).toBe(false)
+  // It used to fall through to the overlay's close path, which submits `:q!`:
+  // the reflexive Escape threw away the edits and unlocked the achievement.
+  it('swallows Escape in normal mode, as real vim does, so it never quits', () => {
+    const state = buffer({ dirty: true, cursor: { row: 0, col: 2 } })
+    expect(handleVimKey(state, new KeyboardEvent('keydown', { key: 'Escape' }))).toBe(true)
+    expect(state).toEqual(buffer({ dirty: true, cursor: { row: 0, col: 2 } }))
   })
 
-  it('lets `:` through, so the command line is typed in the shell input', () => {
-    expect(handleVimKey(buffer({ mode: 'insert' }), new KeyboardEvent('keydown', { key: ':' }))).toBe(
-      false,
-    )
+  it('lets `:` through in normal mode, so the command line is typed in the shell input', () => {
+    expect(handleVimKey(buffer(), new KeyboardEvent('keydown', { key: ':' }))).toBe(false)
+  })
+
+  // It used to be let through in insert mode too, so `a:b` put `a` in the file
+  // and `:b` on the command line.
+  it('types `:` into the file in insert mode, like any other character', () => {
+    const state = buffer({ mode: 'insert', cursor: { row: 0, col: 5 } })
+    expect(handleVimKey(state, new KeyboardEvent('keydown', { key: ':' }))).toBe(true)
+    expect(state.lines).toEqual(['hello:'])
   })
 })
 

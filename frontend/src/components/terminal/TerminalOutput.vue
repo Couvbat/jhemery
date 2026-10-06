@@ -1,8 +1,31 @@
 <script setup lang="ts">
+import { computed } from 'vue'
 import { profile } from '@/content'
+import { runLink } from '@/composables/useTerminal'
+import { closeTerminal } from '@/composables/useTerminalShell'
+import { routeTo } from '@/composables/useViewSwing'
+import { linkTarget } from '@/terminal/links'
 import type { OutputLine } from '@/terminal/types'
 
-defineProps<{ line: OutputLine }>()
+const props = defineProps<{ line: OutputLine }>()
+
+const target = computed(() => (props.line.href ? linkTarget(props.line.href) : null))
+
+/**
+ * The site's own links stay in this tab (see `terminal/links.ts`). A modified click —
+ * Ctrl, Cmd, Shift, or the middle button — is left to the browser, so "open in a new
+ * tab" still works on any of them.
+ */
+function follow(event: MouseEvent) {
+  const to = target.value
+  if (!to || to.kind === 'external') return
+  if (event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return
+  event.preventDefault()
+  if (to.kind === 'run') void runLink(to.line)
+  else if (to.kind === 'route') {
+    if (closeTerminal()) routeTo(to.path)
+  } else window.location.assign(to.href)
+}
 
 const toneClass: Record<string, string> = {
   default: 'text-foreground',
@@ -28,9 +51,10 @@ const toneClass: Record<string, string> = {
   <p v-else-if="line.href" :class="['break-words', line.pre ? 'whitespace-pre' : 'whitespace-pre-wrap']">
     <a
       :href="line.href"
-      target="_blank"
-      rel="noopener noreferrer"
+      :target="target?.kind === 'external' ? '_blank' : undefined"
+      :rel="target?.kind === 'external' ? 'noopener noreferrer' : undefined"
       class="text-accent underline underline-offset-2 hover:text-primary transition-colors"
+      @click="follow"
       >{{ line.text }}</a
     >
   </p>

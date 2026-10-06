@@ -9,6 +9,7 @@ import { HEIGHT, WIDTH } from '../games/snake'
 import { ANSWERS } from '../games/data/words-en'
 import { dailyResult, recordDaily } from '../games/scores'
 import { dailyIndex, fold } from '../games/wordle'
+import { setMotion } from '@/composables/useMotion'
 import type { Command, CommandContext, OutputLine } from '../types'
 
 // Snake has two loops — a 120 ms tick and a reduced-motion step-per-keypress —
@@ -53,6 +54,7 @@ function harness(): Harness {
   const ctx: CommandContext = {
     args: [],
     raw: '',
+    tty: true,
     locale: 'en',
     t: (<T,>(value: Localised<T>) => value.en) as CommandContext['t'],
     print: (input) => {
@@ -293,6 +295,29 @@ describe('snake', () => {
     expect(length).toBeGreaterThanOrEqual(10)
     expect(isUnlocked('snake')).toBe(true)
     expect(lines.some((l) => l.text.includes('Nokia Nostalgia'))).toBe(true)
+  })
+
+  // Motion control is for decoration and for animations a command plays; a game's clock
+  // is one of its rules, so only the OS setting moves snake to a step per keypress.
+  it('keeps its tick when motion is paused from the menu', async () => {
+    motion.reduced = false
+    setMotion('paused')
+    vi.useFakeTimers()
+    try {
+      const game = harness()
+      const finished = command('snake').run(game.ctx) as Promise<OutputLine[]>
+      const at = () => cells(game.frame(), '█').map((p) => `${p.x},${p.y}`).join(' ')
+      const before = at()
+
+      await vi.advanceTimersByTimeAsync(120 * 2)
+      expect(at()).not.toBe(before)
+
+      game.press('q')
+      await vi.advanceTimersByTimeAsync(120)
+      await finished
+    } finally {
+      setMotion('full')
+    }
   })
 
   it('still reports the unlock when the game is aborted rather than quit', async () => {
@@ -622,7 +647,7 @@ describe('wordle daily', () => {
     expect(stats.wordleHistogram).toHaveBeenCalledWith(DAY, 'en')
   })
 
-  it('leaves the board alone when the API does not answer, and tries again next time', async () => {
+  it('leaves the board alone when the API does not answer', async () => {
     stats.recordWordle.mockRejectedValue(new Error('down'))
     const { game, finished } = daily()
     await loaded()
@@ -632,6 +657,40 @@ describe('wordle daily', () => {
 
     expect(game.printed().some((l) => l.text.includes('everyone today'))).toBe(false)
     expect(dailyResult('en', DAY)?.reported).toBeFalsy()
+  })
+
+  // Reopening a finished board needs no keystroke, and `?run=wordle daily` is a link,
+  // so only the Enter that finishes a board may post its report. An unreported board
+  // stays uncounted rather than reported by whoever opens a link to it.
+  it('never posts from a board it only reopens, even an unreported one', async () => {
+    stats.recordWordle.mockRejectedValue(new Error('down'))
+    const first = daily()
+    await loaded()
+    for (const letter of ANSWER) first.game.press(letter.toLowerCase())
+    first.game.press('Enter')
+    await first.finished
+    expect(stats.recordWordle).toHaveBeenCalledTimes(1)
+
+    const again = daily()
+    await loaded()
+    await again.finished
+    expect(stats.recordWordle).toHaveBeenCalledTimes(1)
+    expect(stats.wordleHistogram).toHaveBeenCalledWith(DAY, 'en')
+  })
+
+  // Two tabs on the same day: the other one finished and reported while this one sat
+  // open with its own copy of the board. The day is counted once.
+  it('does not report a board another tab already reported', async () => {
+    const { game, finished } = daily()
+    await loaded()
+    recordDaily('en', { day: DAY, guesses: [ANSWER], marks: ['ggggg'], done: true, won: true, reported: true })
+    for (const letter of ANSWER) game.press(letter.toLowerCase())
+    game.press('Enter')
+    await finished
+
+    expect(stats.recordWordle).not.toHaveBeenCalled()
+    expect(stats.wordleHistogram).toHaveBeenCalledWith(DAY, 'en')
+    expect(dailyResult('en', DAY)?.reported).toBe(true)
   })
 
   it('share has nothing to copy before the daily is finished', async () => {

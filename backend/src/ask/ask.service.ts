@@ -9,13 +9,13 @@ import { AskDto } from './ask.dto';
 import { UnitHealth } from '../common/health';
 
 /**
- * The published summary of the site, which already exists for exactly this
- * audience. Fetched over HTTP rather than imported so `src/content` stays the
- * single source across a deploy boundary — the frontend generates this file,
- * the backend consumes the published output, and neither has to be redeployed
- * when the other changes.
+ * The corpus is the site's published summary, `${FRONTEND_URL}/llms.txt`, which
+ * already exists for exactly this audience. It is the same origin the MCP endpoint
+ * reads `content.json` from, so a local or staging install answers from its own
+ * copy rather than production's. Fetched over HTTP rather than imported, so the two
+ * apps deploy independently. The file is hand-written in `frontend/public/` today,
+ * not generated (see roadmap §H, *generated llms.txt*).
  */
-const CORPUS_URL = 'https://jhemery.xyz/llms.txt';
 const CORPUS_TTL_MS = 60 * 60 * 1000;
 const CORPUS_TIMEOUT_MS = 5_000;
 /**
@@ -329,6 +329,12 @@ export class AskService {
     return this.corpus?.text ?? FALLBACK_CORPUS;
   }
 
+  /** `${FRONTEND_URL}/llms.txt`, or null when there is nowhere to read it from. */
+  private get corpusUrl(): string | null {
+    const base = this.config.get<string>('FRONTEND_URL')?.replace(/\/+$/, '');
+    return base ? `${base}/llms.txt` : null;
+  }
+
   /**
    * Same fetch-and-cache shape as `github.service.ts` and `steam.service.ts`,
    * but off the request path. A failure parks the fallback for `CORPUS_RETRY_MS`
@@ -338,12 +344,29 @@ export class AskService {
   private refreshCorpus(): Promise<void> {
     if (this.corpusRefresh) return this.corpusRefresh;
 
+    // Nowhere to read from: answer from the fallback and don't dial anything.
+    // Reaching production from a misconfigured install is the bug this guards,
+    // and nothing will change until a restart, so park it for the whole TTL.
+    const url = this.corpusUrl;
+    if (!url) {
+      if (!this.corpus) {
+        this.logger.warn(
+          'FRONTEND_URL is not set; ask answers from its fallback',
+        );
+      }
+      this.corpus = {
+        text: FALLBACK_CORPUS,
+        expiresAt: Date.now() + CORPUS_TTL_MS,
+      };
+      return Promise.resolve();
+    }
+
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), CORPUS_TIMEOUT_MS);
 
     this.corpusRefresh = (async () => {
       try {
-        const res = await fetch(CORPUS_URL, {
+        const res = await fetch(url, {
           signal: controller.signal,
           headers: { 'User-Agent': 'jhemery-portfolio' },
         });

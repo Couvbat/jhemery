@@ -47,8 +47,15 @@ async function bootstrap() {
     // x-room-token is the same story for the rooms' host routes.
     allowedHeaders: ['Content-Type', 'x-admin-password', 'x-room-token'],
   });
-  // Apache fronts this app, so req.ip must come from X-Forwarded-For for the
-  // per-IP rate limiter to see real clients rather than the proxy.
+  // One hop, not two, although Cloudflare and Apache both append to
+  // X-Forwarded-For. Passenger forwards the header it was given, then adds its
+  // own line carrying Apache's peer address, and Node joins the two, so at 1
+  // req.ip is that peer: the one entry no client can write. 2 would take the
+  // entry before it, which is Cloudflare's own only for traffic that went
+  // through Cloudflare. The origin also answers anyone who connects to it
+  // directly, and for them that entry is whatever they sent. Visitors who did
+  // come through Cloudflare are told apart by CF-Connecting-IP instead; see
+  // clientIp() in common/rate-limit.guard.ts.
   app.set('trust proxy', 1);
   app.useGlobalPipes(new ValidationPipe({ whitelist: true }));
   await app.listen(process.env.PORT ?? 3000);

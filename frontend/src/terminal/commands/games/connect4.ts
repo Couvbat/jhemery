@@ -1,5 +1,5 @@
 import type { Localised } from '@/content/types'
-import { api, ApiError, roomEventsUrl, type RoomSnapshot } from '@/lib/api'
+import { api, ApiError, openEventSource, roomEventsPath, type RoomSnapshot } from '@/lib/api'
 import { normaliseCode } from '@/rooms/sync'
 import { blank, line, segmented } from '../../format'
 import * as c4 from '../../games/connect4'
@@ -164,6 +164,7 @@ export const command: Command = {
     fr: 'Puissance 4 contre un autre visiteur, avec un code de salle',
   },
   group: 'fun',
+  writes: 'server',
   run: (ctx: CommandContext) =>
     play(ctx, 'connect4', async (session) => {
       const { t } = ctx
@@ -197,7 +198,7 @@ export const command: Command = {
 
       const events = inbox()
       const release = ctx.capture((key) => events.push({ kind: 'key', key }))
-      const source = new EventSource(roomEventsUrl(code))
+      const source = openEventSource(roomEventsPath(code))
       source.onmessage = (event: MessageEvent<string>) => {
         try {
           events.push({ kind: 'snapshot', snapshot: JSON.parse(event.data) as RoomSnapshot })

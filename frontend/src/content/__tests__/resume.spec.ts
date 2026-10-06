@@ -1,10 +1,69 @@
 // @vitest-environment node
 // The plugin runs at build time, in Node, outside the app; so does this.
 import { describe, expect, it } from 'vitest'
-import { buildContentJson, buildResume, buildResumeHtml, escapeHtml, RESUME_CSS, resumeHtmlFile } from '../../../vite-plugins/resume'
+import { buildContentJson, buildManRoff, buildResume, buildResumeHtml, escapeHtml, escapeRoff, RESUME_CSS, resumeHtmlFile } from '../../../vite-plugins/resume'
+import { durationLabel, periodLabel, yearSpan } from '../dates'
+import { education, experience } from '../experience'
 import { profile } from '../profile'
 import { projects } from '../projects'
 import { skillNames } from '../skills'
+
+const AT = new Date('2026-10-01T12:00:00Z')
+
+/**
+ * Each name's position in `text` after `from`, which must come in the list's own order.
+ * Searching from the section's heading matters: "In-Leed" is in the bio too, well
+ * before the experience section, and would satisfy a search of the whole document.
+ */
+function inOrder(document: string, from: string, names: string[]): void {
+  const start = document.indexOf(from)
+  expect(start, from).toBeGreaterThan(-1)
+  const text = document.slice(start)
+  const positions = names.map((name) => text.indexOf(name))
+  for (const [i, position] of positions.entries()) expect(position, names[i]).toBeGreaterThan(-1)
+  expect(positions).toEqual([...positions].sort((a, b) => a - b))
+}
+
+// The duration lives in the experience section and nowhere else, so it can't go
+// stale in a sentence. (The bio's age, "de 25 ans", is not a length of experience.)
+const TYPED_DURATION = /\d+\s*(years?|ans)\s+(of experience|d['’]expérience)|over \d+ years|sur \d+ ans/i
+
+describe('one CV, every renderer', () => {
+  it('lists the same roles and courses in the same order everywhere', () => {
+    const txt = buildResume(AT)
+    inOrder(txt, 'EXPERIENCE', experience.map((role) => role.employer.en))
+    inOrder(txt, 'EDUCATION', education.map((course) => course.school.en))
+    for (const locale of ['en', 'fr'] as const) {
+      const html = buildResumeHtml(locale, AT)
+      inOrder(html, '<ul class="experience">', experience.map((role) => escapeHtml(role.employer[locale])))
+      inOrder(html, '<ul class="education">', education.map((course) => escapeHtml(course.school[locale])))
+    }
+    const data = JSON.parse(buildContentJson(AT)) as {
+      experience: Array<{ employer: unknown }>
+      education: Array<{ school: unknown }>
+    }
+    expect(data.experience.map((r) => r.employer)).toEqual(experience.map((role) => role.employer))
+    expect(data.education.map((c) => c.school)).toEqual(education.map((course) => course.school))
+  })
+
+  it('works each duration out from the months', () => {
+    const text = buildResume(AT)
+    for (const role of experience) {
+      expect(text).toContain(periodLabel(role.start, role.end).en)
+      expect(text).toContain(durationLabel(role.start, role.end, AT).en)
+    }
+    const fr = buildResumeHtml('fr', AT)
+    for (const role of experience) expect(fr).toContain(escapeHtml(durationLabel(role.start, role.end, AT).fr))
+    for (const course of education) expect(fr).toContain(yearSpan(course.start, course.end))
+  })
+
+  it('types no length of experience into the prose', () => {
+    for (const locale of ['en', 'fr'] as const) {
+      for (const paragraph of profile.bio[locale]) expect(paragraph).not.toMatch(TYPED_DURATION)
+      for (const project of projects) expect(project.description[locale]).not.toMatch(TYPED_DURATION)
+    }
+  })
+})
 
 describe('resume.txt', () => {
   it('carries the availability line and every skill name', () => {
@@ -15,6 +74,14 @@ describe('resume.txt', () => {
 
   it('points at the printable version', () => {
     expect(buildResume()).toContain(`https://${profile.domain}/resume.html`)
+  })
+
+  // Every byte, escapes included, at a fixed date: the palette is shared with the
+  // terminal (`terminal/ansi.ts`), and only the CTF's concealed run is checked anywhere
+  // else, so a changed colour code would get through without this. Rewrite it with
+  // `npx vitest run src/content/__tests__/resume.spec.ts -u` when the CV really changes.
+  it('keeps its exact bytes, colours included', async () => {
+    await expect(buildResume(new Date('2026-10-01T12:00:00Z'))).toMatchFileSnapshot('./__snapshots__/resume.txt')
   })
 })
 
@@ -55,8 +122,9 @@ describe('resume.html', () => {
 })
 
 describe('content.json', () => {
-  const data = JSON.parse(buildContentJson(new Date('2026-09-24T00:00:00Z'))) as {
+  const data = JSON.parse(buildContentJson(AT)) as {
     version: number
+    experience: Array<{ start: string; end?: string; duration: { en: string; fr: string } }>
     profile: { name: string; availability: { open: boolean } }
     skills: Array<{ name: string; usedIn: Array<{ url: string }> }>
     projects: Array<{ name: string }>
@@ -64,7 +132,11 @@ describe('content.json', () => {
   }
 
   it('carries the shape version the backend checks for', () => {
-    expect(data.version).toBe(1)
+    expect(data.version).toBe(2)
+  })
+
+  it('works durations out at build time, as the backend has no clock rule of its own', () => {
+    for (const role of data.experience) expect(role.duration).toEqual(durationLabel(role.start, role.end, AT))
   })
 
   it('is the same content the pages render', () => {
@@ -83,5 +155,24 @@ describe('content.json', () => {
 
   it('never carries a CTF flag — the chain is not something to hand an agent whole', () => {
     expect(buildContentJson()).not.toMatch(/CTF\{/)
+  })
+})
+
+describe('jules.1', () => {
+  it('escapes roff: backslashes, hyphens, and a line that would read as a request', () => {
+    expect(escapeRoff('a\\b')).toBe('a\\eb')
+    expect(escapeRoff('full-stack --hire')).toBe('full\\-stack \\-\\-hire')
+    expect(escapeRoff(".TH x\n'quoted\nfine")).toBe("\\&.TH x\n\\&'quoted\nfine")
+  })
+
+  it.each(['en', 'fr'] as const)('is a manual page in %s whose only requests are its own', (locale) => {
+    const roff = buildManRoff(locale, new Date('2026-10-01T12:00:00Z'))
+    expect(roff.startsWith('.TH JULES 1 "2026-10-01" "jhemery.xyz"')).toBe(true)
+    expect(roff).toContain(locale === 'fr' ? '.SH NOM' : '.SH NAME')
+    expect(roff).toContain(profile.name.split(' ')[0]!)
+    for (const row of roff.split('\n').filter((r) => /^[.']/.test(r))) {
+      expect(row, row).toMatch(/^\.(TH|SH|PP|TP|B|BR|nf|fi|br)( |$)/)
+    }
+    expect(roff).not.toMatch(/CTF\{/)
   })
 })
