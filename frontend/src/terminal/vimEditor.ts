@@ -2,8 +2,15 @@ import type { VimBufferState, VimCursor } from './types'
 
 const MODIFIER_KEYS = new Set(['Shift', 'Control', 'Alt', 'AltGraph', 'Meta', 'CapsLock'])
 
+/** Vim's own ceiling on a count, so a long run of digits can't overflow. */
+const MAX_COUNT = 999_999_999
+
+function lineAt(state: VimBufferState, row: number): string {
+  return state.lines[row] ?? ''
+}
+
 function currentLine(state: VimBufferState): string {
-  return state.lines[state.cursor.row] ?? ''
+  return lineAt(state, state.cursor.row)
 }
 
 /** Clamps the cursor's column to the current line's bounds. `allowEnd` permits
@@ -15,21 +22,21 @@ function clampCol(state: VimBufferState, allowEnd: boolean) {
   state.cursor.col = Math.min(Math.max(0, state.cursor.col), max)
 }
 
-function moveLeft(state: VimBufferState) {
-  state.cursor.col = Math.max(0, state.cursor.col - 1)
+function moveLeft(state: VimBufferState, count = 1) {
+  state.cursor.col = Math.max(0, state.cursor.col - count)
 }
 
-function moveRight(state: VimBufferState) {
-  state.cursor.col = Math.min(state.cursor.col + 1, Math.max(0, currentLine(state).length - 1))
+function moveRight(state: VimBufferState, count = 1) {
+  state.cursor.col = Math.min(state.cursor.col + count, Math.max(0, currentLine(state).length - 1))
 }
 
-function moveDown(state: VimBufferState) {
-  state.cursor.row = Math.min(state.cursor.row + 1, state.lines.length - 1)
+function moveDown(state: VimBufferState, count = 1) {
+  state.cursor.row = Math.min(state.cursor.row + count, state.lines.length - 1)
   clampCol(state, false)
 }
 
-function moveUp(state: VimBufferState) {
-  state.cursor.row = Math.max(state.cursor.row - 1, 0)
+function moveUp(state: VimBufferState, count = 1) {
+  state.cursor.row = Math.max(state.cursor.row - count, 0)
   clampCol(state, false)
 }
 
@@ -86,155 +93,206 @@ function classAt(state: VimBufferState, p: VimCursor) {
 }
 
 /** Vim's `inc()`: one character on, stopping on a line's end before the next
- *  line's first character. False at the end of the buffer. */
-function step(state: VimBufferState, p: VimCursor): boolean {
-  if (p.col < (state.lines[p.row] ?? '').length) p.col += 1
-  else if (p.row < state.lines.length - 1) {
+ *  line's first character. Returns what vim's does: 0 within a line, 2 onto
+ *  its end, 1 onto the next line, and -1 at the end of the buffer. */
+function step(state: VimBufferState, p: VimCursor): -1 | 0 | 1 | 2 {
+  const length = lineAt(state, p.row).length
+  if (p.col < length) {
+    p.col += 1
+    return p.col < length ? 0 : 2
+  }
+  if (p.row < state.lines.length - 1) {
     p.row += 1
     p.col = 0
-  } else return false
-  return true
+    return 1
+  }
+  return -1
 }
 
-/** Where `e` lands from the cursor, following vim's `end_word()`: the end of
- *  the word under the cursor, or from the end of one (or a blank) the end of
- *  the next, across lines if need be. With only blanks left it stops on the
- *  buffer's last character. Null when there is nowhere to go at all. */
-function wordEnd(state: VimBufferState): VimCursor | null {
+/** Where `w` lands under an operator, after vim's `fwd_word()`: past the word
+ *  under the cursor and the blanks after it, `count` times, an empty line
+ *  counting as a word. Only the last of them stops at the end of its line
+ *  rather than going on to the next line's first word, which is why `dw` on a
+ *  line's last word never takes the line break with it but `d2w` can. */
+function wordForward(state: VimBufferState, count: number): VimCursor {
   const p = { ...state.cursor }
-  const startClass = classAt(state, p)
-  if (!step(state, p)) return null
-  if (startClass === 0 || classAt(state, p) !== startClass) {
-    while (classAt(state, p) === 0) {
-      if (!step(state, p)) {
-        if (p.col > 0) p.col -= 1
-        return p
+  for (let left = count; left > 0; left -= 1) {
+    const last = left === 1
+    const startClass = classAt(state, p)
+    const onLastRow = p.row === state.lines.length - 1
+    let moved = step(state, p)
+    // The last `w` stops on a line's end; from the buffer's, none can go on.
+    if (moved === -1 || (moved > 0 && (onLastRow || last))) return p
+    if (startClass !== 0) {
+      while (classAt(state, p) === startClass) {
+        moved = step(state, p)
+        if (moved === -1 || (moved > 0 && last)) return p
       }
     }
+    while (classAt(state, p) === 0 && !(p.col === 0 && lineAt(state, p.row) === '')) {
+      moved = step(state, p)
+      if (moved === -1 || (moved > 0 && last)) return p
+    }
   }
-  const wordClass = classAt(state, p)
-  while (classAt(state, p) === wordClass) step(state, p)
-  // One past the word, and always still on its line: a line's end is a blank.
-  p.col -= 1
   return p
 }
 
-/** `de`: a charwise delete from the cursor through `end`, inclusive, and the
- *  only one that can span lines. Vim turns such a delete linewise when it
- *  starts within the indent and leaves nothing but blanks on its last line. */
-function deleteThrough(state: VimBufferState, end: VimCursor) {
+/** Where `e` lands, after vim's `end_word()`: the end of the word under the
+ *  cursor, or from the end of one (or a blank) the end of the next, across
+ *  lines if need be, `count` times. With only blanks left it stops on the
+ *  buffer's last character. Null when there is nowhere to go at all. */
+function wordEnd(state: VimBufferState, count: number): VimCursor | null {
+  const p = { ...state.cursor }
+  for (let done = 0; done < count; done += 1) {
+    const startClass = classAt(state, p)
+    if (step(state, p) === -1) return done === 0 ? null : p
+    if (startClass === 0 || classAt(state, p) !== startClass) {
+      while (classAt(state, p) === 0) {
+        if (step(state, p) === -1) {
+          if (p.col > 0) p.col -= 1
+          return p
+        }
+      }
+    }
+    const wordClass = classAt(state, p)
+    while (classAt(state, p) === wordClass) step(state, p)
+    // One past the word, and always still on its line: a line's end is a blank.
+    p.col -= 1
+  }
+  return p
+}
+
+/** A charwise delete from the cursor to `end`, finished the way vim's operator
+ *  code finishes one, which is where its two linewise surprises live. An
+ *  exclusive motion ending in column 0 of a later line ends instead at the end
+ *  of the line before, and turns linewise if it started within the indent:
+ *  that is how `dw` deletes an empty line. And a delete over several lines
+ *  that starts within the indent and leaves only blanks after it takes those
+ *  lines whole: `d2$` from column 0. */
+function deleteCharwise(state: VimBufferState, end: VimCursor, inclusive: boolean) {
   const { row, col } = state.cursor
   const line = currentLine(state)
-  const rest = (state.lines[end.row] ?? '').slice(end.col + 1)
-  if (end.row > row && rest.trim() === '' && col <= line.length - line.trimStart().length) {
-    deleteLines(state, row, end.row)
+  const inIndent = col <= (/^[ \t]*/.exec(line)?.[0].length ?? 0)
+  let lastRow = end.row
+  let stop = inclusive ? end.col + 1 : end.col
+  if (!inclusive && end.col === 0 && end.row > row) {
+    if (inIndent) {
+      deleteLines(state, row, end.row - 1)
+      return
+    }
+    lastRow -= 1
+    stop = lineAt(state, lastRow).length
+  }
+
+  const rest = lineAt(state, lastRow).slice(stop)
+  if (lastRow > row && inIndent && /^[ \t]*$/.test(rest)) {
+    deleteLines(state, row, lastRow)
     return
   }
-  state.lines.splice(row, end.row - row + 1, line.slice(0, col) + rest)
+  const joined = line.slice(0, col) + rest
+  if (lastRow === row && joined === line) return
+  state.lines.splice(row, lastRow - row + 1, joined)
   state.dirty = true
   clampCol(state, false)
 }
 
-/** `dw`: the rest of the word under the cursor and the blanks after it. Under
- *  an operator `w` stops at the end of the line instead of moving on to the next
- *  line's first word, so the last word of a line never takes the line break
- *  with it. The one way across a line is from an empty line: `w` lands in
- *  column 0 of the next, an exclusive motion ending in column 0 turns linewise,
- *  and the empty line itself is what gets deleted. */
-function deleteWord(state: VimBufferState) {
-  const line = currentLine(state)
+/** Completes a pending `d` with the motion that followed it, `count` times. A
+ *  key that isn't one of these motions cancels the operator and is itself
+ *  dropped, as in vim; so does a motion that can't move (`j` on the last line,
+ *  `k` on the first, `h` and `0` in column 0). */
+function applyDelete(key: string, state: VimBufferState, count: number) {
   const { row, col } = state.cursor
-  if (line === '') {
-    if (row < state.lines.length - 1) deleteLines(state, row, row)
-    return
-  }
-
-  const startClass = charClass(line.charAt(col))
-  let end = col + 1
-  if (startClass !== 0) {
-    while (end < line.length && charClass(line.charAt(end)) === startClass) end += 1
-  }
-  while (end < line.length && charClass(line.charAt(end)) === 0) end += 1
-
-  deleteSpan(state, col, end)
-}
-
-/** Completes a pending `d` with the key that followed it. A key that isn't one
- *  of these motions cancels the operator and is itself dropped, as in vim; so
- *  does a motion that can't move (`j` on the last line, `k` on the first, `h`
- *  and `0` in column 0). */
-function applyDelete(key: string, state: VimBufferState) {
-  const { row, col } = state.cursor
+  const lastRow = state.lines.length - 1
   switch (key) {
+    // `Ndd` first moves down N - 1 lines, and vim's `cursor_down()` refuses to
+    // from the last line: `2dd` there deletes nothing where `dd` would.
     case 'd':
-      deleteLines(state, row, row)
+      if (count > 1 && row === lastRow) return
+      deleteLines(state, row, Math.min(row + count - 1, lastRow))
       return
     case 'j':
     case 'ArrowDown':
-      if (row < state.lines.length - 1) deleteLines(state, row, row + 1)
+      if (row < lastRow) deleteLines(state, row, Math.min(row + count, lastRow))
       return
     case 'k':
     case 'ArrowUp':
-      if (row > 0) deleteLines(state, row - 1, row)
+      if (row > 0) deleteLines(state, Math.max(row - count, 0), row)
       return
     case 'h':
     case 'ArrowLeft':
-      deleteSpan(state, Math.max(0, col - 1), col)
+      deleteSpan(state, Math.max(0, col - count), col)
       return
     // `l` can't move off the last character, but under an operator vim lets it
     // take that character anyway.
     case 'l':
     case 'ArrowRight':
-      deleteSpan(state, col, Math.min(col + 1, currentLine(state).length))
+      deleteSpan(state, col, Math.min(col + count, currentLine(state).length))
       return
     case '0':
       deleteSpan(state, 0, col)
       return
-    // `$` is inclusive: the character under the cursor goes too.
-    case '$':
-      deleteSpan(state, col, currentLine(state).length)
+    // `$` is inclusive, so the character under the cursor goes too, and `N$`
+    // ends N - 1 lines down, refused from the last line like `Ndd`.
+    case '$': {
+      if (count > 1 && row === lastRow) return
+      const endRow = Math.min(row + count - 1, lastRow)
+      deleteCharwise(state, { row: endRow, col: Math.max(0, lineAt(state, endRow).length - 1) }, true)
       return
+    }
     case 'w':
-      deleteWord(state)
+      deleteCharwise(state, wordForward(state, count), false)
       return
     case 'e': {
-      const end = wordEnd(state)
-      if (end) deleteThrough(state, end)
+      const end = wordEnd(state, count)
+      if (end) deleteCharwise(state, end, true)
       return
     }
   }
 }
 
 function handleNormalKey(key: string, state: VimBufferState): void {
-  if (state.pending === 'd') {
-    state.pending = null
-    applyDelete(key, state)
+  // A count is digits, and `0` only continues one: on its own it is a motion.
+  if (/^[1-9]$/.test(key) || (key === '0' && /\d$/.test(state.pending))) {
+    state.pending += key
+    return
+  }
+
+  const [, before = '', operator = '', after = ''] = /^(\d*)(d?)(\d*)$/.exec(state.pending) ?? []
+  state.pending = ''
+  // A count on each side of the operator multiplies, as in vim: `2d3w` is `d6w`.
+  const count = Math.min(Number(before || 1) * Number(after || 1), MAX_COUNT)
+  if (operator) {
+    applyDelete(key, state, count)
     return
   }
 
   switch (key) {
     case 'h':
     case 'ArrowLeft':
-      moveLeft(state)
+      moveLeft(state, count)
       return
     case 'l':
     case 'ArrowRight':
-      moveRight(state)
+      moveRight(state, count)
       return
     case 'j':
     case 'ArrowDown':
-      moveDown(state)
+      moveDown(state, count)
       return
     case 'k':
     case 'ArrowUp':
-      moveUp(state)
+      moveUp(state, count)
       return
     case '0':
       state.cursor.col = 0
       return
-    case '$':
+    case '$': {
+      const lastRow = state.lines.length - 1
+      if (count > 1 && state.cursor.row === lastRow) return
+      state.cursor.row = Math.min(state.cursor.row + count - 1, lastRow)
       state.cursor.col = Math.max(0, currentLine(state).length - 1)
       return
+    }
     case 'i':
       state.mode = 'insert'
       return
@@ -265,10 +323,10 @@ function handleNormalKey(key: string, state: VimBufferState): void {
       return
     // Vim defines `x` as `dl`.
     case 'x':
-      applyDelete('l', state)
+      applyDelete('l', state, count)
       return
     case 'd':
-      state.pending = 'd'
+      state.pending = `${before}d`
       return
     default:
       return
@@ -351,7 +409,7 @@ export function handleVimKey(state: VimBufferState, event: KeyboardEvent): boole
   // cancel the `d` waiting for it.
   if (MODIFIER_KEYS.has(event.key)) return true
   if (event.key === ':') {
-    state.pending = null
+    state.pending = ''
     return false
   }
   if (state.mode === 'insert') {

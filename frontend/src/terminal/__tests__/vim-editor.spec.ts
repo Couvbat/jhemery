@@ -10,7 +10,7 @@ function buffer(lines: string[], row = 0, col = 0): VimBufferState {
     mode: 'normal',
     dirty: false,
     statusMessage: null,
-    pending: null,
+    pending: '',
   }
 }
 
@@ -60,7 +60,7 @@ describe('dd', () => {
   it('is cancelled by a key that is not a second `d`, which is not run either', () => {
     const state = press(buffer(['one', 'two']), 'd', 'x')
     expect(state.lines).toEqual(['one', 'two'])
-    expect(state.pending).toBeNull()
+    expect(state.pending).toBe('')
     // and the `d` that follows starts afresh instead of completing the old one
     press(state, 'd')
     expect(state.lines).toEqual(['one', 'two'])
@@ -77,7 +77,7 @@ describe('dd', () => {
     const state = buffer(['one', 'two'])
     press(state, 'd')
     expect(handleVimKey(state, new KeyboardEvent('keydown', { key: ':' }))).toBe(false)
-    expect(state.pending).toBeNull()
+    expect(state.pending).toBe('')
   })
 })
 
@@ -93,7 +93,7 @@ describe('dj', () => {
     const state = press(buffer(['one', 'two'], 1), 'd', 'j')
     expect(state.lines).toEqual(['one', 'two'])
     expect(state.dirty).toBe(false)
-    expect(state.pending).toBeNull()
+    expect(state.pending).toBe('')
   })
 
   it('leaves one empty line when it takes the whole buffer', () => {
@@ -318,5 +318,136 @@ describe('dw', () => {
     const state = press(buffer(['one', ''], 1), 'd', 'w')
     expect(state.lines).toEqual(['one', ''])
     expect(state.dirty).toBe(false)
+  })
+})
+
+describe('counts', () => {
+  const lines = () => ['one', 'two', 'three', 'four', 'five']
+
+  describe('on `dd`, `dj` and `dk`', () => {
+    it('`2dd` deletes two lines from the cursor', () => {
+      const state = press(buffer(lines(), 1), '2', 'd', 'd')
+      expect(state.lines).toEqual(['one', 'four', 'five'])
+      expect(state.cursor.row).toBe(1)
+    })
+
+    it('takes the count after the `d` too, as `d2d`', () => {
+      expect(press(buffer(lines(), 1), 'd', '2', 'd').lines).toEqual(['one', 'four', 'five'])
+    })
+
+    it('multiplies a count on each side: `2d2d` is four lines', () => {
+      expect(press(buffer(lines()), '2', 'd', '2', 'd').lines).toEqual(['five'])
+    })
+
+    it('stops at the last line when the count runs past it', () => {
+      expect(press(buffer(lines(), 3), '5', 'd', 'd').lines).toEqual(['one', 'two', 'three'])
+    })
+
+    // Vim's `cursor_down()` refuses outright from the last line, so a count
+    // there deletes nothing, where a plain `dd` would.
+    it('does nothing from the last line', () => {
+      const state = press(buffer(lines(), 4), '2', 'd', 'd')
+      expect(state.lines).toEqual(lines())
+      expect(state.dirty).toBe(false)
+    })
+
+    it('`d2j` deletes the line and the two below', () => {
+      expect(press(buffer(lines(), 1), 'd', '2', 'j').lines).toEqual(['one', 'five'])
+    })
+
+    it('`d2k` deletes the line and the two above, stopping at the first', () => {
+      expect(press(buffer(lines(), 3), 'd', '2', 'k').lines).toEqual(['one', 'five'])
+      expect(press(buffer(lines(), 1), 'd', '5', 'k').lines).toEqual(['three', 'four', 'five'])
+    })
+  })
+
+  describe('on charwise motions', () => {
+    it('`d3w` deletes three words', () => {
+      const state = press(buffer(['one two three four']), 'd', '3', 'w')
+      expect(state.lines).toEqual(['four'])
+    })
+
+    it('`2d3w` deletes six', () => {
+      expect(press(buffer(['a b c d e f g h']), '2', 'd', '3', 'w').lines).toEqual(['g h'])
+    })
+
+    // Only the last `w` stops at the end of its line; the ones before it go on
+    // to the next line like a plain `w` does.
+    it('carries `w` across lines before the last one', () => {
+      const state = press(buffer(['foo bar', 'baz qux'], 0, 4), 'd', '2', 'w')
+      expect(state.lines).toEqual(['foo qux'])
+      expect(state.cursor).toEqual({ row: 0, col: 4 })
+    })
+
+    it('`d2e` deletes through the end of the second word', () => {
+      expect(press(buffer(['foo bar baz']), 'd', '2', 'e').lines).toEqual([' baz'])
+    })
+
+    it('`d3l` and `3x` delete three characters, as far as the line goes', () => {
+      expect(press(buffer(['hello'], 0, 1), 'd', '3', 'l').lines).toEqual(['ho'])
+      expect(press(buffer(['hello'], 0, 1), '3', 'x').lines).toEqual(['ho'])
+      expect(press(buffer(['hello'], 0, 3), '5', 'x').lines).toEqual(['hel'])
+    })
+
+    it('`d3h` deletes three characters back, as far as column 0', () => {
+      const state = press(buffer(['hello'], 0, 4), 'd', '3', 'h')
+      expect(state.lines).toEqual(['ho'])
+      expect(state.cursor.col).toBe(1)
+      expect(press(buffer(['hello'], 0, 2), 'd', '9', 'h').lines).toEqual(['llo'])
+    })
+
+    it('`d2$` deletes to the end of the next line', () => {
+      const state = press(buffer(['foo bar', 'baz', 'qux'], 0, 4), 'd', '2', '$')
+      expect(state.lines).toEqual(['foo ', 'qux'])
+    })
+
+    // Vim's rule for a charwise delete over several lines, again: from the
+    // indent, with nothing left after it, it takes the lines whole.
+    it('`d2$` from the indent deletes the lines whole', () => {
+      expect(press(buffer(['foo', 'bar', 'qux']), 'd', '2', '$').lines).toEqual(['qux'])
+    })
+
+    it('`d2$` does nothing from the last line', () => {
+      expect(press(buffer(['foo', 'bar'], 1), 'd', '2', '$').lines).toEqual(['foo', 'bar'])
+    })
+  })
+
+  describe('on plain motions', () => {
+    it('moves `3j`, `2k`, `3l` and `2h` that many times, as far as the buffer goes', () => {
+      const state = buffer(lines())
+      press(state, '3', 'j')
+      expect(state.cursor.row).toBe(3)
+      press(state, '2', 'k')
+      expect(state.cursor.row).toBe(1)
+      press(state, '9', 'j')
+      expect(state.cursor.row).toBe(4)
+      press(state, '3', 'l')
+      expect(state.cursor.col).toBe(3)
+      press(state, '2', 'h')
+      expect(state.cursor.col).toBe(1)
+    })
+
+    it('`2$` moves to the end of the next line', () => {
+      expect(press(buffer(lines()), '2', '$').cursor).toEqual({ row: 1, col: 2 })
+    })
+  })
+
+  describe('typing them', () => {
+    it('reads `0` as a digit once a count has started, and as the motion otherwise', () => {
+      expect(press(buffer(['abcdefghijkl']), '1', '0', 'x').lines).toEqual(['kl'])
+      expect(press(buffer(['hello world'], 0, 6), 'd', '0').lines).toEqual(['world'])
+    })
+
+    // Vim's 'showcmd' shows the whole command typed so far, count included.
+    it('keeps what has been typed in `pending`, for the status line to show', () => {
+      const state = press(buffer(lines()), '2', 'd', '3')
+      expect(state.pending).toBe('2d3')
+      press(state, 'j')
+      expect(state.pending).toBe('')
+    })
+
+    it('is dropped by Escape, so the next command runs once', () => {
+      expect(press(buffer(['hello']), '3', 'Escape', 'x').lines).toEqual(['ello'])
+    })
   })
 })
