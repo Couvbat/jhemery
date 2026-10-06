@@ -98,9 +98,9 @@ export class JobsService implements OnModuleInit, OnModuleDestroy {
   }
 
   /**
-   * `process.execPath` is the node this app runs on — under Passenger, exactly the
-   * `/opt/alt/alt-nodejs20/...` path the shell check found, without anyone having
-   * to copy it into a config.
+   * `process.execPath` is the node this app runs on — under Passenger, the
+   * `/opt/alt/alt-nodejs<N>/...` build chosen in cPanel's Setup Node.js App,
+   * without anyone having to copy its path into a config.
    */
   private get jsRuntime(): string {
     return this.config.get<string>('JS_RUNTIME') || `node:${process.execPath}`;

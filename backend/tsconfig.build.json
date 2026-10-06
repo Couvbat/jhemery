@@ -1,4 +1,11 @@
 {
   "extends": "./tsconfig.json",
+  "compilerOptions": {
+    // src/ alone, so the output lands at dist/main.js where start:prod and the
+    // deploy expect it. The build info goes inside dist/ too: beside this file it
+    // would outlive `deleteOutDir` and sit untracked in every checkout.
+    "rootDir": "./src",
+    "tsBuildInfoFile": "./dist/tsconfig.build.tsbuildinfo"
+  },
   "exclude": ["node_modules", "test", "dist", "**/*spec.ts"]
 }
