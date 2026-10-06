@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { handleVimKey } from '../vimEditor'
 import type { VimBufferState } from '../types'
 
@@ -11,6 +11,9 @@ function buffer(lines: string[], row = 0, col = 0): VimBufferState {
     dirty: false,
     statusMessage: null,
     pending: '',
+    changes: [],
+    lastSeq: 0,
+    insertFrom: null,
   }
 }
 
@@ -448,6 +451,125 @@ describe('counts', () => {
 
     it('is dropped by Escape, so the next command runs once', () => {
       expect(press(buffer(['hello']), '3', 'Escape', 'x').lines).toEqual(['ello'])
+    })
+  })
+})
+
+describe('u', () => {
+  beforeEach(() => {
+    vi.useFakeTimers()
+    vi.setSystemTime(new Date(2026, 9, 6, 14, 30, 0))
+  })
+  afterEach(() => vi.useRealTimers())
+
+  it('takes back the last change', () => {
+    const state = press(buffer(['one', 'two', 'three']), 'd', 'd', 'u')
+    expect(state.lines).toEqual(['one', 'two', 'three'])
+  })
+
+  it('takes changes back one at a time, newest first', () => {
+    const state = press(buffer(['hello']), 'x', 'x', 'u')
+    expect(state.lines).toEqual(['ello'])
+    press(state, 'u')
+    expect(state.lines).toEqual(['hello'])
+  })
+
+  it('takes back a whole insert session as one change', () => {
+    const state = press(buffer(['hello']), 'i', 'a', 'b', 'c', 'Escape', 'u')
+    expect(state.lines).toEqual(['hello'])
+  })
+
+  // `o` opens the line and the text typed into it is the rest of the same change.
+  it('takes back `o` and what was typed after it together, back where `o` was typed', () => {
+    const state = press(buffer(['one', 'two'], 0, 1), 'o', 'x', 'y', 'Escape')
+    expect(state.lines).toEqual(['one', 'xy', 'two'])
+    press(state, 'u')
+    expect(state.lines).toEqual(['one', 'two'])
+    expect(state.cursor).toEqual({ row: 0, col: 1 })
+  })
+
+  // Vim starts a new change when the arrows move the cursor in insert mode.
+  it('splits an insert session where the arrows moved the cursor', () => {
+    const state = press(buffer(['hello']), 'i', 'a', 'ArrowRight', 'b', 'Escape', 'u')
+    expect(state.lines).toEqual(['ahello'])
+  })
+
+  it('records nothing for a command that changed nothing', () => {
+    const state = press(buffer(['hello']), 'x', 'j', 'l', 'd', 'k', 'i', 'Escape', 'u')
+    expect(state.lines).toEqual(['hello'])
+  })
+
+  it('takes back as many changes as its count', () => {
+    expect(press(buffer(['hello']), 'x', 'x', 'x', 'x', '3', 'u').lines).toEqual(['ello'])
+  })
+
+  it('cancels a `d` waiting for its motion instead of undoing', () => {
+    expect(press(buffer(['hello']), 'x', 'd', 'u').lines).toEqual(['ello'])
+  })
+
+  describe('the cursor', () => {
+    it('goes back to its column when the change was on its line', () => {
+      const state = press(buffer(['hello'], 0, 3), 'x', '0', 'u')
+      expect(state.cursor).toEqual({ row: 0, col: 3 })
+    })
+
+    it('goes to the first non-blank of the first changed line when that is another', () => {
+      const state = press(buffer(['one', '  two', 'three'], 2), 'd', 'k', 'u')
+      expect(state.lines).toEqual(['one', '  two', 'three'])
+      expect(state.cursor).toEqual({ row: 1, col: 2 })
+    })
+  })
+
+  // Back at the file as it was opened, the buffer is unmodified again — so a
+  // plain `:q` lets go without E37, as it does in vim.
+  it('leaves the buffer unmodified once every change is taken back', () => {
+    const state = press(buffer(['hello']), 'x', 'x', 'u')
+    expect(state.dirty).toBe(true)
+    press(state, 'u')
+    expect(state.dirty).toBe(false)
+  })
+
+  describe('says what it did, in vim’s words', () => {
+    it('for lines put back, and when the change was made', () => {
+      const state = press(buffer(['one', 'two', 'three']), 'd', 'd')
+      vi.advanceTimersByTime(4000)
+      press(state, 'u')
+      expect(state.statusMessage).toBe('1 more line; before #1  4 seconds ago')
+      expect(press(buffer(['a', 'b', 'c']), '2', 'd', 'd', 'u').statusMessage).toBe(
+        '2 more lines; before #1  0 seconds ago',
+      )
+    })
+
+    it('for lines taken away, and for lines changed in place', () => {
+      expect(press(buffer(['one']), 'o', 'Escape', 'u').statusMessage).toBe(
+        '1 line less; before #1  0 seconds ago',
+      )
+      vi.advanceTimersByTime(1000)
+      expect(press(buffer(['one']), 'x', 'u').statusMessage).toBe('1 change; before #1  0 seconds ago')
+    })
+
+    it('with "second" for one second', () => {
+      const state = press(buffer(['one']), 'x')
+      vi.advanceTimersByTime(1000)
+      expect(press(state, 'u').statusMessage).toBe('1 change; before #1  1 second ago')
+    })
+
+    it('with the time of day for a change 100 seconds old or more', () => {
+      const state = press(buffer(['one']), 'x')
+      vi.advanceTimersByTime(120_000)
+      expect(press(state, 'u').statusMessage).toBe('1 change; before #1  14:30:00')
+    })
+
+    // Vim numbers changes from 1 and keeps counting through undos.
+    it('numbering changes on through undos', () => {
+      const state = press(buffer(['hello']), 'x', 'u', 'x', 'u')
+      expect(state.statusMessage).toBe('1 change; before #2  0 seconds ago')
+    })
+
+    it('and that there is nothing left to undo', () => {
+      const state = press(buffer(['hello']), 'u')
+      expect(state.lines).toEqual(['hello'])
+      expect(state.statusMessage).toBe('Already at oldest change')
     })
   })
 })

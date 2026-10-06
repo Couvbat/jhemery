@@ -1,4 +1,4 @@
-import type { VimBufferState, VimCursor } from './types'
+import type { VimBufferState, VimChange, VimCursor, VimSnapshot } from './types'
 
 const MODIFIER_KEYS = new Set(['Shift', 'Control', 'Alt', 'AltGraph', 'Meta', 'CapsLock'])
 
@@ -38,6 +38,13 @@ function moveDown(state: VimBufferState, count = 1) {
 function moveUp(state: VimBufferState, count = 1) {
   state.cursor.row = Math.max(state.cursor.row - count, 0)
   clampCol(state, false)
+}
+
+const ARROW_MOVES: Record<string, (state: VimBufferState) => void> = {
+  ArrowLeft: moveLeft,
+  ArrowRight: moveRight,
+  ArrowUp: moveUp,
+  ArrowDown: moveDown,
 }
 
 /** Vim's `^`: the first non-blank, or the last character of a line that is all
@@ -250,6 +257,96 @@ function applyDelete(key: string, state: VimBufferState, count: number) {
   }
 }
 
+function snapshot(state: VimBufferState): VimSnapshot {
+  return { lines: [...state.lines], cursor: { ...state.cursor } }
+}
+
+function sameLines(a: string[], b: string[]): boolean {
+  return a.length === b.length && a.every((line, i) => line === b[i])
+}
+
+/** Records the change that turned `before` into the buffer as it is now, if it
+ *  changed at all: a motion, or a `d` whose motion couldn't move, is no change
+ *  for `u` to take back. */
+function record(state: VimBufferState, before: VimSnapshot) {
+  if (sameLines(before.lines, state.lines)) return
+  state.lastSeq += 1
+  state.changes.push({ ...before, seq: state.lastSeq, time: Date.now() })
+}
+
+/** The lines two versions of the buffer don't share: where they start, and how
+ *  many each version has there. */
+function changedRegion(from: string[], to: string[]) {
+  let top = 0
+  while (top < from.length && top < to.length && from[top] === to[top]) top += 1
+  let tail = 0
+  while (
+    tail < from.length - top &&
+    tail < to.length - top &&
+    from[from.length - 1 - tail] === to[to.length - 1 - tail]
+  ) {
+    tail += 1
+  }
+  return { top, removed: from.length - top - tail, added: to.length - top - tail }
+}
+
+/** Vim's `u_undo_end()` message: what the undo did to the line count, or how
+ *  many lines it changed in place, then which change it went back before and
+ *  when that was made. */
+function undoMessage(removed: number, added: number, change: VimChange): string {
+  const fewer = removed - added
+  const what =
+    fewer === -1
+      ? '1 more line'
+      : fewer < 0
+        ? `${-fewer} more lines`
+        : fewer === 1
+          ? '1 line less'
+          : fewer > 1
+            ? `${fewer} fewer lines`
+            : `${added} ${added === 1 ? 'change' : 'changes'}`
+  const seconds = Math.floor((Date.now() - change.time) / 1000)
+  const when =
+    seconds < 100
+      ? `${seconds} ${seconds === 1 ? 'second' : 'seconds'} ago`
+      : new Date(change.time).toTimeString().slice(0, 8)
+  return `${what}; before #${change.seq}  ${when}`
+}
+
+/** `u`: takes back the last `count` changes. The cursor goes where vim's
+ *  `u_undoredo()` puts it: on the first changed line — or the line above when
+ *  that is where the change was made from, as with `o` — at its old column if
+ *  that is the line it was on, at the first non-blank if not. Back at the file
+ *  as it was opened, the buffer is unmodified again, so `:q` lets go. */
+function undo(state: VimBufferState, count: number) {
+  if (state.changes.length === 0) {
+    state.statusMessage = 'Already at oldest change'
+    return
+  }
+  const undone = state.changes.splice(Math.max(0, state.changes.length - count))
+  const oldest = undone[0]!
+  const { top, removed, added } = changedRegion(state.lines, oldest.lines)
+  state.lines = [...oldest.lines]
+
+  const saved = oldest.cursor
+  let row = top
+  if (saved.row + 1 === row && row > 0) row -= 1
+  if (row > state.lines.length - 1) {
+    state.cursor.row = state.lines.length - 1
+    state.cursor.col = 0
+  } else if (row === saved.row) {
+    state.cursor.row = row
+    state.cursor.col = saved.col
+    clampCol(state, false)
+  } else {
+    state.cursor.row = row
+    firstNonBlank(state)
+  }
+
+  state.dirty = state.changes.length > 0
+  state.statusMessage = undoMessage(removed, added, oldest)
+}
+
 function handleNormalKey(key: string, state: VimBufferState): void {
   // A count is digits, and `0` only continues one: on its own it is a motion.
   if (/^[1-9]$/.test(key) || (key === '0' && /\d$/.test(state.pending))) {
@@ -257,15 +354,34 @@ function handleNormalKey(key: string, state: VimBufferState): void {
     return
   }
 
-  const [, before = '', operator = '', after = ''] = /^(\d*)(d?)(\d*)$/.exec(state.pending) ?? []
+  const [, countBefore = '', operator = '', countAfter = ''] = /^(\d*)(d?)(\d*)$/.exec(state.pending) ?? []
   state.pending = ''
   // A count on each side of the operator multiplies, as in vim: `2d3w` is `d6w`.
-  const count = Math.min(Number(before || 1) * Number(after || 1), MAX_COUNT)
-  if (operator) {
-    applyDelete(key, state, count)
+  const count = Math.min(Number(countBefore || 1) * Number(countAfter || 1), MAX_COUNT)
+  if (!operator && key === 'd') {
+    state.pending = `${countBefore}d`
+    return
+  }
+  if (!operator && key === 'u') {
+    undo(state, count)
     return
   }
 
+  const before = snapshot(state)
+  if (operator) applyDelete(key, state, count)
+  else runCommand(key, state, count)
+  if (state.mode === 'normal') {
+    record(state, before)
+    return
+  }
+  // The command opened an insert session, recorded as one change when it ends.
+  // Vim keeps the cursor from a change's first edit: `o` and `O` make theirs
+  // before they move it, `i`, `a`, `I` and `A` not until a character is typed,
+  // wherever they have put it by then.
+  state.insertFrom = sameLines(before.lines, state.lines) ? snapshot(state) : before
+}
+
+function runCommand(key: string, state: VimBufferState, count: number): void {
   switch (key) {
     case 'h':
     case 'ArrowLeft':
@@ -325,9 +441,6 @@ function handleNormalKey(key: string, state: VimBufferState): void {
     case 'x':
       applyDelete('l', state, count)
       return
-    case 'd':
-      state.pending = `${before}d`
-      return
     default:
       return
   }
@@ -337,24 +450,20 @@ function handleInsertKey(event: KeyboardEvent, state: VimBufferState): void {
   const { key } = event
 
   if (key === 'Escape') {
+    if (state.insertFrom) record(state, state.insertFrom)
+    state.insertFrom = null
     state.mode = 'normal'
     state.cursor.col = Math.max(0, state.cursor.col - 1)
     return
   }
-  if (key === 'ArrowLeft') {
-    moveLeft(state)
-    return
-  }
-  if (key === 'ArrowRight') {
-    moveRight(state)
-    return
-  }
-  if (key === 'ArrowUp') {
-    moveUp(state)
-    return
-  }
-  if (key === 'ArrowDown') {
-    moveDown(state)
+
+  const move = ARROW_MOVES[key]
+  if (move) {
+    // An arrow in insert mode ends one change and starts another, as in vim:
+    // `u` then takes back only what was typed since the cursor last moved.
+    if (state.insertFrom) record(state, state.insertFrom)
+    move(state)
+    state.insertFrom = snapshot(state)
     return
   }
   if (key === 'Backspace') {

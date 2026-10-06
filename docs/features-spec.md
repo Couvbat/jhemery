@@ -659,6 +659,12 @@ editor, because a fake one that ignores `hjkl` is a worse joke than no joke.
   (`2d3w` deletes six words). `0` is a digit only once a count has started. A count that runs past
   the buffer stops at its edge, except that `Ndd`/`N$` from the last line do nothing, as vim's
   `cursor_down()` refuses there. The insert commands ignore theirs.
+- `u` undoes, taking a count too. One change is one normal-mode command, or one insert session
+  (`o` and what is typed after it together) split wherever the arrows moved the cursor. The cursor
+  goes where vim's `u_undoredo()` puts it, and the status line says what vim says
+  (`1 line less; before #2  4 seconds ago`, `Already at oldest change`) in the normal colour; only
+  messages with an `E` number are red. Undoing every change makes the buffer unmodified again, so
+  `:q` stops refusing. No redo yet: `Ctrl+R` never reaches the editor.
 - Insert mode: real text entry, `Enter` splits the line, `Backspace` merges into the previous
   line at the right join column, `Esc` returns to normal mode and steps the cursor back one
   column. The status line gains `[+]` once the buffer is dirty.

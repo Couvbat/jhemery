@@ -24,6 +24,9 @@ function buffer(overrides: Partial<VimBufferState> = {}): VimBufferState {
     dirty: false,
     statusMessage: null,
     pending: '',
+    changes: [],
+    lastSeq: 0,
+    insertFrom: null,
     ...overrides,
   }
 }
