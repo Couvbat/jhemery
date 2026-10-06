@@ -146,7 +146,8 @@ Beyond pageviews, [frontend/src/App.vue](../frontend/src/App.vue) sends one cust
 
 cPanel → **Logiciel** → **Setup Node.js App** → **Create Application**:
 
-- Node version: 24 (or closest available)
+- Node version: 24, and never below 20.19: NestJS 12 ships as ES modules only, which the
+  CommonJS build loads through `require()`, and older Node refuses that, so the API would not boot
 - Application mode: Production
 - Application root: e.g. `api.jhemery.xyz` → `BACKEND_REMOTE_PATH` = `/home/<user>/api.jhemery.xyz`
 - Application URL: `api.jhemery.xyz`
@@ -391,7 +392,7 @@ job API is the same either way, but it is not needed today.
 | yt-dlp | venv at `~/ytdlp` from `/opt/alt/python312/bin/python3.12`; `pip install "yt-dlp[default,curl-cffi]"`; 2026.08.19 at the time of writing. |
 | `ffmpeg` | Absent from the system. Static 7.0.2 (johnvansickle.com build) in `~/bin/ffmpeg` and `~/bin/ffprobe`; yt-dlp needs `--ffmpeg-location ~/bin`. |
 | `xz` | Absent — `tar xJ` fails. The static ffmpeg tarball was unpacked with `~/ytdlp/bin/python -m tarfile -e`, which has `lzma` built in. |
-| Node | 20, at `/opt/alt/alt-nodejs20/root/usr/bin/node` (the Passenger app's runtime). |
+| Node | 24 for the API's Passenger app, chosen in Setup Node.js App (see step 5 for why at least 20.19). CloudLinux keeps each version under `/opt/alt/alt-nodejs<N>/`; this row first recorded the 20 one, `/opt/alt/alt-nodejs20/root/usr/bin/node`. |
 | `/tmp` | Mounted `noexec`. |
 | CPU time | `ulimit -t` is unlimited, but that is the shell's view; CloudLinux LVE limits still apply and were not measured. |
 
@@ -405,7 +406,7 @@ Three of those rows have teeth:
   binary is not. The static ffmpeg has no shared libraries, so it is unaffected.
 - **YouTube wants a JavaScript runtime.** Without one, yt-dlp warns that extraction "has been
   deprecated, and some formats may be missing". Only deno is enabled by default; the host has
-  node, so the runner passes `--js-runtimes node:/opt/alt/alt-nodejs20/root/usr/bin/node`. With
+  node, so the runner passes the one the API itself runs on (`--js-runtimes node:<process.execPath>`). With
   that, a single video extracts from the host's IP with no bot challenge — which was the open
   question, since YouTube challenges datacentre ranges aggressively and a shared host is one.
 - **SoundCloud rate-limits the IP, hard and for about an hour.** A probe that used a *profile*

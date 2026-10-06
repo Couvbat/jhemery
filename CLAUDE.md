@@ -36,6 +36,11 @@ cd frontend && npm run lint         # eslint . (CI runs this; lint:fix rewrites)
 cd frontend && npm run lighthouse   # lhci autorun against lighthouserc.yml budgets
 ```
 
+NestJS 12 is ESM-only and the backend's specs `require()` it, which Jest allows only with
+`--experimental-vm-modules`. `backend/.npmrc` hands that flag to every Node npm starts, so
+`npm test` and `npx jest` work; running `node_modules/.bin/jest` some other way fails with
+"Must use import to load ES Module".
+
 ```bash
 cd backend && npm run start:dev     # http://localhost:3000 (needs .env; cp .env.example .env)
 cd backend && npx jest              # npm test; *.spec.ts colocated under src/

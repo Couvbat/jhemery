@@ -13,8 +13,19 @@
     "target": "ES2023",
     "sourceMap": true,
     "outDir": "./dist",
+    // TypeScript 6 no longer infers these three, and its new defaults changed what
+    // this config meant. `rootDir` has to be explicit once `outDir` is set (ts-jest
+    // compiles one file at a time, so the inferred root became that file's folder);
+    // tsconfig.build.json narrows it to src/ so the build still writes dist/main.js.
+    "rootDir": ".",
     "incremental": true,
     "skipLibCheck": true,
+    // `strict` now defaults to true. This config never set it and picks its strict
+    // flags one by one below; strict property initialisation in particular would
+    // flag every DTO, which the ValidationPipe fills rather than a constructor.
+    "strict": false,
+    // `types` now defaults to none, which left the Jest and Node globals untyped.
+    "types": ["node", "jest"],
     "strictNullChecks": true,
     "forceConsistentCasingInFileNames": true,
     "noImplicitAny": true,
