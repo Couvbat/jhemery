@@ -39,7 +39,7 @@
     "@lhci/cli": "^0.15.1",
     "@playwright/test": "^1.63.0",
     "@tsconfig/node24": "^24.0.5",
-    "@types/node": "^24.12.2",
+    "@types/node": "^26.6.2",
     "@types/three": "^0.185.1",
     "@vitejs/plugin-vue": "^6.0.9",
     "@vitest/eslint-plugin": "^1.6.27",
