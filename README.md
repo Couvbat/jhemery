@@ -175,7 +175,7 @@ work badly with mobile virtual keyboards, and the page itself shows the same con
 | `-`<kbd>Tab</kbd> | Completes a flag, listing what each does when several are left: `grep -`<kbd>Tab</kbd> |
 | <kbd>Ctrl</kbd>+<kbd>L</kbd> | Clear |
 | <kbd>Ctrl</kbd>+<kbd>C</kbd> | Cancel a running command |
-| <kbd>Esc</kbd> | Close the overlay (focus goes back where it was) |
+| <kbd>Esc</kbd> | Close the overlay (focus goes back where it was). Not inside `vim`, where it's vim's key |
 | traffic lights | The title-bar dots really do close, minimise and maximise |
 
 An empty prompt suggests a command in faded text (`try: neofetch`), cycling every few seconds
@@ -196,7 +196,7 @@ into *shell · navigation · content · live data · misc* and only hints that "
 listed here". `help --all` reveals the hidden ones.
 
 **vim.** `vim` (or `vi`, `nvim`, `emacs`) opens a real modal editor pane with normal and insert
-modes, `hjkl` and the arrows, `i`/`a`/`A`/`o`, `x` and `dd`. And yes, `:q!` gets you out. `:q`
+modes, `hjkl` and the arrows, `i`/`a`/`A`/`o`, `x`, and `d` with `d`/`j`/`k`/`$`/`w`. And yes, `:q!` gets you out. `:q`
 refuses once you've typed something, just like the real thing (and at the prompt, with no vim
 open, it only notes the reflex). The red title-bar dot always works
 if you'd rather not play along. `cat` and `vim` read from the same fake filesystem, so a file can

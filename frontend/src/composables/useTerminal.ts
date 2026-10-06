@@ -123,6 +123,7 @@ const effects: TerminalEffects = {
             mode: 'normal',
             dirty: false,
             statusMessage: null,
+            pending: null,
           }
         : null
   },

@@ -232,9 +232,8 @@ function onKeydown(event: KeyboardEvent) {
     event.key !== ':'
   ) {
     if (handleVimKeydown(event)) {
-      // Escape leaving insert mode must not also reach onPanelKeydown's Escape
-      // handling below (which would additionally submit `:q`) — a key the vim
-      // editor consumed is fully consumed, not just its default action.
+      // Escape must not also reach onPanelKeydown's Escape handling — a key the
+      // vim editor consumed is fully consumed, not just its default action.
       event.preventDefault()
       event.stopPropagation()
     }
@@ -284,8 +283,9 @@ function onKeydown(event: KeyboardEvent) {
   }
 }
 
-/** The red dot and Escape share one exit path, vim-trap nudge included — a
- *  close button that silently does nothing just reads as broken.
+/** The red dot's exit path, vim-trap nudge included — a close button that
+ *  silently does nothing just reads as broken. Escape shares it only while no vim
+ *  pane is open; inside vim it is vim's key, not the chrome's.
  *
  *  It submits `:q!`, not `:q`: a visitor who typed something in insert mode has
  *  a dirty buffer, and plain `:q` refuses that with E37 — leaving the button
@@ -303,6 +303,13 @@ function onPanelKeydown(event: KeyboardEvent) {
     if (capturing.value) {
       // Quitting a game should not also dismiss the terminal.
       cancel()
+      return
+    }
+    if (vimBuffer.value) {
+      // Only a non-empty `:` line gets here from the input (the editor eats
+      // Escape otherwise), and vim abandons a half-typed command line on Escape.
+      // It never quits: leaving is `:q`'s job, or the red dot's.
+      input.value = ''
       return
     }
     requestClose()

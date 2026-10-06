@@ -1,5 +1,7 @@
 import type { VimBufferState } from './types'
 
+const MODIFIER_KEYS = new Set(['Shift', 'Control', 'Alt', 'AltGraph', 'Meta', 'CapsLock'])
+
 function currentLine(state: VimBufferState): string {
   return state.lines[state.cursor.row] ?? ''
 }
@@ -31,7 +33,106 @@ function moveUp(state: VimBufferState) {
   clampCol(state, false)
 }
 
+/** Vim's `^`: the first non-blank, or the last character of a line that is all
+ *  blanks. */
+function firstNonBlank(state: VimBufferState) {
+  const line = currentLine(state)
+  const col = line.search(/\S/)
+  state.cursor.col = col === -1 ? Math.max(0, line.length - 1) : col
+}
+
+/** Linewise delete of rows `from`..`to`, for `dd`, `dj` and `dk`. A buffer is
+ *  never zero lines, so deleting all of them leaves one empty line, as in vim.
+ *  The cursor goes to the first non-blank of whichever line takes the range's
+ *  place — vim's 'startofline' default, not neovim's. */
+function deleteLines(state: VimBufferState, from: number, to: number) {
+  if (to - from + 1 === state.lines.length) {
+    if (state.lines.length === 1 && state.lines[0] === '') return
+    state.lines.splice(0, state.lines.length, '')
+  } else {
+    state.lines.splice(from, to - from + 1)
+  }
+  state.cursor.row = Math.min(from, state.lines.length - 1)
+  state.dirty = true
+  firstNonBlank(state)
+}
+
+/** `d$`. Vim's `$` is inclusive, so the character under the cursor goes too. */
+function deleteToEnd(state: VimBufferState) {
+  const line = currentLine(state)
+  if (line === '') return
+  state.lines[state.cursor.row] = line.slice(0, state.cursor.col)
+  state.dirty = true
+  clampCol(state, false)
+}
+
+/** Vim's character classes for `w`: blanks, word characters, and everything
+ *  else. Its default 'iskeyword' takes Latin-1's accented letters, and vim
+ *  classes any other Unicode letter as a word character too, hence `\p{L}`. */
+function charClass(char: string): 0 | 1 | 2 {
+  if (/\s/.test(char)) return 0
+  return /[\p{L}\p{N}_]/u.test(char) ? 2 : 1
+}
+
+/** `dw`: the rest of the word under the cursor and the blanks after it. Under
+ *  an operator `w` stops at the end of the line instead of moving on to the next
+ *  line's first word, so the last word of a line never takes the line break
+ *  with it. The one way across a line is from an empty line: `w` lands in
+ *  column 0 of the next, an exclusive motion ending in column 0 turns linewise,
+ *  and the empty line itself is what gets deleted. */
+function deleteWord(state: VimBufferState) {
+  const line = currentLine(state)
+  const { row, col } = state.cursor
+  if (line === '') {
+    if (row < state.lines.length - 1) deleteLines(state, row, row)
+    return
+  }
+
+  const startClass = charClass(line.charAt(col))
+  let end = col + 1
+  if (startClass !== 0) {
+    while (end < line.length && charClass(line.charAt(end)) === startClass) end += 1
+  }
+  while (end < line.length && charClass(line.charAt(end)) === 0) end += 1
+
+  state.lines[row] = line.slice(0, col) + line.slice(end)
+  state.dirty = true
+  clampCol(state, false)
+}
+
+/** Completes a pending `d` with the key that followed it. A key that isn't one
+ *  of these motions cancels the operator and is itself dropped, as in vim; so
+ *  does a motion that can't move (`j` on the last line, `k` on the first). */
+function applyDelete(key: string, state: VimBufferState) {
+  const { row } = state.cursor
+  switch (key) {
+    case 'd':
+      deleteLines(state, row, row)
+      return
+    case 'j':
+    case 'ArrowDown':
+      if (row < state.lines.length - 1) deleteLines(state, row, row + 1)
+      return
+    case 'k':
+    case 'ArrowUp':
+      if (row > 0) deleteLines(state, row - 1, row)
+      return
+    case '$':
+      deleteToEnd(state)
+      return
+    case 'w':
+      deleteWord(state)
+      return
+  }
+}
+
 function handleNormalKey(key: string, state: VimBufferState): void {
+  if (state.pending === 'd') {
+    state.pending = null
+    applyDelete(key, state)
+    return
+  }
+
   switch (key) {
     case 'h':
     case 'ArrowLeft':
@@ -93,6 +194,9 @@ function handleNormalKey(key: string, state: VimBufferState): void {
       }
       return
     }
+    case 'd':
+      state.pending = 'd'
+      return
     default:
       return
   }
@@ -159,23 +263,28 @@ function handleInsertKey(event: KeyboardEvent, state: VimBufferState): void {
 
 /**
  * Dispatches one keydown to the vim pane's cursor/mode/buffer state, mutating it
- * in place. Returns `false` for `:` — the caller lets that fall through to the
- * existing command-line typing mechanism unchanged — and for `Escape` in normal
- * mode, since there's nothing for it to do there (real vim's normal-mode Escape
- * is a no-op) and the caller needs it to bubble up to the "nudge toward `:q`"
- * handling instead of silently going nowhere. Escape in insert mode is still
- * fully handled here (drop back to normal mode) so it doesn't *also* trigger
- * that nudge. Every other key is considered handled, including ones this editor
- * doesn't map to anything, since real vim's normal mode silently swallows
- * unmapped keys rather than leaking them into the shell.
+ * in place. Returns `false` only for `:` — the caller lets that fall through to
+ * the existing command-line typing mechanism unchanged. Every other key is
+ * considered handled, including ones this editor doesn't map to anything, since
+ * real vim's normal mode silently swallows unmapped keys rather than leaking them
+ * into the shell. That includes Escape in normal mode: it used to bubble up to
+ * the overlay's close path, which submitted `:q!` — so the key every vim user
+ * mashes to make sure they're in normal mode quit the editor, threw the edits
+ * away and handed out the `:q!` achievement for it. In real vim it does nothing.
  */
 export function handleVimKey(state: VimBufferState, event: KeyboardEvent): boolean {
-  if (event.key === ':') return false
+  // A modifier pressed on its own is a keydown of its own in the browser, but
+  // never a key to vim. `$` is Shift+4 on QWERTY, and that Shift must not
+  // cancel the `d` waiting for it.
+  if (MODIFIER_KEYS.has(event.key)) return true
+  if (event.key === ':') {
+    state.pending = null
+    return false
+  }
   if (state.mode === 'insert') {
     handleInsertKey(event, state)
     return true
   }
-  if (event.key === 'Escape') return false
   handleNormalKey(event.key, state)
   return true
 }

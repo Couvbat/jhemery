@@ -154,6 +154,9 @@ export interface VimBufferState {
   /** A refused `:q`/`:wq` shows its error here — VimPane is the only visible
    *  surface while it's open, so the terminal's own scrollback won't do. */
   statusMessage: string | null
+  /** An operator typed in normal mode and waiting for the key that completes
+   *  it. Only `d` exists so far, completed by `d`, `j`, `k`, `$` or `w`. */
+  pending: 'd' | null
 }
 
 export interface VimFile {

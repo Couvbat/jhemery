@@ -36,9 +36,13 @@ const statusText = computed(() => {
       ><template v-else>{{ text || ' ' }}</template></p>
       <p v-for="(_, i) in tildeRows" :key="`tilde-${i}`" class="text-muted-foreground">~</p>
     </div>
-    <p
-      class="px-4 py-1 border-t border-border shrink-0 truncate bg-muted"
-      :class="buffer.statusMessage ? 'text-destructive' : 'text-muted-foreground'"
-    >{{ buffer.statusMessage ?? statusText }}</p>
+    <!-- The pending operator sits at the right, where vim's 'showcmd' puts it:
+         without it a lone `d` looks like a key the editor ignored. -->
+    <p class="flex gap-4 px-4 py-1 border-t border-border shrink-0 bg-muted text-muted-foreground">
+      <span class="flex-1 truncate" :class="{ 'text-destructive': buffer.statusMessage }">{{
+        buffer.statusMessage ?? statusText
+      }}</span>
+      <span v-if="buffer.pending">{{ buffer.pending }}</span>
+    </p>
   </div>
 </template>
