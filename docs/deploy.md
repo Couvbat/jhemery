@@ -199,6 +199,16 @@ Push a commit touching `frontend/` or `backend/` to `master`, or go to **Actions
 
 ### 3. Verify
 
+After a deploy that touches `frontend/public/.htaccess`, check the rewrites by hand, since
+`vite preview` doesn't run Apache's:
+
+```bash
+curl -sI https://jhemery.xyz/neofetch        # text/plain, Vary: User-Agent, Accept-Language
+curl -s -H 'Accept-Language: fr' https://jhemery.xyz/neofetch   # the French page
+curl -sI -A 'Mozilla/5.0' https://jhemery.xyz/about             # text/html: a browser still gets the SPA
+curl -sI https://jhemery.xyz/ | grep -i vary   # Vary: User-Agent, since / is the résumé to curl
+```
+
 **Actions** tab → open the run → expand each step. Failures are almost always a wrong or missing secret rather than a workflow bug:
 
 | Symptom | Cause |
@@ -351,6 +361,16 @@ POST /ask     ->  200 in ~1.1s
 Reproduce with the two `curl` commands in [Known gaps](#known-gaps). If they still look like this, the server is not the problem, whatever the browser says — check the client next, in this order: a private window (extensions), then site data for `jhemery.xyz` (Firefox serves cached permanent redirects as internal `307`s, which reach the console as a missing CORS header on a request that never touched the network).
 
 Note `curl -X POST` does **not** reproduce a browser here: it sends the POST directly, while a browser preflights it first because of the JSON content type. Testing only the POST leaves the half that actually fails untested.
+
+## Outbound calls from rooms
+
+With `ROOMS_ENABLED=true` the backend also calls out, from the server's IP, to
+`https://www.youtube.com/oembed` and `https://soundcloud.com/oembed`, to find the title of each
+item a room queues. Nothing needs configuring and nothing about a visitor is sent, only the
+item's own URL. It is the one feature besides the downloader that makes YouTube and SoundCloud
+see this IP, which is why it is held to a global budget of 30 lookups a minute and four at once,
+with misses remembered for 10 minutes ([room-titles.ts](../backend/src/rooms/room-titles.ts)).
+If either site starts refusing the server, rooms keep working and the queue shows bare IDs.
 
 ## What the shell can run — facts for the downloader
 

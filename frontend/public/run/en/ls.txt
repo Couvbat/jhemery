@@ -1,0 +1,15 @@
+[38;5;46mabout/        [0m
+[38;5;46mprojects/     [0m
+[38;5;46mmusic/        [0m
+[38;5;46mgaming/       [0m
+[38;5;46mhardware/     [0m
+[38;5;46mcontact/      [0m
+[38;5;46mtools/        [0m
+[38;5;46mwatch/        [0m
+[38;5;46mradio/        [0m
+about.txt
+skills.txt
+contact.txt
+now.txt
+
+[2mcurl jhemery.xyz/help for the other pages · live in a browser: https://jhemery.xyz/?run=ls[0m

@@ -4,6 +4,7 @@ import { effectScope, nextTick, ref } from 'vue'
 const motion = vi.hoisted(() => ({ reduced: false }))
 vi.mock('@/composables/useCrt', () => ({ prefersReducedMotion: () => motion.reduced }))
 
+import { setMotion } from '../useMotion'
 import { CYCLE_MS, resetSuggestions, usePromptSuggestion } from '../usePromptSuggestion'
 
 const POOL = ['neofetch', 'projects', 'weather']
@@ -19,6 +20,7 @@ beforeEach(() => {
   vi.useFakeTimers()
   vi.spyOn(Math, 'random').mockReturnValue(0)
   motion.reduced = false
+  setMotion('full')
   resetSuggestions()
 })
 
@@ -60,6 +62,20 @@ describe('usePromptSuggestion', () => {
     const second = mount()
     expect(second.suggestion.value).toBeNull()
     second.stop()
+  })
+
+  // Text changing in place is the tagline's kind of motion: `calm` keeps it, `paused` doesn't.
+  it('keeps cycling under calm, and holds still once paused', async () => {
+    setMotion('calm')
+    const { suggestion, stop } = mount()
+    await vi.advanceTimersByTimeAsync(CYCLE_MS)
+    expect(suggestion.value).toBe('projects')
+
+    setMotion('paused')
+    await nextTick()
+    await vi.advanceTimersByTimeAsync(CYCLE_MS * 3)
+    expect(suggestion.value).toBe('projects')
+    stop()
   })
 
   it('holds one static hint under reduced motion', async () => {

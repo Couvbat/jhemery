@@ -43,7 +43,8 @@ link must not hand out an easter egg. Games are linkable: they write nothing unt
 plays. `connect4` is the exception, because it creates a room or claims a seat.
 
 **Shell versions of the tools.** No pipes: the shell has none and adding them would be the special
-case the registry exists to avoid. `sha256sum` and `base64` take a fake-filesystem file when the
+case the registry exists to avoid. *(Pipes came later, with roadmap §H, and these read their
+stdin when they have no argument: see features-spec §2, the shell language.)* `sha256sum` and `base64` take a fake-filesystem file when the
 argument names one, and literal text otherwise, printing `-` as the name the way `echo … |` would.
 
 **Prompt suggestions** use the `placeholder` attribute, so they are never in the buffer, never

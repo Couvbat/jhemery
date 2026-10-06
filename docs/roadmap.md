@@ -288,37 +288,37 @@ them.
 
 | ✔ | Feature | Approach | Files | Effort |
 |---|---|---|---|---|
-| [ ] | `strace` and a real `curl` | `strace <cmd>` lists every request the command made (`GET /weather = 200 · 1.1 kB · 84 ms`) and the shape of each JSON body, never its values: `strace wordle daily` shows `{ day, locale, guesses }` and nothing else, and `strace ls` shows nothing at all. One observer set in `lib/api.ts`, a no-op when empty, fed by `request()`, `askStream()` and `usePresence`'s EventSource, subscribed for exactly the inner command's lifetime. `curl` becomes a same-origin GET/HEAD client: `-I` prints the real response headers (CSP, HSTS) with `cache: 'no-store'` so the service worker can't answer, and bare `curl jhemery.xyz` fetches the real `resume.txt` through an SGR-to-tone parser that drops concealed runs, so CTF stage 3 still needs a real terminal. Other hosts get "Could not resolve host". | `lib/api.ts`, `composables/usePresence.ts`, `commands/system.ts`, `commands/content.ts` | S |
-| [ ] | Image metadata inspector | Before re-encoding, `image` lists what the file gives away: camera and serial number, lens, software, timestamps, GPS as decimal degrees ("this says where you stood"). Afterwards it parses its own output with the same parser and shows "0 fields — verified", which turns "strips by construction" into a check a browser change would fail on screen. A bounds-checked `DataView` walker written from TIFF 6.0 and CIPA DC-008, over JPEG APP1, PNG chunks and WebP RIFF, reading only the first 256 kB; a spec slices a fixture at every offset and expects a partial result, never a throw. `createImageBitmap` gets `imageOrientation: 'from-image'` explicitly, with an Orientation=6 fixture, so stripping never leaves a phone photo sideways. | `tools/image/metadata.ts` (new), `tools/image/ImageTool.vue`, `tools/__tests__/image.spec.ts` | S |
+| [x] | `strace` and a real `curl` | `strace <cmd>` lists every request the command made (`GET /weather = 200 · 1.1 kB · 84 ms`) and the shape of each JSON body, never its values: `strace wordle daily` shows `{ day, locale, guesses }` and nothing else, and `strace ls` shows nothing at all. One observer set in `lib/api.ts`, a no-op when empty, fed by `request()`, `askStream()` and `usePresence`'s EventSource, subscribed for exactly the inner command's lifetime. `curl` becomes a same-origin GET/HEAD client: `-I` prints the real response headers (CSP, HSTS) with `cache: 'no-store'` so the service worker can't answer, and bare `curl jhemery.xyz` fetches the real `resume.txt` through an SGR-to-tone parser that drops concealed runs, so CTF stage 3 still needs a real terminal. Other hosts get "Could not resolve host". | `lib/api.ts`, `composables/usePresence.ts`, `commands/system.ts`, `commands/content.ts` | S |
+| [x] | Image metadata inspector | Before re-encoding, `image` lists what the file gives away: camera and serial number, lens, software, timestamps, GPS as decimal degrees ("this says where you stood"). Afterwards it parses its own output with the same parser and shows "0 fields — verified", which turns "strips by construction" into a check a browser change would fail on screen. A bounds-checked `DataView` walker written from TIFF 6.0 and CIPA DC-008, over JPEG APP1, PNG chunks and WebP RIFF, reading only the first 256 kB; a spec slices a fixture at every offset and expects a partial result, never a throw. `createImageBitmap` gets `imageOrientation: 'from-image'` explicitly, with an Orientation=6 fixture, so stripping never leaves a phone photo sideways. | `tools/image/metadata.ts` (new), `tools/image/ImageTool.vue`, `tools/__tests__/image.spec.ts` | S |
 
 ### Rooms
 
 | ✔ | Feature | Approach | Files | Effort |
 |---|---|---|---|---|
-| [ ] | Queue as a sidebar | The queue exists (50 items, visible to guests) but sits under the host's controls, listed by raw video id or track path, so nobody can see what's coming. On wide screens the room becomes two columns, the player and an *up next* sidebar with the current item on top and the queue numbered under it; on a phone the sidebar stacks under the player. The host removes and reorders from the sidebar, and "next" moves there too; guests read it. Reordering needs no backend: a queue update already replaces the whole array. | `rooms/RoomPage.vue`, `i18n/messages.ts` | S |
-| [ ] | YouTube in radio | A YouTube id (eleven characters) and a SoundCloud item (an https URL) can't be mistaken for each other, so the queue stays `string[]`. `validMedia()` accepts either for `radio` (watch stays YouTube-only), `parseMedia()` tries both, and the page picks the player per *item* rather than per room. The sync logic already drives both through one `PlayerHandle` and both emit `finished`, so a mixed queue hands over between them with no new sync code. YouTube's embed terms don't allow hiding the video to keep the audio, so a YouTube item in radio plays in a small but visible player. What keeps the two rooms distinct: watch is a big video player, radio a mixed playlist. | `backend/src/rooms/rooms.service.ts`, `rooms/sync.ts`, `rooms/RoomPage.vue`, `i18n/messages.ts` | S–M |
-| [ ] | Titles in the queue (follow-up) | "Artist — Track" instead of an id. The backend resolves a title once, when the host adds the item, through YouTube's and SoundCloud's oEmbed endpoints, and keeps it beside the item. Fetching from the browser would mean widening `connect-src`, which is the reason not to. The queue becomes `{ media, title? }[]`, a change to the shape both apps read, so they deploy together; a failed lookup keeps the id, never blocks the add. | `backend/src/rooms/*`, `lib/api.ts`, `rooms/RoomPage.vue` | M |
+| [x] | Queue as a sidebar | The queue exists (50 items, visible to guests) but sits under the host's controls, listed by raw video id or track path, so nobody can see what's coming. On wide screens the room becomes two columns, the player and an *up next* sidebar with the current item on top and the queue numbered under it; on a phone the sidebar stacks under the player. The host removes and reorders from the sidebar, and "next" moves there too; guests read it. Reordering needs no backend: a queue update already replaces the whole array. | `rooms/RoomPage.vue`, `i18n/messages.ts` | S |
+| [x] | YouTube in radio | A YouTube id (eleven characters) and a SoundCloud item (an https URL) can't be mistaken for each other, so the queue stays `string[]`. `validMedia()` accepts either for `radio` (watch stays YouTube-only), `parseMedia()` tries both, and the page picks the player per *item* rather than per room. The sync logic already drives both through one `PlayerHandle` and both emit `finished`, so a mixed queue hands over between them with no new sync code. YouTube's embed terms don't allow hiding the video to keep the audio, so a YouTube item in radio plays in a small but visible player. What keeps the two rooms distinct: watch is a big video player, radio a mixed playlist. | `backend/src/rooms/rooms.service.ts`, `rooms/sync.ts`, `rooms/RoomPage.vue`, `i18n/messages.ts` | S–M |
+| [x] | Titles in the queue (follow-up) | "Artist — Track" instead of an id. The backend resolves a title once, when the host adds the item, through YouTube's and SoundCloud's oEmbed endpoints, and keeps it beside the item. Fetching from the browser would mean widening `connect-src`, which is the reason not to. The queue becomes `{ media, title? }[]`, a change to the shape both apps read, so they deploy together; a failed lookup keeps the id, never blocks the add. | `backend/src/rooms/*`, `lib/api.ts`, `rooms/RoomPage.vue` | M |
 
 ### The shell, deeper
 
 | ✔ | Feature | Approach | Files | Effort |
 |---|---|---|---|---|
 | [x] | `effects` on `Command` (shipped as `writes`) | A required `effects: 'none' \| 'local' \| 'server'` replaces the hand-kept list of commands that write. Every "may this run without the visitor typing it?" rule then derives from one field: `linkable`, `tour`, pipeline and chain stages, and bang expansion. Build before those rows; each would otherwise make its own judgement, and a hand-kept list is where the next writer slips through. | `terminal/types.ts`, every `commands/*.ts`, `__tests__/registry.spec.ts` | S |
-| [ ] | The shell over curl | `curl jhemery.xyz/neofetch`, `curl jhemery.xyz/projects` and `curl -H 'Accept-Language: fr' jhemery.xyz/about` print the read-only commands, in colour, in a real terminal; `curl jhemery.xyz/help` lists which answer. It works because output is `OutputLine[]` and never HTML. A pure `terminal/ansi.ts` maps tones to SGR codes from a palette shared with the résumé plugin, and links to OSC 8. The files are generated by a vitest spec, not the build: every linkable, non-live, non-game command runs through `recordingContext` in both locales into `toMatchFileSnapshot('public/run/<locale>/<name>.txt')`, so command code never runs inside `vite.config.ts` and CI fails on a stale file. Clock-dependent rows are left out. `.htaccess` rewrites `/<name>` for curl, wget and httpie only, with `Vary: User-Agent, Accept-Language`. | `terminal/ansi.ts` (new), `vite-plugins/resume.ts`, `public/run/**` (generated), `public/.htaccess`, `vite.config.ts` | M |
-| [ ] | Pipes, `;` and `&&` | Reverses [features-spec §10](features-spec.md): `fortune \| cowsay`, `history \| grep theme`, `cat about.txt \| sha256sum`, `projects --json \| jq .`, and `LANG=fr neofetch`. The pipe carries `OutputLine[]`, not bytes, so colour survives and the no-HTML rule holds end to end; `cat f \| sha256sum` matches `sha256sum f` through the existing `fileText()`. `CommandContext` gains exactly `stdin?` and `tty`; a non-final stage prints into a collector and its `capture`/`prompt` throw "not a tty". A quote-aware tokeniser replaces `split(/\s+/)`, **treating quotes as grouping only when they balance**, because French elisions (`sign c'est top`, `ask qu'est-ce que…`) must not open a quote; specs pin those. It must keep the multi-word aliases (`ps aux`, `git log`). A chain or pipe is linkable only if every stage is. | `composables/useTerminal.ts`, `terminal/types.ts`, `commands/text.ts` (new: grep, head, tail, wc, sort, uniq), `terminal/registry.ts` | M |
-| [ ] | `man` pages and `jules(1)` | `man ls` opens a real page (NAME, SYNOPSIS, OPTIONS, EXAMPLES, SEE ALSO) in a `less`-style pager with `/search`; every command answers `--help`; `-<Tab>` completes flags with their descriptions. `Command` gains an optional `manual`, and a generator fills one in from `usage`, `description` and `aliases`, so every command has a page on day one. SEE ALSO carries oblique hints (`ls(1)` → `sl(6)`). `man jules` is the résumé as a man page, and the plugin emits `/jules.1` and `/jules.fr.1` as real roff, so `curl -s jhemery.xyz/jules.1 \| man -l -` works. From a link, `man` refuses a hidden command's page, and `--help` matches exactly so `projects --json` is untouched. | `terminal/types.ts`, `terminal/pager.ts` (new), `commands/core.ts`, `composables/useTerminal.ts`, `vite-plugins/resume.ts`, `vite.config.ts`, `public/.htaccess` | M |
-| [ ] | History like a shell | Ctrl+R reverse search as a mode of the input, `!!`, `!$`, `!42`, `^cta^cat`, ↑ as a prefix search when there's text, and fish-style greyed suggestions drawn only from the visitor's own history. Expansion runs in `run()` before aliases; `runLink()` never goes through `run()`, so `?run=!!` can't replay anyone's history. **Never expand in the arguments of anything whose text leaves the browser** (`sign`, `mail`, `ask`): otherwise `sign Great site!!` posts the previous command to the guestbook. | `composables/useTerminal.ts`, `terminal/history.ts`, `components/terminal/TerminalOverlay.vue` | S |
+| [x] | The shell over curl | `curl jhemery.xyz/neofetch`, `curl jhemery.xyz/projects` and `curl -H 'Accept-Language: fr' jhemery.xyz/about` print the read-only commands, in colour, in a real terminal; `curl jhemery.xyz/help` lists which answer. It works because output is `OutputLine[]` and never HTML. A pure `terminal/ansi.ts` maps tones to SGR codes from a palette shared with the résumé plugin, and links to OSC 8. The files are generated by a vitest spec, not the build: every linkable, non-live, non-game command runs through `recordingContext` in both locales into `toMatchFileSnapshot('public/run/<locale>/<name>.txt')`, so command code never runs inside `vite.config.ts` and CI fails on a stale file. Clock-dependent rows are left out. `.htaccess` rewrites `/<name>` for curl, wget and httpie only, with `Vary: User-Agent, Accept-Language`. | `terminal/ansi.ts` (new), `vite-plugins/resume.ts`, `public/run/**` (generated), `public/.htaccess`, `vite.config.ts` | M |
+| [x] | Pipes, `;` and `&&` | Reverses [features-spec §10](features-spec.md): `fortune \| cowsay`, `history \| grep theme`, `cat about.txt \| sha256sum`, `projects --json \| jq .`, and `LANG=fr neofetch`. The pipe carries `OutputLine[]`, not bytes, so colour survives and the no-HTML rule holds end to end; `cat f \| sha256sum` matches `sha256sum f` through the existing `fileText()`. `CommandContext` gains exactly `stdin?` and `tty`; a non-final stage prints into a collector and its `capture`/`prompt` throw "not a tty". A quote-aware tokeniser replaces `split(/\s+/)`, **treating quotes as grouping only when they balance**, because French elisions (`sign c'est top`, `ask qu'est-ce que…`) must not open a quote; specs pin those. It must keep the multi-word aliases (`ps aux`, `git log`). A chain or pipe is linkable only if every stage is. | `composables/useTerminal.ts`, `terminal/types.ts`, `commands/text.ts` (new: grep, head, tail, wc, sort, uniq), `terminal/registry.ts` | M |
+| [x] | `man` pages and `jules(1)` | `man ls` opens a real page (NAME, SYNOPSIS, OPTIONS, EXAMPLES, SEE ALSO) in a `less`-style pager with `/search`; every command answers `--help`; `-<Tab>` completes flags with their descriptions. `Command` gains an optional `manual`, and a generator fills one in from `usage`, `description` and `aliases`, so every command has a page on day one. SEE ALSO carries oblique hints (`ls(1)` → `sl(6)`). `man jules` is the résumé as a man page, and the plugin emits `/jules.1` and `/jules.fr.1` as real roff, so `curl -s jhemery.xyz/jules.1 \| man -l -` works. From a link, `man` refuses a hidden command's page, and `--help` matches exactly so `projects --json` is untouched. | `terminal/types.ts`, `terminal/pager.ts` (new), `commands/core.ts`, `composables/useTerminal.ts`, `vite-plugins/resume.ts`, `vite.config.ts`, `public/.htaccess` | M |
+| [x] | History like a shell | Ctrl+R reverse search as a mode of the input, `!!`, `!$`, `!42`, `^cta^cat`, ↑ as a prefix search when there's text, and fish-style greyed suggestions drawn only from the visitor's own history. Expansion runs in `run()` before aliases; `runLink()` never goes through `run()`, so `?run=!!` can't replay anyone's history. **Never expand in the arguments of anything whose text leaves the browser** (`sign`, `mail`, `ask`): otherwise `sign Great site!!` posts the previous command to the guestbook. | `composables/useTerminal.ts`, `terminal/history.ts`, `components/terminal/TerminalOverlay.vue` | S |
 
 ### Craft and polish
 
 | ✔ | Feature | Approach | Files | Effort |
 |---|---|---|---|---|
-| [ ] | `acid` | A 16-step TB-303-style sequencer on `/tools` in plain Web Audio: saw or square into a resonant low-pass, accent, slide and drive, a tempo that reaches hardcore speeds, and "randomise in phrygian". The link is the save file: the pattern packs to about 30 bytes behind a version byte into `?p=`, decoded defensively (every field clamped). One persistent oscillator → `BiquadFilter` (resonance capped short of self-oscillation) → `tanh` shaper → gain, a lookahead scheduler against `AudioContext.currentTime`, master at −12 dB into a limiter, nothing sounds without a gesture. `acid <code>` plays it from the shell and is **not** linkable: a link that starts sound is hostile. If the site ever gets more sound, it starts from this engine. | `tools/acid/` (new), `tools/registry.ts`, `commands/tools.ts` | M |
-| [ ] | Scheme forge and export | `theme forge #d65d0e` (or *make one* in the 🎨 menu) grows a twelve-colour scheme in OKLCH around one seed, then steps lightness until it passes the floors every shipped scheme is held to, reporting any it can't meet. The floors move from `themes.spec.ts` into `lib/themeRules.ts` so the test and the forge share one rule; colours go through `toHex`, so typed input never reaches a style attribute verbatim. A forged scheme is one extra theme, `custom`, restored before mount. `theme export alacritty\|kitty\|base16` prints the scheme on screen as a config for a real terminal; start with those three. | `lib/themeRules.ts` (new), `lib/forge.ts` (new), `lib/themes.ts`, `composables/useTheme.ts`, `commands/theme.ts`, `components/ThemeMenu.vue` | M |
-| [ ] | Theme transitions | A new scheme spreads in a circle from the swatch clicked (`document.startViewTransition`, a clip-path on `::view-transition-new(root)`, ~450 ms; skipped for dark → light so the Flashbang plays as today), and the wireframes ease to their new colour with a preallocated lerp. Fixes three things that ignore the scheme: `MatrixRain.vue`'s hard-coded greens and English-only hint, the `.crt-overdrive` fringe, and the SoundCloud colour baked into `content/music.ts`. | `composables/useTheme.ts`, `components/ThreeBackground.vue`, `components/effects/MatrixRain.vue`, `assets/main.css`, `content/music.ts`, `sections/MusicSection.vue` | S |
-| [ ] | Motion control | *Full · calm · paused* in the 🎨 menu and a `motion` command, persisted as `couvbat:motion`. Today only the OS setting stops the field (WCAG 2.2.2). The OS setting is a floor the row can't lift. Decorative surfaces read a `decorativeMotion()` (field, confetti, glitch, boot replay, prompt cycling, swing), while the games keep reading `prefersReducedMotion()`. Also a frame governor: 60 fps at most, 30 while the terminal's blurred panel is open. Not linkable, since it writes a setting. | `composables/useMotion.ts` (new), `components/ThemeMenu.vue`, `components/ThreeBackground.vue`, the effect components | S |
-| [ ] | Accessible page changes | After the prism swing settles, focus the new view's `<h1 tabindex="-1">` and announce its `tabTitle()` in one `role="status"` node; the leaving face is `inert` for the swing (two `<main>`s overlap today); a skip link comes first. Tested in e2e, because focus after a real transition is what jsdom can't see. | `App.vue`, `composables/useViewSwing.ts`, `composables/useTabTitle.ts`, `e2e/navigation.spec.ts` | M |
-| [ ] | `who` and `wall` | `who` lists everyone on the site as anonymous ttys (`somebody pts/3`). `wall` sends a wave with no content: every other visitor's wireframes ripple outward, and an open terminal prints "Broadcast message from somebody@jhemery.xyz". Rides the existing presence stream, so no new connection; the server coalesces waves to one per 3 s. No text, no id, and the count is the one already sent. After the rate-limit fix. | `backend/src/presence/*`, `composables/usePresence.ts`, `components/ThreeBackground.vue`, `commands/system.ts` | S |
+| [x] | `acid` | A 16-step TB-303-style sequencer on `/tools` in plain Web Audio: saw or square into a resonant low-pass, accent, slide and drive, a tempo that reaches hardcore speeds, and "randomise in phrygian". The link is the save file: the pattern packs to about 30 bytes behind a version byte into `?p=`, decoded defensively (every field clamped). One persistent oscillator → `BiquadFilter` (resonance capped short of self-oscillation) → `tanh` shaper → gain, a lookahead scheduler against `AudioContext.currentTime`, master at −12 dB into a limiter, nothing sounds without a gesture. `acid <code>` plays it from the shell and is **not** linkable: a link that starts sound is hostile. If the site ever gets more sound, it starts from this engine. | `tools/acid/` (new), `tools/registry.ts`, `commands/tools.ts` | M |
+| [x] | Scheme forge and export | `theme forge #d65d0e` (or *make one* in the 🎨 menu) grows a twelve-colour scheme in OKLCH around one seed, then steps lightness until it passes the floors every shipped scheme is held to, reporting any it can't meet. The floors move from `themes.spec.ts` into `lib/themeRules.ts` so the test and the forge share one rule; colours go through `toHex`, so typed input never reaches a style attribute verbatim. A forged scheme is one extra theme, `custom`, restored before mount. `theme export alacritty\|kitty\|base16` prints the scheme on screen as a config for a real terminal; start with those three. | `lib/themeRules.ts` (new), `lib/forge.ts` (new), `lib/themes.ts`, `composables/useTheme.ts`, `commands/theme.ts`, `components/ThemeMenu.vue` | M |
+| [x] | Theme transitions | A new scheme spreads in a circle from the swatch clicked (`document.startViewTransition`, a clip-path on `::view-transition-new(root)`, ~450 ms; skipped for dark → light so the Flashbang plays as today), and the wireframes ease to their new colour with a preallocated lerp. Fixes three things that ignore the scheme: `MatrixRain.vue`'s hard-coded greens and English-only hint, the `.crt-overdrive` fringe, and the SoundCloud colour baked into `content/music.ts`. | `composables/useTheme.ts`, `components/ThreeBackground.vue`, `components/effects/MatrixRain.vue`, `assets/main.css`, `content/music.ts`, `sections/MusicSection.vue` | S |
+| [x] | Motion control | *Full · calm · paused* in the 🎨 menu and a `motion` command, persisted as `couvbat:motion`. Today only the OS setting stops the field (WCAG 2.2.2). The OS setting is a floor the row can't lift. Decorative surfaces read a `decorativeMotion()` (field, confetti, glitch, boot replay, prompt cycling, swing), while the games keep reading `prefersReducedMotion()`. Also a frame governor: 60 fps at most, 30 while the terminal's blurred panel is open. Not linkable, since it writes a setting. | `composables/useMotion.ts` (new), `components/ThemeMenu.vue`, `components/ThreeBackground.vue`, the effect components | S |
+| [x] | Accessible page changes | After the prism swing settles, focus the new view's `<h1 tabindex="-1">` and announce its `tabTitle()` in one `role="status"` node; the leaving face is `inert` for the swing (two `<main>`s overlap today); a skip link comes first. Tested in e2e, because focus after a real transition is what jsdom can't see. | `App.vue`, `composables/useViewSwing.ts`, `composables/useTabTitle.ts`, `e2e/navigation.spec.ts` | M |
+| [x] | `who` and `wall` | `who` lists everyone on the site as anonymous ttys (`somebody pts/3`). `wall` sends a wave with no content: every other visitor's wireframes ripple outward, and an open terminal prints "Broadcast message from somebody@jhemery.xyz". Rides the existing presence stream, so no new connection; the server coalesces waves to one per 15 s. No text, no id, and the count is the one already sent. After the rate-limit fix. | `backend/src/presence/*`, `composables/usePresence.ts`, `components/ThreeBackground.vue`, `commands/system.ts` | S |
 
 ### Departures from the approach column
 
@@ -407,6 +407,234 @@ Recorded as each row ships.
     estimated. The projects grid and the tab title read it. The home page measured 278 KiB of the
     300 KiB budget (median of five), so nothing was split. The decisions, the other half of the
     copy, ride in the lazy terminal chunk.
+- **`strace` and a real `curl`:**
+  - An event stream is reported once, as `= stream` when it opens (or `error` before it does),
+    with no size: what arrives afterwards is the stream's, not one request's.
+  - `strace wordle daily` only shows a request once a board finishes; the tests read a sent body's
+    shape through `sign` instead, which proves the same thing: `{ name, message }`, and neither.
+  - A failing command exits 1, and Ctrl+C ends with `+++ killed by SIGINT +++` and the requests
+    made so far.
+  - `curl` takes from a link only what its Tab offers (the domain, `-I` and the site's plain
+    files), so a link can't make the terminal print a host or path of its author's choosing.
+    Typed, any path on this origin works.
+  - A body past 256 kB is not printed: the warning says how to save it in a real terminal.
+- **The shell over curl:**
+  - `resume` has no page. Its durations are clocks, so the two-clock rule would drop the current
+    role, and the bare host already serves `resume.txt` with each deploy's dates.
+  - The résumé gains `tip: curl jhemery.xyz/help`, in the file and in the `resume` command.
+  - Twelve pages a locale, plus `help.txt`.
+- **Pipes, `;` and `&&`:**
+  - Quotes only group: they hide operators, and a stage's words are still its text split on
+    spaces, quotes and all. Commands have always read their own quoting, so a line with no
+    operator in it runs exactly as before.
+  - `||` came with `&&`, and a pipeline fails when any stage does, as `set -o pipefail` reads one.
+  - An achievement toast is `stderr` but not a failure: failing takes `fail()`, a stderr line in
+    the error tone, so `fortune && pwd` still runs `pwd` on the day `fortune` unlocks one.
+  - `grep` with no match succeeds, since nothing but `fail()` can say otherwise.
+  - A line goes into history once it has run, so `history | grep theme` lists only what came
+    before it.
+  - A link may not pass `grep` a pattern: it is free text, held to Tab's offers like any other.
+  - The text commands have no curl pages: with no pipe they have nothing to read.
+  - Found in review: a message to the server (`sign`, `ask`) on a line with an operator must be
+    quoted, or nothing runs, since `why`, `about` and `play` are commands as well as words;
+    `sign` drops one pair of outer quotes for it. A link may carry no env words. A game says
+    "not a tty" before it touches anything, so `connect4 | cat` takes nobody's seat.
+- **`man` pages and `jules(1)`:**
+  - The pager prints a page that fits outright, as `less -F` does; nobody should have to press
+    `q` to leave a short page. `Escape` quits as well as `q`.
+  - `help <command>` ends with a pointer to `man <command>`, since `man` stopped being its alias.
+  - `jules(1)` has `--hire` (the availability note, which is the honest answer) and `--coffee`.
+  - `curl` offers `/jules.1` among the site's plain files.
+- **History like a shell:**
+  - Expansion runs in `submit()`, on typed lines, rather than in `run()`: `run()` is also what
+    tests and the palette call, and only a typed line has a history to point into.
+  - A line is held back when any word on it names a server-writing command, so `strace sign a!!`
+    is left alone as well as `sign a!!`. An expansion that would write anything at all, server or
+    local, goes into history for ↑ and Enter rather than running.
+  - `!word` (a search by prefix) is a letter: nobody types it here, and every `!` that expands is
+    one more way for a typed line to surprise.
+  - ↑ past the oldest prefix match stays on it.
+- **Image metadata inspector:**
+  - It reads the whole file, up to 64 MB, not the first 256 kB: WebP's extended format puts
+    EXIF and XMP after the image data, and PNG text chunks may follow IDAT. That made it M, not S.
+  - It reads more than JPEG APP1. In JPEG: XMP, ICC (APP2), IPTC (inside APP13's Photoshop
+    resources) and comments. In PNG: text, `tIME`, `iCCP` and `eXIf`. In WebP: ICC, EXIF and
+    XMP. HEIC, AVIF and GIF are reported as unreadable, never as "0 fields".
+  - A field is defined: each Exif tag, each PNG text chunk, the PNG time, and each XMP, ICC, IPTC
+    and comment block. JFIF, VP8X, the IFD pointers and the image data are structure, and GPS's
+    four tags show as one position.
+  - "0 fields — verified" holds only for PNG in Chromium. Its JPEG and WebP encoders write an
+    sRGB colour profile of their own, which the check counts, so those outputs read "1 field
+    survived re-encoding: colour profile". The privacy copy says so. The e2e asserts "0 fields"
+    on PNG, and on the default WebP only that nothing from the photo came through.
+  - The Orientation=6 check is an e2e, since jsdom has no `createImageBitmap`. A browser that
+    predates `imageOrientation: 'from-image'` rejects the option with a TypeError, so it gets its
+    default rather than "not an image".
+  - Beyond the list: the camera owner's name is read with the artist, a maker note shows its
+    size, bidi overrides are stripped as well as control characters, PNG text and JPEG comments
+    list the first 32 (the rest are counted), and only the first Exif block is walked.
+  - `inspectBytes` has no catch-all. It never throws because nothing in it can, so the slicing
+    and fuzzing specs see a bounds bug rather than a swallowed one. `inspectFile` is the catch,
+    at the I/O edge, and it answers "can't read" rather than "clean".
+- **Queue as a sidebar:**
+  - The two columns start at `lg`, not on any wide screen: at `md`, inside the page's
+    `max-w-5xl`, a 17rem sidebar would leave the video under about 450 px.
+  - The sidebar opens with a new *now playing* block, which takes the current item's label,
+    clock and play state out of the status row.
+  - Reordering is ↑ and ↓ buttons, not drag and drop: they work with a keyboard, a screen reader
+    and a thumb at no extra cost, and the queue holds 50 items at most. Each names its item in
+    its `aria-label`, and focus follows the item that moved.
+  - Shipped with the row: a fix for the queue race on quick edits. Every edit is built from the
+    last snapshot, so two quick clicks used to lose one. The buttons are now inert while an edit
+    is in flight (`aria-disabled` rather than `disabled`, so the pressed one keeps focus), and the
+    edits that can't be refused, a track ending on its own and a link added to the queue, wait
+    their turn instead.
+- **YouTube in radio:**
+  - The page picks the player from `mediaSource(media)`, decided by the item alone, and a change
+    of source also resets the sync loop's anchor timer and seek cooldown, so the new player's
+    first readings aren't weighed against the old one's.
+  - "A small but visible player" is a `compact` prop on `YouTubePlayer`: `max-w-md`, and
+    `min-h-[200px]` for YouTube's 200×200 minimum. Both players now take one `PlayerProps`, so
+    the page can swap them per item.
+  - `mediaLabel()` takes the item alone and marks a video `youtube:<id>`, in watch too, until
+    titles land.
+  - An old backend answers a YouTube item in a radio with a 400 until it deploys; nothing else
+    depends on the order.
+- **Titles in the queue:**
+  - The queue stays `string[]`. Titles travel beside it as `titles?: Record<string, string>`,
+    with `state.title` for the current item, rather than turning it into `{ media, title? }[]`.
+    Bundles cached by the service worker call `.replace` on each item and post the queue back
+    into a `string[]` DTO, so the new shape would have broken them. The change is additive, so
+    nothing deploys together and either app may be the older one.
+  - The title is the oEmbed `title` as given, not reshaped into "Artist — Track" (SoundCloud's
+    reads "Track by Artist"). Control and bidi characters are stripped and it is capped at 120
+    code points.
+  - Titles are looked up on any update, not only when the host adds the item: for every item the
+    room holds without one. A cache shared by every room (an LRU of 500) means a promotion by
+    `next`, a reorder or a second room holding the same item costs no request. A miss is asked
+    again after 10 minutes, and a lookup the budget refused on the next update.
+  - Not in the approach: a global budget of 30 lookups a minute and 4 at once, each one request
+    (3 s, 16 kB, no redirects). Without it, a host posting 50 ids at the state route's limit
+    would make the server hammer YouTube, which has blocked this host once already.
+  - A title that lands late is published only to a room that is still open and still holds the
+    item, and titles for items a room no longer holds are pruned on every update.
+  - The page renders a title by interpolation only, with the item itself as the tooltip.
+- **`acid`:**
+  - The pattern is 27 bytes (36 characters), not "about 30": the version byte, 16 × 9-bit steps
+    (on, accent, slide, octave, note), one tempo byte (`bpm = 60 + byte`, up to 300), the wave and
+    root sharing a byte, and six knobs. A code cut short or carrying an unknown version is
+    refused, and bytes past the 27th are ignored.
+  - The `AudioContext` is opened by a small module the shell imports eagerly,
+    `tools/acid/audio.ts`, rather than by the engine. The shell loads the engine lazily, and by
+    the time that import resolves the keystroke is over. The engine only takes the context it is
+    handed.
+  - `acid` with no code plays the tool's default pattern. The row only had `acid <code>`.
+  - The shell's `acid` also stops when the overlay closes. Closing doesn't cancel a running
+    command, so without this the stop keys would go and the bassline would stay.
+  - One sequencer sounds at a time: the tool and the shell stop each other rather than play two
+    patterns over each other.
+  - A stopped engine suspends its context once the release has faded, so a silent sequencer holds
+    no audio thread.
+  - Under reduced motion neither the panel nor the shell draws the playhead, which jumps up to
+    twenty times a second at 300 bpm. The status still says it is playing.
+  - The share link, and the `acid <code>` that plays it in the shell, are shown only after *copy
+    link*, and cleared on the next edit, so a stale code is never on screen.
+  - One e2e plays it from a click under the production CSP (`tools-csp.spec.ts`), because only a
+    real browser has an audio clock to move the playhead.
+- **Motion control:**
+  - The wireframe loop became delta-time based first, since it counted frames: a 120 Hz screen
+    ran the field at twice its speed, and a 30 fps cap would have halved it. 120 Hz screens now
+    slow to the 60 Hz speed, on purpose.
+  - The brief names `calm` without defining it. It is the field at 0.35× and 30 fps with no
+    pointer pull (the gravity well *and* the camera's parallax), and no swing, confetti, glitch,
+    flashbang or theme circle; prompt cycling, the tagline and the boot sequence stay.
+  - "Boot replay" is not decorative after all: `reboot` is typed, so like `matrix`, `ssh`,
+    `hack`, `sl`, `top`, `ping`, `ask`'s typewriter and `tour`'s pauses it honours `paused`
+    only. The first-visit boot sequence does stop at `paused`.
+  - The field loads on the first level that isn't `paused` and is never unloaded; pausing stops
+    its loop and draws one still frame, and the screensaver stops with it.
+  - The glitch's motion check sits in the terminal's `effects.glitch`, not in `useCrt.glitch()`:
+    `useMotion` imports `useCrt`, and the reverse import would be a cycle the guard refuses.
+  - `motion` is `writes: 'local'` even bare, where `theme`'s depends on its arguments: the
+    bare listing would gain nothing from reading as `none`, since `motion` is never worth a link.
+  - `main.css` now also stops `.animate-pulse` under `prefers-reduced-motion`: the hero's cursor
+    pulsed with no guard at all, beside the `motion-safe:` ones.
+  - Outside the census: scrolling to a section (`scrollToSection()` and the router's hash
+    scroll) was smooth even under reduced motion. It jumps with motion `paused` now.
+  - Found in review: `acid`'s playhead, in the shell and on the tool, is a typed animation like
+    `sl`'s, so `paused` stills it, the OS setting included.
+- **Theme transitions:**
+  - Beside dark → light, the circle is also skipped below `full` motion and while the prism
+    turns, and a new pick cuts one in flight short.
+  - The circle is a Web Animations `clip-path` on `::view-transition-new(root)`, started from
+    `useTheme` once the transition is ready, rather than CSS keyframes, so its radius reaches
+    the farthest corner from wherever the pick was. `::view-transition` lets clicks through, so
+    the next pick in the menu lands while one spreads.
+  - The wireframes' ease lasts as long as the circle (450 ms, smoothstepped), and only runs with
+    the loop; paused, they jump.
+  - The window dots became one `WindowDots.vue` in `destructive`, `warning` and `primary` (the
+    terminal's error, warning and success tones), so green is orange under Gruvbox. The
+    terminal's own dots, which are buttons, take the same three from it, and their glyphs moved
+    from black to the page background so they read on a light scheme.
+  - The radio rooms' SoundCloud player, which hard-coded the same green, takes the scheme's too,
+    read when an item mounts; both embeds now write `auto_play` once.
+- **Scheme forge and export:**
+  - The floors were already in `lib/themeRules.ts` (slice 1); the forge adds `meetsFloors()` and
+    `floorFor()` there, and lifts every tone that has a floor, not only the text.
+  - The menu's *make one…* forges in the mode of the scheme on screen, and spreads from the item.
+  - A grey seed keeps its surfaces neutral, since its hue reads as 0°, which is pink.
+  - The ANSI mapping fixes red to `destructive` and yellow to `warning`, and gives green, cyan,
+    blue and magenta the nearest tone by hue, so two slots can share a colour.
+  - `theme export` prints the scheme on screen, whatever it is, and saves nothing; it is
+    `local` only because everything after `theme` is.
+  - Found in review: a forged scheme's colour never reaches the SoundCloud widget, which gets
+    the default green instead. A colour that is near-unique and kept in the visitor's storage
+    would let SoundCloud link their visits. A seed with a non-finite number is not a colour.
+- **Accessible page changes:**
+  - It announces `pageLabel()`, the tab title except on the 404, rather than `tabTitle()`
+    itself: the 404's tab keeps the site title for crawlers, and announcing that would call it
+    the home page.
+  - The palette's open state moved out of `CommandPalette.vue` into `composables/usePalette.ts`,
+    so the focus can leave it alone without importing a component.
+  - `SectionHeader`'s `<h2>` takes `tabindex="-1"` too, since a hash from another page focuses
+    the section's heading.
+  - `cd` closes the terminal, so after `cd tools` the keyboard goes to the tools page's
+    heading. The case the guard covers, a page changing under an open terminal, is tested with
+    Back instead.
+  - The tests live in `e2e/views.spec.ts` beside the prism's, not in `navigation.spec.ts`.
+  - Found in review: a change of page off the prism (`/work/a` to `/work/b`, `/now` to the 404)
+    turns no face but still settles, so it is focused and announced. The hero's `<h1>` is named
+    by the whole tagline, since focus can land on it while it is still typing.
+- **`who` and `wall`:**
+  - `who` caps its rows at twelve others, the field's own cap, then one "… and N more" line, so
+    the rows still add up to the count.
+  - `wall` is off unless `WALL_ENABLED` is set: it would be the first unauthenticated route
+    that makes other visitors' pages react. Enabled, `POST /presence/wall` is a bare 204 whatever
+    happened; off, `{ configured: false }`.
+  - Found in review: the limits are 2 per 10 min per IP and one wave every 15 s site-wide,
+    not the 6/min and 3 s first built, under which one client looping `curl` every 15 s kept
+    every visitor's page rippling indefinitely. It takes JSON only, so the CORS preflight stops
+    other sites sending it through their visitors. And each connection gets its own wave
+    object: one shared one carried an SSE id copied from another visitor's connection.
+  - Found in review too: a stream the browser closed itself (a 502 while the backend restarts)
+    is let go at once rather than waited on, so the next `who` opens a new one.
+  - "Rides the existing presence stream" holds, but presence no longer only starts on the home
+    page: `who` and `wall` start it on demand (`whenPresent`), and it stays open after. It is
+    still not started app-wide, which would change what the footer counts.
+  - The wave is a named SSE event, `wave`, with `{}`, so the count frame stays exactly
+    `{ online }` and old bundles never hear it. Waves aren't replayed to later arrivals.
+  - The sender mutes its own echo for 3.5 s from just *before* its POST, since the broadcast can
+    beat the reply, and puts the window back if the POST is refused. A tab shows one wave every
+    15 s at most.
+  - With nobody else here, `wall` says so and makes no request.
+  - The terminal's line is localised ("Message diffusé par somebody@jhemery.xyz" in French),
+    followed by a note that a wave carries nothing. A wave that lands while the terminal is
+    closed isn't kept for later; one that lands mid-command is printed after it.
+  - The ripple only plays at `full` motion with the loop running.
+  - Integrated onto slice 4: `api.wall()` goes through `request()`, so `strace wall` shows the
+    POST, and the presence stream is opened by `openEventSource()`, which strace reports once.
+    A wave is an event on that stream, not a request. A wave that couldn't be sent is a
+    `fail()`, so `wall && …` stops on it.
 
 ## Build order
 

@@ -11,7 +11,35 @@ export const music = {
   } satisfies Localised,
 } as const
 
-export const soundcloudEmbedSrc =
-  `https://w.soundcloud.com/player/?url=${encodeURIComponent(music.playlistUrl)}` +
-  '&color=%2300ff41&auto_play=false&hide_related=true&show_comments=false' +
-  '&show_reposts=false&show_teaser=false&visual=false'
+/** The site's own green, which the widget falls back to. */
+export const EMBED_FALLBACK_COLOUR = '#00ff41'
+
+/**
+ * The colour a SoundCloud widget is drawn in: the caller reads `--neon-green`, so the
+ * player follows the scheme, but only a plain `#rrggbb` goes into a URL another origin
+ * parses. Anything else is the site's own green.
+ */
+export function embedColour(colour: string): string {
+  const trimmed = colour.trim().toLowerCase()
+  return /^#[0-9a-f]{6}$/.test(trimmed) ? trimmed : EMBED_FALLBACK_COLOUR
+}
+
+/**
+ * The playlist's widget. Pure, so the colour is the caller's to read: changing `src`
+ * reloads the cross-origin player and stops it, so `MusicSection` reads the colour only
+ * when it mounts the frame. `auto_play` is written once, either way — appending
+ * `&auto_play=true` after a `false` used to send the widget both.
+ */
+export function soundcloudEmbedSrc(colour: string, autoplay = false): string {
+  const params = new URLSearchParams({
+    url: music.playlistUrl,
+    color: embedColour(colour),
+    auto_play: String(autoplay),
+    hide_related: 'true',
+    show_comments: 'false',
+    show_reposts: 'false',
+    show_teaser: 'false',
+    visual: 'false',
+  })
+  return `https://w.soundcloud.com/player/?${params}`
+}

@@ -1,7 +1,6 @@
 <script setup lang="ts">
 import { computed, defineAsyncComponent, onMounted, ref, watch } from 'vue'
 import { RouterView, useRouter } from 'vue-router'
-import { useMediaQuery } from '@vueuse/core'
 import NavBar from '@/components/NavBar.vue'
 import BootSequence from '@/components/BootSequence.vue'
 import CommandPalette from '@/components/CommandPalette.vue'
@@ -9,7 +8,10 @@ import TerminalLauncher from '@/components/terminal/TerminalLauncher.vue'
 import { useKonami } from '@/composables/useKonami'
 import { restoreCrt, setCrt } from '@/composables/useCrt'
 import { useMatrix } from '@/composables/useMatrix'
+import { useMotion } from '@/composables/useMotion'
 import { useTabTitle } from '@/composables/useTabTitle'
+import { focusPageHeading, pageAnnouncement, usePageFocus } from '@/composables/usePageFocus'
+import { useLocale } from '@/i18n'
 import { terminalOpen } from '@/composables/useTerminalShell'
 import { installViewSwing, untilSettled, useViewSwing } from '@/composables/useViewSwing'
 import { consumeRunParam } from '@/composables/useRunLink'
@@ -32,21 +34,37 @@ const TerminalOverlay = defineAsyncComponent(
 )
 
 const { matrixActive } = useMatrix()
-// Purely decorative, so it's kept off the critical rendering path: skipped entirely
-// for reduced-motion (no point fetching ~500KB of three.js for a static frame nobody
-// asked to animate), and deferred until the browser is idle for everyone else so it
-// doesn't compete with hero content for bandwidth/CPU during first paint.
+const { level: motion } = useMotion()
+// Purely decorative, so it's kept off the critical rendering path: never fetched while
+// motion is paused, reduced motion included (no point fetching ~500KB of three.js for a
+// static frame nobody asked to animate), and deferred until the browser is idle for
+// everyone else so it doesn't compete with hero content for bandwidth/CPU during first
+// paint. It loads on the first level that isn't `paused` and is never unloaded: pausing
+// later stops its loop instead, which costs nothing and keeps the scene as it was.
 const showThreeBackground = ref(false)
+let fieldScheduled = false
+
+function scheduleField() {
+  if (fieldScheduled) return
+  fieldScheduled = true
+  const load = () => {
+    showThreeBackground.value = true
+  }
+  if (typeof requestIdleCallback === 'function') {
+    requestIdleCallback(load, { timeout: 2000 })
+  } else {
+    setTimeout(load, 200)
+  }
+}
 
 // The prism swing between views (features-spec §11). The router drives the clock;
 // the stage below only binds its values as CSS custom properties, its `<Transition>`
 // ends when that clock does (`untilSettled`), and `ThreeBackground` reads the same
-// clock for the wireframes. Under reduced motion the `<Transition>` puts no classes
-// on and the composable never starts a tween, so the pages swap instantly.
+// clock for the wireframes. Below `full` motion the `<Transition>` puts no classes on
+// and the composable never starts a tween, so the pages swap instantly.
 const router = useRouter()
 installViewSwing(router)
 const { swing, swingDirection, swinging, leaveScroll } = useViewSwing()
-const reducedMotion = useMediaQuery('(prefers-reduced-motion: reduce)')
 const stageStyle = computed(() => ({
   '--swing': String(swing.value),
   '--swing-dir': String(swingDirection.value),
@@ -54,6 +72,15 @@ const stageStyle = computed(() => ({
 }))
 
 useTabTitle()
+usePageFocus(router)
+const { t, m } = useLocale()
+
+/** The leaving face is `inert` for its turn: two `<main>`s overlap while the prism
+ *  swings, and only the arriving one may be reached, read or clicked. */
+function onLeave(el: Element, done: () => void) {
+  el.setAttribute('inert', '')
+  untilSettled(el, done)
+}
 
 // Once true, stays true — TerminalOverlay is mounted for the rest of the session
 // (its own internal `open`/Transition handles every close/reopen after that) so
@@ -76,20 +103,27 @@ onMounted(() => {
   restoreCrt()
   void consumeRunParam(router)
 
-  if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return
-
-  const load = () => {
-    showThreeBackground.value = true
-  }
-  if (typeof requestIdleCallback === 'function') {
-    requestIdleCallback(load, { timeout: 2000 })
-  } else {
-    setTimeout(load, 200)
-  }
+  watch(
+    motion,
+    (level) => {
+      if (level !== 'paused') scheduleField()
+    },
+    { immediate: true },
+  )
 })
 </script>
 
 <template>
+  <!-- First in the page, so it is the first Tab. It focuses the heading itself rather
+       than following its hash, which the router would treat as a section to scroll to;
+       the href is there so it is a real link, and names a node that exists. -->
+  <a
+    href="#content"
+    class="sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-2 focus:z-[200] focus:rounded focus:border focus:border-primary focus:bg-background focus:px-3 focus:py-2 focus:text-sm focus:text-primary"
+    @click.prevent="focusPageHeading"
+  >
+    {{ t(m.nav.skip) }}
+  </a>
   <ThreeBackground v-if="showThreeBackground" />
   <NavBar />
 
@@ -98,10 +132,10 @@ onMounted(() => {
     the visitor does not turn, the world does. Nothing inside a view may be
     `position: fixed` — a transformed ancestor becomes its containing block.
   -->
-  <div class="view-stage" :class="{ 'is-swinging': swinging }" :style="stageStyle">
+  <div id="content" class="view-stage" :class="{ 'is-swinging': swinging }" :style="stageStyle">
     <div class="view-prism">
       <RouterView v-slot="{ Component }">
-        <Transition name="view" :css="!reducedMotion" @enter="untilSettled" @leave="untilSettled">
+        <Transition name="view" :css="motion === 'full'" @enter="untilSettled" @leave="onLeave">
           <component :is="Component" />
         </Transition>
       </RouterView>
@@ -117,4 +151,7 @@ onMounted(() => {
 
   <MatrixRain v-if="matrixActive" />
   <BootSequence />
+
+  <!-- The one place a page change is announced (`usePageFocus`). -->
+  <p class="sr-only" role="status" aria-live="polite" data-testid="page-announcement">{{ pageAnnouncement }}</p>
 </template>

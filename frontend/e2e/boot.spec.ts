@@ -1,4 +1,6 @@
+import type { Page } from '@playwright/test'
 import { expect, test } from './fixtures'
+import { messages } from '@/i18n/messages'
 
 /**
  * First contact: the boot sequence, and the two performance decisions that are only
@@ -53,6 +55,27 @@ test.describe('the boot sequence', () => {
   })
 })
 
+/**
+ * Proving a *negative* needs a defined moment to check at, and the app's own scheduler
+ * provides one: queue an idle callback of our own and wait for it. Callbacks run in
+ * registration order, so ours firing means App.vue's — queued during mount, long
+ * before this — has already had its turn. The `setTimeout` branch mirrors the fallback
+ * in App.vue for engines without `requestIdleCallback` (WebKit), rather than inventing
+ * a different wait.
+ */
+function afterAppIdle(page: Page): Promise<void> {
+  return page.evaluate(
+    () =>
+      new Promise<void>((resolve) => {
+        if (typeof requestIdleCallback === 'function') {
+          requestIdleCallback(() => resolve(), { timeout: 3000 })
+        } else {
+          setTimeout(resolve, 600)
+        }
+      }),
+  )
+}
+
 test.describe('the three.js background', () => {
   test('is fetched, but only once the browser is idle', async ({ page }) => {
     const requested: string[] = []
@@ -93,22 +116,7 @@ test.describe('the three.js background', () => {
         page.evaluate(() => matchMedia('(prefers-reduced-motion: reduce)').matches),
       ).resolves.toBe(true)
 
-      // Proving a *negative* needs a defined moment to check at, and the app's own
-      // scheduler provides one: queue an idle callback of our own and wait for it.
-      // Callbacks run in registration order, so ours firing means App.vue's — queued
-      // during mount, long before this — has already had its turn. The `setTimeout`
-      // branch mirrors the fallback in App.vue for engines without
-      // `requestIdleCallback` (WebKit), rather than inventing a different wait.
-      await page.evaluate(
-        () =>
-          new Promise<void>((resolve) => {
-            if (typeof requestIdleCallback === 'function') {
-              requestIdleCallback(() => resolve(), { timeout: 3000 })
-            } else {
-              setTimeout(resolve, 600)
-            }
-          }),
-      )
+      await afterAppIdle(page)
 
       // Not "loaded and then hidden" — never requested. Half a megabyte for a static
       // frame nobody asked to animate is the exact cost this rule exists to avoid.
@@ -124,6 +132,48 @@ test.describe('the three.js background', () => {
       await terminal.run('help')
 
       await terminal.expectOutput('whoami')
+    })
+
+    // The OS setting is a floor the menu can't lift: the two settings above it are
+    // there, dimmed, and say why rather than looking broken.
+    test('holds the motion menu at paused, and says why', async ({ page }) => {
+      await page.goto('/')
+      await page.getByRole('button', { name: messages.nav.theme.en }).click()
+
+      const group = page.getByRole('group', { name: messages.motion.label.en })
+      await expect(group.getByRole('menuitemradio', { name: /^paused/ })).toHaveAttribute('aria-checked', 'true')
+      for (const id of ['full', 'calm']) {
+        const item = group.getByRole('menuitemradio', { name: new RegExp(`^${id}`) })
+        await expect(item).toHaveAttribute('aria-disabled', 'true')
+        await expect(item).toHaveAccessibleDescription(messages.motion.os.en)
+      }
+    })
+  })
+
+  // Motion control (useMotion.ts): the visitor's own `paused` is the same promise as the
+  // OS setting's, and choosing `full` again is what finally fetches the field.
+  test.describe('with motion paused from the menu', () => {
+    test.beforeEach(async ({ app }) => {
+      await app.seed({ motion: 'paused' })
+    })
+
+    test('is never fetched, until full motion is chosen', async ({ page }) => {
+      const requested: string[] = []
+      page.on('request', (request) => requested.push(request.url()))
+
+      await page.goto('/')
+      await expect(page.locator('#about')).toBeVisible()
+      await expect(page.locator('html')).toHaveAttribute('data-motion', 'paused')
+      await afterAppIdle(page)
+      expect(requested.filter((url) => url.includes('ThreeBackground'))).toEqual([])
+
+      await page.getByRole('button', { name: messages.nav.theme.en }).click()
+      await page.getByRole('menuitemradio', { name: /^full/ }).click()
+
+      await expect(page.locator('html')).not.toHaveAttribute('data-motion', /.*/)
+      await expect(async () => {
+        expect(requested.some((url) => url.includes('ThreeBackground'))).toBe(true)
+      }).toPass()
     })
   })
 })

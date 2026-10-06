@@ -2,6 +2,7 @@
 import type { WorkflowRun } from '@/lib/api'
 import { useLocale } from '@/i18n'
 import { relativeTime } from '@/composables/useGithub'
+import WindowDots from '@/components/WindowDots.vue'
 
 defineProps<{ runs: WorkflowRun[] }>()
 
@@ -61,9 +62,7 @@ function duration(run: WorkflowRun): string {
 <template>
   <div class="rounded border border-border bg-card overflow-hidden">
     <div class="flex items-center gap-2 px-4 py-2 bg-muted border-b border-border">
-      <span class="w-3 h-3 rounded-full bg-red-500/80"></span>
-      <span class="w-3 h-3 rounded-full bg-yellow-500/80"></span>
-      <span class="w-3 h-3 rounded-full bg-green-500/80"></span>
+      <WindowDots />
       <span class="ml-3 text-xs text-muted-foreground">{{ t(m.build.title) }}</span>
     </div>
 

@@ -3,12 +3,13 @@ import { computed, nextTick, onMounted, onUnmounted, ref, shallowRef, watch } fr
 import { sections, views } from '@/content'
 import { useLocale } from '@/i18n'
 import { openTerminal } from '@/composables/useTerminalShell'
+import { paletteOpen } from '@/composables/usePalette'
 import { goTo } from '@/composables/useViewSwing'
 import type { Command } from '@/terminal/types'
 
 const { t, m } = useLocale()
 
-const open = ref(false)
+const open = paletteOpen
 const query = ref('')
 const cursor = ref(0)
 const inputEl = ref<HTMLInputElement | null>(null)

@@ -31,7 +31,9 @@ const tone = computed(() => toneClasses[props.tone])
       ><span class="text-muted-foreground">:~$</span>
       <span class="ml-2 text-foreground">{{ meta.prompt }}</span>
     </p>
-    <h2 :class="['text-2xl md:text-3xl font-bold', tone.glow, tone.text]">
+    <!-- Focusable from script only: a section reached from another page (`/#contact`)
+         takes focus here once the swing has settled (usePageFocus). -->
+    <h2 tabindex="-1" :class="['text-2xl md:text-3xl font-bold rounded-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-4 focus-visible:ring-offset-background', tone.glow, tone.text]">
       <span :class="tone.hash">#</span> {{ t(meta.heading) }}
     </h2>
   </div>

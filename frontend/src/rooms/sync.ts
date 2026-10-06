@@ -1,4 +1,5 @@
 import type { PlaybackState, RoomKind } from '@/lib/api'
+import { embedColour } from '@/content/music'
 
 /**
  * The pure half of the rooms: codes, media parsing, the drift maths and the embed
@@ -56,14 +57,55 @@ export function parseSoundCloud(input: string): string | null {
   return `https://soundcloud.com${path}`
 }
 
-export function parseMedia(kind: RoomKind, input: string): string | null {
-  return kind === 'watch' ? parseYouTube(input) : parseSoundCloud(input)
+/** Which embed plays an item. */
+export type MediaSource = 'youtube' | 'soundcloud'
+
+/**
+ * Decided by the item alone, since a radio queue mixes the two: an eleven-character
+ * id is YouTube's, and anything else the server let through is a soundcloud.com URL.
+ * The two can't be confused — an id has no `:`.
+ */
+export function mediaSource(media: string): MediaSource {
+  return YOUTUBE_ID.test(media) ? 'youtube' : 'soundcloud'
 }
 
-/** What the pages print for an item: the id for a video, the path for a track. */
-export function mediaLabel(kind: RoomKind, media: string): string {
-  if (kind === 'watch') return media
+/** Watch takes YouTube only; radio tries SoundCloud, then YouTube. */
+export function parseMedia(kind: RoomKind, input: string): string | null {
+  return kind === 'watch' ? parseYouTube(input) : (parseSoundCloud(input) ?? parseYouTube(input))
+}
+
+/**
+ * What the pages print for an item when nothing better is known: the path for a
+ * track, the id for a video, marked as YouTube's so a mixed queue says which is which.
+ */
+export function mediaLabel(media: string): string {
+  if (mediaSource(media) === 'youtube') return `youtube:${media}`
   return media.replace(/^https:\/\/soundcloud\.com\//, '')
+}
+
+/**
+ * What the pages print for an item: the server's title when it found one, the bare
+ * item otherwise. Read with `hasOwn`, since a YouTube id may be any eleven characters
+ * from its alphabet — `constructor` is one — and a plain object answers that key
+ * from its prototype.
+ */
+export function itemLabel(media: string, titles: Readonly<Record<string, string>> | undefined): string {
+  const title = titles && Object.hasOwn(titles, media) ? titles[media] : undefined
+  return typeof title === 'string' && title !== '' ? title : mediaLabel(media)
+}
+
+/**
+ * The queue with one item moved from `from` to `to`, as a new array — the state route
+ * replaces the whole queue, so a reorder is just this sent back. An index off either
+ * end moves nothing: a click on a list that has since changed under it is a no-op,
+ * not a guess.
+ */
+export function moveItem<T>(list: readonly T[], from: number, to: number): T[] {
+  const next = [...list]
+  if (from < 0 || from >= next.length || to < 0 || to >= next.length) return next
+  const [item] = next.splice(from, 1) as [T]
+  next.splice(to, 0, item)
+  return next
 }
 
 /** Seconds a guest may be out before it seeks. Two: under it, a seek is more
@@ -145,13 +187,14 @@ export function youtubeEmbed(id: string, pageOrigin: string, host: boolean): str
   return `${YOUTUBE_ORIGIN}/embed/${id}?${params}`
 }
 
-/** The same widget `MusicSection` embeds, in the site's green, with every share
- *  and buy button off — a party is not a shop. */
-export function soundcloudEmbed(url: string): string {
+/** The same widget `MusicSection` embeds, in the scheme's `--neon-green` (read by the
+ *  caller, validated by `embedColour`), with every share and buy button off — a party is
+ *  not a shop. `auto_play` is written once, rather than patched into the string after. */
+export function soundcloudEmbed(url: string, colour: string, autoplay = false): string {
   const params = new URLSearchParams({
     url,
-    color: '#00ff41',
-    auto_play: 'false',
+    color: embedColour(colour),
+    auto_play: String(autoplay),
     hide_related: 'true',
     show_comments: 'false',
     show_reposts: 'false',

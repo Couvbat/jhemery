@@ -1,4 +1,6 @@
+import type { Page } from '@playwright/test'
 import { expect, test } from './fixtures'
+import type { ApiStub } from './fixtures/api'
 
 /**
  * What jsdom cannot see about the rooms: that `/watch` and `/radio` are real routes
@@ -16,9 +18,15 @@ const ROOM = {
   members: 3,
 }
 
+const STUB = '<!doctype html><title>stub</title>'
+const TRACK = 'https://soundcloud.com/couvbat/abysses'
+
 test.beforeEach(async ({ page }) => {
   await page.route('**/*.youtube-nocookie.com/**', (route) =>
-    route.fulfill({ status: 200, contentType: 'text/html', body: '<!doctype html><title>stub</title>' }),
+    route.fulfill({ status: 200, contentType: 'text/html', body: STUB }),
+  )
+  await page.route('https://w.soundcloud.com/**', (route) =>
+    route.fulfill({ status: 200, contentType: 'text/html', body: STUB }),
   )
 })
 
@@ -84,6 +92,145 @@ test.describe('rooms', () => {
 
     await expect(page).toHaveURL(/\/radio\/AB3DE$/)
     await expect(page.getByRole('region', { name: /radio AB3DE/i }).getByText(/waiting for the host/i)).toBeVisible()
+  })
+
+  test.describe('the up-next sidebar, as a guest', () => {
+    /** The player and the sidebar, once the stream has filled both. */
+    async function layout(page: Page, api: ApiStub) {
+      api.room(ROOM)
+      await page.goto('/watch/AB3DE')
+      const region = page.getByRole('region', { name: /watch party AB3DE/i })
+      const frame = region.locator('iframe')
+      const aside = region.getByRole('complementary', { name: /up next/i })
+      await expect(frame).toBeVisible()
+      await expect(aside.getByRole('listitem')).toHaveText([/zyxwvutsrq9/])
+      await expect(aside.getByText(/now playing/i)).toBeVisible()
+      // No token in this tab: no next, no reorder, no remove.
+      await expect(aside.getByRole('button')).toHaveCount(0)
+      return { player: (await frame.boundingBox())!, side: (await aside.boundingBox())! }
+    }
+
+    test('sits right of the player on a wide screen', async ({ page, api, pageErrors }) => {
+      test.skip(test.info().project.name === 'mobile', 'Two columns start at lg.')
+      const { player, side } = await layout(page, api)
+      expect(side.x).toBeGreaterThanOrEqual(player.x + player.width)
+      expect(side.y).toBeLessThan(player.y + player.height)
+      expect(pageErrors).toEqual([])
+    })
+
+    test('stacks under the player on a phone', async ({ page, api, pageErrors }) => {
+      test.skip(test.info().project.name !== 'mobile', 'One column below lg.')
+      const { player, side } = await layout(page, api)
+      expect(side.y).toBeGreaterThanOrEqual(player.y + player.height)
+      expect(pageErrors).toEqual([])
+    })
+  })
+
+  test('the host reorders and removes from the sidebar, each button naming its item', async ({ page, api }) => {
+    const [a, b, c] = ['aaaaaaaaaaa', 'bbbbbbbbbbb', 'ccccccccccc']
+    const button = (verb: string, item: string, tail = '') => new RegExp(`^${verb} .*${item}${tail}$`, 'i')
+    // A title is someone else's text, `$` patterns included, and the label names it as written.
+    const cash = 'Cash $& $$ money'
+    api.room({
+      ...ROOM,
+      state: { media: null, position: 0, playing: false, at: Date.now() },
+      queue: [a, b, c],
+      titles: { [c]: cash },
+      members: 1,
+    })
+    await page.goto('/watch')
+    await page.getByRole('button', { name: /start a room/i }).click()
+
+    const aside = page.getByRole('complementary', { name: /up next/i })
+    await expect(aside.getByRole('button', { name: button('move', a, ' up') })).toHaveAttribute('aria-disabled', 'true')
+    await aside.getByRole('button', { name: button('move', b, ' up') }).click()
+    await expect(aside.getByRole('listitem')).toHaveText([new RegExp(b), new RegExp(a), /Cash \$& \$\$ money/])
+    // Focus follows the item, so a keyboard user's next press acts on the same one.
+    await expect(aside.getByRole('button', { name: button('move', b, ' up') })).toBeFocused()
+
+    await aside.getByRole('button', { name: `remove ${cash}`, exact: true }).click()
+    await expect(aside.getByRole('listitem')).toHaveText([new RegExp(b), new RegExp(a)])
+    expect(api.sent('POST', '/rooms/AB3DE/state').map((r) => r.body)).toEqual([{ queue: [b, a, c] }, { queue: [b, a] }])
+  })
+
+  test.describe('YouTube in radio', () => {
+    test('a video in the queue plays in a small player that is still at least 200 px high', async ({
+      page,
+      api,
+      pageErrors,
+    }) => {
+      api.room({ ...ROOM, kind: 'radio', queue: [TRACK] })
+      await page.goto('/radio/AB3DE')
+
+      const region = page.getByRole('region', { name: /radio AB3DE/i })
+      const frame = region.locator('iframe')
+      await expect(frame).toHaveAttribute('src', /^https:\/\/www\.youtube-nocookie\.com\/embed\/aqz-KE-bpKQ\?/)
+      // YouTube's terms: never hidden for the sound, never under 200×200.
+      const box = (await frame.boundingBox())!
+      expect(box.height).toBeGreaterThanOrEqual(200)
+      expect(box.width).toBeGreaterThanOrEqual(200)
+      await expect(region.getByRole('complementary', { name: /up next/i }).getByText('couvbat/abysses')).toBeVisible()
+      expect(pageErrors).toEqual([])
+    })
+
+    test('a track that finishes hands over to the video after it, and the queue moves on', async ({ page, api }) => {
+      // This widget answers the page's first message by saying the track has ended,
+      // which is all the handover needs from it.
+      await page.route('https://w.soundcloud.com/**', (route) =>
+        route.fulfill({
+          status: 200,
+          contentType: 'text/html',
+          body: `${STUB}<script>
+            addEventListener('message', function once() {
+              removeEventListener('message', once)
+              parent.postMessage(JSON.stringify({ method: 'finish' }), '*')
+            })
+          </script>`,
+        }),
+      )
+      api.room({
+        ...ROOM,
+        kind: 'radio',
+        state: { media: TRACK, position: 0, playing: true, at: Date.now() },
+        queue: ['aqz-KE-bpKQ'],
+        members: 1,
+      })
+      await page.goto('/radio')
+      await page.getByRole('button', { name: /start a room/i }).click()
+
+      const region = page.getByRole('region', { name: /radio AB3DE/i })
+      await expect(region.locator('iframe')).toHaveAttribute('src', /^https:\/\/www\.youtube-nocookie\.com\/embed\/aqz-KE-bpKQ\?/)
+      await expect(region.getByRole('complementary', { name: /up next/i }).getByText(/nothing queued/i)).toBeVisible()
+      expect(api.sent('POST', '/rooms/AB3DE/state').map((r) => r.body)).toContainEqual({
+        media: 'aqz-KE-bpKQ',
+        queue: [],
+        position: 0,
+        playing: true,
+      })
+    })
+  })
+
+  test('a guest sees the titles the server found, with the item itself as the tooltip', async ({
+    page,
+    api,
+    pageErrors,
+  }) => {
+    api.room({
+      ...ROOM,
+      kind: 'radio',
+      state: { ...ROOM.state, title: 'Big Buck Bunny' },
+      queue: [TRACK, 'zyxwvutsrq9'],
+      // A title is a third party's text: markup in it must arrive as text.
+      titles: { 'aqz-KE-bpKQ': 'Big Buck Bunny', [TRACK]: 'Abysses by <b>couvbat</b>' },
+    })
+    await page.goto('/radio/AB3DE')
+
+    const aside = page.getByRole('complementary', { name: /up next/i })
+    await expect(aside.getByText('Big Buck Bunny')).toHaveAttribute('title', 'aqz-KE-bpKQ')
+    await expect(aside.getByRole('listitem')).toHaveText([/Abysses by <b>couvbat<\/b>/, /youtube:zyxwvutsrq9/])
+    await expect(aside.getByText('Abysses by <b>couvbat</b>')).toHaveAttribute('title', TRACK)
+    await expect(aside.locator('b')).toHaveCount(0)
+    expect(pageErrors).toEqual([])
   })
 
   test('a code nobody has is reported as such', async ({ page, api }) => {

@@ -1,14 +1,43 @@
 import { computed, ref, shallowRef } from 'vue'
-import { DEFAULT_THEME, findTheme, themes, themeTokens, type Theme } from '@/lib/themes'
-import { prefersReducedMotion } from './useCrt'
+import { EMBED_FALLBACK_COLOUR } from '@/content/music'
+import {
+  CUSTOM_THEME,
+  DEFAULT_THEME,
+  findTheme,
+  setCustomTheme,
+  themes,
+  themeTokens,
+  type Theme,
+  type ThemeColours,
+} from '@/lib/themes'
+import { decorativeMotion } from './useMotion'
+import { useViewSwing } from './useViewSwing'
 
 const STORAGE_KEY = 'couvbat:theme'
+/**
+ * A forged scheme's finished colours, with the seed and mode it was grown from. The
+ * colours rather than the seed, so restoring one before mount never needs `forge.ts`
+ * in the entry chunk; and every one of them is checked to be `#rrggbb` on the way back
+ * in, because this is the one stored value that reaches the inline style verbatim.
+ */
+const CUSTOM_KEY = 'couvbat:theme:custom'
+const HEX = /^#[0-9a-f]{6}$/
 /** Matches the `theme-flash` keyframes in main.css. */
 const FLASH_MS = 900
+/** How long a new scheme takes to spread across the page from where it was picked. */
+const CIRCLE_MS = 450
+
+/** Where a pick happened, in viewport pixels: the circle the new scheme spreads in starts here. */
+export interface ThemeOrigin {
+  x: number
+  y: number
+}
 
 const defaultTheme = findTheme(DEFAULT_THEME)!
 /** Every property any scheme writes — all schemes derive the same set. */
 const TOKEN_NAMES = Object.keys(themeTokens(defaultTheme))
+/** The dozen colours a scheme names, which a stored forge has to carry every one of. */
+const COLOUR_NAMES = Object.keys(defaultTheme.colours) as (keyof ThemeColours)[]
 
 // Module-level, like the locale: one scheme for the whole page, not one per caller.
 const current = ref<Theme>(defaultTheme)
@@ -18,11 +47,21 @@ const current = ref<Theme>(defaultTheme)
  * identity, and a deep ref would hand back a proxy that never matches.
  */
 const shown = shallowRef<Theme | null>(null)
+/** The visitor's forged scheme, mirrored from `lib/themes.ts`'s slot so the menu can list it. */
+const custom = shallowRef<Theme | null>(null)
 
 /** `index.html`'s own `theme-color`, captured before the first override so the
  *  default can put back exactly what shipped. */
 let shippedThemeColour: string | null = null
 let flashTimer: ReturnType<typeof setTimeout> | undefined
+/** The circle still spreading, if any. */
+let spreading: ViewTransition | null = null
+/**
+ * Counts picks. A view transition runs its callback a frame or so after it is asked
+ * for, and one cut short by a newer pick still runs it; the count is how that callback
+ * knows a newer pick has happened and leaves the page to it.
+ */
+let picks = 0
 
 function paint(theme: Theme) {
   if (typeof document === 'undefined') return
@@ -51,10 +90,11 @@ function paint(theme: Theme) {
 
 /**
  * The white-out on a dark-to-light switch — the joke the `flashbang` achievement is
- * named after. One flash, never repeated, and skipped under reduced motion.
+ * named after. One flash, never repeated, and only at `full` motion: `calm` leaves it
+ * out, and reduced motion forces `paused`.
  */
 function flash() {
-  if (prefersReducedMotion() || typeof document === 'undefined') return
+  if (decorativeMotion() !== 'full' || typeof document === 'undefined') return
   const root = document.documentElement
   clearTimeout(flashTimer)
   root.classList.remove('theme-flash')
@@ -64,16 +104,95 @@ function flash() {
   flashTimer = setTimeout(() => root.classList.remove('theme-flash'), FLASH_MS)
 }
 
-/** Applies and saves a scheme. Returns it, or `null` for an id no scheme has. */
-export function setTheme(id: string): Theme | null {
+/**
+ * Whether a switch spreads as a circle (`document.startViewTransition`): only where the
+ * API exists, only at `full` motion, not from dark to light — that one is the flashbang,
+ * and a circle would hide the joke — and not while the prism turns, which is motion
+ * enough, and whose stage a snapshot would freeze mid-swing.
+ */
+function circles(from: Theme, next: Theme): boolean {
+  return (
+    typeof document !== 'undefined' &&
+    typeof document.startViewTransition === 'function' &&
+    !(from.mode === 'dark' && next.mode === 'light') &&
+    decorativeMotion() === 'full' &&
+    !useViewSwing().swinging.value
+  )
+}
+
+/**
+ * The new scheme grows as a circle from `origin` over the old one, on
+ * `::view-transition-new(root)` (main.css turns the default cross-fade off). Animated
+ * from here rather than in CSS so the radius can reach the farthest corner from wherever
+ * the pick was; the coordinates are numbers, rounded, never anything typed.
+ */
+function spread(next: Theme, origin: ThemeOrigin | undefined, pick: number) {
+  // While a transition runs, hit-testing goes to the root, so a circle still spreading
+  // is cut short rather than left between the visitor and the next click.
+  spreading?.skipTransition()
+  const x = Math.round(origin?.x ?? window.innerWidth / 2)
+  const y = Math.round(origin?.y ?? window.innerHeight / 2)
+  const transition = document.startViewTransition(() => {
+    if (pick === picks) apply(next)
+  })
+  spreading = transition
+  const root = document.documentElement
+  transition.ready.then(
+    () => {
+      if (typeof root.animate !== 'function') return
+      const radius = Math.hypot(Math.max(x, window.innerWidth - x), Math.max(y, window.innerHeight - y))
+      root.animate(
+        { clipPath: [`circle(0px at ${x}px ${y}px)`, `circle(${Math.ceil(radius)}px at ${x}px ${y}px)`] },
+        { duration: CIRCLE_MS, easing: 'cubic-bezier(0.4, 0, 0.2, 1)', pseudoElement: '::view-transition-new(root)' },
+      )
+    },
+    // Cut short before it was ready: there is no circle to draw.
+    () => {},
+  )
+  const done = () => {
+    if (spreading === transition) spreading = null
+  }
+  transition.finished.then(done, done)
+}
+
+function apply(next: Theme) {
+  // A pick that doesn't circle (dark to light, calm, the prism turning) still ends a circle
+  // in flight: the rest of it would show the old snapshot around the new scheme.
+  spreading?.skipTransition()
+  paint(next)
+  shown.value = null
+  current.value = next
+}
+
+/**
+ * The colour a third-party embed (the SoundCloud widget) is drawn in: the scheme's green,
+ * unless the scheme is a forged one. A forged colour is near-unique to one visitor and
+ * lives in their storage, so sent on every visit it would let SoundCloud link their
+ * sessions; a shipped scheme's green is shared by everyone who picked it.
+ */
+export function embedColour(): string {
+  if (current.value.id === 'custom' || typeof document === 'undefined') return EMBED_FALLBACK_COLOUR
+  return getComputedStyle(document.documentElement).getPropertyValue('--neon-green')
+}
+
+/**
+ * Applies and saves a scheme. Returns it, or `null` for an id no scheme has. `origin`
+ * is where the pick happened (the 🎨 menu passes the click); the terminal passes none,
+ * and the circle starts from the centre of the viewport. Where the circle doesn't run,
+ * the page repaints at once, as it always did.
+ */
+export function setTheme(id: string, { origin }: { origin?: ThemeOrigin } = {}): Theme | null {
   const next = findTheme(id)
   if (!next) return null
-  shown.value = null
 
   const from = current.value
-  paint(next)
-  current.value = next
-  if (from.mode === 'dark' && next.mode === 'light') flash()
+  const pick = ++picks
+  if (circles(from, next)) {
+    spread(next, origin, pick)
+  } else {
+    apply(next)
+    if (from.mode === 'dark' && next.mode === 'light') flash()
+  }
 
   try {
     if (next.id === DEFAULT_THEME) window.localStorage.removeItem(STORAGE_KEY)
@@ -93,6 +212,7 @@ export function setTheme(id: string): Theme | null {
 export function previewTheme(id: string): (() => void) | null {
   const next = findTheme(id)
   if (!next) return null
+  spreading?.skipTransition()
   paint(next)
   shown.value = next
   return () => {
@@ -102,19 +222,71 @@ export function previewTheme(id: string): (() => void) | null {
   }
 }
 
+function installCustom(theme: Theme) {
+  setCustomTheme(theme)
+  custom.value = theme
+}
+
+/**
+ * Makes a forged scheme (`forge.ts`) the visitor's `custom` one, saves it, and applies it
+ * like any pick. A second forge replaces the first: there is one slot.
+ */
+export function applyForgedTheme(theme: Theme, options: { origin?: ThemeOrigin } = {}): Theme {
+  const forged: Theme = { ...theme, id: CUSTOM_THEME }
+  installCustom(forged)
+  try {
+    window.localStorage.setItem(
+      CUSTOM_KEY,
+      JSON.stringify({ seed: forged.seed, mode: forged.mode, colours: forged.colours }),
+    )
+  } catch {
+    // As for the choice itself: the forge just won't survive a reload.
+  }
+  return setTheme(CUSTOM_THEME, options)!
+}
+
+/** A stored forge, or null for anything that isn't exactly one: every colour and the
+ *  seed `#rrggbb`, the mode one of the two. Anything tampered with is ignored whole. */
+function readCustom(raw: string | null): Theme | null {
+  if (!raw) return null
+  let data: unknown
+  try {
+    data = JSON.parse(raw)
+  } catch {
+    return null
+  }
+  if (!data || typeof data !== 'object') return null
+  const { seed, mode, colours } = data as Record<string, unknown>
+  if (mode !== 'dark' && mode !== 'light') return null
+  if (typeof seed !== 'string' || !HEX.test(seed)) return null
+  if (!colours || typeof colours !== 'object') return null
+  const checked = {} as ThemeColours
+  for (const name of COLOUR_NAMES) {
+    const value = (colours as Record<string, unknown>)[name]
+    if (typeof value !== 'string' || !HEX.test(value)) return null
+    checked[name] = value
+  }
+  return { id: CUSTOM_THEME, name: 'Custom', mode, colours: checked, seed }
+}
+
 /**
  * Re-applies a saved scheme. Called from `main.ts` before the app mounts, so a
  * returning visitor's first painted frame is already in their colours — and without
- * the flash, which is for the switch, not for every page load after it.
+ * the flash, which is for the switch, not for every page load after it. A forged
+ * scheme is put back in its slot first, so `custom` resolves like any other id.
  */
 export function restoreTheme() {
   if (typeof window === 'undefined') return
   let stored: string | null
+  let forged: string | null
   try {
     stored = window.localStorage.getItem(STORAGE_KEY)
+    forged = window.localStorage.getItem(CUSTOM_KEY)
   } catch {
     return
   }
+  const restored = readCustom(forged)
+  if (restored) installCustom(restored)
   const theme = stored ? findTheme(stored) : undefined
   if (!theme) return
   paint(theme)
@@ -127,7 +299,8 @@ export function useTheme() {
     theme: computed(() => shown.value ?? current.value),
     /** What the visitor picked, whatever a preview is painting over it. */
     chosen: computed(() => current.value),
-    themes,
+    /** Every scheme that can be picked: the eleven that ship, then the visitor's forge. */
+    themes: computed(() => (custom.value ? [...themes, custom.value] : themes)),
     setTheme,
   }
 }
