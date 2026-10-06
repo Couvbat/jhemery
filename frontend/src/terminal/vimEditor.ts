@@ -503,8 +503,9 @@ function handleInsertKey(event: KeyboardEvent, state: VimBufferState): void {
 
 /**
  * Dispatches one keydown to the vim pane's cursor/mode/buffer state, mutating it
- * in place. Returns `false` only for `:` — the caller lets that fall through to
- * the existing command-line typing mechanism unchanged. Every other key is
+ * in place. Returns `false` only for `:` in normal mode — the caller lets that
+ * fall through to the existing command-line typing mechanism unchanged. In
+ * insert mode `:` is a character like any other. Every other key is
  * considered handled, including ones this editor doesn't map to anything, since
  * real vim's normal mode silently swallows unmapped keys rather than leaking them
  * into the shell. That includes Escape in normal mode: it used to bubble up to
@@ -517,13 +518,13 @@ export function handleVimKey(state: VimBufferState, event: KeyboardEvent): boole
   // never a key to vim. `$` is Shift+4 on QWERTY, and that Shift must not
   // cancel the `d` waiting for it.
   if (MODIFIER_KEYS.has(event.key)) return true
-  if (event.key === ':') {
-    state.pending = ''
-    return false
-  }
   if (state.mode === 'insert') {
     handleInsertKey(event, state)
     return true
+  }
+  if (event.key === ':') {
+    state.pending = ''
+    return false
   }
   handleNormalKey(event.key, state)
   return true

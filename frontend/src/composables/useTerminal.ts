@@ -158,8 +158,8 @@ export function handleCaptureKeydown(event: KeyboardEvent): boolean {
 }
 
 /** Delegates one keydown to the vim editor's pure state machine. Returns `false`
- *  if there's no open vim buffer, or the key wasn't handled (currently only `:`),
- *  telling the caller to let the keystroke fall through normally. */
+ *  if there's no open vim buffer, or the key wasn't handled (only `:` in normal
+ *  mode), telling the caller to let the keystroke fall through normally. */
 export function handleVimKeydown(event: KeyboardEvent): boolean {
   if (!vimBuffer.value) return false
   // A fresh editing action dismisses whatever status message is showing —
