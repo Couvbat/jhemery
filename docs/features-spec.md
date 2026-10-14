@@ -943,6 +943,13 @@ wraps rather than run wider than the screen, which a guestbook name can make it 
   escaped, every time in UTC. The feed always carries a `VTIMEZONE` for Europe/Paris that no
   event refers to, because the grammar requires one component and the list is often empty.
   `calendar` is kept off the curl pages, which are snapshots and can't know what is ahead.
+- **Disclosure policy** (`content/security.ts`, `views/SecurityView.vue`) — `/security`, outside
+  the prism like `/privacy`, and `security.txt` (RFC 9116), which `vite-plugins/security.ts`
+  builds from the same module: `Contact`, an `Expires` `EXPIRES_DAYS` (180) after the build,
+  `Policy`, `Acknowledgments` and both `Canonical` addresses. The file is at the root and
+  `.htaccess` answers `/.well-known/security.txt` from it, because the frontend deploy's rsync
+  excludes `.well-known/` whole to protect AutoSSL's challenges; `security.spec.ts` holds the
+  rewrite ahead of the SPA fallback and checks the exclude it works around.
 - **What the site keeps** (`lib/storage-keys.ts`, `views/PrivacyView.vue`) — every key the site
   writes, with its storage, group, owner, purpose and whether it is a secret, in one list that
   `du`, `rm` and `/privacy` all read. `storage-keys.spec.ts` reads the source for every `couvbat:`
@@ -1445,7 +1452,7 @@ this section only fixes the rules the code cites.
   The leaving face is `inert` from the `<Transition>`'s `leave` to its removal, so in every frame
   exactly one `<main>` can be reached; and `settled`, a counter bumped when a swing ends or the
   pages swap, is what `usePageFocus` waits on (§9).
-- **Pages outside the prism.** `/now`, `/privacy` and `/work/<id>` are routes but not views: they are reached
+- **Pages outside the prism.** `/now`, `/privacy`, `/security` and `/work/<id>` are routes but not views: they are reached
   from links, not the navbar, so the prism keeps its four faces, and `viewIndex()` puts them after
   the faces so a swing to one still has a direction. `cd` doesn't reach them, because
   `resolvePath` is shared by four callers. Each names itself in `tabTitle()`.

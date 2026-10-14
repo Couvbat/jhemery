@@ -223,6 +223,7 @@ const claims = computed(() => [privacyCopy.presence, privacyCopy.stats, privacyC
 
       <p class="text-xs text-muted-foreground">
         <RouterLink to="/now" class="text-primary hover:underline">/now</RouterLink>
+        · <RouterLink to="/security" class="text-primary hover:underline">/security</RouterLink>
         · <RouterLink to="/" class="text-primary hover:underline">~</RouterLink>
       </p>
     </div>

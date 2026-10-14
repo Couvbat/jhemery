@@ -936,6 +936,16 @@ export const messages = {
   // /privacy (views/PrivacyView.vue). The keys and their purposes are lib/storage-keys.ts's,
   // shared with `du`; this is the page around them. Every claim below is one the code
   // keeps, and `strace` is how a visitor checks it rather than taking the page's word.
+  // `/security`, the disclosure policy. Its paragraphs are copy, in `content/security.ts`.
+  security: {
+    heading: { en: 'Reporting a security problem', fr: 'Signaler un problème de sécurité' },
+    updated: { en: 'Policy last updated', fr: 'Politique mise à jour le' },
+    report: { en: 'How to report it', fr: 'Comment le signaler' },
+    inScope: { en: 'What counts', fr: 'Ce qui compte' },
+    outOfScope: { en: 'What doesn’t', fr: 'Ce qui ne compte pas' },
+    harbour: { en: 'Testing in good faith', fr: 'Tester de bonne foi' },
+    thanks: { en: 'Thanks', fr: 'Remerciements' },
+  },
   privacy: {
     heading: { en: 'What this site keeps', fr: 'Ce que ce site garde' },
     browser: { en: 'In this browser', fr: 'Dans ce navigateur' },

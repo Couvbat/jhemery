@@ -5,6 +5,11 @@
   RewriteEngine On
   RewriteBase /
 
+  # RFC 9116's security.txt lives at the root: the deploy's rsync excludes
+  # .well-known/ whole, so that --delete never touches AutoSSL's challenges, and a
+  # built copy there would never upload. The well-known path is answered from it.
+  RewriteRule ^\.well-known/security\.txt$ /security.txt [L]
+
   # `curl jhemery.xyz` gets the ANSI résumé instead of an HTML document. Also
   # covers agentic/LLM crawlers that fetch raw HTML without running JavaScript —
   # without this they'd see an empty `<div id="app">` instead of real content.
@@ -164,6 +169,10 @@
   # The calendar feeds, rebuilt by every deploy that changes an event. A subscribed
   # app re-reads them every twelve hours (REFRESH-INTERVAL), so it must get today's.
   <FilesMatch "^events(\.fr)?\.ics$">
+    Header set Cache-Control "no-cache"
+  </FilesMatch>
+  # security.txt carries an Expires date counted from the deploy.
+  <FilesMatch "^security\.txt$">
     Header set Cache-Control "no-cache"
   </FilesMatch>
 

@@ -10,6 +10,7 @@ import { commitSha } from './vite-plugins/git'
 import { notesPlugin } from './vite-plugins/notes'
 import { resumePlugin } from './vite-plugins/resume'
 import { searchPlugin } from './vite-plugins/search'
+import { securityPlugin } from './vite-plugins/security'
 import { thirdPartyPlugin } from './vite-plugins/third-party'
 import { stampSource, xrayPlugin } from './vite-plugins/xray'
 import { profile } from './src/content/profile'
@@ -24,6 +25,7 @@ export default defineConfig({
     tailwindcss(),
     resumePlugin(),
     calendarPlugin(),
+    securityPlugin(),
     notesPlugin(),
     searchPlugin(),
     thirdPartyPlugin(),
@@ -125,6 +127,9 @@ export default defineConfig({
           /^\/search\.json$/,
           // The calendar feeds (`vite-plugins/calendar.ts`), which a calendar app reads.
           /^\/events(\.fr)?\.ics$/,
+          // RFC 9116's file, at the root and at the path `.htaccess` answers from it.
+          /^\/security\.txt$/,
+          /^\/\.well-known\//,
         ],
         cleanupOutdatedCaches: true,
         clientsClaim: true,
