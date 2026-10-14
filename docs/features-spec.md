@@ -639,12 +639,17 @@ It shares the registry, so it needs no separate maintenance.
 **Content search** (roadmap §I). Matching is `lib/search.ts`: the query is split into words,
 folded as the word games fold with œ and æ spelt out (`coeur` finds *cœur*), and every word
 has to start a word of the entry; a match in a
-title outranks one in a note's heading, which outranks one in body text. From three characters
+title outranks one in a note's heading, which outranks one in body text. The matcher isn't in the
+first paint: it comes by `import()` on the palette's first open, with the registry, and until it
+lands (a frame on a cached site) the list filters by plain substring. If its chunk never comes,
+offline before the precache has it or in a tab older than the deploy, the palette says the
+search didn't load rather than that nothing matches, and asks no more: the module map keeps a
+failed module for the page's life. From three characters
 the palette also fetches `/search.json`, which `vite-plugins/search.ts` writes at build time: one
 entry per case study, per `why` topic, per heading of every design note (with the id the notes
 plugin gave it) and for `/now`, each cut to about two hundred characters, in both languages where
 the source has them and notes in their own, marked. Fetched, not bundled, so the eager chunk
-pays only for the matcher; like the notes, it is out of the precache, off the SPA fallback and
+carries none of it; like the notes, it is out of the precache, off the SPA fallback and
 `no-cache`. Results sit under the palette's own entries, grouped by kind, six at most per kind.
 A case study routes, a note heading is a plain navigation to its anchor, and a `why` result runs
 `why <topic>` through the `?run=` path (so `isLinkable` checks it), at every width: below `md`, in

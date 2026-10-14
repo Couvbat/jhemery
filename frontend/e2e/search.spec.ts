@@ -7,20 +7,25 @@ import { messages } from '@/i18n/messages'
  * The palette's content search, where jsdom can't follow it: that the build emits
  * `/search.json` and the server hands it back as itself, that the palette leaves it
  * alone until a query is long enough to search with, and that a phone, which has no
- * Ctrl+K, reaches the palette from the navbar menu and lands on a case study. Then two
+ * Ctrl+K, reaches the palette from the navbar menu and lands on a case study. Then three
  * things only a browser does: where focus goes once the menu that opened the palette
- * has gone, and the input events a composing keyboard sends. What matches what, and
- * where a result goes, is `lib/__tests__/search.spec.ts`'s.
+ * has gone, the input events a composing keyboard sends, and a chunk of the palette's
+ * that is slow or never comes. What matches what, and where a result goes, is
+ * `lib/__tests__/search.spec.ts`'s.
  */
 
 const qr = work.find((part) => part.id === 'qr')!
 const polling = decisions.find((decision) => decision.id === 'polling')!
 
-/** Every request for the index, from the moment the page starts loading. */
-function indexRequests(page: import('@playwright/test').Page): string[] {
+const INDEX = /^\/search\.json$/
+/** `lib/search.ts`'s own chunk. */
+const SCORER = /^\/assets\/search-[\w-]+\.js$/
+
+/** Every request for a path that `matches`, from the moment the page starts loading. */
+function requestsFor(page: import('@playwright/test').Page, matches: RegExp): string[] {
   const seen: string[] = []
   page.on('request', (request) => {
-    if (new URL(request.url()).pathname === '/search.json') seen.push(request.url())
+    if (matches.test(new URL(request.url()).pathname)) seen.push(request.url())
   })
   return seen
 }
@@ -39,11 +44,14 @@ test('the palette fetches the index on the first long enough query, once, and ru
   terminal,
 }) => {
   test.skip(test.info().project.name === 'mobile', 'Ctrl+K is a desktop’s; a phone’s `why` result is tap-shell.spec.ts’s.')
-  const requests = indexRequests(page)
+  const requests = requestsFor(page, INDEX)
+  const scorer = requestsFor(page, SCORER)
 
   await page.goto('/')
   // The launcher being there means the app has mounted, and with it the Ctrl+K listener.
   await expect(page.getByRole('button', { name: /open terminal/i })).toBeVisible()
+  // The scorer is no part of the first paint: the first open asks for it.
+  expect(scorer).toEqual([])
   await page.keyboard.press('Control+k')
   const input = page.getByRole('combobox')
   await expect(input).toBeFocused()
@@ -52,6 +60,7 @@ test('the palette fetches the index on the first long enough query, once, and ru
   await input.pressSequentially('wh')
   await expect(page.getByRole('option', { name: /^why\b/ })).toBeVisible()
   expect(requests).toEqual([])
+  await expect.poll(() => scorer.length).toBe(1)
 
   await input.pressSequentially('y the guestbook')
   const result = page.getByRole('group', { name: messages.search.why.en }).getByRole('option', { name: new RegExp(polling.topic.en) })
@@ -111,7 +120,7 @@ test('closing the palette opened from the menu gives focus back to the menu’s 
 // `v-model` waits for the composition to end: the list sat still until the word was done.
 test('a phone searches a word while its keyboard is still composing it', async ({ page }) => {
   test.skip(test.info().project.name !== 'mobile', 'The composition is driven over CDP, on the phone it happens on.')
-  const requests = indexRequests(page)
+  const requests = requestsFor(page, INDEX)
 
   await page.goto('/')
   await page.getByRole('button', { name: messages.nav.toggleMenu.en }).click()
@@ -127,4 +136,53 @@ test('a phone searches a word while its keyboard is still composing it', async (
   await expect(page.getByRole('group', { name: messages.search.work.en }).getByRole('option', { name: new RegExp(qr.name.en) })).toBeVisible()
   await expect(page.getByRole('option', { name: /^cd /i })).toHaveCount(0)
   expect(requests).toHaveLength(1)
+})
+
+/**
+ * The scorer and the registry come by `import()` on the first open, and a chunk can fail
+ * to: offline before the precache has it, in a window that runs no service worker, or
+ * asked for by a tab older than the deploy that removed it. A scorer that hadn't come
+ * left the palette saying *Nothing matches*, for good once it had failed, and a failed
+ * chunk threw past the palette.
+ */
+test.describe('the palette’s own chunks', () => {
+  // So the requests reach the route, as they do in a window that runs no service worker.
+  test.use({ serviceWorkers: 'block' })
+
+  test('a scorer on its way says so, one that never came says so on every open, and neither throws', async ({
+    page,
+    pageErrors,
+  }) => {
+    test.skip(test.info().project.name === 'mobile', 'Ctrl+K is a desktop’s, and the chunks are the same on a phone.')
+    let release!: () => void
+    const held = new Promise<void>((resolve) => (release = resolve))
+    // `tap` rather than the terminal's `registry`, whose chunk name the tools' eager one
+    // shares: the palette asks for the two together, and either failing loses both.
+    await page.route(/\/assets\/(search|tap)-[\w-]+\.js$/, async (route) => {
+      if (SCORER.test(new URL(route.request().url()).pathname)) await held
+      await route.abort()
+    })
+
+    await page.goto('/')
+    await expect(page.getByRole('button', { name: /open terminal/i })).toBeVisible()
+    await page.keyboard.press('Control+k')
+    const input = page.getByRole('combobox')
+    await expect(input).toBeFocused()
+    const list = page.getByRole('listbox')
+
+    // The substring stand-in finds nothing for this, which isn't the scorer's answer.
+    await input.pressSequentially('qr enc')
+    await expect(list).toContainText(messages.search.loading.en)
+    release()
+    await expect(list).toContainText(messages.search.failed.en)
+    await input.fill('wh')
+    await expect(page.getByRole('option', { name: /^why\b/ })).toHaveCount(0)
+
+    await page.keyboard.press('Escape')
+    await page.keyboard.press('Control+k')
+    await expect(input).toBeFocused()
+    await input.pressSequentially('qr enc')
+    await expect(list).toContainText(messages.search.failed.en)
+    expect(pageErrors).toEqual([])
+  })
 })

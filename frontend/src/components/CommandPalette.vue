@@ -62,22 +62,35 @@ let registryRequested = false
  * site, the list filters by plain substring as it did before the scorer existed.
  */
 const searchLib = shallowRef<typeof import('@/lib/search') | null>(null)
+const scorerFailed = ref(false)
 
+/**
+ * Either chunk can fail to come: offline before the service worker has precached it, in a
+ * window that runs none, or asked for by a tab older than the deploy that removed it. Unlike
+ * the index, it isn't asked for again: the module map keeps a failed module for the page's
+ * life, and Chromium answers a second `import()` from it without a request. So the palette
+ * keeps its sections and views, and says the search didn't load, not that nothing matches.
+ */
 function loadRegistryCommands() {
   if (registryRequested) return
   registryRequested = true
-  void Promise.all([import('@/terminal/registry'), import('@/terminal/tap')]).then(([{ paletteCommands }, { tapLines }]) => {
-    registryCommands.value = paletteCommands()
-    tapped.value = new Set(tapLines())
-  })
-  void import('@/lib/search').then((lib) => {
-    searchLib.value = lib
-  })
-}
-
-/** Whether a query is long enough to search the content index; false until the scorer is in. */
-function wantsIndex(value: string): boolean {
-  return searchLib.value?.wantsIndex(value) ?? false
+  Promise.all([import('@/terminal/registry'), import('@/terminal/tap')]).then(
+    ([{ paletteCommands }, { tapLines }]) => {
+      registryCommands.value = paletteCommands()
+      tapped.value = new Set(tapLines())
+    },
+    () => {
+      // The sections and views are the palette's own, and stay.
+    },
+  )
+  import('@/lib/search').then(
+    (lib) => {
+      searchLib.value = lib
+    },
+    () => {
+      scorerFailed.value = true
+    },
+  )
 }
 
 /**
@@ -209,10 +222,16 @@ const activeDescendant = computed(() =>
   filtered.value[cursor.value] ? `palette-option-${cursor.value}` : undefined,
 )
 
-/** Nothing matched yet: say whether the index is still on its way, or never came. */
+/**
+ * Nothing matched yet: say whether what would search is still on its way, or never came.
+ * Until the scorer is in, that is the scorer, whatever the query: the substring stand-in
+ * finding nothing isn't the answer, so it doesn't get to say *Nothing matches*.
+ */
 const emptyMessage = computed(() => {
-  if (wantsIndex(query.value) && indexState.value === 'loading') return t(m.search.loading)
-  if (wantsIndex(query.value) && indexState.value === 'failed') return t(m.search.failed)
+  const lib = searchLib.value
+  const state = lib ? (lib.wantsIndex(query.value) ? indexState.value : 'idle') : scorerFailed.value ? 'failed' : 'loading'
+  if (state === 'loading') return t(m.search.loading)
+  if (state === 'failed') return t(m.search.failed)
   return t(m.palette.empty)
 })
 

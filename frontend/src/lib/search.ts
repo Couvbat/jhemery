@@ -4,9 +4,10 @@ import { fold } from './fold'
 
 /**
  * What the Ctrl+K palette matches with, for its own entries and for `/search.json`
- * (roadmap §I, *Content search in Ctrl+K*). In the eager chunk with the palette, so it
- * stays small: no dependency, and at a couple of hundred entries a linear scan of
- * pre-split words is instant.
+ * (roadmap §I, *Content search in Ctrl+K*). Loaded by the palette's `import()` on its
+ * first open, never in the first paint, where a static import of it from anything there
+ * would put it back. Small all the same: no dependency, and at a couple of hundred
+ * entries a linear scan of pre-split words is instant.
  *
  * A query is split into words, and every one of them has to start a word somewhere in
  * an entry, so `vim key` finds the vim note's *Key mapping* and `ey` finds nothing.
