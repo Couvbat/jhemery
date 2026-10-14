@@ -5,6 +5,7 @@ import vue from '@vitejs/plugin-vue'
 import vueDevTools from 'vite-plugin-vue-devtools'
 import tailwindcss from '@tailwindcss/vite'
 import { VitePWA } from 'vite-plugin-pwa'
+import { calendarPlugin } from './vite-plugins/calendar'
 import { commitSha } from './vite-plugins/git'
 import { notesPlugin } from './vite-plugins/notes'
 import { resumePlugin } from './vite-plugins/resume'
@@ -22,6 +23,7 @@ export default defineConfig({
     vueDevTools(),
     tailwindcss(),
     resumePlugin(),
+    calendarPlugin(),
     notesPlugin(),
     searchPlugin(),
     thirdPartyPlugin(),
@@ -121,6 +123,8 @@ export default defineConfig({
           // The palette's search index (`vite-plugins/search.ts`). The palette fetches it,
           // which the fallback never answers; this is for a browser opening it by hand.
           /^\/search\.json$/,
+          // The calendar feeds (`vite-plugins/calendar.ts`), which a calendar app reads.
+          /^\/events(\.fr)?\.ics$/,
         ],
         cleanupOutdatedCaches: true,
         clientsClaim: true,

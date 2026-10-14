@@ -909,6 +909,13 @@ export const messages = {
       fr: 'Cette liste date de {n} jours. Une partie n’est sans doute plus vraie.',
     },
     about: { en: 'A /now page, as in', fr: 'Une page /now, comme sur' },
+    // The events block (`content/events.ts`), shown only while one is ahead.
+    upcoming: { en: 'Coming up', fr: 'À venir' },
+    live: { en: 'live now', fr: 'en direct' },
+    until: { en: 'until', fr: 'jusqu’à' },
+    go: { en: 'go there', fr: 'y aller' },
+    subscribe: { en: 'subscribe in your calendar', fr: 's’abonner dans votre agenda' },
+    download: { en: 'download the .ics', fr: 'télécharger le .ics' },
   },
   // X-ray mode (components/XrayLayer.vue). File names are facts and stay as they are;
   // `{n}` is substituted by the caller.
@@ -963,6 +970,8 @@ export const messages = {
     // never anything to say about who the others are.
     online: { en: '{n} here now', fr: '{n} personnes ici' },
     onlineOne: { en: 'just you here', fr: 'vous seul ici' },
+    // An event from `content/events.ts`, once it is a week away or on.
+    live: { en: 'live', fr: 'en direct' },
   },
   boot: {
     skip: { en: 'press any key to skip', fr: 'appuyez sur une touche pour passer' },

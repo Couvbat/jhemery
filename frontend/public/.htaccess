@@ -51,6 +51,10 @@
   # type here downgrades WebAssembly.instantiateStreaming to a full buffer
   # first — the ffmpeg core is 32 MB, so the streaming compile is worth keeping.
   AddType application/wasm .wasm
+  # The calendar feeds (vite-plugins/calendar.ts), typed so that a browser hands
+  # one to the calendar app rather than showing it as text.
+  AddType text/calendar .ics
+  AddCharset UTF-8 .ics
 </IfModule>
 
 <IfModule mod_deflate.c>
@@ -155,6 +159,11 @@
   # The palette's search index (vite-plugins/search.ts): unhashed and rebuilt by every
   # deploy, so a cached copy would offer headings a note no longer has.
   <FilesMatch "^search\.json$">
+    Header set Cache-Control "no-cache"
+  </FilesMatch>
+  # The calendar feeds, rebuilt by every deploy that changes an event. A subscribed
+  # app re-reads them every twelve hours (REFRESH-INTERVAL), so it must get today's.
+  <FilesMatch "^events(\.fr)?\.ics$">
     Header set Cache-Control "no-cache"
   </FilesMatch>
 

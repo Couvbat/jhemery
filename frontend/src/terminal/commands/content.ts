@@ -1,6 +1,12 @@
 import {
   durationLabel,
   education,
+  eventEnd,
+  events,
+  eventStart,
+  feedFile,
+  isLive,
+  upcomingEvents,
   experience,
   gaming,
   isExternal,
@@ -26,6 +32,7 @@ import { useStats } from '@/composables/useStats'
 import { useTheme } from '@/composables/useTheme'
 import { fetchSite, type SiteResponse } from '@/lib/api'
 import { REPO } from '@/lib/source'
+import { relative } from '@/tools/time/time'
 import { parseSgr } from '../ansi'
 import { MARK } from '../ascii'
 import { isPrintable, MAX_LINES, parseCurlArgs, resolveTarget, SITE_FILES } from '../curl'
@@ -370,6 +377,50 @@ export const contentCommands: Command[] = [
           pre: true,
         })
       }
+      return out
+    },
+  },
+  {
+    // BSD's calendar(1) prints the appointments ahead from a file; this one's file is
+    // `content/events.ts`, and its other reader is the feed a calendar app subscribes to.
+    name: 'calendar',
+    description: { en: 'What I host next, and the feed', fr: 'Mes prochains rendez-vous, et le flux' },
+    group: 'content',
+    writes: 'none',
+    linkable: true,
+    run({ t, locale }) {
+      const at = new Date()
+      const feed = `https://${profile.domain}/${feedFile(locale)}`
+      const when = new Intl.DateTimeFormat(locale === 'fr' ? 'fr-FR' : 'en-GB', {
+        weekday: 'short',
+        day: 'numeric',
+        month: 'short',
+        hour: '2-digit',
+        minute: '2-digit',
+        timeZoneName: 'short',
+      })
+      const until = new Intl.DateTimeFormat(locale === 'fr' ? 'fr-FR' : 'en-GB', { hour: '2-digit', minute: '2-digit' })
+      const out: OutputLine[] = [...heading('calendar')]
+      const ahead = upcomingEvents(at, events)
+      if (!ahead.length) out.push(line(t({ en: 'nothing scheduled yet.', fr: 'rien de prévu pour l’instant.' }), 'muted'))
+      for (const event of ahead) {
+        const live = isLive(event, at)
+        out.push(
+          live
+            ? line(`● ${t({ en: 'live now', fr: 'en direct' })} · ${t({ en: 'until', fr: 'jusqu’à' })} ${until.format(eventEnd(event))}`, 'success')
+            : line(`${when.format(eventStart(event))} · ${relative(eventStart(event), at, locale)}`, 'accent'),
+          line(`  ${t(event.title)}`, 'primary'),
+        )
+        if (event.note) out.push(...wrap(t(event.note), 72).map((text) => line(`  ${text}`)))
+        if (event.where && isExternal(event.where)) out.push({ text: `  ${event.where}`, href: event.where, tone: 'accent' })
+        else if (event.where) out.push(line(`  ${t({ en: 'run', fr: 'tapez' })} \`cd ${event.where}\``, 'muted'))
+        out.push(blank)
+      }
+      if (!ahead.length) out.push(blank)
+      out.push(
+        line(t({ en: 'subscribe in any calendar app:', fr: 'à suivre dans n’importe quelle application d’agenda :' }), 'muted'),
+        { text: feed, href: feed, tone: 'accent' },
+      )
       return out
     },
   },

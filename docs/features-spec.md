@@ -61,6 +61,9 @@ src/content/
   experience.ts  dated roles and courses, newest first; the current role names profile.employer
   dates.ts       the date maths: daysSince, monthsBetween (both ends count), durationLabel, periodLabel
   now.ts         the /now list and its staleness rule
+  seasons.ts     the six days the field dresses up for, on the visitor's calendar
+  events.ts      SiteEvent[], the appointments Jules hosts, as instants; read by `calendar`,
+                 /now, the footer and the .ics feeds
   docs.ts        githubSlug and headingSlugs, so a link to a doc's heading can be checked
   decisions.ts   Decision[], what the site chose and turned down; read by `why` (§3)
   work.ts        WorkPart[], the case studies at /work/<id>, `projects <id>` and projects/<id>.md
@@ -453,7 +456,7 @@ into `/proc/`, as it does for `projects/`.
 ### content
 Reads from §1, so it can never contradict the page: `about`, `skills [--why]`,
 `projects [--json] [<part>]`, `music`, `gaming`, `hardware [pc|nas|peripherals]`, `contact`, `resume`,
-`neofetch`, `curl`. `skills --why` prints each skill's `usedIn` evidence (a `goTo` path or a repo
+`neofetch`, `calendar`, `curl`. `skills --why` prints each skill's `usedIn` evidence (a `goTo` path or a repo
 URL), and `neofetch` has a `Status` row from `profile.availability`, the same flag the footer and
 both résumés read. `now.txt` is the `/now` list, with the same 90-day staleness rule.
 
@@ -930,6 +933,16 @@ wraps rather than run wider than the screen, which a guestbook name can make it 
 - **Availability and `/now`** — the footer's status line also carries `profile.availability`
   (a filled or hollow dot and the note) and links `/now`, a route outside the prism
   (`views/NowView.vue`, `content/now.ts`). Past 90 days the page says how old the list is.
+- **Events** (`content/events.ts`) — appointments rather than days: each is an instant with its
+  offset written out, a length, a `Localised` title and note, and a `goTo` path or URL. Its `id`
+  is the feed's `UID`, so it never changes once published. While one hasn't ended, `/now` lists
+  it in the visitor's zone with a relative phrase, `calendar` prints the same, and from
+  `SOON_DAYS` (7) before its start the footer's status line names it, re-read on the same
+  60 s tick. `vite-plugins/calendar.ts` writes `/events.ics` and `/events.fr.ics` from RFC 5545
+  by hand: CRLF lines folded at 75 octets without splitting a character or an escape, TEXT
+  escaped, every time in UTC. The feed always carries a `VTIMEZONE` for Europe/Paris that no
+  event refers to, because the grammar requires one component and the list is often empty.
+  `calendar` is kept off the curl pages, which are snapshots and can't know what is ahead.
 - **What the site keeps** (`lib/storage-keys.ts`, `views/PrivacyView.vue`) — every key the site
   writes, with its storage, group, owner, purpose and whether it is a secret, in one list that
   `du`, `rm` and `/privacy` all read. `storage-keys.spec.ts` reads the source for every `couvbat:`

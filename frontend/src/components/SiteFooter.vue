@@ -1,12 +1,13 @@
 <script setup lang="ts">
-import { onMounted } from 'vue'
+import { computed, onMounted } from 'vue'
 import { RouterLink } from 'vue-router'
-import { profile } from '@/content'
+import { eventStart, profile } from '@/content'
 import { useLocale } from '@/i18n'
+import { relative } from '@/tools/time/time'
 import { useStatus } from '@/composables/useStatus'
 import { startPresence, usePresence } from '@/composables/usePresence'
 
-const { t, m } = useLocale()
+const { t, m, locale } = useLocale()
 
 // Injected by Vite at build time — see vite.config.ts.
 const sha = __BUILD_SHA__
@@ -21,7 +22,15 @@ const builtLabel = new Date(builtAt).toLocaleDateString(undefined, {
 
 // Days since the first commit, and how long ago this build went out — the same
 // numbers `neofetch` and `top` report inside the terminal, kept visible.
-const { uptime, lastDeploy } = useStatus(builtAt)
+const { uptime, lastDeploy, event } = useStatus(builtAt)
+
+// An event a week away or on, which `/now` has in full.
+const eventLabel = computed(() => {
+  const soon = event.value
+  if (!soon) return null
+  const when = soon.live ? t(m.footer.live) : relative(eventStart(soon.event), soon.at, locale.value)
+  return `${when} · ${t(soon.event.title)}`
+})
 
 // The status line is the only surface that shows the count, so it is also the
 // one that opens the stream. Stays null — and the segment stays out of the DOM
@@ -82,6 +91,16 @@ onMounted(startPresence)
         {{ profile.availability.open ? '●' : '○' }} {{ t(profile.availability.note) }}
       </span>
       <span class="text-muted-foreground/40" aria-hidden="true">·</span>
+      <template v-if="eventLabel">
+        <RouterLink
+          to="/now"
+          data-testid="footer-event"
+          :class="['hover:text-primary transition-colors', event?.live ? 'text-primary' : 'text-accent/80']"
+        >
+          {{ event?.live ? '●' : '◆' }} {{ eventLabel }}
+        </RouterLink>
+        <span class="text-muted-foreground/40" aria-hidden="true">·</span>
+      </template>
       <template v-if="online !== null">
         <span>{{ t(online === 1 ? m.footer.onlineOne : m.footer.online).replace('{n}', String(online)) }}</span>
         <span class="text-muted-foreground/40" aria-hidden="true">·</span>

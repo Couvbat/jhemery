@@ -45,6 +45,8 @@ const EXCLUDED: Record<string, string> = {
   help: 'help.txt is a generated index of these pages instead',
   du: 'the visitor’s own browser storage',
   xray: 'it draws over the page, which a terminal hasn’t got',
+  // What is ahead depends on the day, and a page is a snapshot served all year.
+  calendar: 'the appointments ahead, which a snapshot can’t know',
 }
 
 const ORIGIN = `https://${profile.domain}`
