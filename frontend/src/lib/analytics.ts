@@ -40,30 +40,6 @@ const websiteId = import.meta.env.VITE_UMAMI_WEBSITE_ID
 /** Optional comma-separated hostname allowlist, passed through as `data-domains`. */
 const domains = import.meta.env.VITE_UMAMI_DOMAINS
 
-/**
- * The visitor's refusal, set from `/privacy`. Read when the tracker would be injected,
- * so a refused visit sends Umami nothing at all, not even the script request; the page
- * reloads after a change rather than unpicking a tracker that is already running.
- */
-const REFUSED_KEY = 'couvbat:analytics'
-
-export function analyticsRefused(): boolean {
-  try {
-    return localStorage.getItem(REFUSED_KEY) === 'refused'
-  } catch {
-    return false
-  }
-}
-
-export function refuseAnalytics(refused: boolean): void {
-  try {
-    if (refused) localStorage.setItem(REFUSED_KEY, 'refused')
-    else localStorage.removeItem(REFUSED_KEY)
-  } catch {
-    // Blocked storage keeps nothing, so the refusal can't outlive this page.
-  }
-}
-
 /** Whether this build counts visits at all: off in dev and in any build without the two settings. */
 export function analyticsConfigured(): boolean {
   return !!src && !!websiteId
@@ -91,6 +67,10 @@ let unavailable = false
 
 function flush(): void {
   ready = true
+  if (analyticsRefused()) {
+    queue.length = 0
+    return
+  }
   for (const [name, data] of queue.splice(0)) window.umami?.track(name, data)
 }
 
@@ -100,11 +80,76 @@ function abandon(): void {
 }
 
 /**
+ * The visitor's refusal, set from `/privacy`, in two keys written together.
+ * `couvbat:analytics` is the site's record, listed with the other settings, and decides at
+ * each load whether the tracker is injected at all: a refused visit sends Umami nothing,
+ * not even the script request. `umami.disabled` is Umami's own switch, which its tracker
+ * reads before every send, automatic page views included, in every open tab: so a refusal
+ * also silences a tracker already running, here or in a tab the visitor left open, without
+ * waiting for a reload. (Found in review: the record alone left both of those counting.)
+ *
+ * The switch is written holding the record's name, so a load that finds the switch without
+ * the record knows it set it and can take it back (`rm settings` clears only the record).
+ * One holding anything else is the owner's, set by hand to keep their own visits out, as
+ * Umami's docs suggest, and is left alone.
+ */
+const REFUSED_KEY = 'couvbat:analytics'
+const UMAMI_SWITCH = 'umami.disabled'
+
+export function analyticsRefused(): boolean {
+  try {
+    return localStorage.getItem(REFUSED_KEY) === 'refused'
+  } catch {
+    return false
+  }
+}
+
+/**
+ * Records the choice, or returns false when the browser wouldn't keep it (storage full or
+ * blocked), having changed nothing: a refusal that silently didn't stick would be worse
+ * than one the page says failed.
+ */
+export function refuseAnalytics(refused: boolean): boolean {
+  try {
+    if (refused) {
+      // The switch first: it is what stops a tracker that is already running.
+      if (localStorage.getItem(UMAMI_SWITCH) === null) localStorage.setItem(UMAMI_SWITCH, REFUSED_KEY)
+      localStorage.setItem(REFUSED_KEY, 'refused')
+      // Events waiting for the script must not reach it once the visitor has said no.
+      queue.length = 0
+    } else {
+      localStorage.removeItem(REFUSED_KEY)
+      if (localStorage.getItem(UMAMI_SWITCH) === REFUSED_KEY) localStorage.removeItem(UMAMI_SWITCH)
+    }
+    return true
+  } catch {
+    // A switch set without its record would silence the tracker while the page said it
+    // counts, so it is taken back.
+    if (refused) syncSwitch(analyticsRefused())
+    return false
+  }
+}
+
+/** Puts the switch back in line with the record: at each load, and after a write that failed. */
+function syncSwitch(refused: boolean): void {
+  try {
+    const current = localStorage.getItem(UMAMI_SWITCH)
+    if (refused && current === null) localStorage.setItem(UMAMI_SWITCH, REFUSED_KEY)
+    if (!refused && current === REFUSED_KEY) localStorage.removeItem(UMAMI_SWITCH)
+  } catch {
+    // Unreadable storage: the record reads as absent too, and there is nothing to align.
+  }
+}
+
+/**
  * Injects the tracker. Safe to call when unconfigured (does nothing) and safe to
  * call twice (the second call is ignored) — `main.ts` is the only caller.
  */
 export function initAnalytics(): void {
-  if (!src || !websiteId || analyticsRefused()) return
+  if (!src || !websiteId) return
+  const refused = analyticsRefused()
+  syncSwitch(refused)
+  if (refused) return
   if (document.querySelector('script[data-umami-tracker]')) return
 
   const script = document.createElement('script')

@@ -968,6 +968,10 @@ export const messages = {
     counting: { en: 'Visit counting', fr: 'Mesure d’audience' },
     refuse: { en: 'refuse and reload', fr: 'refuser et recharger' },
     allow: { en: 'count me again and reload', fr: 'me compter à nouveau et recharger' },
+    unsaved: {
+      en: 'Your browser wouldn’t keep the choice, so nothing changed. A content blocker refuses the tracker just as well.',
+      fr: 'Votre navigateur n’a pas voulu garder ce choix : rien n’a changé. Un bloqueur de contenu refuse le traceur tout aussi bien.',
+    },
     who: { en: 'Who answers for it', fr: 'Qui en répond' },
     rights: { en: 'Your rights', fr: 'Vos droits' },
   },

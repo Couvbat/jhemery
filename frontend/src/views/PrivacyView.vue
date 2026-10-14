@@ -127,10 +127,14 @@ const claims = [
 const counting = analyticsConfigured()
 const refused = analyticsRefused()
 const switching = ref(false)
+// Storage full or blocked: nothing changed, and the page says so instead of reloading into
+// the same state as if it had worked.
+const unsaved = ref(false)
 
 async function switchCounting() {
+  unsaved.value = !refuseAnalytics(!refused)
+  if (unsaved.value) return
   switching.value = true
-  refuseAnalytics(!refused)
   await reloadPage()
 }
 </script>
@@ -254,6 +258,7 @@ async function switchCounting() {
               {{ switching ? t(m.privacy.cleared) : t(refused ? m.privacy.allow : m.privacy.refuse) }}
             </button>
           </div>
+          <p v-if="unsaved" class="text-xs text-warning" role="alert">{{ t(m.privacy.unsaved) }}</p>
         </div>
         <p class="text-sm text-foreground leading-relaxed"><CodeText :text="t(privacyCopy.strace)" /></p>
       </section>

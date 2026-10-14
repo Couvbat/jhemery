@@ -101,7 +101,11 @@ export const STORAGE_KEYS: StorageKey[] = [
     key: 'couvbat:analytics',
     area: 'local',
     group: 'settings',
-    purpose: { en: 'you refused visit counting', fr: 'vous avez refusé la mesure d’audience' },
+    // Umami's own `umami.disabled` is written beside it, outside the namespace, so the row says so.
+    purpose: {
+      en: 'you refused visit counting; `umami.disabled`, the tracker’s own switch, is set beside it',
+      fr: 'vous avez refusé la mesure d’audience ; `umami.disabled`, l’interrupteur du traceur, est posé à côté',
+    },
     owner: 'lib/analytics.ts',
   },
   {

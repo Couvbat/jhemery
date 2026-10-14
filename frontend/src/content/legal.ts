@@ -42,8 +42,14 @@ export interface Credit {
 /**
  * The version of `@ffmpeg/core` the ffmpeg tool serves, unmodified. It is GPL, so the credit
  * names the exact source it was built from; `legal.spec.ts` holds this to the installed file.
+ *
+ * The source is pinned by its own tag, not derived from the version: upstream tags the
+ * monorepo by release, and `v0.12.10` holds core 0.12.6, while core 0.12.10 is under `v12.15`
+ * (its `packages/core/package.json` says so; found in review). A bump fails the spec above,
+ * and is the moment to look the new tag up the same way.
  */
 export const FFMPEG_CORE_VERSION = '0.12.10'
+const FFMPEG_SOURCE_TAG = 'v12.15'
 
 const MIT = { name: 'MIT', href: 'https://opensource.org/license/mit' }
 
@@ -72,7 +78,7 @@ export const credits: Credit[] = [
   {
     what: { en: 'The ffmpeg tool', fr: 'L’outil ffmpeg' },
     who: `ffmpeg.wasm (@ffmpeg/core ${FFMPEG_CORE_VERSION}, unmodified)`,
-    href: `https://github.com/ffmpegwasm/ffmpeg.wasm/tree/v${FFMPEG_CORE_VERSION}`,
+    href: `https://github.com/ffmpegwasm/ffmpeg.wasm/tree/${FFMPEG_SOURCE_TAG}/packages/core`,
     licence: { name: 'GPL-2.0-or-later', href: 'https://www.gnu.org/licenses/old-licenses/gpl-2.0.html' },
   },
   { what: { en: 'The 3D background', fr: 'Le fond 3D' }, who: 'three.js', href: 'https://threejs.org/', licence: MIT },

@@ -37,8 +37,12 @@ describe('the hosts and credits', () => {
     }
   })
 
-  it('names the @ffmpeg/core version that is installed', () => {
+  it('names the @ffmpeg/core version that is installed, and a pinned source tag', () => {
     const installed = JSON.parse(readFileSync(resolve(process.cwd(), 'node_modules/@ffmpeg/core/package.json'), 'utf8'))
     expect(FFMPEG_CORE_VERSION).toBe(installed.version)
+    // Not `v${version}`: upstream's tags don't follow the core's version (see legal.ts).
+    const ffmpeg = credits.find((credit) => credit.who.startsWith('ffmpeg.wasm'))!
+    expect(ffmpeg.href).toMatch(/\/tree\/v[\d.]+\/packages\/core$/)
+    expect(ffmpeg.href).not.toContain(`/tree/v${FFMPEG_CORE_VERSION}/`)
   })
 })

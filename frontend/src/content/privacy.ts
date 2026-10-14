@@ -47,8 +47,8 @@ export const privacyCopy = {
     fr: '`sign` publie le nom et le message que vous donnez, avec la date, à la vue de tous les visiteurs. Un message reste jusqu’à ce que 500 plus récents le poussent dehors, ou jusqu’à ce que vous me demandiez de le retirer.',
   },
   addresses: {
-    en: 'Your IP address reaches the server with every request. The rate limiter keeps it to stop abuse, only in memory, never on disk, and only for its window: an hour at the longest. The host’s access logs record it too, under o2switch’s own retention.',
-    fr: 'Votre adresse IP arrive au serveur avec chaque requête. Le limiteur de débit la garde pour freiner les abus, en mémoire seulement, jamais sur disque, et le temps de sa fenêtre : une heure au plus. Les journaux d’accès de l’hébergeur l’enregistrent aussi, selon la durée de conservation d’o2switch.',
+    en: 'Your IP address reaches the server with every request. The rate limiter keeps it to stop abuse, in memory only, never on disk: it counts against you for an hour at the longest, and the entry goes at the next clean-up, which runs as later requests arrive, or when the server restarts. The host’s access logs record it too, under o2switch’s own retention.',
+    fr: 'Votre adresse IP arrive au serveur avec chaque requête. Le limiteur de débit la garde pour freiner les abus, en mémoire seulement, jamais sur disque : elle compte contre vous une heure au plus, puis l’entrée part au nettoyage suivant, qui passe à l’arrivée des requêtes suivantes, ou au redémarrage du serveur. Les journaux d’accès de l’hébergeur l’enregistrent aussi, selon la durée de conservation d’o2switch.',
   },
   cloudflare: {
     en: 'Cloudflare carries every request on its way to the server, so it sees your IP address, the page asked for and your browser’s user agent. It acts on my behalf, and its transfers to the US rest on the EU–US Data Privacy Framework.',
@@ -67,8 +67,8 @@ export const privacyCopy = {
     fr: 'Rien de tout cela n’est à croire sur parole. `strace <commande>` lance une commande et liste chaque requête qu’elle a faite, avec les clés de ce qui est parti et jamais les valeurs.',
   },
   analyticsOn: {
-    en: 'Visits from this browser are counted. Refusing keeps the tracker from loading at all.',
-    fr: 'Les visites de ce navigateur sont comptées. Refuser empêche le traceur de se charger du tout.',
+    en: 'Visits from this browser are counted. Refusing stops the tracker at once, in every open tab, and keeps it from loading at all after that.',
+    fr: 'Les visites de ce navigateur sont comptées. Refuser arrête le traceur aussitôt, dans tous les onglets ouverts, puis l’empêche de se charger du tout.',
   },
   analyticsOff: {
     en: 'You refused: this browser loads no tracker and is not counted.',

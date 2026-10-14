@@ -940,7 +940,8 @@ wraps rather than run wider than the screen, which a guestbook name can make it 
   list: the ffmpeg core in the HTTP cache, and the embeds' storage under their own origins. Then
   the privacy claims, each one the code keeps, with `strace` as the way to check them, a button
   to refuse Umami (`couvbat:analytics`, read before the tracker is injected, so a refusal sends
-  nothing at all), and the GDPR's part: who answers for the data, on what basis, and the
+  nothing at all, and Umami's own `umami.disabled` beside it, which stops a tracker already
+  running in any tab), and the GDPR's part: who answers for the data, on what basis, and the
   visitor's rights. Caches are reported, never cleared: they hold the site's own files, and a
   clear would only cost a download.
 - **`/legal` and consent** (`views/LegalView.vue`, `content/legal.ts`) — the mentions légales
