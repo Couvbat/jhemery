@@ -2,6 +2,7 @@ import { decisions, findDecision, profile, type Decision, type Localised } from 
 import { decorativeMotion } from '@/composables/useMotion'
 import { previewTheme, useTheme } from '@/composables/useTheme'
 import { touchLayout } from '@/composables/useTerminalShell'
+import { setXray } from '@/composables/useXray'
 import { findTheme } from '@/lib/themes'
 import { docUrl } from '@/lib/source'
 import { achievementList, unlockedCount } from '../achievements'
@@ -221,6 +222,46 @@ export const workCommands: Command[] = [
         ? { en: 'End of the tour. The stop button stops one, `tour` starts another.', fr: 'Fin de la visite. Le bouton stop en arrête une, `tour` en relance une.' }
         : { en: 'End of the tour. Ctrl+C stops one, `tour` starts another.', fr: 'Fin de la visite. Ctrl+C en arrête une, `tour` en relance une.' }
       ctx.print([blank, line(ctx.t(end), 'muted')])
+    },
+  },
+  {
+    name: 'xray',
+    description: {
+      en: 'Outline each component on the page, with its source',
+      fr: 'Entourer chaque composant de la page, avec sa source',
+    },
+    manual: {
+      description: {
+        en: [
+          'Outlines every component on screen and tags it with its file, and with the files its words come from: the content modules it reads and, for the chrome strings, `messages.ts`. Each name links to that file on GitHub, at the commit this build came from.',
+          'The three.js canvas is tagged too, with how many shapes it holds. Esc, the exit button in the corner or a second `xray` turns it off.',
+        ],
+        fr: [
+          'Entoure chaque composant à l’écran et l’étiquette avec son fichier, et avec les fichiers d’où viennent ses textes : les modules de contenu qu’il lit et, pour les libellés de l’interface, `messages.ts`. Chaque nom mène à ce fichier sur GitHub, au commit dont vient ce build.',
+          'Le canvas three.js est étiqueté aussi, avec le nombre de formes qu’il contient. Échap, le bouton quitter dans le coin ou un second `xray` l’éteint.',
+        ],
+      },
+      seeAlso: ['why(1)', 'projects(1)'],
+    },
+    group: 'content',
+    // An overlay saved nowhere, which Esc takes off and a reload forgets: it shows the
+    // page's structure and changes none of it, so a link may run it (`?run=xray`).
+    writes: 'none',
+    linkable: true,
+    palette: true,
+    run({ t, close }) {
+      if (!setXray()) return [line(t({ en: 'x-ray off.', fr: 'Rayons X éteints.' }), 'muted')]
+      // The page is what it shows, so the terminal gets out of the way, as `cd` does.
+      close()
+      return [
+        line(
+          t({
+            en: 'x-ray on: each component is outlined and tagged with its file and where its words come from. Esc, or `xray` again, ends it.',
+            fr: 'Rayons X allumés : chaque composant est entouré et étiqueté avec son fichier et l’origine de ses textes. Échap, ou `xray` à nouveau, pour en sortir.',
+          }),
+          'primary',
+        ),
+      ]
     },
   },
 ]

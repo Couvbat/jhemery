@@ -487,6 +487,34 @@ motion it prints everything at once and shows no scheme. A stop's `only` keeps i
 listing instead of the games (which point at `wordle daily`) and leaves out the `curl` hint, and
 names the navbar's 🎨 menu and the stop button where the keyboard walk names `theme` and Ctrl+C.
 
+`xray` (`commands/work.ts`, roadmap §I) toggles `useXray`, and on the way in closes the
+terminal, as `cd` does, since the page is what it shows. `App.vue` then mounts
+`components/XrayLayer.vue` beside `RouterView` (§11: it is fixed chrome). The layer outlines
+every component on screen and gives each distinct file one tag, linked through `lib/source.ts`
+at the build's commit, with the files its words come from. It writes nothing, so it is linkable
+and in the palette. **Build side** (`vite-plugins/xray.ts`): a `nodeTransforms` entry handed to
+`vue()` stamps `data-src="<repo path>"` on each root element of each template under
+`frontend/src`, through `<template v-if>` and the built-ins that render in place. A production
+build keeps a component's `__name` but not its `__file`, so the path has to be written into the
+markup. A template that is one component (`HashTool.vue` is one `<ToolFrame>`) is stamped
+`data-src-outer` instead, because an attribute on a component falls through onto the inner
+root and under the same name would replace the inner file's. The shadcn primitives in
+`components/ui/` aren't stamped. **Words:** `virtual:xray-map` parses each component's imports
+and resolves every name taken from the `@/content` barrel against what the modules in
+`src/content/` export. `types.ts` is left out (shapes and two helpers), and `i18n/messages.ts`
+is added when the component takes `m` from `useLocale()`. The map is a chunk of the layer's own,
+so first paint pays for the attributes alone. **Page side** (`lib/xray.ts`, pure but for the
+DOM it is handed): an element is outlined when it is on screen, at least 4 px once its
+ancestors' overflow has cut it, visible and not `inert`. A fixed element covering the screen
+(the canvas) is tagged in the bottom corner, not outlined, and reads `ThreeBackground.vue ·
+N shapes` from `useSceneControl`. Repeats of one file share a tag with a count. Tags start at
+their box's top-left corner and stack in document order, so a page's tag sits above its
+sections'. The layer measures again on scroll, resize, transition end and any mutation outside
+itself, at most once a frame. It skips all of this while the terminal or the palette is open
+or the page is swinging. CSS alone (`attr(data-src)` in a `::before`) was rejected and still
+is: it would collide with components' own pseudo-elements, and a pseudo-element can't carry a
+link.
+
 ### live
 | Command | Endpoint | Fallback |
 |---|---|---|
@@ -1249,6 +1277,12 @@ Retrofitting these is painful, so they are part of the definition of done:
   on open and restored to the nav button on close.
 - Achievement toast: `role="status"` with `aria-live="polite"`, so an unlock is announced without
   stealing focus from whatever the visitor was doing.
+- X-ray layer (§3 `xray`): the tags are ordinary links in a labelled `<nav>`, and the layer comes
+  after the page in the DOM, so the page's own tab order is untouched and Tab reaches the tags
+  last. Nothing is focused when it opens and nothing traps focus. A tag's arrows are
+  `aria-hidden`, with "words from" and "through" read in their place; the outlines are
+  `aria-hidden`. `Esc` ends it unless a dialog has claimed the key first, and so does an *exit*
+  button, since a phone has no `Esc`. Focus on a tag at that moment goes back where it came from.
 - **Motion control** (WCAG 2.2.2, pause, stop, hide). The wireframes move for as long as the
   page is open, and before this only the OS setting could stop them. `composables/useMotion.ts`
   holds *full · calm · paused*, saved under `couvbat:motion`, restored in `main.ts` before mount

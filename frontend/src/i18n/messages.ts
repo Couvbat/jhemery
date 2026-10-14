@@ -907,6 +907,22 @@ export const messages = {
     },
     about: { en: 'A /now page, as in', fr: 'Une page /now, comme sur' },
   },
+  // X-ray mode (components/XrayLayer.vue). File names are facts and stay as they are;
+  // `{n}` is substituted by the caller.
+  xray: {
+    label: { en: 'X-ray: the components on screen', fr: 'Rayons X : les composants à l’écran' },
+    status: { en: 'x-ray · {n} components', fr: 'rayons X · {n} composants' },
+    statusOne: { en: 'x-ray · 1 component', fr: 'rayons X · 1 composant' },
+    hint: { en: 'Esc ends it', fr: 'Échap pour quitter' },
+    exit: { en: 'exit', fr: 'quitter' },
+    exitLabel: { en: 'Exit x-ray', fr: 'Quitter les rayons X' },
+    // Read before the files a tag's words come from, in place of the arrow drawn there.
+    words: { en: 'words from', fr: 'textes tirés de' },
+    // Between a component and the one its template is nothing but, in place of `›`.
+    through: { en: 'through', fr: 'via' },
+    times: { en: '{n} on screen', fr: '{n} à l’écran' },
+    shapes: { en: '{n} shapes', fr: '{n} formes' },
+  },
   // /privacy (views/PrivacyView.vue). The keys and their purposes are lib/storage-keys.ts's,
   // shared with `du`; this is the page around them. Every claim below is one the code
   // keeps, and `strace` is how a visitor checks it rather than taking the page's word.

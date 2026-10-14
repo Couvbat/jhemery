@@ -9,6 +9,7 @@ import { renderToString } from 'vue/server-renderer'
 import { compileTemplate, parse } from 'vue/compiler-sfc'
 import { describe, expect, it } from 'vitest'
 import { buildXrayMap, repoPath, stampSource } from '../../vite-plugins/xray'
+import { CANVAS_FILE } from '@/lib/xray'
 import { OUTER_ATTR, SRC_ATTR } from '@/lib/xray-stamp'
 
 /**
@@ -168,5 +169,11 @@ describe('the words map', () => {
       expect(existsSync(at(component)), component).toBe(true)
       for (const file of words) expect(existsSync(at(file)), file).toBe(true)
     }
+  })
+
+  // The layer finds the canvas's tag by this path, to add the shape count.
+  it('knows where the canvas is', () => {
+    expect(existsSync(at(CANVAS_FILE))).toBe(true)
+    expect(map[CANVAS_FILE]).toContain('frontend/src/content/seasons.ts')
   })
 })

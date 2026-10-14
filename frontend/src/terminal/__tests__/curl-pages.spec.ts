@@ -44,6 +44,7 @@ const EXCLUDED: Record<string, string> = {
   resume: 'the bare host is the résumé',
   help: 'help.txt is a generated index of these pages instead',
   du: 'the visitor’s own browser storage',
+  xray: 'it draws over the page, which a terminal hasn’t got',
 }
 
 const ORIGIN = `https://${profile.domain}`
