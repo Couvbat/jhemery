@@ -1,6 +1,7 @@
 import { expect, test } from './fixtures'
-import { pages } from '@/content/pages'
+import { pages, pageUrl } from '@/content/pages'
 import { profile } from '@/content/profile'
+import { LOCALES, pageFile } from '../vite-plugins/pages'
 
 /**
  * The files the SPA fallback must not swallow.
@@ -123,17 +124,31 @@ test.describe('discoverability', () => {
   // serves for its route. `vite preview` can't run that rewrite, so this checks the files
   // it points at, and docs/deploy.md the live one. The copy must still be the app, and
   // load the same build as index.html does.
-  test('every public page has a copy of the app that names it', async ({ request }) => {
+  test('every public page has a copy of the app that names it, in each language', async ({ request }) => {
     const script = /<script type="module" crossorigin src="([^"]+)">/
     const app = script.exec(await (await request.get('/')).text())?.[1]
     expect(app).toBeTruthy()
-    for (const page of pages.filter((entry) => entry.path !== '/')) {
-      const response = await request.get(`/pages${page.path}.html`)
-      expect(response.status(), page.path).toBe(200)
-      const html = await response.text()
-      expect(script.exec(html)?.[1], page.path).toBe(app)
-      expect(html, page.path).toContain(`<link rel="canonical" href="https://${profile.domain}${page.path}">`)
+    for (const locale of LOCALES) {
+      for (const page of pages) {
+        const file = pageFile(page.path, locale)
+        const response = await request.get(`/${file}`)
+        expect(response.status(), file).toBe(200)
+        const html = await response.text()
+        expect(script.exec(html)?.[1], file).toBe(app)
+        expect(html, file).toContain(`<html lang="${locale}">`)
+        expect(html, file).toContain(`<link rel="canonical" href="${pageUrl(page.path, locale)}">`)
+      }
     }
+  })
+
+  // Generated from the content at build time now (vite-plugins/discovery.ts), so these are
+  // the files the build wrote, not ones copied from public/.
+  test('the sitemap lists both languages, and llms.txt the tools', async ({ request }) => {
+    const sitemap = await (await request.get('/sitemap.xml')).text()
+    expect(sitemap).toContain(`<loc>${pageUrl('/tools/json', 'fr')}</loc>`)
+    const llms = await (await request.get('/llms.txt')).text()
+    expect(llms).toContain(`](${pageUrl('/tools/json', 'en')})`)
+    expect(llms).not.toContain('{{')
   })
 
   test('the PWA manifest describes this app', async ({ request }) => {

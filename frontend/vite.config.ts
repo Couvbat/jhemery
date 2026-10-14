@@ -5,6 +5,7 @@ import vue from '@vitejs/plugin-vue'
 import vueDevTools from 'vite-plugin-vue-devtools'
 import tailwindcss from '@tailwindcss/vite'
 import { VitePWA } from 'vite-plugin-pwa'
+import { discoveryPlugin } from './vite-plugins/discovery'
 import { commitSha } from './vite-plugins/git'
 import { notesPlugin } from './vite-plugins/notes'
 import { pagesPlugin } from './vite-plugins/pages'
@@ -25,6 +26,7 @@ export default defineConfig({
     resumePlugin(),
     notesPlugin(),
     pagesPlugin(),
+    discoveryPlugin(),
     searchPlugin(),
     thirdPartyPlugin(),
     xrayPlugin(),

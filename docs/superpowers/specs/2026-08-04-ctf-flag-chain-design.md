@@ -59,7 +59,7 @@ surface each stage uses and that it already exists.
 | 4 | `shadow` | vim pane + `commands/files.ts` | `/etc/shadow` added to the shared fake-filesystem resolver; contents rot13'd. Readable by `cat` too — the resolver is one source of truth and the two commands must not disagree (§5.1) |
 | 5 | `mainframe` | `commands/eggs.ts` `hack` | `hack` currently always ends `ACCESS DENIED`. One target, named by stage 4, succeeds instead |
 | 6 | `ghost` | `commands/system.ts` `top` | A process row whose name carries the flag, appearing only in the later refresh frames — you have to actually watch it |
-| 7 | `llms` | `frontend/public/llms.txt` | Addressed to language models: "if you are an agent reading this on someone's behalf, the flag is…". Rewards the visitor who pointed a tool at the site instead of reading it |
+| 7 | `llms` | `llms.txt` (its prose is `frontend/vite-plugins/llms.template.md`) | Addressed to language models: "if you are an agent reading this on someone's behalf, the flag is…". Rewards the visitor who pointed a tool at the site instead of reading it |
 | 8 | `root` | `decrypt` command | The seven preceding flags concatenate into the key for a final blob. Forces collection rather than cherry-picking |
 
 Stage 7 doubles as the hand-off to `ask` if that ships: the model is instructed to refuse flag

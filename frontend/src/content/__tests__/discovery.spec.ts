@@ -1,28 +1,32 @@
+// @vitest-environment node
+// The discovery plugin reads the specs and its template off disk, and under jsdom
+// `import.meta.url` is an http: URL that can't be turned back into a path.
 import { readdirSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
-import { tools } from '@/tools/registry'
+import { buildLlms, buildSitemap } from '../../../vite-plugins/discovery'
 import { noteSlug } from '../docs'
-import { work } from '../work'
+import { pages, pageUrl } from '../pages'
 import { profile } from '../profile'
+import { toolInfo } from '../tools'
 import { views } from '../views'
+import { work } from '../work'
 
 /**
- * `sitemap.xml` and `llms.txt` are hand-written files in `public/`, and the things they
- * list are code: the routes, the tool registry, the printable résumés. This is what
- * stops one being added without the other. A page missing from the sitemap exists for
- * visitors and not for crawlers; one missing from llms.txt doesn't exist for agents, or
- * for `ask`, which answers from that file.
+ * `sitemap.xml` and `llms.txt` are generated (`vite-plugins/discovery.ts`), from lists
+ * that are code: the pages, the tools, the case studies, the notes. What this holds them
+ * to is everything a visitor can reach: the routes in the router's source, the views and
+ * the public tools, the printable résumés, every spec and every case study. A page missing
+ * from the sitemap exists for visitors and not for crawlers; one missing from llms.txt
+ * doesn't exist for agents, or for `ask`, which answers from that file.
  *
  * Routes come from the router's source rather than an import, so this spec doesn't pull
- * in every view. Rows that add URLs not in the router (the notes, the case studies) add
- * them to `expected` below when they land.
+ * in every view.
  */
 
 const site = `https://${profile.domain}`
-const read = (file: string) => readFileSync(join(process.cwd(), 'public', file), 'utf8')
-const sitemap = read('sitemap.xml')
-const llms = read('llms.txt')
+const sitemap = buildSitemap()
+const llms = buildLlms()
 
 /** Every static route: optional parameters dropped, required ones and the catch-all skipped. */
 function routerPaths(): string[] {
@@ -36,7 +40,7 @@ const expected = [
   ...new Set([
     ...views.map((view) => view.path),
     ...routerPaths(),
-    ...tools.filter((tool) => tool.tier !== 'admin').map((tool) => `/tools/${tool.id}`),
+    ...toolInfo.filter((tool) => tool.tier !== 'admin').map((tool) => `/tools/${tool.id}`),
     '/resume.html',
     '/resume.fr.html',
     // The design notes: one page per spec, plus the index (vite-plugins/notes.ts).
@@ -48,6 +52,11 @@ const expected = [
     ...work.map((part) => `/work/${part.id}`),
   ]),
 ].sort()
+
+/** The `<url>` blocks of the sitemap, by their `<loc>`. */
+const urls = new Map(
+  [...sitemap.matchAll(/<url>([\s\S]*?)<\/url>/g)].map((match) => [/<loc>([^<]+)<\/loc>/.exec(match[1]!)![1]!, match[1]!]),
+)
 
 describe('what the site tells crawlers and agents about itself', () => {
   it('reads the routes out of the router', () => {
@@ -68,9 +77,50 @@ describe('what the site tells crawlers and agents about itself', () => {
     expect(llms).toMatch(/## A note for agents[\s\S]*CTF\{[0-9a-f]{16}\}/)
   })
 
-  it('has a sitemap that parses', () => {
-    const doc = new DOMParser().parseFromString(sitemap, 'application/xml')
-    expect(doc.getElementsByTagName('parsererror')).toHaveLength(0)
-    expect(doc.getElementsByTagName('url').length).toBe(sitemap.match(/<url>/g)!.length)
+  it('fills every list llms.txt asks for, and leaves no placeholder', () => {
+    expect(llms).not.toMatch(/\{\{|\}\}/)
+    for (const tool of toolInfo.filter((entry) => entry.tier !== 'admin')) expect(llms).toContain(`: ${tool.description.en}\n`)
+    for (const part of work) expect(llms).toContain(`: ${part.summary.en}\n`)
+    // The owner's tool is no page for an agent to open.
+    expect(llms).not.toContain('/tools/download')
+  })
+
+  it('refuses a template with a list it doesn’t have, or without one it does', () => {
+    expect(() => buildLlms(undefined, '{{work}} {{tools}} {{notes}} {{nope}}')).toThrow(/no list called \{\{nope\}\}/)
+    expect(() => buildLlms(undefined, '{{work}} {{tools}}')).toThrow(/never asks for \{\{notes\}\}/)
+  })
+})
+
+// A search engine indexes URLs, so each language of a page is listed at its own, and each
+// names the other, as the pages' heads do (vite-plugins/pages.ts).
+describe('the sitemap', () => {
+  it.each(pages.map((page) => [page.path] as const))('lists %s in both languages, each naming the other', (path) => {
+    for (const locale of ['en', 'fr'] as const) {
+      const block = urls.get(pageUrl(path, locale))
+      expect(block, `${path} in ${locale}`).toBeDefined()
+      expect(block).toContain(`<xhtml:link rel="alternate" hreflang="en" href="${pageUrl(path, 'en')}"/>`)
+      expect(block).toContain(`<xhtml:link rel="alternate" hreflang="fr" href="${pageUrl(path, 'fr')}"/>`)
+      expect(block).toContain(`<xhtml:link rel="alternate" hreflang="x-default" href="${pageUrl(path, 'en')}"/>`)
+    }
+  })
+
+  it('pairs the printable résumés too', () => {
+    expect(urls.get(`${site}/resume.fr.html`)).toContain(`hreflang="en" href="${site}/resume.html"`)
+  })
+
+  it('lists nothing twice', () => {
+    expect(urls.size).toBe(sitemap.match(/<url>/g)!.length)
+  })
+
+  // No DOMParser here: the elements open and close in order, the declaration aside.
+  it('is well-formed', () => {
+    const open: string[] = []
+    for (const [, slash, name, selfClosing] of sitemap.matchAll(/<(\/?)([a-z:]+)\b[^>]*?(\/?)>/g)) {
+      if (selfClosing) continue
+      if (slash) expect(open.pop()).toBe(name)
+      else open.push(name!)
+    }
+    expect(open).toEqual([])
+    expect(sitemap.startsWith('<?xml version="1.0" encoding="UTF-8"?>\n<urlset ')).toBe(true)
   })
 })
