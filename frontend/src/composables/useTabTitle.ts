@@ -1,7 +1,7 @@
 import { watchEffect } from 'vue'
 import { useRoute } from 'vue-router'
 import { findWork, profile, viewFor } from '@/content'
-import { siteTitle } from '@/content/pages'
+import { siteTitle } from '@/content/site'
 import { useLocale } from '@/i18n'
 import { resolvePath } from './useViewSwing'
 

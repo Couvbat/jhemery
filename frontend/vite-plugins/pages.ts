@@ -1,5 +1,6 @@
 import type { Plugin } from 'vite'
-import { pages, pageUrl, type PageMeta } from '../src/content/pages'
+import { pages, type PageMeta } from '../src/content/pages'
+import { pageUrl } from '../src/content/site'
 import type { Locale, Localised } from '../src/content/types'
 import { escapeHtml } from './markdown'
 
@@ -17,6 +18,12 @@ import { escapeHtml } from './markdown'
  * it is the home page, which is the bug this exists to fix. The English home page's copy
  * would be `index.html` itself, and `pages.spec.ts` holds it to that, so the two cannot
  * describe the site differently.
+ *
+ * `index.html` explains none of this in comments, because it is the one document every
+ * visitor downloads and the Lighthouse byte budget counts it. The same goes for its
+ * JSON-LD, which every copy carries as it is: `WebSite` is where Google takes the site
+ * name it prints above a result (otherwise it guesses from the domain), and `Person` is
+ * who the site is about.
  */
 
 export const LOCALES: Locale[] = ['en', 'fr']

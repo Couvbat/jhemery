@@ -1,28 +1,23 @@
 import { profile } from './profile'
+import { canonicalPath, siteTitle } from './site'
 import { toolInfo } from './tools'
-import { LANG_PARAM, type Locale, type Localised } from './types'
-import { viewFor, views } from './views'
+import type { Localised } from './types'
+import { views } from './views'
 import { work } from './work'
 
 /**
- * Every public page a search engine should list, with what it should say about it.
+ * What every public page says to a search engine: its title, its heading and a
+ * description, in both languages. The build reads it and the app doesn't (`site.ts` says
+ * why); `vite-plugins/pages.ts` writes each page a copy of `index.html` with this head,
+ * and `vite-plugins/discovery.ts` lists the pages in the sitemap.
  *
  * The app is one `index.html`, and before this list every route was served that file
  * as-is: `/tools/json`, `/work/qr` and `/now` all said they were the home page, down to
  * `<link rel="canonical" href="https://jhemery.xyz/">`. That is a canonical a crawler
- * obeys, so each one was folded into `/` however well the sitemap listed it. Now
- * `vite-plugins/pages.ts` writes each page its own copy of `index.html` with the head
- * below, and `usePageMeta` keeps the same head in step as the visitor moves around.
- *
- * Each page exists in both languages, and each language has its own URL, since a search
- * engine indexes URLs, not settings: the English one is the bare path, the French one
- * adds `?lang=fr` (`pageUrl`). A query rather than a `/fr/` prefix, because the router,
- * the terminal's `cd` and every link in the app take paths, and none of them has to learn
- * a second form of each. The app reads the parameter as it loads (`i18n/index.ts`), and
- * every copy names both URLs as alternates, so each language is found from the other.
+ * obeys, so each one was folded into `/` however well the sitemap listed it.
  *
  * Titles are the tab's (`useTabTitle`), not new copy: `pages.spec.ts` holds every entry
- * to `tabTitle()` in both languages, and the sitemap is generated from this list.
+ * to `tabTitle()` in both languages, and the list to `pagePaths`.
  */
 export interface PageMeta {
   /** The route path, with no trailing slash. */
@@ -32,13 +27,6 @@ export interface PageMeta {
   /** What the page is, on its own: the heading a crawler without JavaScript reads. */
   heading: Localised
   description: Localised
-}
-
-export const SITE = `https://${profile.domain}`
-
-/** The page's URL in a language. English is the default, so its URL is the bare path. */
-export function pageUrl(path: string, locale: Locale): string {
-  return `${SITE}${path}${locale === 'en' ? '' : `?${LANG_PARAM}=${locale}`}`
 }
 
 /** Markdown code spans read as stray backticks in a search result. */
@@ -54,10 +42,24 @@ function page(path: string, heading: Localised, description: Localised): PageMet
   return { path, title: titled(heading), heading, description: plain(description) }
 }
 
-/** The tagline without its full stop: the home page's title, and the 404's. */
-export const siteTitle: Localised = {
-  en: profile.tagline.en.replace(/\.$/, ''),
-  fr: profile.tagline.fr.replace(/\.$/, ''),
+/** What each view is, for a search result. index.html carries the home page's in English. */
+const VIEW_DESCRIPTIONS: Record<string, Localised> = {
+  home: {
+    en: 'Jules Hémery (Couvbat) — Full-Stack Developer at In-Leed, based in France. Portfolio with live GitHub/Steam activity, music production and a fully interactive terminal.',
+    fr: 'Jules Hémery (Couvbat) — Développeur Full-Stack chez In-Leed, basé en France. Portfolio avec l’activité GitHub/Steam en direct, de la production musicale et un terminal entièrement interactif.',
+  },
+  tools: {
+    en: 'Small developer tools that run entirely in your browser: images, hashes, Base64, JSON, JWT, regex, cron, QR codes, diffs and more. Nothing is uploaded.',
+    fr: 'Petits outils de développeur qui tournent entièrement dans votre navigateur : images, hash, Base64, JSON, JWT, regex, cron, QR codes, diffs et plus. Rien n’est envoyé.',
+  },
+  watch: {
+    en: 'A watch party: one room code, one YouTube video, and everyone at the same second. No accounts, and nothing is stored.',
+    fr: 'Une soirée vidéo : un code de salon, une vidéo YouTube, et tout le monde à la même seconde. Sans compte, et rien n’est enregistré.',
+  },
+  radio: {
+    en: 'A shared radio: the host queues SoundCloud tracks and YouTube videos, and every listener hears the same one at the same time.',
+    fr: 'Une radio partagée : l’hôte enchaîne des morceaux SoundCloud et des vidéos YouTube, et chaque auditeur entend le même au même moment.',
+  },
 }
 
 const home = views.find((view) => view.id === 'home')!
@@ -80,9 +82,9 @@ export const pages: PageMeta[] = [
     path: '/',
     title: siteTitle,
     heading: { en: `${profile.name} (${profile.alias})`, fr: `${profile.name} (${profile.alias})` },
-    description: home.description,
+    description: VIEW_DESCRIPTIONS.home!,
   },
-  ...views.filter((view) => view !== home).map((view) => page(view.path, view.heading, view.description)),
+  ...views.filter((view) => view !== home).map((view) => page(view.path, view.heading, VIEW_DESCRIPTIONS[view.id]!)),
   ...toolInfo
     .filter((tool) => tool.tier !== 'admin')
     .map((tool) =>
@@ -110,13 +112,8 @@ export const pages: PageMeta[] = [
   ...work.map((part) => page(`/work/${part.id}`, part.name, part.summary)),
 ]
 
-/**
- * The page a path stands for: its own entry, or the view it sits under, so a room code
- * or a tool that doesn't exist points crawlers at `/watch` or `/tools`. Nothing for the
- * 404 or an unknown case study, which tell crawlers not to index them instead.
- */
+/** The page a path stands for, as `canonicalPath` reads it. */
 export function pageFor(path: string): PageMeta | undefined {
-  // The router matches without regard to case, so `/Tools/JSON` is the JSON tool too.
-  const clean = path.toLowerCase().replace(/\/+$/, '') || '/'
-  return pages.find((entry) => entry.path === clean) ?? pages.find((entry) => entry.path === viewFor(clean)?.path)
+  const found = canonicalPath(path)
+  return pages.find((entry) => entry.path === found)
 }

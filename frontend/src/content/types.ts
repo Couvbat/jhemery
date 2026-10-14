@@ -8,7 +8,7 @@
 
 export type Locale = 'en' | 'fr'
 
-/** The query parameter a page's URL names its language with: `?lang=fr` (`content/pages.ts`). */
+/** The query parameter a page's URL names its language with: `?lang=fr` (`content/site.ts`). */
 export const LANG_PARAM = 'lang'
 
 /** A value that differs per locale. Facts (specs, URLs, tech names) stay plain. */
@@ -72,8 +72,6 @@ export interface ViewMeta {
   /** The fake shell command shown above the view's heading. */
   prompt: string
   heading: Localised
-  /** What a search result says under the title: the page's `<meta name="description">`. */
-  description: Localised
 }
 
 export interface GameEntry {

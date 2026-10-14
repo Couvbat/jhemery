@@ -1,5 +1,6 @@
 import { expect, test } from './fixtures'
-import { pages, pageUrl } from '@/content/pages'
+import { pages } from '@/content/pages'
+import { pageUrl } from '@/content/site'
 import { profile } from '@/content/profile'
 import { LOCALES, pageFile } from '../vite-plugins/pages'
 

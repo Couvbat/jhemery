@@ -3,7 +3,7 @@ import { createApp, defineComponent, h, nextTick } from 'vue'
 import { createMemoryHistory, createRouter } from 'vue-router'
 
 import { profile, work } from '@/content'
-import { siteTitle } from '@/content/pages'
+import { siteTitle } from '@/content/site'
 import { setLocale } from '@/i18n'
 import { pageLabel, tabTitle, useTabTitle } from '../useTabTitle'
 

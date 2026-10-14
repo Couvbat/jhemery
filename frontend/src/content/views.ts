@@ -16,11 +16,6 @@ export const views: ViewMeta[] = [
     label: { en: 'home', fr: 'home' },
     prompt: 'cd ~',
     heading: { en: 'Home', fr: 'Accueil' },
-    // index.html carries the English one, and `pages.spec.ts` holds the two together.
-    description: {
-      en: 'Jules Hémery (Couvbat) — Full-Stack Developer at In-Leed, based in France. Portfolio with live GitHub/Steam activity, music production and a fully interactive terminal.',
-      fr: 'Jules Hémery (Couvbat) — Développeur Full-Stack chez In-Leed, basé en France. Portfolio avec l’activité GitHub/Steam en direct, de la production musicale et un terminal entièrement interactif.',
-    },
   },
   {
     id: 'tools',
@@ -28,10 +23,6 @@ export const views: ViewMeta[] = [
     label: { en: 'tools', fr: 'tools' },
     prompt: 'ls ~/tools',
     heading: { en: 'Tools & utilities', fr: 'Outils & utilitaires' },
-    description: {
-      en: 'Small developer tools that run entirely in your browser: images, hashes, Base64, JSON, JWT, regex, cron, QR codes, diffs and more. Nothing is uploaded.',
-      fr: 'Petits outils de développeur qui tournent entièrement dans votre navigateur : images, hash, Base64, JSON, JWT, regex, cron, QR codes, diffs et plus. Rien n’est envoyé.',
-    },
   },
   {
     id: 'watch',
@@ -39,10 +30,6 @@ export const views: ViewMeta[] = [
     label: { en: 'watch', fr: 'watch' },
     prompt: 'open ~/watch',
     heading: { en: 'Watch party', fr: 'Soirée vidéo' },
-    description: {
-      en: 'A watch party: one room code, one YouTube video, and everyone at the same second. No accounts, and nothing is stored.',
-      fr: 'Une soirée vidéo : un code de salon, une vidéo YouTube, et tout le monde à la même seconde. Sans compte, et rien n’est enregistré.',
-    },
   },
   {
     id: 'radio',
@@ -50,10 +37,6 @@ export const views: ViewMeta[] = [
     label: { en: 'radio', fr: 'radio' },
     prompt: 'play ~/radio',
     heading: { en: 'Radio', fr: 'Radio' },
-    description: {
-      en: 'A shared radio: the host queues SoundCloud tracks and YouTube videos, and every listener hears the same one at the same time.',
-      fr: 'Une radio partagée : l’hôte enchaîne des morceaux SoundCloud et des vidéos YouTube, et chaque auditeur entend le même au même moment.',
-    },
   },
 ]
 

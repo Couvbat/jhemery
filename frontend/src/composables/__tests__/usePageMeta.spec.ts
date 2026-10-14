@@ -2,7 +2,6 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { createApp, defineComponent, h, nextTick } from 'vue'
 import { createMemoryHistory, createRouter } from 'vue-router'
 import { profile } from '@/content'
-import { pageFor } from '@/content/pages'
 import { setLocale } from '@/i18n'
 import { applyPageMeta, usePageMeta } from '../usePageMeta'
 
@@ -10,7 +9,6 @@ const site = `https://${profile.domain}`
 const canonical = () => document.head.querySelector('link[rel="canonical"]')?.getAttribute('href')
 const alternate = (hreflang: string) =>
   document.head.querySelector(`link[rel="alternate"][hreflang="${hreflang}"]`)?.getAttribute('href')
-const description = () => document.head.querySelector('meta[name="description"]')?.getAttribute('content')
 const robots = () => document.head.querySelector('meta[name="robots"]')?.getAttribute('content')
 
 beforeEach(() => {
@@ -25,13 +23,12 @@ beforeEach(() => {
 afterEach(() => setLocale('en'))
 
 describe('applyPageMeta', () => {
-  it('names the page in the canonical link, the alternates and the description', () => {
+  it('names the page in the canonical link and the alternates', () => {
     applyPageMeta('/tools/json')
     expect(canonical()).toBe(`${site}/tools/json`)
     expect(alternate('en')).toBe(`${site}/tools/json`)
     expect(alternate('fr')).toBe(`${site}/tools/json?lang=fr`)
     expect(alternate('x-default')).toBe(`${site}/tools/json`)
-    expect(description()).toBe(pageFor('/tools/json')!.description.en)
     expect(robots()).toBeUndefined()
   })
 
@@ -54,11 +51,19 @@ describe('applyPageMeta', () => {
     expect(document.head.querySelectorAll('link[rel="alternate"]')).toHaveLength(3)
   })
 
+  // The router takes one segment under a view; deeper is the 404, not the view.
+  it('keeps a path deeper than the router takes out of the index', () => {
+    for (const path of ['/tools/json/extra', '/watch/AB3DE/extra', '/radio/abcd/x/y']) {
+      applyPageMeta(path)
+      expect(robots(), path).toBe('noindex')
+      expect(canonical(), path).toBeUndefined()
+    }
+  })
+
   // The page shows French, so its canonical is the French URL, as that page's copy says.
-  it('describes the page in the visitor’s language, at that language’s URL', () => {
+  it('names the page at the URL of the language it shows', () => {
     setLocale('fr')
     applyPageMeta('/now')
-    expect(description()).toBe(pageFor('/now')!.description.fr)
     expect(canonical()).toBe(`${site}/now?lang=fr`)
     expect(alternate('en')).toBe(`${site}/now`)
   })

@@ -4,7 +4,8 @@ import { afterEach, describe, expect, it } from 'vitest'
 import { tabTitle } from '@/composables/useTabTitle'
 import { setLocale } from '@/i18n'
 import { LOCALES, pageFile, pageShell } from '../../../vite-plugins/pages'
-import { pageFor, pages, pageUrl, siteTitle } from '../pages'
+import { pageFor, pages } from '../pages'
+import { pagePaths, pageUrl, siteTitle } from '../site'
 import { profile } from '../profile'
 import type { Locale } from '../types'
 
@@ -42,8 +43,10 @@ describe('the pages', () => {
     expect(unescape(titleOf(indexHtml)!)).toBe(siteTitle.en)
   })
 
-  it('has one entry per path', () => {
-    expect(new Set(pages.map((page) => page.path)).size).toBe(pages.length)
+  // The app names pages from `pagePaths` alone, so the copy and the list can't disagree.
+  it('has one entry per public path, in the same order', () => {
+    expect(pages.map((page) => page.path)).toEqual(pagePaths)
+    expect(new Set(pagePaths).size).toBe(pagePaths.length)
   })
 
   it.each(pages.map((page) => [page.path, page] as const))('%s is titled as its tab is', (path, page) => {
@@ -74,6 +77,8 @@ describe('pageFor', () => {
     expect(pageFor('/tools/json/')?.path).toBe('/tools/json')
     expect(pageFor('/Tools/JSON')?.path).toBe('/tools/json')
     expect(pageFor('/')?.path).toBe('/')
+    // The home page's own file, which Apache serves at that address too.
+    expect(pageFor('/index.html')?.path).toBe('/')
   })
 
   it('points a room code or an unlisted tool at its view', () => {
@@ -88,6 +93,13 @@ describe('pageFor', () => {
     expect(pageFor('/definitely-not-a-page')).toBeUndefined()
     expect(pageFor('/work/nope')).toBeUndefined()
     expect(pageFor('/work')).toBeUndefined()
+  })
+
+  // The router takes `/tools/:tool?` and `/watch/:code?`: one segment, and deeper is the 404.
+  it('has nothing for a path deeper than the router takes', () => {
+    expect(pageFor('/tools/json/extra')).toBeUndefined()
+    expect(pageFor('/watch/AB3DE/extra')).toBeUndefined()
+    expect(pageFor('/now/extra')).toBeUndefined()
   })
 })
 

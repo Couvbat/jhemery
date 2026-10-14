@@ -1,6 +1,6 @@
 import { watch, watchEffect } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { pageFor, pageUrl } from '@/content/pages'
+import { canonicalPath, pageUrl } from '@/content/site'
 import { LANG_PARAM, type Locale } from '@/content/types'
 import { useLocale } from '@/i18n'
 
@@ -12,7 +12,10 @@ import { useLocale } from '@/i18n'
  * that loads first; everything after that is a client-side navigation, and this.
  *
  * The canonical is the URL of the page in the language it is showing (`?lang=fr` for
- * French), with both languages' URLs as alternates, as the copies have them.
+ * French), with both languages' URLs as alternates, as the copies have them. The
+ * description is left as the copy served it: a crawler fetches every URL afresh, so it
+ * never reads one after a client-side navigation, and carrying thirty descriptions in
+ * two languages would weigh on every visitor's first load (`content/site.ts`).
  *
  * The 404 and an unknown case study get `noindex` and lose the canonical. The server
  * answers them with a 200 (it is a single-page app), and a page that says "not found"
@@ -39,19 +42,18 @@ function removeAll(selector: string): void {
 }
 
 export function applyPageMeta(path: string): void {
-  const { t, locale } = useLocale()
-  const page = pageFor(path)
+  const { locale } = useLocale()
+  const page = canonicalPath(path)
   if (!page) {
     removeAll('link[rel="canonical"], link[rel="alternate"][hreflang]')
     element('meta', { name: 'robots' }).setAttribute('content', 'noindex')
     return
   }
-  element('link', { rel: 'canonical' }).setAttribute('href', pageUrl(page.path, locale.value))
+  element('link', { rel: 'canonical' }).setAttribute('href', pageUrl(page, locale.value))
   for (const hreflang of HREFLANGS) {
     const lang = hreflang === 'x-default' ? 'en' : hreflang
-    element('link', { rel: 'alternate', hreflang }).setAttribute('href', pageUrl(page.path, lang))
+    element('link', { rel: 'alternate', hreflang }).setAttribute('href', pageUrl(page, lang))
   }
-  element('meta', { name: 'description' }).setAttribute('content', t(page.description))
   removeAll('meta[name="robots"]')
 }
 

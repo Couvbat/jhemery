@@ -29,7 +29,7 @@ function writeStored(next: Locale): void {
 }
 
 /**
- * `?lang=fr` in the address is the French URL of a page (`content/pages.ts`): what a
+ * `?lang=fr` in the address is the French URL of a page (`content/site.ts`): what a
  * French search result or the `hreflang` alternates link to. It wins over the stored
  * choice, and becomes it, so the visitor who arrived in French stays in French after a
  * reload. `usePageMeta` takes it out of the address once the visitor switches language.

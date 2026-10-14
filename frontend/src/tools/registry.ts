@@ -34,14 +34,9 @@ const panels: Record<string, AsyncComponentLoader> = {
  * The tools, to the tools page what `commands/index.ts` is to the terminal: the page,
  * the `tools` command, `ls tools`, `cd tools/<id>` and Tab all derive from this array.
  * Adding a tool means one entry in `content/tools.ts`, one panel above and its folder —
- * never a special case anywhere else. A tool without a panel fails as this module loads,
- * so every spec that touches the tools catches it.
+ * never a special case anywhere else. `registry.spec.ts` fails on a tool with no panel.
  */
-export const tools: ToolMeta[] = toolInfo.map((info) => {
-  const load = panels[info.id]
-  if (!load) throw new Error(`tools/registry.ts: the tool "${info.id}" has no panel`)
-  return { ...info, load }
-})
+export const tools: ToolMeta[] = toolInfo.map((info) => ({ ...info, load: panels[info.id]! }))
 
 /**
  * What a visitor is shown: everything but the admin tier, until the owner unlocks it
