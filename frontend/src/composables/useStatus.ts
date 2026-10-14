@@ -1,5 +1,5 @@
 import { computed, onMounted, onUnmounted, ref } from 'vue'
-import { isLive, profile, soonestEvent } from '@/content'
+import { profile } from '@/content'
 import { relativeTime } from './useGithub'
 
 /** How often the visible ticker re-reads the clock. A minute is plenty for a
@@ -43,12 +43,6 @@ export function useStatus(deployedAt: string) {
       // explicitly for this one to ever change.
       void now.value
       return relativeTime(deployedAt, 'just now')
-    }),
-    /** The event the status line names (`content/events.ts`), re-read on the same tick. */
-    event: computed(() => {
-      const at = new Date(now.value)
-      const next = soonestEvent(at)
-      return next && { event: next, at, live: isLive(next, at) }
     }),
   }
 }

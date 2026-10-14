@@ -12,6 +12,7 @@ import {
   completeCommand,
   filterByPrefix,
   argsOffered,
+  isCommandWord,
   isLinkable,
   isServerBound,
   resolve,
@@ -357,10 +358,12 @@ async function runNested(input: string, scope: Scope, stdin?: OutputLine[]): Pro
 /**
  * Whether `name`, read with the word after it, is a command. An alias never shadows
  * one: run and Tab completion both ask this, so they can't disagree about what a
- * line will run.
+ * line will run. Nor the first word of a two-word one (`git` of `git log`), which `alias`
+ * already refuses to define: a stored alias of that name, restored from someone else's save,
+ * would otherwise run whatever it says when the visitor types the word on its own.
  */
 function namesCommand(name: string, next?: string): boolean {
-  return resolve(name) !== undefined || (next !== undefined && resolve(`${name} ${next}`) !== undefined)
+  return isCommandWord(name) || (next !== undefined && resolve(`${name} ${next}`) !== undefined)
 }
 
 // ---------------------------------------------------------------------------

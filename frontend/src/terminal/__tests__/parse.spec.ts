@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { lastStageStart, MAX_STAGES, parseLine, replaceStages, type Link } from '../parse'
+import { closingQuotes, lastStageStart, MAX_STAGES, parseLine, replaceStages, type Link } from '../parse'
 
 const chain = (line: string): Link[] => {
   const parsed = parseLine(line)
@@ -119,5 +119,43 @@ describe('lastStageStart', () => {
     expect(lastStageStart('ls | gr')).toBe(4)
     expect(lastStageStart('echo "a | b" whoam')).toBe(0)
     expect(lastStageStart('echo "a | whoam')).toBe(9)
+  })
+})
+
+describe('quoted groups on long lines', () => {
+  // The rule as it was first written: for each opening quote, scan the rest of the line.
+  // Quadratic, but plainly right, so the linear lookup is held to it.
+  const isSpace = (c: string | undefined) => c !== undefined && /\s/.test(c)
+  const operatorAt = (line: string, i: number) =>
+    line[i] === ';' || line[i] === '|' || (line[i] === '&' && line[i + 1] === '&')
+  function rescan(line: string, start: number): number {
+    for (let i = start + 1; i < line.length; i++) {
+      if (line[i] === line[start] && (i + 1 >= line.length || isSpace(line[i + 1]) || operatorAt(line, i + 1))) return i
+    }
+    return -1
+  }
+
+  it('finds where each group closes exactly as the plain rescan does', () => {
+    const alphabet = ["'", '"', ' ', 'a', ';', '|', '&', '\u00a0']
+    let seed = 7
+    const next = () => (seed = (seed * 1103515245 + 12345) % 2 ** 31) / 2 ** 31
+    for (let n = 0; n < 5000; n++) {
+      const line = Array.from({ length: 1 + Math.floor(next() * 24) }, () => alphabet[Math.floor(next() * alphabet.length)]).join('')
+      const closing = closingQuotes(line)
+      // Asked in order along the line, as both callers do.
+      for (let i = 0; i < line.length; i++) {
+        if (line[i] === "'" || line[i] === '"') expect(closing(i), `${JSON.stringify(line)} at ${i}`).toBe(rescan(line, i))
+      }
+    }
+  })
+
+  // 60 kB of unclosed quotes, as a save link can put in the history or an alias.
+  it('parses a line of thousands of unclosed quotes in linear time', () => {
+    const line = "'x ".repeat(20_000)
+    const started = performance.now()
+    const parsed = parseLine(line)
+    expect(lastStageStart(`${line}| gr`)).toBe(line.length + 1)
+    expect(performance.now() - started).toBeLessThan(500)
+    expect(parsed.ok && parsed.chain[0]!.pipeline[0]!.argv).toHaveLength(20_000)
   })
 })

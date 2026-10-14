@@ -165,9 +165,15 @@ export interface Payoff {
 const STORAGE_KEY = 'couvbat:ctf'
 const knownIds = new Set<string>(stages.map((s) => s.id))
 
-/** Captured flags by stage. Anything under the key that is not a stage is dropped. */
+/**
+ * Captured flags by stage. Anything under the key that is not a stage, or not shaped like a
+ * flag, is dropped. Whether a kept one is the stage's real flag is only known by hashing it,
+ * which can't happen here, so `submitFlag` lets the real one replace it instead.
+ */
 const captured = ref<Record<string, string>>(
-  Object.fromEntries(Object.entries(loadRecord(STORAGE_KEY)).filter(([id]) => knownIds.has(id))),
+  Object.fromEntries(
+    Object.entries(loadRecord(STORAGE_KEY)).filter(([id, flag]) => knownIds.has(id) && normaliseFlag(flag) === flag),
+  ),
 )
 
 /** Misses on the current stage, for the hint ladder. In memory on purpose (spec). */
@@ -241,7 +247,15 @@ export async function submitFlag(input: string): Promise<Verdict> {
   if (!flag) return { kind: 'malformed' }
 
   const stage = await stageFor(flag)
-  if (stage && captured.value[stage.id]) return { kind: 'already', stage }
+  const held = stage && captured.value[stage.id]
+  if (stage && held === flag) return { kind: 'already', stage }
+  // A stage holding a flag that isn't its own (one restored from someone else's save, or
+  // typed into devtools) takes the real one in its place, wherever the chain is. Answering
+  // "already solved" there would leave the chain stuck, and `decrypt` with no way through.
+  if (stage && held) {
+    capture(stage.id, flag)
+    return { kind: 'solved', stage, next: currentStage() }
+  }
   if (stage && current && stage.id !== current.id) return { kind: 'order', stage, current }
   if (stage) {
     capture(stage.id, flag)

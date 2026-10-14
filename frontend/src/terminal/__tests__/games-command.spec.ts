@@ -609,9 +609,37 @@ describe('wordle daily', () => {
   })
 
   it('is a different board in each language, and tomorrow a different word', () => {
-    recordDaily('en', { day: DAY, guesses: [], marks: [], done: true, won: false })
+    recordDaily('en', { day: DAY, guesses: [fold(ANSWER)], marks: ['hhhhh'], done: true, won: true })
+    expect(dailyResult('en', DAY)).not.toBeNull()
     expect(dailyResult('fr', DAY)).toBeNull()
     expect(dailyResult('en', '2026-09-25')).toBeNull()
+  })
+
+  // A save link can restore this key from someone else's code: a record the game could
+  // never have written reads as none, rather than breaking the board or `wordle share`.
+  it('reads a record the game couldn’t have written as no record', () => {
+    const store = (record: unknown) => localStorage.setItem('couvbat:games:wordle:daily', JSON.stringify({ en: record }))
+    const valid = { day: DAY, guesses: ['ABCDE'], marks: ['mnmmh'], done: false, won: false }
+    store(valid)
+    expect(dailyResult('en', DAY)).toEqual(valid)
+    const bad = [
+      { ...valid, guesses: [null] },
+      { ...valid, guesses: [1] },
+      { ...valid, marks: [null] },
+      { ...valid, guesses: ['A'.repeat(60_000)] },
+      { ...valid, marks: ['h'.repeat(60_000)] },
+      { ...valid, marks: [] },
+      { ...valid, done: true },
+      { ...valid, won: true },
+      { ...valid, guesses: Array(10).fill('ABCDE'), marks: [...Array(9).fill('mmmmm'), 'hhhhh'], done: true, won: true },
+      { ...valid, day: 'today' },
+      [valid],
+      'valid',
+    ]
+    for (const record of bad) {
+      store(record)
+      expect(dailyResult('en', DAY), JSON.stringify(record).slice(0, 80)).toBeNull()
+    }
   })
 
   it('share copies the emoji grid to the clipboard and prints none of it', async () => {
@@ -683,7 +711,7 @@ describe('wordle daily', () => {
   it('does not report a board another tab already reported', async () => {
     const { game, finished } = daily()
     await loaded()
-    recordDaily('en', { day: DAY, guesses: [ANSWER], marks: ['ggggg'], done: true, won: true, reported: true })
+    recordDaily('en', { day: DAY, guesses: [fold(ANSWER)], marks: ['hhhhh'], done: true, won: true, reported: true })
     for (const letter of ANSWER) game.press(letter.toLowerCase())
     game.press('Enter')
     await finished

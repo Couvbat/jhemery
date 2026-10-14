@@ -10,6 +10,7 @@ import {
   type Theme,
   type ThemeColours,
 } from '@/lib/themes'
+import { checkFloors } from '@/lib/themeRules'
 import { decorativeMotion } from './useMotion'
 import { useViewSwing } from './useViewSwing'
 
@@ -246,7 +247,8 @@ export function applyForgedTheme(theme: Theme, options: { origin?: ThemeOrigin }
 }
 
 /** A stored forge, or null for anything that isn't exactly one: every colour and the
- *  seed `#rrggbb`, the mode one of the two. Anything tampered with is ignored whole. */
+ *  seed `#rrggbb`, the mode one of the two, and text that can be read. Anything tampered
+ *  with is ignored whole. */
 function readCustom(raw: string | null): Theme | null {
   if (!raw) return null
   let data: unknown
@@ -266,6 +268,10 @@ function readCustom(raw: string | null): Theme | null {
     if (typeof value !== 'string' || !HEX.test(value)) return null
     checked[name] = value
   }
+  // A forge always clears the floors for body and muted text: its surfaces come from a fixed
+  // ladder and its text is lifted to them. A stored palette that misses them (a save link can
+  // restore someone else's) would paint every visit unreadable before anything else draws.
+  if (checkFloors(checked).some((miss) => /^(foreground|muted) /.test(miss))) return null
   return { id: CUSTOM_THEME, name: 'Custom', mode, colours: checked, seed }
 }
 

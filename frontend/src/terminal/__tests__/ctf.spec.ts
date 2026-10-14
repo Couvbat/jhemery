@@ -140,6 +140,18 @@ describe('flag', () => {
     expect(solvedCount.value).toBe(0)
   })
 
+  // A save link can restore someone else's record: a flag that isn't the stage's own must
+  // give way to the real one, or the chain sticks on "already solved" for good.
+  it('lets the real flag replace a stored one that isn’t, and drops what isn’t a flag at all', async () => {
+    const [real] = await flagsFromSurfaces()
+    window.localStorage.setItem('couvbat:ctf', JSON.stringify({ secret: 'CTF{0000000000000000}', console: 'x' }))
+    const { submitFlag, capturedFlag } = await load()
+    expect(capturedFlag('console')).toBeUndefined()
+    expect(await submitFlag(real!)).toMatchObject({ kind: 'solved', stage: { id: 'secret' } })
+    expect(capturedFlag('secret')).toBe(real)
+    expect(await submitFlag(real!)).toMatchObject({ kind: 'already' })
+  })
+
   it('says a solved stage is already solved', async () => {
     const [first] = await flagsFromSurfaces()
     const { submitFlag } = await load()

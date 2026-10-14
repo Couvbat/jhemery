@@ -3,7 +3,15 @@ import { ref } from 'vue'
 const STORAGE_KEY = 'couvbat:aliases'
 /** Enough for a chain like `a`→`b`→`c`; past this the definition is a loop. */
 const MAX_EXPANSIONS = 10
+/** Far past any alias typed by hand, and short enough that expanding one stays instant. */
+const MAX_DEFINITION = 4096
 
+/**
+ * The stored aliases, trusting none of them: a save link (`lib/save-file.ts`) can restore
+ * this key from someone else's code. A name has to be one word, which is all a lookup can
+ * ever match, and a definition has to fit `MAX_DEFINITION`. Whether a name shadows a
+ * command is the shell's call, made when a line runs (`namesCommand` in `useTerminal`).
+ */
 function load(): Record<string, string> {
   if (typeof window === 'undefined') return {}
   try {
@@ -11,7 +19,7 @@ function load(): Record<string, string> {
     if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return {}
     const out: Record<string, string> = {}
     for (const [key, value] of Object.entries(parsed)) {
-      if (typeof value === 'string') out[key] = value
+      if (/^\S{1,64}$/.test(key) && typeof value === 'string' && value.length <= MAX_DEFINITION) out[key] = value
     }
     return out
   } catch {
