@@ -909,13 +909,6 @@ export const messages = {
       fr: 'Cette liste date de {n} jours. Une partie n’est sans doute plus vraie.',
     },
     about: { en: 'A /now page, as in', fr: 'Une page /now, comme sur' },
-    // The events block (`content/events.ts`), shown only while one is ahead.
-    upcoming: { en: 'Coming up', fr: 'À venir' },
-    live: { en: 'live now', fr: 'en direct' },
-    until: { en: 'until', fr: 'jusqu’à' },
-    go: { en: 'go there', fr: 'y aller' },
-    subscribe: { en: 'subscribe in your calendar', fr: 's’abonner dans votre agenda' },
-    download: { en: 'download the .ics', fr: 'télécharger le .ics' },
   },
   // X-ray mode (components/XrayLayer.vue). File names are facts and stay as they are;
   // `{n}` is substituted by the caller.
@@ -936,102 +929,19 @@ export const messages = {
   // /privacy (views/PrivacyView.vue). The keys and their purposes are lib/storage-keys.ts's,
   // shared with `du`; this is the page around them. Every claim below is one the code
   // keeps, and `strace` is how a visitor checks it rather than taking the page's word.
-  // `/security`, the disclosure policy. Its paragraphs are copy, in `content/security.ts`.
+  // `/security`'s heading, which the tab title names too. The rest of the page's words are
+  // in `content/security.ts`, which only the page loads.
   security: {
     heading: { en: 'Reporting a security problem', fr: 'Signaler un problème de sécurité' },
-    updated: { en: 'Policy last updated', fr: 'Politique mise à jour le' },
-    report: { en: 'How to report it', fr: 'Comment le signaler' },
-    inScope: { en: 'What counts', fr: 'Ce qui compte' },
-    outOfScope: { en: 'What doesn’t', fr: 'Ce qui ne compte pas' },
-    harbour: { en: 'Testing in good faith', fr: 'Tester de bonne foi' },
-    thanks: { en: 'Thanks', fr: 'Remerciements' },
   },
+  // `/privacy`'s heading, which the tab title names too, and the one line that names a
+  // browser API, which `content/` may not (`purity.spec.ts`). The rest of the page's words
+  // are in `content/privacy.ts`, which only the page loads.
   privacy: {
     heading: { en: 'What this site keeps', fr: 'Ce que ce site garde' },
-    browser: { en: 'In this browser', fr: 'Dans ce navigateur' },
-    notSet: { en: 'not set', fr: 'absente' },
-    secret: { en: 'secret: only its length is shown', fr: 'secret : seule sa longueur est affichée' },
-    // `{n}` keys, `{size}` bytes: a group's total, beside its clear button.
-    stored: { en: 'stored: {n} · {size}', fr: 'stockées : {n} · {size}' },
-    clear: { en: 'clear', fr: 'effacer' },
-    // The first press arms; the second, on a different button, clears. The armed button
-    // turns into Cancel in place, so a double-click lands on Cancel.
-    cancel: { en: 'cancel', fr: 'annuler' },
-    confirm: { en: 'yes, clear {n} and reload', fr: 'oui, effacer {n} et recharger' },
-    cleared: { en: 'Cleared. Reloading…', fr: 'Effacé. Rechargement…' },
-    caches: { en: 'Caches', fr: 'Caches' },
-    files: { en: '{n} files', fr: '{n} fichiers' },
-    noCaches: {
-      en: 'Nothing cached here: the service worker hasn’t stored anything yet, or isn’t running.',
-      fr: 'Rien en cache ici : le service worker n’a encore rien stocké, ou ne tourne pas.',
-    },
     estimate: {
       en: 'Your browser counts {size} in use by this site (`navigator.storage.estimate()`).',
       fr: 'Votre navigateur compte {size} utilisés par ce site (`navigator.storage.estimate()`).',
-    },
-    sends: { en: 'What leaves your browser', fr: 'Ce qui quitte votre navigateur' },
-  },
-  // The stems mixer in the music section (components/stems/). `{name}` is a stem's,
-  // `{size}` a download's, `{n}` a percentage.
-  stems: {
-    heading: { en: 'Remix it', fr: 'Remixez-le' },
-    track: { en: 'Track', fr: 'Morceau' },
-    load: { en: 'load the stems ({size})', fr: 'charger les pistes ({size})' },
-    loading: { en: 'loading… {n}%', fr: 'chargement… {n} %' },
-    play: { en: 'play', fr: 'lecture' },
-    pause: { en: 'pause', fr: 'pause' },
-    mute: { en: 'Mute {name}', fr: 'Couper {name}' },
-    solo: { en: 'Solo {name}', fr: 'Isoler {name}' },
-    level: { en: 'Level of {name}', fr: 'Niveau de {name}' },
-    filter: { en: 'filter', fr: 'filtre' },
-    reset: { en: 'reset', fr: 'réinitialiser' },
-    copy: { en: 'copy this mix as a link', fr: 'copier ce mix en lien' },
-    copied: { en: 'link copied', fr: 'lien copié' },
-    fromLink: { en: 'A mix from a link: load the stems, then play.', fr: 'Un mix venu d’un lien : chargez les pistes, puis lancez.' },
-    badLink: {
-      en: 'That mix link doesn’t fit any track here, so the mix starts flat.',
-      fr: 'Ce lien de mix ne correspond à aucun morceau ici : le mix repart à plat.',
-    },
-    noAudio: { en: 'This browser can’t play Web Audio.', fr: 'Ce navigateur ne sait pas lire le Web Audio.' },
-    failed: { en: 'The stems didn’t load. Try again?', fr: 'Les pistes ne se sont pas chargées. Réessayer ?' },
-    hidden: { en: 'Stopped: the tab went to the background.', fr: 'Arrêté : l’onglet est passé en arrière-plan.' },
-  },
-  // The save file on `/privacy` (components/SaveFile.vue). `{n}` keys, `{size}` bytes.
-  saveFile: {
-    heading: { en: 'Carry it to another browser', fr: 'L’emporter dans un autre navigateur' },
-    groups: { en: 'What to carry', fr: 'Quoi emporter' },
-    make: { en: 'make a save link ({n} · {size})', fr: 'créer un lien de sauvegarde ({n} · {size})' },
-    nothing: { en: 'Nothing is stored in these groups yet.', fr: 'Rien n’est encore stocké dans ces groupes.' },
-    link: { en: 'Save link', fr: 'Lien de sauvegarde' },
-    copy: { en: 'copy', fr: 'copier' },
-    copied: { en: 'copied', fr: 'copié' },
-    qrAlt: { en: 'QR code of the save link', fr: 'QR code du lien de sauvegarde' },
-    noQr: {
-      en: 'Too long for a QR code a phone reads reliably: copy the link instead, or leave the shell out.',
-      fr: 'Trop long pour un QR code qu’un téléphone lit sans peine : copiez plutôt le lien, ou laissez le shell de côté.',
-    },
-    restoreHeading: { en: 'Restore one here', fr: 'En restaurer une ici' },
-    paste: { en: 'a save link or code', fr: 'un lien ou un code de sauvegarde' },
-    read: { en: 'read it', fr: 'le lire' },
-    restore: { en: 'restore {n} and reload', fr: 'restaurer {n} et recharger' },
-    restoring: { en: 'Restored. Reloading…', fr: 'Restauré. Rechargement…' },
-    fresh: { en: 'new here', fr: 'nouvelle ici' },
-    replaces: { en: 'replaces what is here', fr: 'remplace l’actuelle' },
-    same: { en: 'already the same', fr: 'déjà identique' },
-    dropped: {
-      en: '{n} more in it were left out: secrets, or keys this site doesn’t keep.',
-      fr: '{n} autres y ont été écartées : des secrets, ou des clés que ce site ne garde pas.',
-    },
-    empty: { en: 'It holds nothing this site keeps.', fr: 'Il ne contient rien que ce site garde.' },
-    malformed: { en: 'That isn’t a save code, or it was cut short.', fr: 'Ce n’est pas un code de sauvegarde, ou il a été tronqué.' },
-    version: {
-      en: 'That code comes from a newer version of the site. Reload and try again.',
-      fr: 'Ce code vient d’une version plus récente du site. Rechargez et réessayez.',
-    },
-    unsupported: { en: 'This browser can’t unpack that code. A newer one can.', fr: 'Ce navigateur ne sait pas décompresser ce code. Un plus récent le peut.' },
-    tooLarge: {
-      en: 'That code unpacks to more than any save holds, so it wasn’t read.',
-      fr: 'Ce code se décompresse en plus qu’aucune sauvegarde n’en contient : il n’a pas été lu.',
     },
   },
   footer: {
@@ -1043,8 +953,6 @@ export const messages = {
     // never anything to say about who the others are.
     online: { en: '{n} here now', fr: '{n} personnes ici' },
     onlineOne: { en: 'just you here', fr: 'vous seul ici' },
-    // An event from `content/events.ts`, once it is a week away or on.
-    live: { en: 'live', fr: 'en direct' },
   },
   boot: {
     skip: { en: 'press any key to skip', fr: 'appuyez sur une touche pour passer' },

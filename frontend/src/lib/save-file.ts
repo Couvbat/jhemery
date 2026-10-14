@@ -83,15 +83,41 @@ async function pipe(bytes: Uint8Array, stream: CompressionStream | Decompression
 
 const canDeflate = () => typeof CompressionStream === 'function' && typeof DecompressionStream === 'function'
 
-export async function encodeSave(items: readonly SavedItem[]): Promise<string> {
-  const json = new TextEncoder().encode(JSON.stringify(Object.fromEntries(items.map((item) => [item.key, item.value]))))
+/**
+ * What a save can carry as it is, and the keys it can't: one value over `MAX_VALUE_BYTES`,
+ * or the ones that would take the whole past `MAX_SAVE_BYTES`. The same limits `decodeSave`
+ * holds a code to, checked before a link is offered, so a link never promises what restoring
+ * it then drops. The history is the one that can grow that large: a hundred lines, of any
+ * length.
+ */
+export function fitSave(items: readonly SavedItem[]): { items: SavedItem[]; tooBig: string[] } {
+  const kept: SavedItem[] = []
+  const tooBig: string[] = []
+  // The braces, then each `"key":"value",` as JSON writes it, escapes and all.
+  let total = 2
+  for (const item of items) {
+    const bytes = byteLength(`${JSON.stringify(item.key)}:${JSON.stringify(item.value)},`)
+    if (byteLength(item.value) > MAX_VALUE_BYTES || total + bytes > MAX_SAVE_BYTES) {
+      tooBig.push(item.key)
+      continue
+    }
+    kept.push(item)
+    total += bytes
+  }
+  return { items: kept, tooBig }
+}
+
+/** A code for `items`, leaving out what `fitSave` says won't fit, and naming it. */
+export async function encodeSave(items: readonly SavedItem[]): Promise<{ code: string; tooBig: string[] }> {
+  const fitted = fitSave(items)
+  const json = new TextEncoder().encode(JSON.stringify(Object.fromEntries(fitted.items.map((item) => [item.key, item.value]))))
   const deflate = canDeflate()
   const payload = deflate ? await pipe(json, new CompressionStream('deflate-raw')) : json
   const bytes = new Uint8Array(payload.length + 2)
   bytes[0] = SAVE_VERSION
   bytes[1] = deflate ? DEFLATED : RAW
   bytes.set(payload, 2)
-  return toBase64Url(bytes)
+  return { code: toBase64Url(bytes), tooBig: fitted.tooBig }
 }
 
 export type SaveRead =

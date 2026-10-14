@@ -978,6 +978,19 @@ brainstorm's pitch rather than from the rows.
     release as mastered, and the limiter only catches the filter's peaks.
 - **Seasons:** the spec that kept each mood a nudge now bounds the speed's magnitude, and a
   second spec holds April Fools' as the only reversed one.
+- **After review (#152):**
+  - The PR first went 2.3 kB over the home page's byte budget. Words only lazy pages read
+    moved out of `i18n/messages.ts` into tables beside them (`/privacy`'s own, existing ones
+    included), the footer's event line became a chunk fetched only while there is an event,
+    and `events.ts` and `stems.ts` were cut down to data, with what their readers compute in
+    `upcoming.ts` and the mixer's chunk. The page ends about 0.5 kB heavier than before.
+  - A save link makes every key it can carry someone else's input. A sweep of their readers
+    found states that broke a page or left something out of reach (a daily wordle record,
+    achievements, CTF flags, a forged scheme, aliases, history), and one that froze the tab:
+    `parse.ts` rescanned the rest of the line for each opening quote. Each reader now checks
+    what it finds, the parser is linear, and the preview lists restored aliases in full.
+  - Making a save holds to the limits a restore applies, a link made while the choice
+    changed is thrown away, and a restore the storage refuses says so instead of reloading.
 
 ## Build order
 

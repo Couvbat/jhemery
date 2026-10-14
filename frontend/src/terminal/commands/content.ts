@@ -1,12 +1,8 @@
 import {
   durationLabel,
   education,
-  eventEnd,
   events,
-  eventStart,
   feedFile,
-  isLive,
-  upcomingEvents,
   experience,
   gaming,
   isExternal,
@@ -32,6 +28,7 @@ import { useStats } from '@/composables/useStats'
 import { useTheme } from '@/composables/useTheme'
 import { fetchSite, type SiteResponse } from '@/lib/api'
 import { REPO } from '@/lib/source'
+import { eventEnd, eventStart, isLive, upcomingEvents } from '@/content/upcoming'
 import { relative } from '@/tools/time/time'
 import { parseSgr } from '../ansi'
 import { MARK } from '../ascii'

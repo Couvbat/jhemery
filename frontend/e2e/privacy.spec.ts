@@ -1,4 +1,5 @@
 import { expect, test } from './fixtures'
+import { privacyLabels } from '@/content/privacy'
 import { messages } from '@/i18n/messages'
 
 /**
@@ -52,7 +53,7 @@ test.describe('/privacy', () => {
     await expect(page.getByRole('heading', { level: 1, name: heading })).toBeVisible()
     expect(await page.evaluate(() => localStorage.getItem('couvbat:games:snake'))).toBeNull()
     const after = page.getByTestId('privacy-group-scores')
-    await expect(after.locator('li', { hasText: 'couvbat:games:snake' })).toContainText(messages.privacy.notSet.en)
+    await expect(after.locator('li', { hasText: 'couvbat:games:snake' })).toContainText(privacyLabels.notSet.en)
     await expect(after.getByRole('button').first()).toBeDisabled()
   })
 
@@ -62,7 +63,7 @@ test.describe('/privacy', () => {
     await page.goto('/privacy')
     const settings = page.getByTestId('privacy-group-settings')
     const theme = settings.locator('li', { has: page.getByText('couvbat:theme', { exact: true }) })
-    await expect(theme).toContainText(messages.privacy.notSet.en)
+    await expect(theme).toContainText(privacyLabels.notSet.en)
 
     await page.getByRole('button', { name: messages.nav.theme.en }).click()
     await page.getByRole('menuitemradio', { name: 'dracula' }).click()
@@ -74,7 +75,7 @@ test.describe('/privacy', () => {
     await settings.getByRole('button', { name: 'yes, clear 3 and reload' }).click()
 
     await expect.poll(() => page.evaluate(() => (window as unknown as { __before?: boolean }).__before ?? null)).toBeNull()
-    await expect(theme).toContainText(messages.privacy.notSet.en)
+    await expect(theme).toContainText(privacyLabels.notSet.en)
     expect(await page.evaluate(() => localStorage.getItem('couvbat:theme'))).toBeNull()
     await expect(page.locator('html')).not.toHaveAttribute('data-theme', 'dracula')
   })
@@ -91,7 +92,7 @@ test.describe('/privacy', () => {
 
     await own.focus()
     await page.keyboard.press('Enter')
-    await expect(own).toHaveText(messages.privacy.cancel.en)
+    await expect(own).toHaveText(privacyLabels.cancel.en)
     await page.keyboard.press('Tab')
     await expect(stale.getByRole('button', { name: 'yes, clear 1 and reload' })).toBeFocused()
     // The confirm goes, and focus with it would fall to <body>: it lands on the group's button.

@@ -62,9 +62,11 @@ src/content/
   dates.ts       the date maths: daysSince, monthsBetween (both ends count), durationLabel, periodLabel
   now.ts         the /now list and its staleness rule
   seasons.ts     the six days the field dresses up for, on the visitor's calendar
-  events.ts      SiteEvent[], the appointments Jules hosts, as instants; read by `calendar`,
-                 /now, the footer and the .ics feeds
-  stems.ts       StemTrack[], tracks split into stems for the music section's mixer
+  events.ts      SiteEvent[], the appointments Jules hosts, as instants; only the list
+  upcoming.ts    what the readers compute from it (when, which are ahead) and their words;
+                 outside the barrel, so an empty list costs the home page nothing
+  stems.ts       StemTrack[], tracks split into stems for the music section's mixer;
+                 outside the barrel, and only data
   security.ts    the disclosure policy and security.txt; outside the barrel, like privacy.ts
   docs.ts        githubSlug and headingSlugs, so a link to a doc's heading can be checked
   decisions.ts   Decision[], what the site chose and turned down; read by `why` (§3)
@@ -86,6 +88,14 @@ across every caller), a `t(localised)` resolver, and `setLocale()` which persist
 → `en`.
 
 Surfaces: a `EN/FR` toggle in the navbar, and the `lang [en|fr]` terminal command.
+
+Interface strings live in `i18n/messages.ts`, which loads whole with the first paint. The home
+page sits at its byte budget (`lighthouserc.yml`), so the words of a page or panel that only
+loads on demand can sit in a table beside it instead, imported only by it: `/privacy`'s and
+the save file's (`content/privacy.ts`), `/security`'s (`content/security.ts`), the events block's
+(`content/upcoming.ts`) and the stems mixer's (`components/stems/labels.ts`). `i18n.spec.ts`
+walks those tables with the message tree, under the same rules, plus one more for all of
+them: a `{placeholder}` in one language is in the other.
 
 **Trade-off:** full-site i18n roughly doubles the copy that has to be maintained. It is included
 because the profile advertises both languages and a French visitor landing on English copy is a
@@ -939,8 +949,10 @@ wraps rather than run wider than the screen, which a guestbook name can make it 
   offset written out, a length, a `Localised` title and note, and a `goTo` path or URL. Its `id`
   is the feed's `UID`, so it never changes once published. While one hasn't ended, `/now` lists
   it in the visitor's zone with a relative phrase, `calendar` prints the same, and from
-  `SOON_DAYS` (7) before its start the footer's status line names it, re-read on the same
-  60 s tick. `vite-plugins/calendar.ts` writes `/events.ics` and `/events.fr.ics` from RFC 5545
+  `SOON_DAYS` (7) before its start the footer's status line names it through
+  `FooterEvent.vue`, which re-reads the clock each minute. The footer only fetches that
+  component while the list has an entry, and the helpers and words all readers share are in
+  `upcoming.ts`, outside the barrel: with the list empty, the home page pays for one array. `vite-plugins/calendar.ts` writes `/events.ics` and `/events.fr.ics` from RFC 5545
   by hand: CRLF lines folded at 75 octets without splitting a character or an escape, TEXT
   escaped, every time in UTC. The feed always carries a `VTIMEZONE` for Europe/Paris that no
   event refers to, because the grammar requires one component and the list is often empty.
@@ -957,7 +969,9 @@ wraps rather than run wider than the screen, which a guestbook name can make it 
   master, so the loudest setting is the release as mastered. `mix.ts` is the pure part:
   squared faders, mute over solo as on a desk, an exponential 40 Hz–20 kHz cutoff, and the
   code `<track>.<base64url(version, count, level and flags per stem, cutoff)>`, refused when
-  the count doesn't match the track's. A hidden tab pauses it, as it stops `acid`.
+  the count doesn't match the track's. A hidden tab pauses it, as it stops `acid`. The
+  mixer's chunk, like `FooterEvent`'s, is kept out of the service worker's precache, since
+  neither is fetched while its list is empty.
 - **Save file** (`lib/save-file.ts`, `components/SaveFile.vue` on `/privacy`) — the visitor's
   chosen groups (settings, progress, scores, shell; never secrets) as one code:
   `base64url(version · format · payload)`, the payload a JSON object of key to value,
@@ -969,9 +983,25 @@ wraps rather than run wider than the screen, which a guestbook name can make it 
   pasted into `/privacy`'s own address bar is caught by a watch on the route instead.
   Reading a code trusts nothing: only keys `entryFor()` lists in `localStorage` and not
   secret, only strings, 64 kB a value and 256 kB unpacked, the second enforced while
-  inflating. The page shows each key against what is already stored and writes the
-  changed ones only on restore, through `writeItems()` in `storage-keys.ts` (the one module
-  allowed to touch storage for keys it doesn't own), then reloads, as a clear does.
+  inflating. Making one holds to the same limits (`fitSave()`), leaving out and naming a
+  value too big rather than offering a link that restores less than it says. A link being
+  made while the choice or the storage changes is thrown away. The page shows each key
+  against what is already stored and writes the changed ones only on restore, through
+  `writeItems()` in `storage-keys.ts` (the one module allowed to touch storage for keys it
+  doesn't own), then reloads, as a clear does; if a full or blocked storage refuses some,
+  it says how many and stays, so the preview shows what's left. The aliases in a save are
+  listed in full there, since they are the one value that later runs commands.
+  A code is someone else's input, so every reader of a key it can carry treats what it finds
+  as untrusted, and no stored value can break a page or leave something out of reach: the
+  daily wordle record must be one the game could have written, and `resumeDaily` drops a
+  guess the board refuses; unknown achievement ids are dropped, a set missing only
+  `completionist` gets it, and `explorer` is checked on every visit; a stage's real CTF flag
+  replaces a stored one that isn't; a forged scheme whose body or muted text misses its floor
+  is refused (`forge.spec.ts` holds every forge across the seed cube to those two floors);
+  alias names are one word, definitions and history lines at most 4 kB, the history base a
+  safe integer; an alias never shadows the first word of a two-word command; and
+  `parse.ts` finds where quotes close in one pass, where it used to rescan the rest of the
+  line for each one, which made a long line of unclosed quotes freeze the tab.
 - **Disclosure policy** (`content/security.ts`, `views/SecurityView.vue`) — `/security`, outside
   the prism like `/privacy`, and `security.txt` (RFC 9116), which `vite-plugins/security.ts`
   builds from the same module: `Contact`, an `Expires` `EXPIRES_DAYS` (180) after the build,

@@ -2,7 +2,7 @@
 import { computed, onMounted, ref, shallowRef } from 'vue'
 import { RouterLink } from 'vue-router'
 import { profile } from '@/content'
-import { privacyCopy } from '@/content/privacy'
+import { privacyCopy, privacyLabels as labels } from '@/content/privacy'
 import type { Localised } from '@/content/types'
 import CodeText from '@/components/CodeText.vue'
 import SaveFile from '@/components/SaveFile.vue'
@@ -129,7 +129,7 @@ const claims = computed(() => [privacyCopy.presence, privacyCopy.stats, privacyC
       </header>
 
       <section class="space-y-6" aria-labelledby="privacy-browser">
-        <h2 id="privacy-browser" class="text-primary font-mono text-sm">## {{ t(m.privacy.browser) }}</h2>
+        <h2 id="privacy-browser" class="text-primary font-mono text-sm">## {{ t(labels.browser) }}</h2>
 
         <section
           v-for="group in groups"
@@ -141,7 +141,7 @@ const claims = computed(() => [privacyCopy.presence, privacyCopy.stats, privacyC
           <div class="flex flex-wrap items-center gap-x-3 gap-y-2 font-mono text-sm">
             <h3 :id="`privacy-group-${group.id}`" class="text-accent">### {{ t(group.label) }}</h3>
             <span class="text-xs text-muted-foreground">
-              {{ t(m.privacy.stored).replace('{n}', String(group.stored.length)).replace('{size}', formatBytes(group.bytes)) }}
+              {{ t(labels.stored).replace('{n}', String(group.stored.length)).replace('{size}', formatBytes(group.bytes)) }}
             </span>
             <div class="ml-auto flex flex-wrap gap-2" @keydown.esc="disarm">
               <button
@@ -151,7 +151,7 @@ const claims = computed(() => [privacyCopy.presence, privacyCopy.stats, privacyC
                 :aria-expanded="armed === group.id"
                 @click="toggle(group.id)"
               >
-                {{ armed === group.id ? t(m.privacy.cancel) : `${t(m.privacy.clear)} ${t(group.label)}` }}
+                {{ armed === group.id ? t(labels.cancel) : `${t(labels.clear)} ${t(group.label)}` }}
               </button>
               <button
                 v-if="armed === group.id"
@@ -160,7 +160,7 @@ const claims = computed(() => [privacyCopy.presence, privacyCopy.stats, privacyC
                 :disabled="clearing"
                 @click="clear(group.id)"
               >
-                {{ clearing ? t(m.privacy.cleared) : t(m.privacy.confirm).replace('{n}', String(group.stored.length)) }}
+                {{ clearing ? t(labels.cleared) : t(labels.confirm).replace('{n}', String(group.stored.length)) }}
               </button>
             </div>
           </div>
@@ -177,10 +177,10 @@ const claims = computed(() => [privacyCopy.presence, privacyCopy.stats, privacyC
             >
               <span class="text-foreground break-all">{{ row.key }}</span>
               <span class="text-muted-foreground">
-                <CodeText :text="t(row.purpose)" /> · {{ row.area }}<template v-if="row.secret"> · {{ t(m.privacy.secret) }}</template>
+                <CodeText :text="t(row.purpose)" /> · {{ row.area }}<template v-if="row.secret"> · {{ t(labels.secret) }}</template>
               </span>
               <span :class="row.item ? 'text-primary' : 'text-muted-foreground'">
-                {{ row.item ? formatBytes(row.item.bytes) : t(m.privacy.notSet) }}
+                {{ row.item ? formatBytes(row.item.bytes) : t(labels.notSet) }}
               </span>
             </li>
           </ul>
@@ -190,7 +190,7 @@ const claims = computed(() => [privacyCopy.presence, privacyCopy.stats, privacyC
       <SaveFile />
 
       <section class="space-y-3" aria-labelledby="privacy-caches">
-        <h2 id="privacy-caches" class="text-primary font-mono text-sm">## {{ t(m.privacy.caches) }}</h2>
+        <h2 id="privacy-caches" class="text-primary font-mono text-sm">## {{ t(labels.caches) }}</h2>
         <p class="text-sm text-foreground leading-relaxed">{{ t(privacyCopy.cachesIntro) }}</p>
         <template v-if="report">
           <ul v-if="report.caches?.length" class="space-y-2 font-mono text-xs" data-testid="privacy-caches">
@@ -201,12 +201,12 @@ const claims = computed(() => [privacyCopy.presence, privacyCopy.stats, privacyC
             >
               <span class="text-foreground break-all">{{ store.name }}</span>
               <span class="text-muted-foreground">
-                <template v-if="cachePurpose(store.name)">{{ t(cachePurpose(store.name)!) }} · </template>{{ t(m.privacy.files).replace('{n}', String(store.files)) }}
+                <template v-if="cachePurpose(store.name)">{{ t(cachePurpose(store.name)!) }} · </template>{{ t(labels.files).replace('{n}', String(store.files)) }}
               </span>
               <span class="text-primary">{{ formatBytes(store.bytes) }}</span>
             </li>
           </ul>
-          <p v-else class="text-sm text-muted-foreground">{{ t(m.privacy.noCaches) }}</p>
+          <p v-else class="text-sm text-muted-foreground">{{ t(labels.noCaches) }}</p>
           <p v-if="report.caches?.length" class="text-sm text-muted-foreground">{{ t(WORKBOX_NOTE) }}</p>
           <p v-if="report.usage !== null" data-testid="storage-estimate" class="text-sm text-muted-foreground">
             <CodeText :text="t(m.privacy.estimate).replace('{size}', formatBytes(report.usage))" />
@@ -217,7 +217,7 @@ const claims = computed(() => [privacyCopy.presence, privacyCopy.stats, privacyC
       </section>
 
       <section class="space-y-3" aria-labelledby="privacy-sends">
-        <h2 id="privacy-sends" class="text-primary font-mono text-sm">## {{ t(m.privacy.sends) }}</h2>
+        <h2 id="privacy-sends" class="text-primary font-mono text-sm">## {{ t(labels.sends) }}</h2>
         <ul class="space-y-3 text-sm text-foreground leading-relaxed">
           <li v-for="(claim, i) in claims" :key="i" class="border-l-2 border-primary/40 pl-4"><CodeText :text="t(claim)" /></li>
         </ul>

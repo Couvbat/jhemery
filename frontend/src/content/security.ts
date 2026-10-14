@@ -11,6 +11,16 @@ import type { Localised } from './types'
  * the lazy page and the build read it.
  */
 
+/** The page's headings, here rather than in `i18n/messages.ts` for the reason this module is outside the barrel. */
+export const securityLabels = {
+  updated: { en: 'Policy last updated', fr: 'Politique mise à jour le' },
+  report: { en: 'How to report it', fr: 'Comment le signaler' },
+  inScope: { en: 'What counts', fr: 'Ce qui compte' },
+  outOfScope: { en: 'What doesn’t', fr: 'Ce qui ne compte pas' },
+  harbour: { en: 'Testing in good faith', fr: 'Tester de bonne foi' },
+  thanks: { en: 'Thanks', fr: 'Remerciements' },
+} satisfies Record<string, Localised>
+
 /** Bump when the policy's wording changes, since the page dates it. */
 export const POLICY_UPDATED = '2026-10-14'
 

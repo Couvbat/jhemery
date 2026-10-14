@@ -88,6 +88,11 @@ export default defineConfig({
           // `/assets/` header in public/.htaccess, not on the service worker.
           '**/ffmpeg-core-*.js',
           '**/ffmpeg.worker-*.js',
+          // The stems mixer and the footer's event line: each is only ever fetched while
+          // its list in `src/content/` has an entry, and both ship empty. Precaching them
+          // would download on every install what no visitor can be shown.
+          '**/StemsMixer-*.js',
+          '**/FooterEvent-*.js',
           // The printable résumés and the design notes: documents a few visitors read,
           // matched by the html and css globs above. Precaching them would charge every
           // install for pages almost nobody opens.

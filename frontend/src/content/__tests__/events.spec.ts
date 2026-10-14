@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { resolvePath } from '@/composables/useViewSwing'
-import { eventEnd, eventUrl, events, isExternal, isLive, soonestEvent, upcomingEvents, type SiteEvent } from '..'
+import { events, isExternal, type SiteEvent } from '..'
+import { eventEnd, eventUrl, isLive, soonestEvent, upcomingEvents } from '../upcoming'
 
 const set = (id: string, start: string, minutes = 120): SiteEvent => ({
   id,

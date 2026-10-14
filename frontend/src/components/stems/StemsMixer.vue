@@ -2,13 +2,14 @@
 import { computed, onMounted, onUnmounted, ref, shallowRef, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import WindowDots from '@/components/WindowDots.vue'
-import { downloadBytes, stemTracks, type StemTrack } from '@/content/stems'
+import { stemTracks, type StemTrack } from '@/content/stems'
 import type { Localised } from '@/content/types'
 import { useLocale } from '@/i18n'
 import { closeAfterFade, openAudioContext } from '@/tools/acid/audio'
 import { formatBytes } from '@/tools/image/image'
 import { createStemsEngine, type StemsEngine } from './engine'
-import { loadStems } from './load'
+import { stemsLabels as labels } from './labels'
+import { downloadBytes, loadStems } from './load'
 import { decodeMix, defaultMix, encodeMix, type Mix } from './mix'
 
 /**
@@ -17,7 +18,7 @@ import { decodeMix, defaultMix, encodeMix, type Mix } from './mix'
  * as `/?mix=<code>#music`, which is read once and dropped from the address, as `?run=` is.
  */
 
-const { t, m } = useLocale()
+const { t } = useLocale()
 const route = useRoute()
 const router = useRouter()
 
@@ -69,7 +70,7 @@ async function load() {
       onStop(reason) {
         playing.value = false
         window.clearInterval(clock)
-        if (reason === 'hidden') notice.value = m.stems.hidden
+        if (reason === 'hidden') notice.value = labels.hidden
       },
     })
     status.value = 'ready'
@@ -147,12 +148,12 @@ onMounted(async () => {
   void router.replace({ path: route.path, hash: route.hash, query })
   const decoded = decodeMix(code, stemTracks)
   if (!decoded) {
-    notice.value = m.stems.badLink
+    notice.value = labels.badLink
     return
   }
   track.value = decoded.track
   mix.value = decoded.mix
-  notice.value = m.stems.fromLink
+  notice.value = labels.fromLink
 })
 
 onUnmounted(release)
@@ -167,9 +168,9 @@ onUnmounted(release)
 
     <div class="p-4 space-y-4 font-mono text-xs">
       <div class="flex flex-wrap items-center gap-x-4 gap-y-2">
-        <h3 class="text-sm text-accent">{{ t(m.stems.heading) }}</h3>
+        <h3 class="text-sm text-accent">{{ t(labels.heading) }}</h3>
         <label v-if="stemTracks.length > 1" class="flex items-center gap-2 text-muted-foreground">
-          {{ t(m.stems.track) }}
+          {{ t(labels.track) }}
           <select
             :value="track.id"
             class="bg-background border border-border rounded px-2 py-1 text-foreground"
@@ -190,7 +191,7 @@ onUnmounted(release)
           :disabled="status === 'loading' || status === 'noAudio'"
           @click="load"
         >
-          {{ status === 'loading' ? t(m.stems.loading).replace('{n}', String(percent(progress))) : t(m.stems.load).replace('{size}', size) }}
+          {{ status === 'loading' ? t(labels.loading).replace('{n}', String(percent(progress))) : t(labels.load).replace('{size}', size) }}
         </button>
         <button
           v-else
@@ -199,39 +200,39 @@ onUnmounted(release)
           :aria-pressed="playing"
           @click="toggle"
         >
-          <span aria-hidden="true">{{ playing ? '■' : '▶' }}</span> {{ playing ? t(m.stems.pause) : t(m.stems.play) }}
+          <span aria-hidden="true">{{ playing ? '■' : '▶' }}</span> {{ playing ? t(labels.pause) : t(labels.play) }}
         </button>
         <div v-if="status === 'ready'" class="h-1 flex-1 min-w-24 rounded bg-muted overflow-hidden" aria-hidden="true">
-          <div class="h-full bg-primary/70" :style="{ width: `${percent(position)}%` }"></div>
+          <div class="h-full bg-primary" :style="{ width: `${percent(position)}%` }"></div>
         </div>
       </div>
-      <p v-if="status === 'failed'" class="text-warning" role="alert">{{ t(m.stems.failed) }}</p>
-      <p v-else-if="status === 'noAudio'" class="text-warning" role="alert">{{ t(m.stems.noAudio) }}</p>
+      <p v-if="status === 'failed'" class="text-warning" role="alert">{{ t(labels.failed) }}</p>
+      <p v-else-if="status === 'noAudio'" class="text-warning" role="alert">{{ t(labels.noAudio) }}</p>
       <p v-if="notice" class="text-muted-foreground" aria-live="polite">{{ t(notice) }}</p>
 
       <ul class="space-y-2">
         <li
           v-for="(stem, i) in track.stems"
           :key="stem.id"
-          class="grid grid-cols-[minmax(0,7rem)_auto_auto_1fr_2.5rem] items-center gap-2"
+          class="flex items-center gap-2"
         >
-          <span class="truncate text-foreground">{{ t(stem.name) }}</span>
+          <span class="w-24 shrink-0 truncate text-foreground">{{ t(stem.name) }}</span>
           <button
             type="button"
-            class="w-7 py-0.5 rounded border transition-colors"
+            class="w-9 py-1 rounded border transition-colors"
             :class="mix.stems[i]!.muted ? 'border-warning text-warning' : 'border-border text-muted-foreground hover:text-foreground'"
             :aria-pressed="mix.stems[i]!.muted"
-            :aria-label="fill(t(stem.name), m.stems.mute)"
+            :aria-label="fill(t(stem.name), labels.mute)"
             @click="mix.stems[i]!.muted = !mix.stems[i]!.muted"
           >
             M
           </button>
           <button
             type="button"
-            class="w-7 py-0.5 rounded border transition-colors"
+            class="w-9 py-1 rounded border transition-colors"
             :class="mix.stems[i]!.solo ? 'border-accent text-accent' : 'border-border text-muted-foreground hover:text-foreground'"
             :aria-pressed="mix.stems[i]!.solo"
-            :aria-label="fill(t(stem.name), m.stems.solo)"
+            :aria-label="fill(t(stem.name), labels.solo)"
             @click="mix.stems[i]!.solo = !mix.stems[i]!.solo"
           >
             S
@@ -242,15 +243,15 @@ onUnmounted(release)
             min="0"
             max="1"
             step="0.01"
-            class="w-full accent-primary"
-            :aria-label="fill(t(stem.name), m.stems.level)"
+            class="min-w-0 flex-1 accent-[var(--neon-green)]"
+            :aria-label="fill(t(stem.name), labels.level)"
           />
-          <span class="text-right text-muted-foreground tabular-nums">{{ percent(mix.stems[i]!.level) }}</span>
+          <span class="w-9 shrink-0 text-right text-muted-foreground tabular-nums">{{ percent(mix.stems[i]!.level) }}</span>
         </li>
-        <li class="grid grid-cols-[minmax(0,7rem)_1fr_2.5rem] items-center gap-2 pt-2 border-t border-border">
-          <span class="text-foreground">{{ t(m.stems.filter) }}</span>
-          <input v-model.number="mix.cutoff" type="range" min="0" max="1" step="0.01" class="w-full accent-accent" :aria-label="t(m.stems.filter)" />
-          <span class="text-right text-muted-foreground tabular-nums">{{ percent(mix.cutoff) }}</span>
+        <li class="flex items-center gap-2 pt-2 border-t border-border">
+          <span class="w-24 shrink-0 text-foreground">{{ t(labels.filter) }}</span>
+          <input v-model.number="mix.cutoff" type="range" min="0" max="1" step="0.01" class="min-w-0 flex-1 accent-[var(--neon-green)]" :aria-label="t(labels.filter)" />
+          <span class="w-9 shrink-0 text-right text-muted-foreground tabular-nums">{{ percent(mix.cutoff) }}</span>
         </li>
       </ul>
 
@@ -260,14 +261,14 @@ onUnmounted(release)
           class="px-3 py-1 rounded border border-border text-foreground hover:border-primary hover:text-primary transition-colors"
           @click="copy"
         >
-          {{ copied ? t(m.stems.copied) : t(m.stems.copy) }}
+          {{ copied ? t(labels.copied) : t(labels.copy) }}
         </button>
         <button
           type="button"
           class="px-3 py-1 rounded border border-border text-muted-foreground hover:border-primary hover:text-primary transition-colors"
           @click="reset"
         >
-          {{ t(m.stems.reset) }}
+          {{ t(labels.reset) }}
         </button>
       </div>
     </div>

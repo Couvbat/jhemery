@@ -1,4 +1,4 @@
-import { downloadBytes, type StemTrack } from '@/content/stems'
+import { DECODED_BYTES_PER_SECOND, type StemTrack } from '@/content/stems'
 
 /**
  * Fetches a track's stems and decodes them, counting the bytes as they arrive so the
@@ -6,6 +6,16 @@ import { downloadBytes, type StemTrack } from '@/content/stems'
  * site's own host. Nothing is fetched until the visitor asks: a track is megabytes, and
  * most visitors to the music section only listen.
  */
+
+/** What the load button announces. */
+export function downloadBytes(track: Pick<StemTrack, 'stems'>): number {
+  return track.stems.reduce((sum, stem) => sum + stem.bytes, 0)
+}
+
+/** What the track costs held decoded, all its stems together. */
+export function decodedBytes(track: Pick<StemTrack, 'seconds' | 'stems'>): number {
+  return track.seconds * DECODED_BYTES_PER_SECOND * track.stems.length
+}
 
 async function fetchCounting(url: string, onBytes: (bytes: number) => void, signal?: AbortSignal): Promise<ArrayBuffer> {
   const response = await fetch(url, { signal })

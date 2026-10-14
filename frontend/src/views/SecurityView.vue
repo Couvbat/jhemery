@@ -2,7 +2,7 @@
 import { computed } from 'vue'
 import { RouterLink } from 'vue-router'
 import { profile } from '@/content'
-import { acknowledgments, POLICY_UPDATED, securityCopy } from '@/content/security'
+import { acknowledgments, POLICY_UPDATED, securityCopy, securityLabels as labels } from '@/content/security'
 import CodeText from '@/components/CodeText.vue'
 import { useLocale } from '@/i18n'
 
@@ -31,13 +31,13 @@ const day = (date: string) =>
           <span class="text-accent">#</span> {{ t(m.security.heading) }}
         </h1>
         <p class="mt-3 text-sm text-muted-foreground">
-          {{ t(m.security.updated) }} <time :datetime="POLICY_UPDATED">{{ day(POLICY_UPDATED) }}</time>
+          {{ t(labels.updated) }} <time :datetime="POLICY_UPDATED">{{ day(POLICY_UPDATED) }}</time>
         </p>
         <p class="mt-3 text-sm text-foreground leading-relaxed">{{ t(securityCopy.intro) }}</p>
       </header>
 
       <section class="space-y-3" aria-labelledby="security-report">
-        <h2 id="security-report" class="text-primary font-mono text-sm">## {{ t(m.security.report) }}</h2>
+        <h2 id="security-report" class="text-primary font-mono text-sm">## {{ t(labels.report) }}</h2>
         <p class="text-sm text-foreground leading-relaxed">{{ t(securityCopy.report) }}</p>
         <p class="font-mono text-sm">
           <a :href="`mailto:${profile.email}`" data-testid="security-contact" class="text-primary hover:underline">{{ profile.email }}</a>
@@ -46,7 +46,7 @@ const day = (date: string) =>
       </section>
 
       <section class="space-y-3" aria-labelledby="security-in">
-        <h2 id="security-in" class="text-primary font-mono text-sm">## {{ t(m.security.inScope) }}</h2>
+        <h2 id="security-in" class="text-primary font-mono text-sm">## {{ t(labels.inScope) }}</h2>
         <ul class="space-y-3 text-sm text-foreground leading-relaxed">
           <li v-for="(item, i) in securityCopy.inScope" :key="i" class="border-l-2 border-primary/40 pl-4">
             <CodeText :text="t(item)" />
@@ -55,7 +55,7 @@ const day = (date: string) =>
       </section>
 
       <section class="space-y-3" aria-labelledby="security-out">
-        <h2 id="security-out" class="text-primary font-mono text-sm">## {{ t(m.security.outOfScope) }}</h2>
+        <h2 id="security-out" class="text-primary font-mono text-sm">## {{ t(labels.outOfScope) }}</h2>
         <ul class="space-y-3 text-sm text-foreground leading-relaxed">
           <li v-for="(item, i) in securityCopy.outOfScope" :key="i" class="border-l-2 border-border pl-4">
             <CodeText :text="t(item)" />
@@ -64,12 +64,12 @@ const day = (date: string) =>
       </section>
 
       <section class="space-y-3" aria-labelledby="security-harbour">
-        <h2 id="security-harbour" class="text-primary font-mono text-sm">## {{ t(m.security.harbour) }}</h2>
+        <h2 id="security-harbour" class="text-primary font-mono text-sm">## {{ t(labels.harbour) }}</h2>
         <p class="text-sm text-foreground leading-relaxed">{{ t(securityCopy.safeHarbour) }}</p>
       </section>
 
-      <section id="thanks" class="space-y-3 scroll-mt-20" aria-labelledby="security-thanks">
-        <h2 id="security-thanks" class="text-primary font-mono text-sm">## {{ t(m.security.thanks) }}</h2>
+      <section id="thanks" class="space-y-3" aria-labelledby="security-thanks">
+        <h2 id="security-thanks" class="text-primary font-mono text-sm">## {{ t(labels.thanks) }}</h2>
         <ul v-if="acknowledgments.length" class="space-y-2 font-mono text-sm">
           <li v-for="entry in acknowledgments" :key="`${entry.date}:${entry.name}`" class="grid gap-x-4 sm:grid-cols-[9rem_1fr] border-l-2 border-primary/40 pl-4">
             <time :datetime="entry.date" class="text-muted-foreground">{{ day(entry.date) }}</time>

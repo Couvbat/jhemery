@@ -7,6 +7,7 @@ import {
   codeFrom,
   decodeSave,
   encodeSave,
+  fitSave,
   isPortable,
   portableItems,
   saveLink,
@@ -55,13 +56,32 @@ describe('what a save may carry', () => {
 
 describe('a save code', () => {
   it('reads back exactly what was written into it', async () => {
-    const code = await encodeSave(ITEMS)
+    const { code, tooBig } = await encodeSave(ITEMS)
     expect(code).toMatch(/^[A-Za-z0-9_-]+$/)
+    expect(tooBig).toEqual([])
     expect(await decodeSave(code)).toEqual({ ok: true, items: ITEMS, dropped: [] })
   })
 
+  // The same limits a read holds a code to, so a link never offers what restoring drops.
+  it('leaves out, and names, a value too big for a restore to take', async () => {
+    const history = { key: 'couvbat:history', value: JSON.stringify(Array.from({ length: 100 }, (_, i) => `echo ${i} ${'x'.repeat(700)}`)) }
+    const { code, tooBig } = await encodeSave([...ITEMS, history])
+    expect(tooBig).toEqual(['couvbat:history'])
+    expect(await decodeSave(code)).toEqual({ ok: true, items: ITEMS, dropped: [] })
+  })
+
+  it('stops adding values once the whole would pass what a read unpacks', () => {
+    const big = (key: string) => ({ key, value: 'x'.repeat(MAX_VALUE_BYTES - 100) })
+    const keys = ['couvbat:history', 'couvbat:aliases', 'couvbat:achievements', 'couvbat:ctf', 'couvbat:theme:custom']
+    const { items, tooBig } = fitSave(keys.map(big))
+    expect(items.length).toBe(Math.floor(MAX_SAVE_BYTES / MAX_VALUE_BYTES))
+    expect(tooBig).toEqual(keys.slice(items.length))
+    const json = JSON.stringify(Object.fromEntries(items.map((i) => [i.key, i.value])))
+    expect(new TextEncoder().encode(json).length).toBeLessThanOrEqual(MAX_SAVE_BYTES)
+  })
+
   it('reads from the link as well as the bare code, which rides in the fragment', async () => {
-    const code = await encodeSave(ITEMS)
+    const { code } = await encodeSave(ITEMS)
     const link = saveLink('https://jhemery.xyz', code)
     expect(link).toBe(`https://jhemery.xyz/privacy#save=${code}`)
     expect(new URL(link).search).toBe('')

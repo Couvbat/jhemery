@@ -1,18 +1,8 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { RouterLink } from 'vue-router'
-import {
-  eventEnd,
-  eventStart,
-  feedFile,
-  isExternal,
-  isLive,
-  now,
-  nowCategories,
-  profile,
-  staleDays,
-  upcomingEvents,
-} from '@/content'
+import { feedFile, isExternal, now, nowCategories, profile, staleDays } from '@/content'
+import { eventEnd, eventStart, isLive, upcomingEvents, upcomingLabels as labels } from '@/content/upcoming'
 import { goTo } from '@/composables/useViewSwing'
 import { useLocale } from '@/i18n'
 import { relative } from '@/tools/time/time'
@@ -77,12 +67,12 @@ const updatedLabel = computed(() =>
 
       <section v-if="coming.length" aria-labelledby="coming-up" data-testid="now-events" class="space-y-4">
         <h2 id="coming-up" class="text-lg font-bold text-primary">
-          <span class="text-primary/60">##</span> {{ t(m.now.upcoming) }}
+          <span class="text-primary/60">##</span> {{ t(labels.heading) }}
         </h2>
         <ul class="space-y-4 font-mono text-sm">
           <li v-for="event in coming" :key="event.id" class="space-y-1 border-l-2 border-accent/50 pl-4">
             <p v-if="isLive(event, at)" class="text-primary">
-              ● {{ t(m.now.live) }} · {{ t(m.now.until) }} {{ endLabel(eventEnd(event)) }}
+              ● {{ t(labels.live) }} · {{ t(labels.until) }} {{ endLabel(eventEnd(event)) }}
             </p>
             <p v-else class="text-accent">
               <time :datetime="event.start">{{ startLabel(eventStart(event)) }}</time>
@@ -98,19 +88,19 @@ const updatedLabel = computed(() =>
                 rel="noopener noreferrer"
                 class="text-primary hover:underline"
               >
-                {{ t(m.now.go) }} ↗
+                {{ t(labels.go) }} ↗
               </a>
               <button v-else type="button" class="text-primary hover:underline" @click="goTo(event.where)">
-                {{ t(m.now.go) }} →
+                {{ t(labels.go) }} →
               </button>
             </template>
           </li>
         </ul>
         <p class="flex flex-wrap gap-x-3 text-xs text-muted-foreground">
           <!-- webcal: hands the feed to the calendar app as a subscription, which re-reads it. -->
-          <a :href="`webcal://${profile.domain}/${feed}`" class="text-primary hover:underline">{{ t(m.now.subscribe) }}</a>
+          <a :href="`webcal://${profile.domain}/${feed}`" class="text-primary hover:underline">{{ t(labels.subscribe) }}</a>
           <span aria-hidden="true">·</span>
-          <a :href="`/${feed}`" download class="hover:text-primary hover:underline">{{ t(m.now.download) }}</a>
+          <a :href="`/${feed}`" download class="hover:text-primary hover:underline">{{ t(labels.download) }}</a>
         </p>
       </section>
 

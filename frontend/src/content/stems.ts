@@ -3,7 +3,10 @@ import type { Localised } from './types'
 /**
  * Tracks of Jules's, split into stems a visitor can remix in the music section (roadmap
  * §J, *Stems*). The mixer (`components/stems/`) shows only while this list has a track, so
- * it ships empty and nothing appears until there are stems to put in it.
+ * it ships empty and nothing appears until there are stems to put in it. Imported as
+ * `@/content/stems` rather than through the barrel, and kept to data: the music section
+ * reads it on the home page, and everything the mixer computes from it is in the mixer's
+ * own chunk.
  *
  * Each stem is a file under `public/stems/<track id>/`, all of one track the same length,
  * and the excerpt is what loops: a mixer holds every stem decoded at once, so a whole
@@ -43,15 +46,3 @@ export const DECODED_BYTES_PER_SECOND = 48_000 * 2 * 4
 
 /** What a track may cost once decoded, all its stems together: about what a phone tab can spare. */
 export const MAX_DECODED_BYTES = 160 * 1024 * 1024
-
-export function decodedBytes(track: Pick<StemTrack, 'seconds' | 'stems'>): number {
-  return track.seconds * DECODED_BYTES_PER_SECOND * track.stems.length
-}
-
-export function downloadBytes(track: Pick<StemTrack, 'stems'>): number {
-  return track.stems.reduce((sum, stem) => sum + stem.bytes, 0)
-}
-
-export function findStemTrack(id: string): StemTrack | undefined {
-  return stemTracks.find((track) => track.id === id)
-}

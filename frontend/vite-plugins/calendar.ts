@@ -1,5 +1,6 @@
 import type { Plugin } from 'vite'
-import { eventEnd, eventStart, eventUrl, events, feedFile, type SiteEvent } from '../src/content/events'
+import { events, feedFile, type SiteEvent } from '../src/content/events'
+import { eventEnd, eventStart, eventUrl } from '../src/content/upcoming'
 import { profile } from '../src/content/profile'
 import type { Locale, Localised } from '../src/content/types'
 

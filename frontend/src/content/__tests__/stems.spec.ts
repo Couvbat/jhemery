@@ -1,7 +1,8 @@
 import { existsSync, statSync } from 'node:fs'
 import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
-import { decodedBytes, DECODED_BYTES_PER_SECOND, downloadBytes, MAX_DECODED_BYTES, MAX_STEMS, stemTracks, type StemTrack } from '../stems'
+import { decodedBytes, downloadBytes } from '@/components/stems/load'
+import { DECODED_BYTES_PER_SECOND, MAX_DECODED_BYTES, MAX_STEMS, stemTracks, type StemTrack } from '../stems'
 
 /**
  * The stems list against the files in `public/stems/`: every stem a file that exists, the
