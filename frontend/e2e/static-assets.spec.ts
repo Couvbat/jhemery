@@ -1,4 +1,5 @@
 import { expect, test } from './fixtures'
+import { pages } from '@/content/pages'
 import { profile } from '@/content/profile'
 
 /**
@@ -116,6 +117,23 @@ test.describe('discoverability', () => {
 
     expect(sitemap).toContain(profile.domain)
     expect(robots.toLowerCase()).toContain('sitemap')
+  })
+
+  // Each public page's copy of index.html (`vite-plugins/pages.ts`), which `.htaccess`
+  // serves for its route. `vite preview` can't run that rewrite, so this checks the files
+  // it points at, and docs/deploy.md the live one. The copy must still be the app, and
+  // load the same build as index.html does.
+  test('every public page has a copy of the app that names it', async ({ request }) => {
+    const script = /<script type="module" crossorigin src="([^"]+)">/
+    const app = script.exec(await (await request.get('/')).text())?.[1]
+    expect(app).toBeTruthy()
+    for (const page of pages.filter((entry) => entry.path !== '/')) {
+      const response = await request.get(`/pages${page.path}.html`)
+      expect(response.status(), page.path).toBe(200)
+      const html = await response.text()
+      expect(script.exec(html)?.[1], page.path).toBe(app)
+      expect(html, page.path).toContain(`<link rel="canonical" href="https://${profile.domain}${page.path}">`)
+    }
   })
 
   test('the PWA manifest describes this app', async ({ request }) => {

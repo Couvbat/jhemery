@@ -1438,7 +1438,7 @@ this section only fixes the rules the code cites.
   duration of a swing. Fixed chrome lives in `App.vue`, beside `RouterView`.
 - **The tool registry is the API** (`tools/registry.ts`), exactly as §2 says of commands: the page,
   `ls tools`, `cd tools/<id>`, the `tools` command and Tab derive from one array. Metas are plain
-  data in both locales; each tool's maths lives in a pure `.ts` beside its panel and is tested in
+  data in both locales, kept apart from the panels in `content/tools.ts` so the build can read them; each tool's maths lives in a pure `.ts` beside its panel and is tested in
   jsdom. Client-side tools never send a file anywhere; the page says so once.
 - **The image tool checks its own claim** (`tools/image/metadata.ts`). Before converting, it lists
   what the file gives away; afterwards it runs the same parser on its output and shows "0 fields —

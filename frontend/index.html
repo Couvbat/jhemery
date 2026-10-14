@@ -41,23 +41,47 @@
     <meta name="twitter:image" content="https://jhemery.xyz/og-image.png">
     <meta name="twitter:image:alt" content="A terminal window reading: couvbat@portfolio:~$ whoami — Jules Hémery, Full-Stack Developer · Musician · Gamer.">
 
+    <!--
+      Structured data. WebSite is where Google takes the site name it prints above a
+      result (otherwise it guesses from the domain); Person is who the site is about.
+      The page copies in pages/ (vite-plugins/pages.ts) carry this block as it is.
+    -->
     <script type="application/ld+json">
       {
         "@context": "https://schema.org",
-        "@type": "Person",
-        "name": "Jules Hémery",
-        "alternateName": "Couvbat",
-        "jobTitle": "Full-Stack Developer",
-        "url": "https://jhemery.xyz/",
-        "email": "mailto:contact@jhemery.xyz",
-        "worksFor": {
-          "@type": "Organization",
-          "name": "In-Leed"
-        },
-        "sameAs": [
-          "https://github.com/Couvbat",
-          "https://www.linkedin.com/in/jules-h%C3%A9mery-338134195/",
-          "https://soundcloud.com/couvbat"
+        "@graph": [
+          {
+            "@type": "WebSite",
+            "@id": "https://jhemery.xyz/#website",
+            "url": "https://jhemery.xyz/",
+            "name": "Jules Hémery",
+            "alternateName": ["Couvbat", "jhemery.xyz"],
+            "inLanguage": ["en", "fr"],
+            "publisher": { "@id": "https://jhemery.xyz/#person" }
+          },
+          {
+            "@type": "Person",
+            "@id": "https://jhemery.xyz/#person",
+            "name": "Jules Hémery",
+            "alternateName": "Couvbat",
+            "jobTitle": "Full-Stack Developer",
+            "url": "https://jhemery.xyz/",
+            "email": "mailto:contact@jhemery.xyz",
+            "worksFor": {
+              "@type": "Organization",
+              "name": "In-Leed"
+            },
+            "homeLocation": {
+              "@type": "Country",
+              "name": "France"
+            },
+            "knowsLanguage": ["fr", "en"],
+            "sameAs": [
+              "https://github.com/Couvbat",
+              "https://www.linkedin.com/in/jules-h%C3%A9mery-338134195/",
+              "https://soundcloud.com/couvbat"
+            ]
+          }
         ]
       }
     </script>

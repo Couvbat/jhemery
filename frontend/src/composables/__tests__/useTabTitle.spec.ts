@@ -1,13 +1,9 @@
-import { afterEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, describe, expect, it } from 'vitest'
 import { createApp, defineComponent, h, nextTick } from 'vue'
 import { createMemoryHistory, createRouter } from 'vue-router'
 
-// The composable reads index.html's title when it loads, so it has to be there first.
-vi.hoisted(() => {
-  document.title = 'Site title'
-})
-
 import { profile, work } from '@/content'
+import { siteTitle } from '@/content/pages'
 import { setLocale } from '@/i18n'
 import { pageLabel, tabTitle, useTabTitle } from '../useTabTitle'
 
@@ -15,8 +11,16 @@ afterEach(() => setLocale('en'))
 
 describe('tabTitle', () => {
   it('keeps the site title on the home page and the 404', () => {
-    expect(tabTitle('/')).toBe('Site title')
-    expect(tabTitle('/definitely-not-a-page')).toBe('Site title')
+    expect(tabTitle('/')).toBe(siteTitle.en)
+    expect(tabTitle('/definitely-not-a-page')).toBe(siteTitle.en)
+  })
+
+  // A page's static copy opens with its own title; reaching home from it must not keep it.
+  it('does not take the site title from the document', () => {
+    document.title = `JSON formatter — ${profile.name}`
+    expect(tabTitle('/')).toBe(siteTitle.en)
+    setLocale('fr')
+    expect(tabTitle('/')).toBe(siteTitle.fr)
   })
 
   it('names the view, or the tool open inside it', () => {
@@ -96,7 +100,7 @@ describe('useTabTitle', () => {
     expect(titles).toEqual([
       `Tools & utilities — ${profile.name}`,
       `Watch party · AB3DE — ${profile.name}`,
-      'Site title',
+      siteTitle.en,
     ])
 
     app.unmount()

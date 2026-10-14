@@ -153,6 +153,7 @@ Each app has its own README for working on its code:
 | **`/now`** | What I'm doing at the moment, dated. Past 90 days old, the page says how old it is instead of passing for current. It's also `cat now.txt`, and it's a route outside the prism so the navbar stays at four faces. |
 | **`/privacy`** | Every key the site keeps in your browser, set or not: what it is for, which storage it is in and its size, in five groups (settings, progress, best scores, shell, secrets) with a clear button each. Clearing takes two presses on two different buttons, and ends in a reload, since achievements, the language and the scheme are read once at load. Below them, the service worker's caches, what `navigator.storage.estimate()` counts, and what no page can list (ffmpeg's core in the HTTP cache, the embeds' own storage). Then what leaves the browser, with `strace` as the way to check it. The list is `src/lib/storage-keys.ts`, which `du` and `rm` read too, and a test fails on any `couvbat:` key in the source that it doesn't list. Linked from the footer, so phones get it. |
 | **Printable résumé** | `/resume.html` and `/resume.fr.html`: static, script-free, with a print stylesheet, so "Save as PDF" gives a clean CV. Linked from the contact section and `resume`. |
+| **A page per route** | Each view, tool and case study, `/now` and `/privacy` is also built as a copy of `index.html` with its own title, description, canonical URL and link-preview tags, which Apache serves for that route. A search engine or a chat app's link preview reads the page it asked for, not the home page. Once the app runs it keeps the same head in step with the route, and marks the 404 `noindex`. |
 | **Case studies** | `/work/<part>`: eight parts of this site, from the vim pane and the QR encoder to the rooms and the word lists. Each has what was hard, its numbers, the code at the build's commit and its design, and most have a *try it* link and the `why` behind them. They're linked from a "How this site is built" grid in the projects section, and say the same as `projects <part>`. A test holds every number to the line of code it comes from, or marks it as measured. |
 | **Design notes** | [`/notes/`](https://jhemery.xyz/notes/): the design specs in `docs/superpowers/specs`, published as static, script-free pages by a small hand-written markdown renderer. Each one says which language it is in (one is French). `why` links into them. |
 | **X-ray mode** | `xray` (or <kbd>Ctrl</kbd>+<kbd>K</kbd>, or `?run=xray`) outlines every component on screen and tags it with its file and the files its words come from: the content modules it imports and, for the interface's own strings, `messages.ts`. Each name links to that file on GitHub at the build's commit. A component whose template is just another one reads as both (`HashTool.vue ← messages.ts › ToolFrame.vue`), a component repeated on screen is tagged once with a count (`WindowDots.vue ×3`), and the background says how many shapes it holds. The shadcn primitives (badges, buttons, cards) are left out. The build stamps a `data-src` attribute on each component's root elements, since a production build keeps no file names; the map of words is its own chunk, fetched the first time x-ray turns on, so first paint pays for the attributes alone. The tags are links placed after the page in the tab order, and nothing takes focus. <kbd>Esc</kbd>, the *exit* button or a second `xray` ends it. |
@@ -400,7 +401,8 @@ to its panel, with its own tests.
 | **`download`** | The owner's tool, and the only one with a server behind it. yt-dlp on the server turns one YouTube video or one SoundCloud track into an mp3. It runs as a *job* that the page polls, and the file is handed over once and then deleted. The tool stays hidden until `sudo -i` (or the panel's own field) unlocks it with the admin password. It never accepts a playlist, set or profile: fetching a whole profile is what got the server's IP blocked for an hour. See [deploy.md](docs/deploy.md#what-the-shell-can-run--facts-for-the-downloader). |
 
 The page, the `tools` command and Tab completion all read `src/tools/registry.ts`. Adding a tool
-means adding one object there, plus the tool's folder.
+means one entry in `src/content/tools.ts` (its name, description and keywords, which the build
+also reads to give the tool a page of its own), its panel in the registry, and the tool's folder.
 
 **Rooms.** `/watch` and `/radio` are the third and fourth faces of the prism. A room is a
 five-character code. The host pastes a YouTube link (watch) or queues SoundCloud tracks, sets and
@@ -567,7 +569,7 @@ This is a personal site, but the workflow is written down so it stays consistent
   back into `dev`. `master` is the release branch and only receives PRs from `dev`, opened by the
   owner. Dependabot targets `dev` too.
 - **The registry is the API.** A new terminal command is one object in `src/terminal/commands/`,
-  and a new tool is one entry in `src/tools/registry.ts`. `help`, Tab, the palette and `ls` pick
+  and a new tool is one entry in `src/content/tools.ts` plus its panel in `src/tools/registry.ts`. `help`, Tab, the palette and `ls` pick
   them up automatically.
 - **Every user-visible string is `Localised<{ en, fr }>`**, and every animation checks the motion
   level (`decorativeMotion()`, which `prefers-reduced-motion` holds at `paused`).

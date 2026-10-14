@@ -69,6 +69,8 @@ export interface ViewMeta {
   /** The fake shell command shown above the view's heading. */
   prompt: string
   heading: Localised
+  /** What a search result says under the title: the page's `<meta name="description">`. */
+  description: Localised
 }
 
 export interface GameEntry {
