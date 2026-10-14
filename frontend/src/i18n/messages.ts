@@ -727,6 +727,7 @@ export const messages = {
     common: { en: 'ordinary use', fr: 'usage ordinaire' },
     rare: { en: 'rarely needed', fr: 'rarement utile' },
     none: { en: 'no ordinary use', fr: 'aucun usage ordinaire' },
+    shell: { en: 'in the terminal: cat {path}', fr: 'dans le terminal : cat {path}' },
   },
   rooms: {
     introWatch: {

@@ -2,8 +2,8 @@ import type { FingerprintEnv, NavigatorLike } from './fingerprint'
 
 /**
  * The real browser, as `fingerprint.ts` takes it. Kept apart from that module so it
- * stays pure, and only ever called by the panel as it opens: importing this reads
- * nothing, and `fingerprint.spec.ts` checks no other file imports it.
+ * stays pure, and only ever called by the panel as it opens and by a `/proc/self` read:
+ * importing this reads nothing, and `fingerprint.spec.ts` checks no other file imports it.
  */
 export function browserEnvironment(): FingerprintEnv {
   const Offline =

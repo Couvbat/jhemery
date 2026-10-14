@@ -35,6 +35,24 @@ test.describe('the fingerprint tool', () => {
     expect(pageErrors).toEqual([])
   })
 
+  // jsdom proves `cat` and the panel call the same function; only a real browser proves
+  // they land on the same values, with the terminal's chunk carrying its own copy of it.
+  test('cat /proc/self prints what the panel shows', async ({ page, terminal }) => {
+    test.skip(test.info().project.name === 'mobile', 'No terminal on a phone.')
+    await page.goto('/tools/fingerprint')
+    const region = page.getByRole('region', { name: /browser fingerprint/i })
+    const value = (row: string) => region.locator(`[data-row="${row}"]`).getByTestId('fingerprint-value')
+    await expect(value('screen_size')).toHaveText(/^\d+×\d+$/)
+    const size = (await value('screen_size').textContent())!.trim()
+    const cores = (await value('cores').textContent())!.trim()
+
+    await terminal.open()
+    await terminal.run('cat /proc/self/screen')
+    await terminal.expectOutput(new RegExp(`screen_size +${size}`))
+    await terminal.run('cat /proc/self/hardware')
+    await terminal.expectOutput(new RegExp(`cores +${cores}`))
+  })
+
   test('fits a phone without scrolling sideways', async ({ page }) => {
     await page.goto('/tools/fingerprint')
     const region = page.getByRole('region', { name: /browser fingerprint/i })

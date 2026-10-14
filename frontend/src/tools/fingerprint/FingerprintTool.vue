@@ -8,6 +8,7 @@ import {
   GROUPS,
   NOT_AVAILABLE,
   ROWS,
+  SHELL_GROUPS,
   combinedHash,
   feeds,
   readLater,
@@ -87,6 +88,8 @@ const fedText = computed(() =>
     .replace('{total}', String(available.value)),
 )
 
+const inShell = (group: Group) => (SHELL_GROUPS as readonly Group[]).includes(group)
+
 const VERDICT_TONE: Record<Verdict, string> = {
   common: 'text-primary border-primary/40',
   rare: 'text-warning border-warning/40',
@@ -129,7 +132,13 @@ const VERDICT_TONE: Record<Verdict, string> = {
     </div>
 
     <div v-for="{ group, rows } in groups" :key="group" class="space-y-2">
-      <p class="text-[0.65rem] uppercase tracking-wider text-accent">{{ t(GROUPS[group]) }}</p>
+      <div class="flex items-baseline justify-between gap-2">
+        <p class="text-[0.65rem] uppercase tracking-wider text-accent">{{ t(GROUPS[group]) }}</p>
+        <!-- The shell reads the same rows from the same module; no shell on a phone (§10). -->
+        <p v-if="inShell(group)" class="hidden md:block font-mono text-[0.7rem] text-muted-foreground">
+          {{ t(m.toolFingerprint.shell).replace('{path}', `/proc/self/${group}`) }}
+        </p>
+      </div>
       <ul class="space-y-2">
         <li
           v-for="{ row, reading: got } in rows"

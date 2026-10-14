@@ -418,11 +418,11 @@ refused: it survives a reload, so `alias ls=rickroll` would be a lockout rather 
 ### navigate
 | Command | Behaviour |
 |---|---|
-| `ls [-a] [path]` | Lists sections and views as directories; `ls tools` lists the tools and `ls projects` the case studies, the one section that isn't empty. `-a` also reveals `.secret` and `.env` (§5) |
+| `ls [-a] [path]` | Lists sections and views as directories; `ls tools` lists the tools and `ls projects` the case studies, the one section that isn't empty. `-a` also reveals `.secret` and `.env` (§5). `ls /proc` and `ls /proc/self` list the `/proc` files |
 | `cd <path>` | A section scrolls there and closes the overlay, routing home first from another view; `tools`, `tools/<id>`, `watch/<code>` and `radio/<code>` go through `goTo()` (§11) |
 | `pwd` | The view plus the current section — `/home/couvbat/projects`, `/home/couvbat/tools/image` |
 | `tools [<id>]` | Lists the tools from `tools/registry.ts`, or opens one |
-| `cat <file>` | `about.txt`, `skills.txt`, `contact.txt`, `now.txt`, `projects/<id>.md`, `.secret`, `.env` |
+| `cat <file>` | `about.txt`, `skills.txt`, `contact.txt`, `now.txt`, `projects/<id>.md`, `.secret`, `.env`, `/proc/…` |
 | `diff <a> <b>` | Line diff of any two files the fake filesystem resolves |
 | `ping <section\|view>` | Four paced fake replies and an rtt summary, then `cd`s there |
 | `open <target>` | `github`, `linkedin`, `soundcloud`, `steam`, `email` — opens in a new tab |
@@ -430,6 +430,17 @@ refused: it survives a reload, so `alias ls=rickroll` would be a lockout rather 
 `diff` runs both operands through the same `resolveFileLines()` `cat` uses, then through a pure
 LCS line diff (`terminal/diff.ts`) rendered `-`/`+`/context. No dependency: the files are a few
 dozen lines each, so the O(n·m) table is cheaper than a diffing library.
+
+`/proc` needs no shaped filesystem. `resolveFileLines()` hands any `/proc/…` path to
+`commands/proc.ts`, as it already answered `/etc/shadow` by its absolute path, and `ls` asks
+`listProc()` before `shellPath()` would read `/` as home. Each file is computed when it is read.
+`version` is `uname`'s line plus `__BUILD_SHA__` and `__BUILD_TIME__`. `uptime` gives two figures:
+the seconds since `profile.since` (`uptimeSeconds()`, which `neofetch`'s days come from), and as
+idle, those less the tab's own lifetime. `loadavg` prints the presence count only if the stream is
+already open, so `strace cat /proc/loadavg` shows no request. `self/{gpu,hardware,locale,screen}`
+are `readNow()` over the fingerprint tool's `SHELL_GROUPS` (§11), whose rows are all read at once,
+because `cat` can't wait on a render. `cat` offers these paths to Tab only once the word reaches
+into `/proc/`, as it does for `projects/`.
 
 ### content
 Reads from §1, so it can never contradict the page: `about`, `skills [--why]`,
@@ -1346,7 +1357,8 @@ this section only fixes the rules the code cites.
   motion neither draws the playhead.
 - **`fingerprint` reads only when it is asked to** (`tools/fingerprint/`). `fingerprint.ts` is
   pure: the browser arrives as a `FingerprintEnv`, which `environment.ts` builds and only the
-  panel calls for (on mount and on *read again*), so the rest of the site still reads none of it.
+  panel (on mount and on *read again*) and a `/proc/self` read (§3) call for, so the rest of the
+  site still reads none of it.
   Rows read at once (`readNow`) are kept apart from those that render or ask (`readLater`: the
   canvas, the audio and the high-entropy client hints), and a read that throws is *not
   available*, never an error. **No uniqueness score**: an honest one needs population

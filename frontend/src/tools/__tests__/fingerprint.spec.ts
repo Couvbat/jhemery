@@ -359,12 +359,12 @@ describe('what the tool never does', () => {
     },
   )
 
-  // The site reads these only when the panel asks: the real browser is handed over in
-  // one place, and only the panel may call for it.
-  it('hands the real browser only to the panel', () => {
+  // The site reads these only when the panel or `/proc/self` asks: the real browser is
+  // handed over in one place, and only those two may call for it.
+  it('hands the real browser only to the panel and /proc', () => {
     const callers = sources(SRC)
       .filter((path) => /fingerprint\/environment'|\.\/environment'/.test(readFileSync(path, 'utf8')))
       .map((path) => relative(SRC, path))
-    expect(callers.sort()).toEqual(['tools/fingerprint/FingerprintTool.vue'])
+    expect(callers.sort()).toEqual(['terminal/commands/proc.ts', 'tools/fingerprint/FingerprintTool.vue'])
   })
 })

@@ -3,13 +3,14 @@ import { digest, digestText, toHex } from '../hash/hash'
 
 /**
  * What any page can read about a browser without a permission prompt, row by row, and
- * what each value is for.
+ * what each value is for. The panel and the shell's `/proc/self` files both read from
+ * here, so `cat /proc/self/gpu` and the page cannot disagree about a value.
  *
  * Pure: the browser comes in as a `FingerprintEnv` (`environment.ts` builds the real
  * one), so the specs hand it fakes, and nothing is read until a function here is called.
- * The site reads none of this anywhere else: the panel opening is the only time it
- * happens. Nothing here sends anything anywhere, and `fingerprint.spec.ts` holds the
- * folder to that.
+ * The site reads none of this anywhere else: the panel opening or a `/proc/self` file
+ * being read is the only time it happens. Nothing here sends anything anywhere, and
+ * `fingerprint.spec.ts` holds the folder to that.
  *
  * There is deliberately no uniqueness score. An honest one needs to know how many other
  * browsers share each value, which this site doesn't, and "1 in 200 000" without that is
@@ -91,6 +92,12 @@ export const GROUPS: Record<Group, Localised> = {
   gpu: { en: 'Graphics', fr: 'Graphisme' },
   render: { en: 'Renders', fr: 'Rendus' },
 }
+
+/**
+ * The groups the shell has a `/proc/self/<group>` file for, in `ls` order. `cat` can't
+ * wait on a render, so every row in them is read at once; `proc.spec.ts` holds them to it.
+ */
+export const SHELL_GROUPS = ['gpu', 'hardware', 'locale', 'screen'] as const satisfies readonly Group[]
 
 /** What a row reads as when this browser doesn't give it — on the page and in the shell. */
 export const NOT_AVAILABLE: Localised = { en: 'not available', fr: 'non disponible' }
