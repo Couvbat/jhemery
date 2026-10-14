@@ -68,8 +68,9 @@ tools, watch-party and radio rooms, and 38 hidden achievements. English and Fren
   a guestbook and a self-hosted LLM behind `ask`. Every integration degrades gracefully when it's
   switched off.
 - 🔒 **Privacy by construction.** Presence is one anonymous integer (and `wall`'s wave carries
-  nothing at all), stats count sessions rather than commands, `ask` logs nothing, analytics are
-  self-hosted and cookieless. `strace <cmd>` shows every request a command makes and the shape of
+  nothing at all), stats count sessions rather than commands, `ask` logs how long it took and
+  whether it worked but never the question or the answer, and analytics are self-hosted and
+  cookieless. `strace <cmd>` shows every request a command makes and the shape of
   what it carries, never a value. [`/privacy`](https://jhemery.xyz/privacy), or `du ~` in the
   shell, lists every key the site keeps in your browser and what it is for, and clears them a
   group at a time.

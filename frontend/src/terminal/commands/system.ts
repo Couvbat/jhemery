@@ -376,16 +376,29 @@ async function cacheLines(t: CommandContext['t']): Promise<OutputLine[]> {
   return out
 }
 
-/** `-s`, `-h`, or both in one word: the flags `du -sh ~` habits type. */
-function duFlags(args: readonly string[]): { summary: boolean; operands: string[]; bad?: string } {
-  let summary = false
+/**
+ * Flags and operands, as GNU's getopt reads them for `du` and `rm`: the letters in `known`,
+ * one to a word or clustered (`-sh`, `-rf`), anywhere on the line until `--`, after which
+ * every word is an operand; a lone `-` is one too. The error is in GNU's words, for the
+ * first thing it doesn't know: a long option whole, a cluster by its first unknown letter.
+ */
+function getopt(name: string, args: readonly string[], known: string): { flags: string; operands: string[]; error?: OutputLine } {
+  let flags = ''
   const operands: string[] = []
-  for (const arg of args) {
-    if (/^-[sh]+$/.test(arg)) summary ||= arg.includes('s')
-    else if (arg.startsWith('-') && arg !== '-') return { summary, operands, bad: arg }
-    else operands.push(arg)
+  for (const [i, arg] of args.entries()) {
+    if (arg === '--') {
+      operands.push(...args.slice(i + 1))
+      break
+    }
+    if (arg === '-' || !arg.startsWith('-')) operands.push(arg)
+    else if (arg.startsWith('--')) return { flags, operands, error: fail(`${name}: unrecognized option '${arg}'`) }
+    else {
+      const unknown = [...arg.slice(1)].find((letter) => !known.includes(letter))
+      if (unknown) return { flags, operands, error: fail(`${name}: invalid option -- '${unknown}'`) }
+      flags += arg.slice(1)
+    }
   }
-  return { summary, operands }
+  return { flags, operands }
 }
 
 const du: Command = {
@@ -420,10 +433,14 @@ const du: Command = {
   // Reads storage and the caches, and prints only the visitor's own data back to them.
   writes: 'none',
   linkable: true,
-  complete: ({ index }) => (index < MAX_OPERANDS ? ['-s', '-h', ...homeAndGroups()] : []),
+  // `-sh` is how fingers type it, and the form the README gives, so a link may carry it
+  // too. It is offered once typed and not before, so `-s` and Tab still lands on `-s`.
+  complete: ({ index, word }) =>
+    index < MAX_OPERANDS ? ['-s', '-h', ...(['-sh', '-hs'].includes(word) ? [word] : []), ...homeAndGroups()] : [],
   async run({ args, t }) {
-    const { summary, operands, bad } = duFlags(args)
-    if (bad) return [fail(`du: invalid option -- '${bad.replace(/^-+/, '')}'`)]
+    const { flags, operands, error } = getopt('du', args, 'sh')
+    if (error) return [error]
+    const summary = flags.includes('s')
     const items = storedItems()
     const words = operands.length ? operands : ['~']
     const out: OutputLine[] = []
@@ -495,15 +512,12 @@ const rm: Command = {
   writes: 'local',
   complete: ({ index }) => (index < MAX_OPERANDS ? [...homeAndGroups(), ...new Set(storedItems().map((item) => shortName(item.key)))] : []),
   async run({ args, t, print }) {
-    const flags = args.filter((a) => /^-[rRf]+$/.test(a)).join('')
-    const unknown = args.find((a) => a.startsWith('-') && a !== '-' && !/^-[rRf]+$/.test(a))
-    if (unknown) {
-      return [fail(unknown.startsWith('--') ? `rm: unrecognized option '${unknown}'` : `rm: invalid option -- '${unknown.replace(/^-+/, '')}'`)]
-    }
+    const { flags, operands, error } = getopt('rm', args, 'rRf')
+    if (error) return [error]
     const recursive = /[rR]/.test(flags)
     const force = flags.includes('f')
-    const operands = args.filter((a) => !/^-[rRf]+$/.test(a))
-    if (!operands.length) return [fail('rm: missing operand'), line("Try 'rm --help' for more information.", 'muted')]
+    // GNU's `rm -f` with nothing to remove has nothing to say either.
+    if (!operands.length) return force ? [] : [fail('rm: missing operand'), line("Try 'rm --help' for more information.", 'muted')]
 
     const items = storedItems()
     const out: OutputLine[] = []
@@ -548,8 +562,10 @@ const rm: Command = {
       ),
     )
     // Printed now, because the command never returns: `reloadPage` doesn't settle, so the
-    // shell never writes this line back into the history it just cleared.
-    print(out)
+    // shell never writes this line back into the history it just cleared. As remarks
+    // (`stderr`), which reach the screen from the left of a `|` too: no next stage ever
+    // reads what a command that doesn't return wrote, and the page is about to go.
+    print(out.map((l) => ({ ...l, stderr: true })))
     await reloadPage()
   },
 }

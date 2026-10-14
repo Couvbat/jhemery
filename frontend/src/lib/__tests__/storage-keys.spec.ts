@@ -3,12 +3,15 @@ import { join, relative } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import {
   NAMESPACE,
+  RELOAD_PAUSE_MS,
   STORAGE_GROUPS,
   STORAGE_KEYS,
   cachePurpose,
   cacheReport,
   entryFor,
   groupOf,
+  onStorageChange,
+  reloadPage,
   removeItems,
   shortName,
   storedItems,
@@ -171,6 +174,81 @@ describe('reading what is stored', () => {
     })
     sessionStorage.setItem('couvbat:sudo', 'pw')
     expect(storedItems().map((i) => i.key)).toEqual(['couvbat:sudo'])
+  })
+})
+
+describe('watching what is stored', () => {
+  const { setItem, removeItem, clear } = Storage.prototype
+  afterEach(() => {
+    localStorage.clear()
+    sessionStorage.clear()
+  })
+
+  it('hears this tab’s writes, once a batch, and another tab’s', async () => {
+    const heard = vi.fn()
+    const stop = onStorageChange(heard)
+    // A scheme and the achievement it counts towards: one action, one call, after both.
+    localStorage.setItem('couvbat:theme', 'dracula')
+    localStorage.setItem('couvbat:achievements:themes', '["dracula"]')
+    expect(heard).not.toHaveBeenCalled()
+    await Promise.resolve()
+    expect(heard).toHaveBeenCalledTimes(1)
+
+    sessionStorage.removeItem('couvbat:sudo')
+    await Promise.resolve()
+    localStorage.clear()
+    await Promise.resolve()
+    window.dispatchEvent(new StorageEvent('storage', { key: 'couvbat:locale' }))
+    await Promise.resolve()
+    expect(heard).toHaveBeenCalledTimes(4)
+    stop()
+  })
+
+  it('puts the mutators back once nobody listens', async () => {
+    const first = vi.fn()
+    const second = vi.fn()
+    const stopFirst = onStorageChange(first)
+    const stopSecond = onStorageChange(second)
+    stopFirst()
+    localStorage.setItem('couvbat:locale', 'fr')
+    await Promise.resolve()
+    expect(first).not.toHaveBeenCalled()
+    expect(second).toHaveBeenCalledTimes(1)
+
+    stopSecond()
+    expect(Storage.prototype.setItem).toBe(setItem)
+    expect(Storage.prototype.removeItem).toBe(removeItem)
+    expect(Storage.prototype.clear).toBe(clear)
+    localStorage.setItem('couvbat:locale', 'en')
+    window.dispatchEvent(new StorageEvent('storage', { key: 'couvbat:locale' }))
+    await Promise.resolve()
+    expect(second).toHaveBeenCalledTimes(1)
+  })
+})
+
+describe('the reload after a clear', () => {
+  const reload = vi.fn()
+  beforeEach(() => {
+    vi.useFakeTimers()
+    vi.stubGlobal('location', { ...window.location, reload })
+    reload.mockClear()
+  })
+  afterEach(() => {
+    vi.useRealTimers()
+    vi.unstubAllGlobals()
+  })
+
+  // `rm`'s line goes into history once the command returns, and history is written
+  // whole: a reload that settled would put the cleared history back before the page went.
+  it('waits, reloads, and never settles', async () => {
+    let settled = false
+    void reloadPage().finally(() => (settled = true))
+    await vi.advanceTimersByTimeAsync(RELOAD_PAUSE_MS - 1)
+    expect(reload).not.toHaveBeenCalled()
+    await vi.advanceTimersByTimeAsync(1)
+    expect(reload).toHaveBeenCalledTimes(1)
+    await vi.runAllTimersAsync()
+    expect(settled).toBe(false)
   })
 })
 

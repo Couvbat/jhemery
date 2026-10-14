@@ -44,8 +44,12 @@ export const STORAGE_GROUPS: { id: StorageGroup; label: Localised }[] = [
   { id: 'secrets', label: { en: 'secrets', fr: 'secrets' } },
 ]
 
-/** A key under the namespace that nothing on the list owns: an older version of the site left it. */
-export const STALE_LABEL: Localised = { en: 'left by an older version', fr: 'laissées par une version précédente' }
+/**
+ * A key under the namespace that nothing on the list owns: an older version of the site left
+ * it. A noun, like the other labels, because it is read after `clear` on the page's button
+ * as well as on its own as a heading.
+ */
+export const STALE_LABEL: Localised = { en: 'leftovers from an older version', fr: 'restes d’une version précédente' }
 export const STALE_PURPOSE: Localised = {
   en: 'no longer read by anything; `rm -rf ~` clears it',
   fr: 'plus rien ne la lit ; `rm -rf ~` l’efface',
@@ -261,6 +265,62 @@ export function storedItems(): StoredItem[] {
 /** The group a stored item is cleared with; a stale key has none of its own. */
 export function groupOf(item: StoredItem): StorageGroup | 'stale' {
   return item.entry?.group ?? 'stale'
+}
+
+const listeners = new Set<() => void>()
+let unwrap: (() => void) | undefined
+let queued = false
+
+function changed(): void {
+  if (queued) return
+  queued = true
+  queueMicrotask(() => {
+    queued = false
+    for (const listener of [...listeners]) listener()
+  })
+}
+
+function wrapMutators(): () => void {
+  const proto = Storage.prototype
+  const { setItem, removeItem, clear } = proto
+  proto.setItem = function (key: string, value: string) {
+    setItem.call(this, key, value)
+    changed()
+  }
+  proto.removeItem = function (key: string) {
+    removeItem.call(this, key)
+    changed()
+  }
+  proto.clear = function () {
+    clear.call(this)
+    changed()
+  }
+  window.addEventListener('storage', changed)
+  return () => {
+    Object.assign(proto, { setItem, removeItem, clear })
+    window.removeEventListener('storage', changed)
+  }
+}
+
+/**
+ * Calls `onChange` after a write to either storage, from this tab or another, until the
+ * returned function is called. Another tab's write fires `storage`, but nothing tells a page
+ * about its own, and the owners on the list write their keys themselves, a dozen modules of
+ * them. So for as long as anyone listens, the three mutators all of them go through are
+ * wrapped, and put back after. The call waits a microtask: the several writes of one action
+ * (a scheme, and the achievement it counts towards) make one call, after the last of them,
+ * and never in the middle of the writer's own code.
+ */
+export function onStorageChange(onChange: () => void): () => void {
+  if (typeof window === 'undefined' || typeof Storage === 'undefined') return () => {}
+  listeners.add(onChange)
+  unwrap ??= wrapMutators()
+  return () => {
+    listeners.delete(onChange)
+    if (listeners.size) return
+    unwrap?.()
+    unwrap = undefined
+  }
 }
 
 /** Removes each item, and returns the ones that went. Never throws. */

@@ -1,9 +1,10 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue'
+import { computed, onMounted, ref, shallowRef } from 'vue'
 import { RouterLink } from 'vue-router'
 import { profile } from '@/content'
 import type { Localised } from '@/content/types'
 import CodeText from '@/components/CodeText.vue'
+import { useStoredItems } from '@/composables/useStoredItems'
 import { useLocale } from '@/i18n'
 import {
   EMBEDS_NOTE,
@@ -38,8 +39,11 @@ interface Row {
   item?: StoredItem
 }
 
-// Read once. Nothing on this page writes, and a clear ends in a reload.
-const items = storedItems()
+const live = useStoredItems()
+// Held once a clear starts, until the reload: the rows go on showing what went, and a
+// cleared stale group doesn't vanish from under its own "Cleared" note.
+const held = shallowRef<StoredItem[] | null>(null)
+const items = computed(() => held.value ?? live.value)
 
 /**
  * Every key on the list, set or not: the page is the disclosure, so a key the visitor
@@ -48,9 +52,9 @@ const items = storedItems()
  */
 const groups = computed(() => {
   const listed: { id: Group; label: Localised }[] = [...STORAGE_GROUPS]
-  if (items.some((item) => !item.entry)) listed.push({ id: 'stale', label: STALE_LABEL })
+  if (items.value.some((item) => !item.entry)) listed.push({ id: 'stale', label: STALE_LABEL })
   return listed.map(({ id, label }) => {
-    const stored = items.filter((item) => groupOf(item) === id)
+    const stored = items.value.filter((item) => groupOf(item) === id)
     const area = (a: 'local' | 'session') => (a === 'local' ? 'localStorage' : 'sessionStorage') as Row['area']
     const rows: Row[] =
       id === 'stale'
@@ -78,9 +82,22 @@ function toggle(group: Group) {
   armed.value = armed.value === group ? null : group
 }
 
+/**
+ * Escape disarms from either button. The confirm goes with it, so focus moves to the
+ * group's own button first, rather than falling to `<body>` with the button it was on.
+ */
+function disarm(event: KeyboardEvent) {
+  if (!armed.value) return
+  const own = (event.currentTarget as HTMLElement).querySelector('button')
+  own?.focus()
+  armed.value = null
+}
+
 async function clear(group: Group) {
-  removeItems(items.filter((item) => groupOf(item) === group))
+  held.value = items.value
   clearing.value = true
+  // Storage as it is now, not the rows: the button says the group, so all of it goes.
+  removeItems(storedItems().filter((item) => groupOf(item) === group))
   await reloadPage()
 }
 
@@ -122,7 +139,7 @@ const claims = computed(() => [m.privacy.presence, m.privacy.stats, m.privacy.as
             <span class="text-xs text-muted-foreground">
               {{ t(m.privacy.stored).replace('{n}', String(group.stored.length)).replace('{size}', formatBytes(group.bytes)) }}
             </span>
-            <div class="ml-auto flex flex-wrap gap-2" @keydown.esc="armed = null">
+            <div class="ml-auto flex flex-wrap gap-2" @keydown.esc="disarm">
               <button
                 type="button"
                 class="px-3 py-1 rounded border border-border text-xs text-foreground hover:border-primary hover:text-primary transition-colors disabled:opacity-50 disabled:pointer-events-none"

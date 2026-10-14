@@ -73,7 +73,8 @@ describe('du', () => {
     expect(text).toContain('the language you picked')
     expect(text).toContain('["ls","theme dracula"]')
     expect(text).toMatch(/^best scores · localStorage$/m)
-    expect(text).toMatch(/^left by an older version · localStorage$/m)
+    // A noun, as the others are: the page's button reads `clear <label>`.
+    expect(text).toMatch(/^leftovers from an older version · localStorage$/m)
     // Nothing outside the namespace is the site's to report.
     expect(text).not.toContain('umami')
   })
@@ -121,20 +122,40 @@ describe('du', () => {
     const missing = await runCommand(du(), ['nope'])
     expect(missing.lines[0]).toMatchObject({ text: "du: cannot access 'nope': No such file or directory", stderr: true })
     expect((await runCommand(du(), ['-x'])).lines[0]).toMatchObject({ text: "du: invalid option -- 'x'", stderr: true })
+    // GNU's words: a cluster by its first unknown letter, a long option whole.
+    expect((await runCommand(du(), ['-sx', '~'])).text).toBe("du: invalid option -- 'x'")
+    expect((await runCommand(du(), ['--summarize'])).text).toBe("du: unrecognized option '--summarize'")
+  })
+
+  it('reads -- as the end of the options', async () => {
+    seed()
+    expect((await runCommand(du(), ['-s', '--', 'scores'])).text).toBe('6 B      scores')
+    expect((await runCommand(du(), ['--', '~'])).text).toContain('7 keys, 64 B')
   })
 
   it('speaks French', async () => {
     seed()
     const { text } = await runCommand(du(), ['~'], { locale: 'fr' })
     expect(text).toMatch(/^réglages · localStorage$/m)
+    expect(text).toMatch(/^restes d’une version précédente · localStorage$/m)
     expect(text).toContain('la langue choisie')
     expect(text).toContain(`<secret, ${PASSWORD.length} octets>`)
   })
 
   it('writes nothing, and a link may run it', () => {
     expect(writesOf(du())).toBe('none')
-    for (const args of [[], ['~'], ['-s', '~'], ['scores']]) expect(isLinkable(du(), args), args.join(' ')).toBe(true)
+    // `-sh` too: the README's own example, and how the fingers type it.
+    for (const args of [[], ['~'], ['-s', '~'], ['-sh', '~'], ['-hs', 'scores'], ['scores']]) {
+      expect(isLinkable(du(), args), args.join(' ')).toBe(true)
+    }
     expect(isLinkable(du(), ['your', 'data', 'is', 'gone'])).toBe(false)
+    expect(isLinkable(du(), ['-shx', '~'])).toBe(false)
+  })
+
+  it('offers -sh once typed, so -s and Tab still lands on -s', () => {
+    const offered = (word: string) => du().complete!({ args: [word], index: 0, word }).filter((c) => c.startsWith(word))
+    expect(offered('-s')).toEqual(['-s'])
+    expect(offered('-sh')).toEqual(['-sh'])
   })
 })
 
@@ -230,7 +251,20 @@ describe('rm', () => {
     expect((await runCommand(rm(), ['aliases'])).text).toBe("rm: cannot remove 'aliases': No such file or directory")
     // The files `cat` reads are the site's.
     expect((await runCommand(rm(), ['about.txt'])).text).toBe("rm: cannot remove 'about.txt': Permission denied")
+    // GNU's `rm -f` with no operand at all says nothing either.
+    expect((await runCommand(rm(), ['-f'])).lines).toEqual([])
     expect(reload.page).not.toHaveBeenCalled()
+  })
+
+  it('reads options as GNU’s getopt does', async () => {
+    seed()
+    expect((await runCommand(rm(), ['-rx', 'history'])).text).toBe("rm: invalid option -- 'x'")
+    expect((await runCommand(rm(), ['--force', 'history'])).text).toBe("rm: unrecognized option '--force'")
+    expect(namespaced()).toEqual(SEEDED)
+    // `--` ends them, and a flag after an operand is still a flag.
+    expect((await runCommand(rm(), ['--', 'history'])).text).toContain("removed 'couvbat:history'")
+    expect((await runCommand(rm(), ['nope', '-f'])).lines).toEqual([])
+    expect(reload.page).toHaveBeenCalledTimes(1)
   })
 
   it('completes ~, the groups and the keys that are set', () => {
@@ -242,10 +276,14 @@ describe('rm', () => {
 })
 
 // Last: the line never settles, as in a browser, so the shell stays busy afterwards.
+// `storage-keys.spec.ts` holds the real `reloadPage` to that.
 describe('rm in the shell', () => {
+  beforeEach(() => {
+    reload.page.mockImplementation(() => new Promise<never>(() => {}))
+  })
+
   it('doesn’t let the shell write the cleared history back', async () => {
     const { buffer } = useTerminal()
-    reload.page.mockImplementation(() => new Promise<never>(() => {}))
     history.value = ['ls', 'neofetch']
     localStorage.setItem('couvbat:history', JSON.stringify(history.value))
     void submit('rm -rf ~')
@@ -253,5 +291,18 @@ describe('rm in the shell', () => {
     await new Promise((settle) => setTimeout(settle, 20))
     expect(localStorage.getItem('couvbat:history')).toBeNull()
     expect(reload.page).toHaveBeenCalledTimes(1)
+  })
+
+  // The next stage would never read it: `rm` doesn't return, and the page is about to go.
+  it('says what it removed from the left of a pipe too', async () => {
+    const { buffer } = useTerminal()
+    const from = buffer.value.length
+    localStorage.setItem('couvbat:games:snake', '12')
+    void submit('rm games:snake | cat')
+    const printed = () => buffer.value.slice(from).map((l) => l.text)
+    await vi.waitFor(() => expect(reload.page).toHaveBeenCalledTimes(1))
+    expect(localStorage.getItem('couvbat:games:snake')).toBeNull()
+    expect(printed()).toContain("removed 'couvbat:games:snake'")
+    expect(printed()).toContainEqual(expect.stringContaining('1 key, 2 B cleared. Reloading'))
   })
 })
