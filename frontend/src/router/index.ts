@@ -45,6 +45,13 @@ const router = createRouter({
       component: () => import('../views/NowView.vue'),
     },
     {
+      // What the site keeps in the visitor's browser, and what it sends. Outside the prism
+      // like /now, and linked from the footer, so a phone, which has no `du`, gets it too.
+      path: '/privacy',
+      name: 'privacy',
+      component: () => import('../views/PrivacyView.vue'),
+    },
+    {
       // The case studies (content/work.ts). Like /now, not a face of the prism: they are
       // reached from the projects section, and `viewIndex()` puts them after the faces.
       path: '/work/:id',

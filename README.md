@@ -70,7 +70,9 @@ tools, watch-party and radio rooms, and 38 hidden achievements. English and Fren
 - 🔒 **Privacy by construction.** Presence is one anonymous integer (and `wall`'s wave carries
   nothing at all), stats count sessions rather than commands, `ask` logs nothing, analytics are
   self-hosted and cookieless. `strace <cmd>` shows every request a command makes and the shape of
-  what it carries, never a value.
+  what it carries, never a value. [`/privacy`](https://jhemery.xyz/privacy), or `du ~` in the
+  shell, lists every key the site keeps in your browser and what it is for, and clears them a
+  group at a time.
 - 📄 **One source for the CV.** `curl jhemery.xyz` returns an ANSI-coloured résumé (and
   `curl jhemery.xyz/help` the shell's other pages), and
   `/resume.html` a printable one in either language, both generated at build time from the same
@@ -147,6 +149,7 @@ Each app has its own README for working on its code:
 | **Status ticker** | The footer shows the uptime `neofetch` reports (days since the first commit), how long ago this build shipped, and whether I'm open to work. It refreshes slowly, so a tab left open stays accurate. |
 | **Skills with evidence** | Under the skill badges, `skills --why` links each claim to where it's actually used: SSE to the presence stream and the watch parties, WebAssembly to the ffmpeg tool, GraphQL to the heatmap. Skills with nothing to show stay plain badges. |
 | **`/now`** | What I'm doing at the moment, dated. Past 90 days old, the page says how old it is instead of passing for current. It's also `cat now.txt`, and it's a route outside the prism so the navbar stays at four faces. |
+| **`/privacy`** | Every key the site keeps in your browser, set or not: what it is for, which storage it is in and its size, in five groups (settings, progress, best scores, shell, secrets) with a clear button each. Clearing takes two presses on two different buttons, and ends in a reload, since achievements, the language and the scheme are read once at load. Below them, the service worker's caches, what `navigator.storage.estimate()` counts, and what no page can list (ffmpeg's core in the HTTP cache, the embeds' own storage). Then what leaves the browser, with `strace` as the way to check it. The list is `src/lib/storage-keys.ts`, which `du` and `rm` read too, and a test fails on any `couvbat:` key in the source that it doesn't list. Linked from the footer, so phones get it. |
 | **Printable résumé** | `/resume.html` and `/resume.fr.html`: static, script-free, with a print stylesheet, so "Save as PDF" gives a clean CV. Linked from the contact section and `resume`. |
 | **Case studies** | `/work/<part>`: eight parts of this site, from the vim pane and the QR encoder to the rooms and the word lists. Each has what was hard, its numbers, the code at the build's commit and its design, and most have a *try it* link and the `why` behind them. They're linked from a "How this site is built" grid in the projects section, and say the same as `projects <part>`. A test holds every number to the line of code it comes from, or marks it as measured. |
 | **Design notes** | [`/notes/`](https://jhemery.xyz/notes/): the design specs in `docs/superpowers/specs`, published as static, script-free pages by a small hand-written markdown renderer. Each one says which language it is in (one is French). `why` links into them. |
@@ -230,6 +233,8 @@ never show two different contents.
 | `wc` | | `wc [-l -w -c] [file]`: lines, words and bytes |
 | `sort` · `uniq` | | `sort [-r -n -u]`, `uniq [-c]`: sort lines; fold neighbouring repeats |
 | `strace` | | `strace <command>`: run a command and list the requests it made (`GET /weather = 200 · 1.10 kB · 84 ms`), with the keys of each body and never their values. `strace ls` prints just what `ls` does |
+| `du` | | `du [-s] [-h] [~\|<group>\|<key>]`: every key the site keeps in this browser, with its size, its value (the admin password and a room's host token only as `<secret, N bytes>`) and what it is for; then the service worker's caches and the browser's estimate. `du -sh ~` is the total |
+| `rm` | | `rm [-r] [-f] <key\|group\|~>`: clear one key (`rm history`), a group (`rm scores`), or with `rm -rf ~` everything, then reload. Never from a link. `rm -rf /` gets GNU's failsafe; `sudo rm -rf /` still gets the joke |
 | `exit` | `quit`, `logout` | Close the terminal |
 
 </details>

@@ -321,6 +321,8 @@ Grouped as they appear in `help`.
 | `alias` / `unalias` | Session-persistent command renames, expanded before anything else parses the line |
 | `sha256sum` (aliases `sha1sum`, `sha512sum`) · `base64 [-d]` · `uuidgen` · `jq .` | The shell versions of the hash, encode and JSON tools, each importing the pure module its panel uses. A fake-filesystem name is read as that file, other text as literal text, and with no argument they read what a `\|` hands them |
 | `strace <command>` | Runs the command inside itself (`ctx.run`, so without the visitor's aliases) and then lists the non-background requests made meanwhile, as `GET /weather = 200 · 1.10 kB · 84 ms` with the shapes of the bodies below, and `+++ exited with 0 +++`. No request, no trailer, so `strace ls` is `ls`. Its `writes` is the traced command's, so `?run=strace sign x` is refused like `sign x`; `strace strace` is refused |
+| `du [-s] [-h] [~\|<group>\|<key>]` | Every `couvbat:` key in both storages, by group: size, value and purpose, a secret (`couvbat:sudo`, a room token) as `<secret, N bytes>` and a stale key as its size only. For `~`, then the Cache Storage caches with file counts and sizes, `navigator.storage.estimate()`, and the two things no page can list (§6). `writes: 'none'`, linkable, and out of the curl pages, since its output is the visitor's |
+| `rm [-r] [-f] <key\|group\|~>` | Removes a key, a group, or with `-r ~` the whole namespace, prints each `removed '…'`, then reloads after 1.5 s through `reloadPage()`, which never settles, so the shell can't write the cleared history back after the line. `~` without `-r` is a directory, `-r /` gets GNU's failsafe, and a fake file is `Permission denied`. `writes: 'local'`. `sudo rm -rf /` never reaches it: `sudo` parses its own arguments |
 | `exit` (aliases `quit`, `logout`) | Closes the overlay |
 
 **Colour schemes.** `theme` offers the site's own neon (*cyberpunk*, the default) and the palettes
@@ -832,6 +834,19 @@ shapes are the accent colour; clicking one of those is the `cyanSpotter` achieve
 - **Availability and `/now`** — the footer's status line also carries `profile.availability`
   (a filled or hollow dot and the note) and links `/now`, a route outside the prism
   (`views/NowView.vue`, `content/now.ts`). Past 90 days the page says how old the list is.
+- **What the site keeps** (`lib/storage-keys.ts`, `views/PrivacyView.vue`) — every key the site
+  writes, with its storage, group, owner, purpose and whether it is a secret, in one list that
+  `du`, `rm` and `/privacy` all read. `storage-keys.spec.ts` reads the source for every `couvbat:`
+  string, a template's head included, and fails on one the list lacks, on a row whose owner no
+  longer writes its key, on any other module touching either storage, and on any cookie or
+  IndexedDB use in the app's code (Workbox's expiry database for `async-chunks` is the one, and
+  both surfaces say so). `/privacy` is a route outside the prism, linked from the footer: the
+  list with a clear button per group (two presses on two buttons, the first turning into Cancel
+  in place), the service worker's caches and the browser's estimate, and two things no page can
+  list: the ffmpeg core in the HTTP cache, and the embeds' storage under their own origins. Then
+  the privacy claims, each one the code keeps, with `strace` as the way to check them. Caches are
+  reported, never cleared: they hold the site's own files, and a clear would only cost a
+  download.
 - **`/ctf`** — the 404 page recognises the path `robots.txt` "disallows" and says it is a command,
   not a page.
 - **Screensaver** (`composables/useIdle.ts`) — three idle minutes with the tab visible fade every
@@ -1281,7 +1296,7 @@ this section only fixes the rules the code cites.
   The leaving face is `inert` from the `<Transition>`'s `leave` to its removal, so in every frame
   exactly one `<main>` can be reached; and `settled`, a counter bumped when a swing ends or the
   pages swap, is what `usePageFocus` waits on (§9).
-- **Pages outside the prism.** `/now` and `/work/<id>` are routes but not views: they are reached
+- **Pages outside the prism.** `/now`, `/privacy` and `/work/<id>` are routes but not views: they are reached
   from links, not the navbar, so the prism keeps its four faces, and `viewIndex()` puts them after
   the faces so a swing to one still has a direction. `cd` doesn't reach them, because
   `resolvePath` is shared by four callers. Each names itself in `tabTitle()`.

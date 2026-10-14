@@ -13,6 +13,7 @@
 - [Plain-text résumé](https://jhemery.xyz/resume.txt): Full CV as plain text — also what `curl jhemery.xyz` returns
 - [Printable résumé](https://jhemery.xyz/resume.html): The CV as a static page, also in [French](https://jhemery.xyz/resume.fr.html)
 - [Now](https://jhemery.xyz/now): What Jules is doing at the moment, dated
+- [Privacy](https://jhemery.xyz/privacy): Every key the site keeps in a visitor's browser and what it is for, with a clear button per group, and what the site sends and doesn't
 - [Site content as JSON](https://jhemery.xyz/content.json): Profile, experience, education, skills and projects as data
 - [Contact](https://jhemery.xyz/#contact): Contact form and direct email/social links
 
