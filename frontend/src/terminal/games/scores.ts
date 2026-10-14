@@ -30,6 +30,11 @@ const GAMES: Record<GameId, { key: string; better: 'higher' | 'lower' }> = {
   connect4: { key: 'couvbat:games:connect4', better: 'higher' },
 }
 
+/** Whether `name` is a game's own name: every game has a row here, scored or not. */
+export function isGame(name: string): name is GameId {
+  return Object.hasOwn(GAMES, name)
+}
+
 export function isLowerBetter(game: GameId): boolean {
   return GAMES[game].better === 'lower'
 }
@@ -107,16 +112,28 @@ function readDaily(): Record<string, DailyResult> {
   }
 }
 
+/** `wordle.ts`'s board, repeated rather than imported, which would bring the word lists' loaders along. */
+const WORD_LENGTH = 5
+const ROWS = 6
+
+/**
+ * Whether a stored record is one the game could have written: at most six guesses of five
+ * letters, a five-mark row for each, and a won or done flag that agrees with them. Anything
+ * else reads as no record. A save link (`lib/save-file.ts`) lets a visitor restore this key
+ * from someone else's code, and a record that passed a looser check could break the resumed
+ * board or `wordle share` for the rest of the day.
+ */
 function isDaily(value: unknown): value is DailyResult {
   const v = value as DailyResult | null
-  return (
-    !!v &&
-    typeof v.day === 'string' &&
-    Array.isArray(v.guesses) &&
-    Array.isArray(v.marks) &&
-    typeof v.done === 'boolean' &&
-    typeof v.won === 'boolean'
-  )
+  if (!v || typeof v !== 'object' || typeof v.day !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(v.day)) return false
+  if (typeof v.done !== 'boolean' || typeof v.won !== 'boolean') return false
+  if (!Array.isArray(v.guesses) || !Array.isArray(v.marks) || v.guesses.length > ROWS) return false
+  if (v.marks.length !== v.guesses.length) return false
+  const word = (guess: unknown) => typeof guess === 'string' && [...guess].length === WORD_LENGTH && !/\s/.test(guess)
+  const row = (mark: unknown) => typeof mark === 'string' && new RegExp(`^[hnm]{${WORD_LENGTH}}$`).test(mark)
+  if (!v.guesses.every(word) || !v.marks.every(row)) return false
+  const won = v.marks.at(-1) === 'h'.repeat(WORD_LENGTH)
+  return v.won === won && v.done === (won || v.guesses.length === ROWS)
 }
 
 /** The saved daily for `locale`, or null if there is none for `day`. */

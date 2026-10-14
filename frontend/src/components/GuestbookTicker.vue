@@ -40,6 +40,7 @@ function openGuestbook() {
   if (visible.value) dismissGuestbookEntry(visible.value.id)
   clearTimeout(timer)
   visible.value = null
+  // On a phone this is the touch layout, running it as a link would (`openTerminal`).
   openTerminal('guestbook')
 }
 

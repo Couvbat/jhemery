@@ -12,6 +12,7 @@ import {
   completeCommand,
   filterByPrefix,
   argsOffered,
+  isCommandWord,
   isLinkable,
   isServerBound,
   resolve,
@@ -36,6 +37,7 @@ import {
   terminalCapturing,
   terminalOpen as open,
   terminalTrapped as trapped,
+  touchLayout,
 } from './useTerminalShell'
 import { goTo } from './useViewSwing'
 import { setCrt, glitch } from './useCrt'
@@ -79,16 +81,29 @@ watch(keyCapture, (handler) => {
 let abortController: AbortController | null = null
 /** Bumped on every append so the view knows to scroll. */
 const revision = ref(0)
+/**
+ * How many lines have left the buffer's head, to MAX_LINES or to `clear`. Added to an
+ * index it numbers a line for good, which is how the view finds where a batch of output
+ * began once the head has moved under it: a full buffer's length no longer changes.
+ */
+let dropped = 0
+
+/** The buffer becomes `lines`, less what MAX_LINES trims from their head. */
+function keep(lines: OutputLine[]) {
+  dropped += Math.max(0, lines.length - MAX_LINES)
+  buffer.value = lines.slice(-MAX_LINES)
+}
 
 function append(input: OutputLine | OutputLine[] | string) {
   const incoming: OutputLine[] =
     typeof input === 'string' ? [{ text: input }] : Array.isArray(input) ? input : [input]
 
-  buffer.value = [...buffer.value, ...incoming].slice(-MAX_LINES)
+  keep([...buffer.value, ...incoming])
   revision.value += 1
 }
 
 function clearBuffer() {
+  dropped += buffer.value.length
   buffer.value = []
   revision.value += 1
 }
@@ -101,7 +116,7 @@ function openFrame(): (input: OutputLine[]) => void {
 
   return (input: OutputLine[]) => {
     const kept = buffer.value.slice(0, Math.max(0, buffer.value.length - height))
-    buffer.value = [...kept, ...input].slice(-MAX_LINES)
+    keep([...kept, ...input])
     // A frame taller than the whole buffer keeps only its own tail.
     height = Math.min(input.length, MAX_LINES)
     revision.value += 1
@@ -253,7 +268,8 @@ function localeOf(env: Record<string, string>): Locale | undefined {
 
 function notATty(raw: string): Error {
   const name = raw.trim().split(/\s+/)[0] ?? ''
-  return new Error(`${name}: ${messages.terminal.notATty[currentLocale()]}`)
+  const reason = touchLayout.value ? messages.tapShell.notATty : messages.terminal.notATty
+  return new Error(`${name}: ${reason[currentLocale()]}`)
 }
 
 function buildContext(args: string[], raw: string, scope: Scope, stdin?: OutputLine[]): CommandContext {
@@ -342,10 +358,12 @@ async function runNested(input: string, scope: Scope, stdin?: OutputLine[]): Pro
 /**
  * Whether `name`, read with the word after it, is a command. An alias never shadows
  * one: run and Tab completion both ask this, so they can't disagree about what a
- * line will run.
+ * line will run. Nor the first word of a two-word one (`git` of `git log`), which `alias`
+ * already refuses to define: a stored alias of that name, restored from someone else's save,
+ * would otherwise run whatever it says when the visitor types the word on its own.
  */
 function namesCommand(name: string, next?: string): boolean {
-  return resolve(name) !== undefined || (next !== undefined && resolve(`${name} ${next}`) !== undefined)
+  return isCommandWord(name) || (next !== undefined && resolve(`${name} ${next}`) !== undefined)
 }
 
 // ---------------------------------------------------------------------------
@@ -418,7 +436,9 @@ async function runPipeline(stages: ResolvedStage[], signal: AbortSignal): Promis
     const sink = last ? screen() : collector()
     // Each stage starts with the keyboard free: a stage before it can't leave a handler.
     keyCapture.value = null
-    const scope: Scope = { signal, sink, tty: last, locale: localeOf(stage.env) }
+    // In the touch layout nobody can type at any stage, the last one included: a game
+    // answers "not a tty" rather than holding a keyboard the phone hasn't shown.
+    const scope: Scope = { signal, sink, tty: last && !touchLayout.value, locale: localeOf(stage.env) }
     // `--help` as the very first argument, and only there: `projects --json` and
     // `echo hi --help` mean what they always meant.
     if (stage.args[0] === '--help') {
@@ -842,7 +862,7 @@ export function primeOverlay() {
   if (buffer.value.length === 0) {
     append([
       { text: messages.terminal.welcome[currentLocale()], tone: 'primary' },
-      { text: messages.terminal.hint[currentLocale()], tone: 'muted' },
+      { text: (touchLayout.value ? messages.tapShell.hint : messages.terminal.hint)[currentLocale()], tone: 'muted' },
       { text: '' },
     ])
   }
@@ -871,6 +891,8 @@ export function useTerminal() {
     handleCaptureKeydown,
     buffer: computed(() => buffer.value),
     revision: computed(() => revision.value),
+    /** Lines gone from the buffer's head so far; read on a `revision`, not watched. */
+    dropped: () => dropped,
     pendingPrompt: computed(() => pendingPrompt.value),
     history: computed(() => history.value),
     primeOverlay,

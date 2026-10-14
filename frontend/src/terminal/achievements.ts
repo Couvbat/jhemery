@@ -352,7 +352,19 @@ const SECTIONS_KEY = 'couvbat:achievements:sections'
 const THEMES_KEY = 'couvbat:achievements:themes'
 const knownIds = new Set(achievementList.map((a) => a.id))
 
-export const unlocked = ref<Set<string>>(loadSet(ACHIEVEMENTS_KEY))
+/**
+ * The unlocked set as stored, trusting none of it: a save link (`lib/save-file.ts`) can
+ * restore this key from someone else's code. Ids that are no achievement are dropped, or
+ * the count would read 39/38. A set holding every other achievement but not the last one
+ * gets it here, since only a new unlock cascades into it and there would be none left.
+ */
+function loadUnlocked(): Set<string> {
+  const ids = new Set([...loadSet(ACHIEVEMENTS_KEY)].filter((id) => knownIds.has(id)))
+  if (!ids.has(COMPLETIONIST) && achievementList.every((a) => a.id === COMPLETIONIST || ids.has(a.id))) ids.add(COMPLETIONIST)
+  return ids
+}
+
+export const unlocked = ref<Set<string>>(loadUnlocked())
 const visitedSections = ref<Set<string>>(loadSet(SECTIONS_KEY))
 const triedThemes = ref<Set<string>>(loadSet(THEMES_KEY))
 
@@ -398,16 +410,20 @@ export function unlockedCount(): number {
   return unlocked.value.size
 }
 
-/** Marks a section as visited by `cd`; unlocks `explorer` once every section has been. */
+/**
+ * Marks a section as visited by `cd`; unlocks `explorer` once every section has been.
+ * Checked on every visit, not only a new one, as `tryTheme` does: a stored list that
+ * already holds every section without the achievement (a restored save can) would
+ * otherwise never reach the check.
+ */
 export function visitSection(id: string, allSectionIds: readonly string[]): string[] {
-  if (visitedSections.value.has(id)) return []
-
-  const next = new Set(visitedSections.value)
-  next.add(id)
-  visitedSections.value = next
-  persist(SECTIONS_KEY, next)
-
-  return allSectionIds.every((sectionId) => next.has(sectionId)) ? unlock('explorer') : []
+  if (!visitedSections.value.has(id)) {
+    const next = new Set(visitedSections.value)
+    next.add(id)
+    visitedSections.value = next
+    persist(SECTIONS_KEY, next)
+  }
+  return allSectionIds.every((sectionId) => visitedSections.value.has(sectionId)) ? unlock('explorer') : []
 }
 
 /** How many different schemes make a ricer: enough to mean it, few enough to reach by hand. */

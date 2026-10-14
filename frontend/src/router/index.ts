@@ -4,11 +4,14 @@ import { decorativeMotion } from '../composables/useMotion'
 
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
-  scrollBehavior(to) {
+  scrollBehavior(to, from) {
     if (to.hash) {
       // Jumps with motion paused, as `scrollToSection` does.
       return { el: to.hash, behavior: decorativeMotion() === 'paused' ? 'auto' : 'smooth' }
     }
+    // The same page with another query: `?lang=` or `?run=` taken out of the address.
+    // The visitor hasn't gone anywhere, so the page stays where it was.
+    if (from.matched.length && to.path === from.path) return false
     return { top: 0 }
   },
   routes: [
@@ -43,6 +46,26 @@ const router = createRouter({
       path: '/now',
       name: 'now',
       component: () => import('../views/NowView.vue'),
+    },
+    {
+      // What the site keeps in the visitor's browser, and what it sends. Outside the prism
+      // like /now, and linked from the footer, so a phone, which has no `du`, gets it too.
+      path: '/privacy',
+      name: 'privacy',
+      component: () => import('../views/PrivacyView.vue'),
+    },
+    {
+      // The mentions légales and the credits, beside /privacy in the footer and outside
+      // the prism for the same reason.
+      path: '/legal',
+      name: 'legal',
+      component: () => import('../views/LegalView.vue'),
+    },
+    {
+      // The disclosure policy (content/security.ts), outside the prism like /privacy.
+      path: '/security',
+      name: 'security',
+      component: () => import('../views/SecurityView.vue'),
     },
     {
       // The case studies (content/work.ts). Like /now, not a face of the prism: they are

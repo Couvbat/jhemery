@@ -189,10 +189,16 @@ export function newDailyGame(words: WordleWords, locale: Locale, day: string): W
 }
 
 /** Replays guesses already made today onto a fresh daily board — how a daily
- *  survives a closed tab without handing out a second set of six rows. */
+ *  survives a closed tab without handing out a second set of six rows. A guess the board
+ *  refuses is dropped rather than left in the row being typed, where a stored one too long
+ *  to type over would jam the board for the day. */
 export function resumeDaily(state: WordleState, guesses: readonly string[]): WordleState {
   let next = state
-  for (const guess of guesses) next = submit({ ...next, current: guess }).state
+  for (const guess of guesses) {
+    if (next.status !== 'playing') break
+    const result = submit({ ...next, current: guess })
+    if (!result.refused) next = result.state
+  }
   return next
 }
 

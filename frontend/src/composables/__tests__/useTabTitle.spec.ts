@@ -1,13 +1,9 @@
-import { afterEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, describe, expect, it } from 'vitest'
 import { createApp, defineComponent, h, nextTick } from 'vue'
 import { createMemoryHistory, createRouter } from 'vue-router'
 
-// The composable reads index.html's title when it loads, so it has to be there first.
-vi.hoisted(() => {
-  document.title = 'Site title'
-})
-
 import { profile, work } from '@/content'
+import { siteTitle } from '@/content/site'
 import { setLocale } from '@/i18n'
 import { pageLabel, tabTitle, useTabTitle } from '../useTabTitle'
 
@@ -15,8 +11,16 @@ afterEach(() => setLocale('en'))
 
 describe('tabTitle', () => {
   it('keeps the site title on the home page and the 404', () => {
-    expect(tabTitle('/')).toBe('Site title')
-    expect(tabTitle('/definitely-not-a-page')).toBe('Site title')
+    expect(tabTitle('/')).toBe(siteTitle.en)
+    expect(tabTitle('/definitely-not-a-page')).toBe(siteTitle.en)
+  })
+
+  // A page's static copy opens with its own title; reaching home from it must not keep it.
+  it('does not take the site title from the document', () => {
+    document.title = `JSON formatter — ${profile.name}`
+    expect(tabTitle('/')).toBe(siteTitle.en)
+    setLocale('fr')
+    expect(tabTitle('/')).toBe(siteTitle.fr)
   })
 
   it('names the view, or the tool open inside it', () => {
@@ -36,6 +40,20 @@ describe('tabTitle', () => {
     expect(tabTitle('/work/qr')).toBe(`${work.find((p) => p.id === 'qr')!.name.en} — ${profile.name}`)
     // An unknown part still names the page it is on, which says so in its body.
     expect(tabTitle('/work/nope')).toBe(`How this site is built — ${profile.name}`)
+  })
+
+  it('names /privacy, in both languages', () => {
+    expect(tabTitle('/privacy')).toBe(`What this site keeps — ${profile.name}`)
+    expect(pageLabel('/privacy')).toBe(`What this site keeps — ${profile.name}`)
+    setLocale('fr')
+    expect(tabTitle('/privacy')).toBe(`Ce que ce site garde — ${profile.name}`)
+  })
+
+  it('names /legal, in both languages', () => {
+    expect(tabTitle('/legal')).toBe(`Legal notice — ${profile.name}`)
+    expect(pageLabel('/legal')).toBe(`Legal notice — ${profile.name}`)
+    setLocale('fr')
+    expect(tabTitle('/legal')).toBe(`Mentions légales — ${profile.name}`)
   })
 
   it('follows the locale', () => {
@@ -89,7 +107,7 @@ describe('useTabTitle', () => {
     expect(titles).toEqual([
       `Tools & utilities — ${profile.name}`,
       `Watch party · AB3DE — ${profile.name}`,
-      'Site title',
+      siteTitle.en,
     ])
 
     app.unmount()

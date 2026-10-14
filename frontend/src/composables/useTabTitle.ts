@@ -1,6 +1,7 @@
 import { watchEffect } from 'vue'
 import { useRoute } from 'vue-router'
 import { findWork, profile, viewFor } from '@/content'
+import { siteTitle } from '@/content/site'
 import { useLocale } from '@/i18n'
 import { resolvePath } from './useViewSwing'
 
@@ -13,15 +14,18 @@ import { resolvePath } from './useViewSwing'
  * and tools → watch → home ended on "Watch party". A title that is a function of the
  * route has no lifetimes to overlap.
  *
- * index.html's own title — the one the crawlers and the OG tags describe — is read
- * before any view can touch it, and stays the home page's and the 404's.
+ * The home page and the 404 keep the site's own title, which index.html carries too. It
+ * comes from the content rather than `document.title`: a page's static copy
+ * (`vite-plugins/pages.ts`) opens with that page's title, and the home page reached from
+ * `/tools/json` would have kept it.
  */
-const siteTitle = document.title
-
-export function tabTitle(path: string, home: string = siteTitle): string {
+export function tabTitle(path: string): string {
   const { t, m } = useLocale()
   // Routes outside the prism have no view, so they name themselves.
   if (/^\/now\/?$/.test(path)) return `${t(m.now.heading)} — ${profile.name}`
+  if (/^\/privacy\/?$/.test(path)) return `${t(m.privacy.heading)} — ${profile.name}`
+  if (/^\/legal\/?$/.test(path)) return `${t(m.legal.heading)} — ${profile.name}`
+  if (/^\/security\/?$/.test(path)) return `${t(m.security.heading)} — ${profile.name}`
   const study = /^\/work\/([^/]+)\/?$/.exec(path)
   if (study) {
     const part = findWork(study[1]!)
@@ -29,7 +33,7 @@ export function tabTitle(path: string, home: string = siteTitle): string {
   }
 
   const view = viewFor(path)
-  if (!view || view.id === 'home') return home
+  if (!view || view.id === 'home') return t(siteTitle)
 
   // A tool that does not exist, or a code that is not one, resolves to nothing — the
   // page says so in its body, and the tab still names the view.
@@ -48,7 +52,7 @@ export function tabTitle(path: string, home: string = siteTitle): string {
  */
 export function pageLabel(path: string): string {
   const { t, m } = useLocale()
-  const outside = /^\/(now|work\/[^/]+)\/?$/.test(path)
+  const outside = /^\/(now|privacy|legal|security|work\/[^/]+)\/?$/.test(path)
   if (!outside && !viewFor(path)) return `${t(m.notFound.label)} — ${profile.name}`
   return tabTitle(path)
 }

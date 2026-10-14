@@ -3,6 +3,10 @@
  *  Ctrl+C lands within a frame instead of at the end of the animation. */
 export function sleep(ms: number, signal?: AbortSignal): Promise<void> {
   return new Promise((resolve, reject) => {
+    // Cancelled before the wait began, while the command was busy with something that
+    // doesn't take the signal: an abort that already fired never fires again, so the
+    // listener below would wait out the whole delay and the command carry on after it.
+    if (signal?.aborted) return reject(abortError())
     const id = window.setTimeout(resolve, ms)
     signal?.addEventListener(
       'abort',

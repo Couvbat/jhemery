@@ -29,7 +29,7 @@ Getting this wrong is quiet rather than loud: `src/lib/api.ts` falls back to an 
 curl -s https://jhemery.xyz/$(curl -s https://jhemery.xyz/ | grep -oE '/assets/[^"]+\.js' | head -1) | grep -o 'https://api[^"]*'
 ```
 
-Unlike the backend, the frontend deploys to the document root itself, so `--delete` has no subdirectory to be scoped to. Anything living there that the build doesn't produce — `.env`, `.well-known` (AutoSSL's ACME challenges), `cgi-bin`, `error_log` — has to be named in the rsync's `--exclude` list or it gets removed on the next deploy.
+Unlike the backend, the frontend deploys to the document root itself, so `--delete` has no subdirectory to be scoped to. Anything living there that the build doesn't produce — `.env`, `.well-known` (AutoSSL's ACME challenges), `cgi-bin`, `error_log` — has to be named in the rsync's `--exclude` list or it gets removed on the next deploy. The exclude also keeps anything the build puts in `.well-known/` from uploading, which is why `security.txt` is built at the root and `.htaccess` answers `/.well-known/security.txt` from it.
 
 ### Backend directory layout
 
@@ -115,7 +115,7 @@ Building locally instead — a `frontend/.env` on your machine, then deploying t
 
 ### Analytics: the self-hosted Umami at umami.jhemery.xyz
 
-Traffic goes to a self-hosted [Umami](https://umami.is) instance rather than to a third party. It is cookieless and stores only aggregates, so it needs no consent banner and nothing personal leaves the visitor's browser.
+Traffic goes to a self-hosted [Umami](https://umami.is) instance rather than to a third party. It is cookieless and stores only aggregates, so it needs no consent banner and nothing personal leaves the visitor's browser. The CNIL's exemption for audience measurement still asks that a visitor can refuse, so `/privacy` has a button that does: it sets `couvbat:analytics`, after which [frontend/src/lib/analytics.ts](../frontend/src/lib/analytics.ts) never injects the tracker, and `umami.disabled` beside it, Umami's own switch, which silences a tracker already running in any tab. If you keep your own visits out with `umami.disabled` set by hand, the site leaves that value alone.
 
 The tracker is injected by [frontend/src/lib/analytics.ts](../frontend/src/lib/analytics.ts), not hardcoded in `index.html`, and it is configured by three build-time variables — same mechanism as `VITE_API_URL` above, same caveat about a `.env` on the server being inert:
 
@@ -208,6 +208,8 @@ curl -sI https://jhemery.xyz/neofetch        # text/plain, Vary: User-Agent, Acc
 curl -s -H 'Accept-Language: fr' https://jhemery.xyz/neofetch   # the French page
 curl -sI -A 'Mozilla/5.0' https://jhemery.xyz/about             # text/html: a browser still gets the SPA
 curl -sI https://jhemery.xyz/ | grep -i vary   # Vary: User-Agent, since / is the résumé to curl
+curl -s https://jhemery.xyz/.well-known/security.txt   # the file, not index.html: Contact, Expires…
+curl -sI https://jhemery.xyz/events.ics        # text/calendar
 ```
 
 **Actions** tab → open the run → expand each step. Failures are almost always a wrong or missing secret rather than a workflow bug:
@@ -307,13 +309,15 @@ Setup, if you want this path ready before you need it:
 
 ## Apache config
 
-[frontend/public/.htaccess](../frontend/public/.htaccess) is copied into `dist/` by the build and deployed with everything else — but only because [frontend-build.yml](../.github/workflows/frontend-build.yml) sets `include-hidden-files: true` on the artifact upload. `actions/upload-artifact@v4` drops dotfiles by default, and with `.htaccess` missing from the artifact the deploy's `rsync --delete` removes the copy on the server too. The symptom is easy to misread: the site builds, deploys and renders fine, but deep links 404 and `curl jhemery.xyz` returns HTML instead of the résumé. It needs `mod_rewrite` only — no `mod_proxy` — so it works on o2switch shared hosting. It does seven things:
+[frontend/public/.htaccess](../frontend/public/.htaccess) is copied into `dist/` by the build and deployed with everything else — but only because [frontend-build.yml](../.github/workflows/frontend-build.yml) sets `include-hidden-files: true` on the artifact upload. `actions/upload-artifact@v4` drops dotfiles by default, and with `.htaccess` missing from the artifact the deploy's `rsync --delete` removes the copy on the server too. The symptom is easy to misread: the site builds, deploys and renders fine, but deep links 404 and `curl jhemery.xyz` returns HTML instead of the résumé. It needs `mod_rewrite` only — no `mod_proxy` — so it works on o2switch shared hosting. It does eight things:
 
 - **SPA fallback.** Vue Router uses `createWebHistory`, so every non-file request is handed to `index.html`. Without this, a hard refresh on any path other than `/` 404s before Vue Router ever sees the URL.
 - **Design notes.** `/notes/` serves `notes/index.html` and `/notes/<slug>` serves `notes/<slug>.html`, the static pages [vite-plugins/notes.ts](../frontend/vite-plugins/notes.ts) emits from the specs. An unknown slug has no file, so it falls through to the SPA's 404 page. After a deploy that touches them, check `curl -sI https://jhemery.xyz/notes/ctf-flag-chain` answers `200` with `text/html`.
+- **A page per route.** `/tools/json` serves `pages/tools/json.html`, a copy of `index.html` with that page's title, description, canonical URL and link-preview tags, which [vite-plugins/pages.ts](../frontend/vite-plugins/pages.ts) emits for every public page. Its French URL, `/tools/json?lang=fr`, serves `pages/fr/tools/json.html`, and `/?lang=fr` serves `pages/fr/index.html`. The French rules come before the English one, which would otherwise answer first. The rules come after the curl pages, so `curl jhemery.xyz/tools` still gets text. A path with no copy, such as a room code or the 404, falls through to `index.html`. After a deploy, check `curl -s -A 'Mozilla/5.0' https://jhemery.xyz/tools/json | grep canonical` names `/tools/json`, not `/`, and that the same request with `?lang=fr` names `/tools/json?lang=fr`. If either names `/`, its rule isn't running and those pages are filed under the home page again.
 - **`curl jhemery.xyz` → the ANSI résumé.** Matches on `User-Agent` at the site root and serves `resume.txt`, generated at build time by [vite-plugins/resume.ts](../frontend/vite-plugins/resume.ts). The same rule covers LLM crawlers, which would otherwise fetch an empty `<div id="app">`.
-- **Charset.** `UTF-8` by default, and explicitly for `.txt` so the résumé's box-drawing characters survive.
-- **Caching.** Hashed assets are `immutable` for a year. `index.html`, everything the résumé plugin emits (`resume.txt`, `resume.html`, `resume.fr.html`, `resume.css`, and `content.json`, which the backend's MCP endpoint reads) and the design notes are `no-cache`, so a deploy takes effect immediately.
+- **`security.txt`.** `/.well-known/security.txt` is rewritten to the `security.txt` that [vite-plugins/security.ts](../frontend/vite-plugins/security.ts) emits at the root, since the deploy never uploads `.well-known/` (see above). Its `Expires` is half a year after the build, so a site that goes that long without a frontend deploy starts reporting an expired policy, which is the honest answer by then.
+- **Charset.** `UTF-8` by default, and explicitly for `.txt` so the résumé's box-drawing characters survive, and for the `.ics` calendar feeds, which are also typed `text/calendar`.
+- **Caching.** Hashed assets are `immutable` for a year. `index.html` and the pages' copies of it, everything the résumé plugin emits (`resume.txt`, `resume.html`, `resume.fr.html`, `resume.css`, and `content.json`, which the backend's MCP endpoint reads) and the design notes are `no-cache`, so a deploy takes effect immediately.
 - **WebAssembly.** An explicit `application/wasm` type (so the 32 MB ffmpeg core compiles while streaming) and deflate for it, since cPanel's compression switch only covers text types.
 - **Security headers.** HSTS (no `preload`, deliberately), `X-Frame-Options`, `nosniff`, `Referrer-Policy`, a deny-all `Permissions-Policy` and the Content-Security-Policy. Each CSP source is commented with the feature that needs it — the Umami origin, `'wasm-unsafe-eval'` for the ffmpeg tool, `blob:` in `img-src` and `media-src` for the tools' local previews, the YouTube and SoundCloud `frame-src` for the rooms and the music player. Adding an origin there should mean adding a dependency.
 

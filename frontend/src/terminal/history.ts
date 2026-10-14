@@ -4,12 +4,15 @@ const STORAGE_KEY = 'couvbat:history'
 /** How many entries have been dropped off the front, so `history` numbers stay put (`!57` is 57). */
 const BASE_KEY = 'couvbat:history:base'
 const MAX_ENTRIES = 100
+/** Far past any line typed by hand. A save link can restore this key from someone else's code. */
+const MAX_LINE = 4096
 
 function load(): string[] {
   if (typeof window === 'undefined') return []
   try {
     const parsed: unknown = JSON.parse(window.localStorage.getItem(STORAGE_KEY) ?? '[]')
-    return Array.isArray(parsed) ? parsed.filter((v): v is string => typeof v === 'string') : []
+    if (!Array.isArray(parsed)) return []
+    return parsed.filter((v): v is string => typeof v === 'string' && v.length <= MAX_LINE).slice(-MAX_ENTRIES)
   } catch {
     return []
   }
@@ -19,7 +22,9 @@ function loadBase(): number {
   if (typeof window === 'undefined') return 0
   try {
     const n = Number(window.localStorage.getItem(BASE_KEY))
-    return Number.isInteger(n) && n > 0 ? n : 0
+    // A line is dropped per line typed past the hundredth, so a billion is out of reach by
+    // hand, and keeps `base + i + 1` exact: past 2^53 two lines would print the same number.
+    return Number.isSafeInteger(n) && n > 0 && n <= 1e9 ? n : 0
   } catch {
     return 0
   }

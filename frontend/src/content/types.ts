@@ -8,6 +8,9 @@
 
 export type Locale = 'en' | 'fr'
 
+/** The query parameter a page's URL names its language with: `?lang=fr` (`content/site.ts`). */
+export const LANG_PARAM = 'lang'
+
 /** A value that differs per locale. Facts (specs, URLs, tech names) stay plain. */
 export interface Localised<T = string> {
   en: T

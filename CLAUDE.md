@@ -100,6 +100,14 @@ mirrored rather than shared (`backend/src/mcp/mcp.types.ts`), with the backend r
 new `version`, and a backend that accepts both the old and the new one: the two apps deploy from
 the same push in no fixed order.
 
+The same goes for what crawlers read. `content/pages.ts` lists every public page with its title
+and description (build-only: the app keeps just the paths and URLs, in `content/site.ts`, because
+the Lighthouse byte budget is nearly spent), and `vite-plugins/pages.ts` writes each a copy of the
+built `index.html` with its own head, per language (`pages/<path>.html`, `pages/fr/<path>.html`), which `.htaccess` serves for
+that route. `vite-plugins/discovery.ts` generates `sitemap.xml` and `llms.txt` (prose in
+`llms.template.md`, CTF stage 7 included). A new route, tool or case study is listed by adding it
+to the content, not by editing a file in `public/`.
+
 `docs/superpowers/specs/` is build input too: `vite-plugins/notes.ts` publishes each spec as a
 static page at `/notes/<slug>` through a hand-written markdown renderer that fails the build on any
 construct it doesn't know. So a spec edit can break `npm run build`, and the frontend build and
@@ -114,7 +122,9 @@ and every section header consume it.
 `useLocale()` → `{ locale, t, m, setLocale, toggleLocale }`. Any user-visible string is a
 `Localised<T> = { en, fr }` resolved with `t()`; UI chrome strings live in `src/i18n/messages.ts`,
 content strings in `src/content/`. Facts (tech names, URLs, specs) stay plain strings.
-`currentLocale()` is the non-reactive read for code outside a `setup()`.
+`currentLocale()` is the non-reactive read for code outside a `setup()`. A page's French URL is
+its path with `?lang=fr` (`pageUrl()` in `content/site.ts`), read once as the app loads; links
+inside the app stay bare paths, and `usePageMeta` drops the parameter when the visitor switches.
 
 ### Terminal: the registry is the API
 

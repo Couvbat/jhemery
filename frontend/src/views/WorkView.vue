@@ -5,7 +5,7 @@ import { findDecision, findWork, profile, work } from '@/content'
 import CodeText from '@/components/CodeText.vue'
 import { useLocale } from '@/i18n'
 import { docUrl, isNote, sourceUrl } from '@/lib/source'
-import { designLabel, figure, triesPath, tryHref } from '@/terminal/work'
+import { designLabel, figure, triesOnPhone, triesPath, tryHref } from '@/terminal/work'
 
 // A route prop rather than `useRoute()`: the face that turns away during the prism swing
 // keeps its own id, where the app-wide route would already be the next page's and flip
@@ -62,9 +62,14 @@ const decisions = computed(() => (part.value?.decisions ?? []).flatMap((id) => f
             </RouterLink>
             <template v-else>
               <!-- A `?run=` link is read when a page loads, so this one loads the page; below
-                   md there is no terminal to read it, so the command is only named. -->
-              <a :href="tryHref(part.try)" class="hidden md:inline text-primary hover:underline">{{ t(m.work.tryIt) }} → {{ part.try }}</a>
-              <span class="md:hidden text-muted-foreground"
+                   md it runs in the touch layout, unless it is a game, which needs a keyboard
+                   the touch layout hasn't got: that one is only named there. -->
+              <a
+                :href="tryHref(part.try)"
+                :class="['text-primary hover:underline', triesOnPhone(part.try) ? '' : 'hidden md:inline']"
+                >{{ t(m.work.tryIt) }} → {{ part.try }}</a
+              >
+              <span v-if="!triesOnPhone(part.try)" class="md:hidden text-muted-foreground"
                 >{{ t(m.work.tryIt) }} → <code class="text-foreground">{{ part.try }}</code>, {{ t(m.work.tryWide) }}</span
               >
             </template>
@@ -86,9 +91,8 @@ const decisions = computed(() => (part.value?.decisions ?? []).flatMap((id) => f
           <p v-if="decisions.length" class="text-muted-foreground">
             {{ t(m.work.decisions) }}:
             <template v-for="(decision, i) in decisions" :key="decision.id">
-              <!-- `why` in the terminal where there is one; its design note where there isn't. -->
-              <a :href="tryHref(`why ${decision.id}`)" class="hidden md:inline text-accent hover:underline">why {{ decision.id }}</a
-              ><a :href="docUrl(decision.source)" class="md:hidden text-accent hover:underline">{{ t(decision.topic) }}</a
+              <!-- `why` in the terminal, at every width: below md, in the touch layout. -->
+              <a :href="tryHref(`why ${decision.id}`)" class="text-accent hover:underline">why {{ decision.id }}</a
               ><span v-if="i < decisions.length - 1">, </span>
             </template>
           </p>

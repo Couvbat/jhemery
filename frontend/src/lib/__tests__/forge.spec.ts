@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { contrastRatio, parseColour, rgbToOklch } from '@/lib/colour'
 import { EXPORT_FORMATS, exportScheme, forgeScheme } from '../forge'
-import { meetsFloors } from '../themeRules'
+import { checkFloors, meetsFloors } from '../themeRules'
 import { CUSTOM_THEME, findTheme, themes } from '../themes'
 
 const HEX = /^#[0-9a-f]{6}$/
@@ -12,6 +12,22 @@ const ratio = (a: string, b: string) => contrastRatio(parseColour(a)!, parseColo
 /** Seeds across the wheel and the awkward ends of it: near-black, near-white, grey, and
  *  the syntaxes the colour tool reads. */
 const SEEDS = ['#d65d0e', '#00ff41', '#1e66f5', '#ff79c6', '#fabd2f', '#111111', '#fafafa', '#808080', 'rgb(46 160 67)', 'oklch(0.7 0.15 300)', 'hsl(190 80% 45%)']
+
+// `useTheme` refuses a stored scheme whose body or muted text misses its floor, since a save
+// link can restore someone else's. That is only safe if no forge ever makes one: held here
+// across the whole cube of seeds, in both modes.
+it('never forges text the stored-scheme check would refuse', () => {
+  const levels = [0, 36, 73, 109, 146, 182, 219, 255]
+  const hex = (n: number) => n.toString(16).padStart(2, '0')
+  for (const r of levels)
+    for (const g of levels)
+      for (const b of levels)
+        for (const mode of ['dark', 'light'] as const) {
+          const seed = `#${hex(r)}${hex(g)}${hex(b)}`
+          const misses = checkFloors(forgeScheme(seed, mode)!.theme.colours).filter((miss) => /^(foreground|muted) /.test(miss))
+          expect(misses, `${seed} ${mode}`).toEqual([])
+        }
+})
 
 describe('forgeScheme', () => {
   describe.each(SEEDS.flatMap((seed) => (['dark', 'light'] as const).map((mode) => [seed, mode] as const)))(

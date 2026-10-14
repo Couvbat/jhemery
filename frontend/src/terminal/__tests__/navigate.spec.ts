@@ -1,6 +1,13 @@
-import { beforeEach, describe, expect, it } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
+
+// Motion held at paused, the floor the OS setting sets, so `ping` replies without pacing.
+vi.mock('@/composables/useCrt', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@/composables/useCrt')>()),
+  prefersReducedMotion: () => true,
+}))
+
 import type { Localised } from '@/content/types'
-import { work } from '@/content'
+import { profile, work } from '@/content'
 import { activeView } from '@/composables/useViewSwing'
 import { tools, visibleTools } from '@/tools/registry'
 import { navigateCommands } from '../commands/navigate'
@@ -90,11 +97,55 @@ describe('cd', () => {
     }
   })
 
+  it('takes back the path pwd prints', async () => {
+    const printed = (await run('pwd')).text[0]!
+    expect((await run('cd', printed)).ctx.navigated).toEqual(['about'])
+
+    const { ctx, text } = await run('cd', `/home/${profile.handle}/tools/image`)
+    expect(ctx.navigated).toEqual(['tools/image'])
+    expect(text[0]).toBe('~/tools/image')
+  })
+
+  it('reads .. against where you are, and stops at home', async () => {
+    activeView.value = 'tools'
+    expect((await run('cd', '..')).ctx.navigated).toEqual([''])
+    expect((await run('cd', '../projects')).ctx.navigated).toEqual(['projects'])
+    expect((await run('cd', '../../..')).ctx.navigated).toEqual([''])
+  })
+
+  it('names what it was given when the path leads nowhere', async () => {
+    for (const target of [`/home/someone/projects`, '../nope']) {
+      const { ctx, out } = await run('cd', target)
+      expect(ctx.navigated).toEqual([])
+      expect(out[0]).toMatchObject({ tone: 'error', text: `cd: ${target}: No such file or directory` })
+    }
+  })
+
   it('reports a target the shell could not reach', async () => {
     const ctx = context(['tools'])
     ctx.navigate = () => false
     const out = (await command('cd').run(ctx)) as OutputLine[]
     expect(out[0]?.tone).toBe('error')
+  })
+})
+
+describe('ping', () => {
+  // It resolves a path to name the host, then goes there. Both have to read the same
+  // path, or `ping ..` prints four replies from a host it then fails to reach.
+  it('goes to the path it pinged, read as cd reads it', async () => {
+    activeView.value = 'tools'
+    expect((await run('ping', '..')).ctx.navigated).toEqual([''])
+    expect((await run('ping', '../projects')).ctx.navigated).toEqual(['projects'])
+    expect((await run('ping', `/home/${profile.handle}/tools/image`)).ctx.navigated).toEqual([
+      'tools/image',
+    ])
+  })
+
+  it('credits no visit to a section the shell could not reach', async () => {
+    const ctx = context(['projects'])
+    ctx.navigate = () => false
+    await command('ping').run(ctx)
+    expect(window.localStorage.getItem('couvbat:achievements:sections')).toBeNull()
   })
 })
 
@@ -132,6 +183,12 @@ describe('ls', () => {
     expect(cat.complete!({ args: ['projects/'], index: 0, word: 'projects/' })).toEqual(
       expect.arrayContaining(work.map((p) => `projects/${p.id}.md`)),
     )
+  })
+
+  it('reads . and .. as cd does', async () => {
+    activeView.value = 'tools'
+    expect((await run('ls', '.')).text).toHaveLength(visibleTools().length)
+    expect((await run('ls', '..')).text.some((t) => t.startsWith('projects/'))).toBe(true)
   })
 
   it('still honours -a with a path', async () => {

@@ -8,7 +8,9 @@ import TerminalLauncher from '@/components/terminal/TerminalLauncher.vue'
 import { useKonami } from '@/composables/useKonami'
 import { restoreCrt, setCrt } from '@/composables/useCrt'
 import { useMatrix } from '@/composables/useMatrix'
+import { useXray } from '@/composables/useXray'
 import { useMotion } from '@/composables/useMotion'
+import { usePageMeta } from '@/composables/usePageMeta'
 import { useTabTitle } from '@/composables/useTabTitle'
 import { focusPageHeading, pageAnnouncement, usePageFocus } from '@/composables/usePageFocus'
 import { useLocale } from '@/i18n'
@@ -27,6 +29,9 @@ const GuestbookTicker = defineAsyncComponent(() => import('@/components/Guestboo
 const ThreeBackground = defineAsyncComponent(() => import('@/components/ThreeBackground.vue'))
 // Only pulled in when someone actually types `matrix`.
 const MatrixRain = defineAsyncComponent(() => import('@/components/effects/MatrixRain.vue'))
+// `xray`'s outlines, and the map of where each component's words come from: fetched the
+// first time it runs, so first paint pays for the stamped attributes and nothing else.
+const XrayLayer = defineAsyncComponent(() => import('@/components/XrayLayer.vue'))
 // The whole command registry (every command, the guestbook client, the vim
 // editor...) lives behind this — only fetched once the terminal is actually opened.
 const TerminalOverlay = defineAsyncComponent(
@@ -34,6 +39,7 @@ const TerminalOverlay = defineAsyncComponent(
 )
 
 const { matrixActive } = useMatrix()
+const { xrayOn } = useXray()
 const { level: motion } = useMotion()
 // Purely decorative, so it's kept off the critical rendering path: never fetched while
 // motion is paused, reduced motion included (no point fetching ~500KB of three.js for a
@@ -72,6 +78,7 @@ const stageStyle = computed(() => ({
 }))
 
 useTabTitle()
+usePageMeta()
 usePageFocus(router)
 const { t, m } = useLocale()
 
@@ -148,6 +155,8 @@ onMounted(() => {
   <AchievementToast />
   <ConfettiBurst />
   <GuestbookTicker />
+  <!-- After the page and its chrome, so its links come last in the tab order. -->
+  <XrayLayer v-if="xrayOn" />
 
   <MatrixRain v-if="matrixActive" />
   <BootSequence />

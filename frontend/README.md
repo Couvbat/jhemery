@@ -57,6 +57,8 @@ vite-plugins/
   resume.ts      emits /resume.txt (ANSI), /resume.html + /resume.fr.html (printable),
                  and /content.json (read by the backend's MCP endpoint) at build time
   third-party.ts emits /THIRD-PARTY.txt from the licences in node_modules
+  xray.ts        stamps each component's root elements with its file (`data-src`), and
+                 serves `virtual:xray-map`, where each component's words come from
 scripts/
   gen-assets.sh        SVG → PNG, run manually and committed
   build-wordlists.mjs  word-game lists, run manually and committed

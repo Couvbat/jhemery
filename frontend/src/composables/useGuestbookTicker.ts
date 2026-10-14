@@ -1,4 +1,4 @@
-import { computed, ref } from 'vue'
+import { computed, ref, shallowRef } from 'vue'
 import { api, type GuestbookEntry } from '@/lib/api'
 
 /**
@@ -17,6 +17,15 @@ const MAX_FAILURES = 3
 /** Ids present the first time we looked — the baseline, never announced. */
 const seen = new Set<string>()
 const queue = ref<GuestbookEntry[]>([])
+/**
+ * The newest page as the last poll found it, newest first: what the field draws as
+ * wireframes (`ThreeBackground`). The poll already fetched it to spot new ids, so the field
+ * costs no request of its own. Emptied when the guestbook says it is off; a failed poll
+ * leaves it as it was, since a blip is not a deletion. Emptied too when the ticker gives
+ * up: no poll will correct it after that, and an entry the owner deletes would otherwise
+ * stay in the field for the life of the tab.
+ */
+const entries = shallowRef<readonly GuestbookEntry[]>([])
 
 let timer: ReturnType<typeof setInterval> | undefined
 let running = false
@@ -33,18 +42,23 @@ async function poll(seeding = false) {
 
     // Guestbook off? Then there is nothing to watch, forever.
     if (!data.enabled) {
+      entries.value = []
       stopGuestbookTicker()
       return
     }
 
-    const entries = data.entries ?? []
-    const fresh = seeding ? [] : entries.filter((entry) => !seen.has(entry.id))
-    for (const entry of entries) seen.add(entry.id)
+    const page = data.entries ?? []
+    entries.value = page
+    const fresh = seeding ? [] : page.filter((entry) => !seen.has(entry.id))
+    for (const entry of page) seen.add(entry.id)
 
     if (fresh.length) queue.value = [...queue.value, ...fresh]
   } catch {
     failures += 1
-    if (failures >= MAX_FAILURES) stopGuestbookTicker()
+    if (failures >= MAX_FAILURES) {
+      entries.value = []
+      stopGuestbookTicker()
+    }
   }
 }
 
@@ -72,6 +86,7 @@ export function dismissGuestbookEntry(id: string) {
 export function useGuestbookTicker() {
   return {
     queue: computed(() => queue.value),
+    entries: computed(() => entries.value),
     startGuestbookTicker,
     stopGuestbookTicker,
     dismissGuestbookEntry,

@@ -117,15 +117,14 @@ test.describe('presence', () => {
 })
 
 /**
- * The rest of the live surface is only reachable from the terminal, which is
- * desktop-only by design — the launcher is `hidden md:flex` because a fixed input
- * panel fights a mobile virtual keyboard badly enough that no terminal beats a
- * broken one.
+ * The rest of the live surface is only reachable from the terminal. These are typed at
+ * its prompt, which is a desktop's: below md the touch layout runs the same commands
+ * from buttons, and degrading is the commands' own business, not the layout's.
  */
 test.describe('through the terminal', () => {
   test.skip(
     () => test.info().project.name === 'mobile',
-    'There is deliberately no terminal on a phone.',
+    'Typed at the prompt, which a phone doesn’t have: its touch layout runs the same commands (tap-shell.spec.ts).',
   )
 
   test.beforeEach(async ({ page }) => {

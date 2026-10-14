@@ -22,6 +22,11 @@ describe('tool registry', () => {
     for (const id of ids) expect(id).toMatch(/^[a-z][a-z0-9-]*$/)
   })
 
+  // The names live in content/tools.ts and the panels here, so one can be added without the other.
+  it('gives every tool a panel', () => {
+    for (const tool of tools) expect(tool.load, tool.id).toBeTypeOf('function')
+  })
+
   it('names and describes every tool in both locales', () => {
     for (const tool of tools) {
       expect(tool.name.en, tool.id).toBeTruthy()

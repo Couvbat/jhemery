@@ -7,19 +7,25 @@ vi.mock('@/composables/useCrt', async (importOriginal) => ({
 }))
 
 import { setMotion } from '@/composables/useMotion'
+import { touchLayout } from '@/composables/useTerminalShell'
 import { setTheme, useTheme } from '@/composables/useTheme'
 import { TOUR_STOPS } from '../commands/work'
 import { allCommands, isLinkable, resolve, resolveLink } from '../registry'
+import { tapLines } from '../tap'
 import { recordingContext, runCommand } from './context'
 
 const tour = resolve('tour')!
 const runStops = TOUR_STOPS.flatMap((stop) => ('run' in stop ? [stop.run] : []))
+/** The stops one layout walks, as `run` lines. */
+const walked = (layout: 'keyboard' | 'touch') =>
+  TOUR_STOPS.flatMap((stop) => ('run' in stop && stop.only !== (layout === 'touch' ? 'keyboard' : 'touch') ? [stop.run] : []))
 
 afterEach(() => {
   motion.reduced = true
   setMotion('full')
   vi.useRealTimers()
   setTheme('cyberpunk')
+  touchLayout.value = false
 })
 
 describe('tour', () => {
@@ -36,7 +42,18 @@ describe('tour', () => {
 
   it('runs the stops in order, inside itself', async () => {
     const { ran } = await runCommand(tour)
-    expect(ran).toEqual(runStops)
+    expect(ran).toEqual(walked('keyboard'))
+    expect(ran).toContain('games')
+  })
+
+  // `?run=tour` is the bio link, and a bio is mostly opened on a phone. There the tour
+  // runs only what a button could, and points at nothing that needs a keyboard.
+  it.each(['en', 'fr'] as const)('walks the touch layout through what it can tap, in %s', async (locale) => {
+    touchLayout.value = true
+    const { ran, text } = await runCommand(tour, [], { locale, interactive: false })
+    expect(ran).toEqual(walked('touch'))
+    for (const stop of ran) expect(tapLines(), stop).toContain(stop)
+    expect(text).not.toMatch(/wordle|curl|Ctrl\+C|`theme`/)
   })
 
   it.each(['en', 'fr'] as const)('never names a hidden command, in %s', async (locale) => {

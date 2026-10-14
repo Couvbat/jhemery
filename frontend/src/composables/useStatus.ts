@@ -6,13 +6,18 @@ import { relativeTime } from './useGithub'
  *  line measured in days. */
 const TICK_MS = 60_000
 
+/** The same uptime to the second, which `/proc/uptime` prints as it is. */
+export function uptimeSeconds(at: number = Date.now()): number {
+  return (at - new Date(profile.since).getTime()) / 1000
+}
+
 /**
  * Whole-number days since the first commit — the site's "uptime". Lives here
  * rather than next to `neofetch` so the footer can show it without pulling the
  * whole terminal command registry into the main bundle.
  */
 export function uptime(at: number = Date.now()): string {
-  const days = Math.floor((at - new Date(profile.since).getTime()) / 86_400_000)
+  const days = Math.floor(uptimeSeconds(at) / 86_400)
   const years = Math.floor(days / 365)
   const remainder = days % 365
   return years > 0 ? `${years}y ${remainder}d` : `${days}d`

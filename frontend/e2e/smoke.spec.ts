@@ -71,7 +71,7 @@ test.describe('fixtures', () => {
   test('the terminal helper opens a live prompt', async ({ page, terminal }) => {
     test.skip(
       test.info().project.name === 'mobile',
-      'The launcher is `hidden md:flex` — there is deliberately no terminal on a phone.',
+      'Typed at the prompt, which a phone doesn’t have: its touch layout runs the same commands (tap-shell.spec.ts).',
     )
 
     await page.goto('/')

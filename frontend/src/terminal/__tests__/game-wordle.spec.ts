@@ -266,3 +266,30 @@ describe('the daily word', () => {
     expect(text.split('\n')).toHaveLength(8)
   })
 })
+
+describe('resumeDaily', () => {
+  // A daily is resumed from storage, which a save link can fill with someone else's record.
+  const board = () => ({ ...wordle.newGame(WORDS, 'en', () => 0), answer: 'CRANE', display: 'CRANE' })
+
+  it('replays the guesses made today', () => {
+    const state = wordle.resumeDaily(board(), ['SNAKE', 'SPEED'])
+    expect(state.guesses).toEqual(['SNAKE', 'SPEED'])
+    expect(state.current).toBe('')
+    expect(state.status).toBe('playing')
+  })
+
+  it('drops a guess the board refuses rather than leaving it in the row being typed', () => {
+    const state = wordle.resumeDaily(board(), ['SNAKE', 'Q'.repeat(60_000), 'XXXXX', 'SPEED'])
+    expect(state.guesses).toEqual(['SNAKE', 'SPEED'])
+    expect(state.current).toBe('')
+    // The row still takes a letter.
+    expect(wordle.typeLetter(state, 'a').current).toBe('A')
+  })
+
+  it('stops once the board is finished', () => {
+    const state = wordle.resumeDaily(board(), ['CRANE', 'SNAKE'])
+    expect(state.status).toBe('won')
+    expect(state.guesses).toHaveLength(1)
+    expect(state.current).toBe('')
+  })
+})

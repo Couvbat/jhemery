@@ -52,15 +52,33 @@ function operatorAt(line: string, i: number): string | null {
   return null
 }
 
-/** Where a group opened at `start` closes, or -1 if it never does (and so isn't one). */
-function closingQuote(line: string, start: number): number {
-  const quote = line[start]
-  for (let i = start + 1; i < line.length; i++) {
-    if (line[i] !== quote) continue
+type Quote = "'" | '"'
+
+/**
+ * For one line, where a group opened at `start` closes, or -1 if it never does (and so
+ * isn't one): the first matching quote after it that ends a word. Every place a quote can
+ * close is found in one pass, and the callers ask in order along the line, so a cursor per
+ * quote only ever moves forward. Rescanning the rest of the line for each opening quote, as
+ * this once did, made a line of unclosed ones quadratic: 60 kB of them, which a save link
+ * can put in the history or an alias, froze the tab for seconds on every ↑ and Enter.
+ */
+export function closingQuotes(line: string): (start: number) => number {
+  const closers: Record<Quote, number[]> = { "'": [], '"': [] }
+  for (let i = 0; i < line.length; i++) {
+    const c = line[i]
+    if (c !== "'" && c !== '"') continue
     const next = i + 1
-    if (next >= line.length || isSpace(line[next]) || operatorAt(line, next)) return i
+    if (next >= line.length || isSpace(line[next]) || operatorAt(line, next)) closers[c].push(i)
   }
-  return -1
+  const cursor: Record<Quote, number> = { "'": 0, '"': 0 }
+  return (start) => {
+    const quote = line[start] as Quote
+    const at = closers[quote]
+    let k = cursor[quote]
+    while (k < at.length && at[k]! <= start) k++
+    cursor[quote] = k
+    return k < at.length ? at[k]! : -1
+  }
 }
 
 const unquote = (value: string) => value.replace(/^(['"])([\s\S]*)\1$/, '$2')
@@ -83,6 +101,7 @@ function toStage(text: string, words: string[], start: number): Stage {
 }
 
 export function parseLine(line: string): Parsed {
+  const closingQuote = closingQuotes(line)
   const pieces: { text: string; words: string[]; start: number }[] = []
   const ops: string[] = []
   let words: string[] = []
@@ -112,7 +131,7 @@ export function parseLine(line: string): Parsed {
     }
     // At the start of a word, or of an env value (`MSG="a b"`).
     if ((c === '"' || c === "'") && (word === '' || /^[A-Za-z_][A-Za-z0-9_]*=$/.test(word))) {
-      const close = closingQuote(line, i)
+      const close = closingQuote(i)
       if (close > 0) {
         word += line.slice(i, close + 1)
         i = close + 1
@@ -168,6 +187,7 @@ export function replaceStages(line: string, chain: readonly Link[], replace: (st
  * Tab completes from there, so `ls | gr<Tab>` completes a command, not an argument of `ls`.
  */
 export function lastStageStart(text: string): number {
+  const closingQuote = closingQuotes(text)
   let start = 0
   let atWordStart = true
   for (let i = 0; i < text.length; ) {
@@ -180,7 +200,7 @@ export function lastStageStart(text: string): number {
     }
     const c = text[i]!
     if ((c === '"' || c === "'") && atWordStart) {
-      const close = closingQuote(text, i)
+      const close = closingQuote(i)
       if (close > 0) {
         i = close + 1
         atWordStart = false

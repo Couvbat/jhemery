@@ -1,6 +1,5 @@
 import { computed, ref } from 'vue'
-import type { Locale, Localised } from '@/content/types'
-import { pick } from '@/content/types'
+import { LANG_PARAM, pick, type Locale, type Localised } from '@/content/types'
 import { messages } from './messages'
 
 const STORAGE_KEY = 'couvbat:locale'
@@ -10,9 +9,44 @@ function isLocale(value: string | null): value is Locale {
   return value !== null && (LOCALES as string[]).includes(value)
 }
 
+// Read while this module loads, so it must not throw: a browser that blocks site data
+// throws on the `localStorage` getter itself, and an unguarded read here failed the
+// import of everything that shows text, leaving a blank page.
+function readStored(): string | null {
+  try {
+    return window.localStorage.getItem(STORAGE_KEY)
+  } catch {
+    return null
+  }
+}
+
+function writeStored(next: Locale): void {
+  try {
+    window.localStorage.setItem(STORAGE_KEY, next)
+  } catch {
+    // Blocked storage: switched for this page load, the browser's language after a reload.
+  }
+}
+
+/**
+ * `?lang=fr` in the address is the French URL of a page (`content/site.ts`): what a
+ * French search result or the `hreflang` alternates link to. It wins over the stored
+ * choice, and becomes it, so the visitor who arrived in French stays in French after a
+ * reload. `usePageMeta` takes it out of the address once the visitor switches language.
+ */
+function askedInAddress(): Locale | null {
+  const asked = new URLSearchParams(window.location.search).get(LANG_PARAM)
+  return isLocale(asked) ? asked : null
+}
+
 function detectInitialLocale(): Locale {
   if (typeof window === 'undefined') return 'en'
-  const stored = window.localStorage.getItem(STORAGE_KEY)
+  const asked = askedInAddress()
+  if (asked) {
+    writeStored(asked)
+    return asked
+  }
+  const stored = readStored()
   if (isLocale(stored)) return stored
   return navigator.language?.toLowerCase().startsWith('fr') ? 'fr' : 'en'
 }
@@ -27,7 +61,7 @@ if (typeof document !== 'undefined') {
 export function setLocale(next: Locale) {
   locale.value = next
   if (typeof window !== 'undefined') {
-    window.localStorage.setItem(STORAGE_KEY, next)
+    writeStored(next)
     document.documentElement.lang = next
   }
 }

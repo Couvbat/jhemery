@@ -91,7 +91,7 @@ test.describe('contact form', () => {
 test.describe('through the terminal', () => {
   test.skip(
     () => test.info().project.name === 'mobile',
-    'There is deliberately no terminal on a phone.',
+    'Typed at the prompt, which a phone doesn’t have: `sign` and `mail` write, so its touch layout has no button for them.',
   )
 
   test.beforeEach(async ({ page }) => {

@@ -69,7 +69,9 @@ async function flagsFromSurfaces(): Promise<string[]> {
   const { systemCommands } = await import('../commands/system')
   take((await runCommand(systemCommands.find((c) => c.name === 'top')!)).text, 'top')
 
-  take(readFileSync(join(process.cwd(), 'public/llms.txt'), 'utf8'), 'llms.txt')
+  // The prose of llms.txt, stage 7 included, is its template (vite-plugins/discovery.ts);
+  // discovery.spec.ts holds the built file to carrying it.
+  take(readFileSync(join(process.cwd(), 'vite-plugins/llms.template.md'), 'utf8'), 'llms.txt')
   return found
 }
 
@@ -138,6 +140,18 @@ describe('flag', () => {
     const verdict = await submitFlag(flags[3]!)
     expect(verdict).toMatchObject({ kind: 'order', stage: { id: 'shadow' }, current: { id: 'secret' } })
     expect(solvedCount.value).toBe(0)
+  })
+
+  // A save link can restore someone else's record: a flag that isn't the stage's own must
+  // give way to the real one, or the chain sticks on "already solved" for good.
+  it('lets the real flag replace a stored one that isn’t, and drops what isn’t a flag at all', async () => {
+    const [real] = await flagsFromSurfaces()
+    window.localStorage.setItem('couvbat:ctf', JSON.stringify({ secret: 'CTF{0000000000000000}', console: 'x' }))
+    const { submitFlag, capturedFlag } = await load()
+    expect(capturedFlag('console')).toBeUndefined()
+    expect(await submitFlag(real!)).toMatchObject({ kind: 'solved', stage: { id: 'secret' } })
+    expect(capturedFlag('secret')).toBe(real)
+    expect(await submitFlag(real!)).toMatchObject({ kind: 'already' })
   })
 
   it('says a solved stage is already solved', async () => {

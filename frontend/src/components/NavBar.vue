@@ -4,6 +4,7 @@ import { sections, profile, views } from '@/content'
 import { useLocale } from '@/i18n'
 import { activeSection } from '@/composables/useActiveSection'
 import { activeView, goTo } from '@/composables/useViewSwing'
+import { openPalette } from '@/composables/usePalette'
 import AchievementsModal from '@/components/AchievementsModal.vue'
 import ThemeMenu from '@/components/ThemeMenu.vue'
 
@@ -29,6 +30,18 @@ const pages = views.filter((v) => v.id !== 'home')
 function go(target: string) {
   goTo(target)
   menuOpen.value = false
+}
+
+const toggleEl = ref<HTMLButtonElement | null>(null)
+
+/**
+ * Focus onto the menu's toggle first: the palette gives focus back to whatever had it when
+ * it opened, and this button goes with the menu it is in, which left that to <body>.
+ */
+function search() {
+  toggleEl.value?.focus()
+  menuOpen.value = false
+  openPalette()
 }
 
 function onScroll() {
@@ -152,6 +165,7 @@ onUnmounted(() => window.removeEventListener('scroll', onScroll))
           <span :lang="otherLocale">{{ otherLocale.toUpperCase() }}</span>
         </button>
         <button
+          ref="toggleEl"
           class="text-primary p-2"
           @click="menuOpen = !menuOpen"
           :aria-label="t(m.nav.toggleMenu)"
@@ -210,6 +224,16 @@ onUnmounted(() => window.removeEventListener('scroll', onScroll))
           >
             <span>$ cd ./{{ t(v.label) }}</span>
           </a>
+        </li>
+        <!-- The palette and its content search, for a phone: Ctrl+K is the only other
+             way in, and a phone has no keyboard to press it on. -->
+        <li class="border-t border-border mt-1 pt-1">
+          <button
+            class="w-full text-left py-2 text-sm text-muted-foreground hover:text-primary transition-colors"
+            @click="search"
+          >
+            <span>$ {{ t(m.search.open) }}</span>
+          </button>
         </li>
       </ul>
     </div>

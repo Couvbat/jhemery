@@ -104,3 +104,29 @@ describe('hydration', () => {
     expect(history.value).toEqual(['help'])
   })
 })
+
+describe('the stored history', () => {
+  beforeEach(() => {
+    window.localStorage.clear()
+  })
+
+  // A save link can fill these keys with someone else's history.
+  it('drops a line too long to have been typed, and keeps the last hundred', async () => {
+    const lines = ['ls', "'x ".repeat(20_000), ...Array.from({ length: 150 }, (_, i) => `echo ${i}`)]
+    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(lines))
+    const { history } = await freshHistory()
+    expect(history.value).toHaveLength(100)
+    expect(history.value.at(-1)).toBe('echo 149')
+    expect(history.value.every((line) => line.length < 100)).toBe(true)
+  })
+
+  it('reads a numbering base past anything a visitor could reach as none', async () => {
+    for (const base of ['1e300', '9007199254740990', '1000000001', '-3', '1.5']) {
+      window.localStorage.setItem('couvbat:history:base', base)
+      const { historyBase } = await freshHistory()
+      expect(historyBase.value, base).toBe(0)
+    }
+    window.localStorage.setItem('couvbat:history:base', '57')
+    expect((await freshHistory()).historyBase.value).toBe(57)
+  })
+})

@@ -1,5 +1,5 @@
 import { profile, sectionIds, sections, socials, viewIds, views, work } from '@/content'
-import { currentPath, resolvePath } from '@/composables/useViewSwing'
+import { currentPath, resolvePath, shellPath } from '@/composables/useViewSwing'
 import { decorativeMotion } from '@/composables/useMotion'
 import { visibleTools } from '@/tools/registry'
 import { announce, toast, visitSection } from '../achievements'
@@ -8,6 +8,8 @@ import { sleep } from '../timing'
 import type { Command, OutputLine } from '../types'
 import { blank, fail, line, pre, segmented } from '../format'
 import { FILES, FILE_ACHIEVEMENTS, HIDDEN_FILES, listFiles, resolveFileLines } from './files'
+import { listProc, procFiles, procPath } from './proc'
+import { toolRows } from './tools'
 
 const PING_COUNT = 4
 
@@ -51,7 +53,7 @@ export const navigateCommands: Command[] = [
           fr: 'Afficher les fichiers dont le nom commence par un point. Ils sont cachés pour une raison, qui est justement d’aller voir.',
         },
       },
-      examples: [{ command: 'ls tools' }, { command: 'ls projects' }],
+      examples: [{ command: 'ls tools' }, { command: 'ls projects' }, { command: 'ls /proc' }],
       seeAlso: ['cd(1)', 'cat(1)', 'sl(6)'],
     },
     group: 'navigate',
@@ -59,29 +61,28 @@ export const navigateCommands: Command[] = [
     // `ls -a` lists the dotfiles, the way into the `secret` and `dotenv` achievements
     // and the CTF, which a link must not hand to whoever clicks it.
     linkable: (args) => !showsHidden(args),
-    complete: ({ index, args }) =>
-      index === 0 && !args[0]?.startsWith('-')
-        ? ['-a', ...destinations()]
-        : index <= 1
-          ? destinations()
-          : [],
+    // `/proc` is offered only to a word that starts at the root, the one place it is.
+    complete: ({ index, args, word }) =>
+      [
+        ...(index === 0 && !args[0]?.startsWith('-') ? ['-a', ...destinations()] : index <= 1 ? destinations() : []),
+        ...(index <= 1 && word.startsWith('/') ? ['/proc/', '/proc/self/'] : []),
+      ],
     run({ args, t }) {
       const showHidden = showsHidden(args)
       const target = args.find((a) => !a.startsWith('-'))
 
       if (target) {
-        const resolved = resolvePath(target)
+        // `/proc` is not a page, so it is read before `shellPath()` turns `/` into home.
+        const proc = procPath(target)
+        if (proc) {
+          return listProc(proc) ?? [fail(`ls: cannot access '${target}': No such file or directory`)]
+        }
+        const resolved = resolvePath(shellPath(target))
         if (!resolved) {
           return [fail(`ls: cannot access '${target}': No such file or directory`)]
         }
         if (resolved.kind === 'view' && resolved.view.id === 'tools') {
-          const listed = resolved.tool ? [resolved.tool] : visibleTools()
-          return listed.map((tool) =>
-            segmented([
-              { text: tool.id.padEnd(10), tone: 'primary' },
-              { text: t(tool.description), tone: 'muted' },
-            ]),
-          )
+          return toolRows(resolved.tool ? [resolved.tool] : visibleTools(), t)
         }
         // The projects section holds the case studies, one `.md` each.
         if (resolved.kind === 'section' && resolved.section.id === 'projects' && work.length) {
@@ -117,8 +118,9 @@ export const navigateCommands: Command[] = [
     complete: ({ index }) => (index === 0 ? destinations() : []),
     run({ args, navigate, t }) {
       const [target = ''] = args
-      const resolved = resolvePath(target)
-      if (!resolved || !navigate(target)) {
+      const path = shellPath(target)
+      const resolved = resolvePath(path)
+      if (!resolved || !navigate(path)) {
         return [fail(`cd: ${target}: No such file or directory`)]
       }
 
@@ -151,16 +153,25 @@ export const navigateCommands: Command[] = [
     usage: 'cat <file>',
     description: { en: 'Print a file', fr: 'Afficher un fichier' },
     manual: {
-      examples: [{ command: 'cat about.txt' }, { command: 'cat projects/qr.md' }, { command: 'help | cat' }],
+      examples: [
+        { command: 'cat about.txt' },
+        { command: 'cat projects/qr.md' },
+        { command: 'cat /proc/self/gpu' },
+        { command: 'help | cat' },
+      ],
       seeAlso: ['ls(1)', 'diff(1)', 'vim(6)'],
     },
     group: 'navigate',
     writes: 'none',
-    // The case studies only once the word reaches into `projects/`, so a bare Tab
-    // doesn't list eight more files.
+    // The case studies only once the word reaches into `projects/`, and `/proc`'s files
+    // once it reaches into `/proc/`, so a bare Tab lists only the files beside you.
     complete: ({ index, word }) =>
       index === 0
-        ? [...listFiles(), ...(word.startsWith('projects/') ? work.map((part) => `projects/${part.id}.md`) : [])]
+        ? [
+            ...listFiles(),
+            ...(word.startsWith('projects/') ? work.map((part) => `projects/${part.id}.md`) : []),
+            ...(word.startsWith('/proc/') ? procFiles() : []),
+          ]
         : [],
     run({ args, stdin, t }) {
       const [file] = args
@@ -234,7 +245,8 @@ export const navigateCommands: Command[] = [
         return [fail('ping: usage error: Destination address required')]
       }
 
-      const resolved = resolvePath(target)
+      const path = shellPath(target)
+      const resolved = resolvePath(path)
       if (!resolved) {
         return [fail(`ping: ${target}: Name or service not known`)]
       }
@@ -284,8 +296,7 @@ export const navigateCommands: Command[] = [
       ])
 
       // The payoff: a reachable host is one you can go to.
-      ctx.navigate(target)
-      if (resolved.kind !== 'section') return undefined
+      if (!ctx.navigate(path) || resolved.kind !== 'section') return undefined
       return toast(visitSection(resolved.section.id, sectionIds), ctx.t)
     },
   },

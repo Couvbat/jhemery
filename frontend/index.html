@@ -7,7 +7,7 @@
     <!-- iOS ignores the web manifest's icons and only reads this one. -->
     <link rel="apple-touch-icon" href="/apple-touch-icon.png">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Jules Hémery — Full-Stack Developer, Musician & Gamer</title>
+    <title>Jules Hémery — Full-Stack Developer, Musician &amp; Gamer</title>
 
     <meta name="description" content="Jules Hémery (Couvbat) — Full-Stack Developer at In-Leed, based in France. Portfolio with live GitHub/Steam activity, music production and a fully interactive terminal.">
     <meta name="theme-color" content="#0d0f0d">
@@ -15,6 +15,9 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="apple-mobile-web-app-title" content="Couvbat">
     <link rel="canonical" href="https://jhemery.xyz/">
+    <link rel="alternate" hreflang="en" href="https://jhemery.xyz/">
+    <link rel="alternate" hreflang="fr" href="https://jhemery.xyz/?lang=fr">
+    <link rel="alternate" hreflang="x-default" href="https://jhemery.xyz/">
 
     <!--
       Open Graph. The image MUST be a raster format: Twitter/X, LinkedIn, Discord,
@@ -24,8 +27,8 @@
     <meta property="og:type" content="website">
     <meta property="og:url" content="https://jhemery.xyz/">
     <meta property="og:site_name" content="Jules Hémery">
-    <meta property="og:title" content="Jules Hémery — Full-Stack Developer, Musician & Gamer">
-    <meta property="og:description" content="Full-Stack Developer at In-Leed, based in France. Portfolio with live GitHub/Steam activity, music production and a fully interactive terminal.">
+    <meta property="og:title" content="Jules Hémery — Full-Stack Developer, Musician &amp; Gamer">
+    <meta property="og:description" content="Jules Hémery (Couvbat) — Full-Stack Developer at In-Leed, based in France. Portfolio with live GitHub/Steam activity, music production and a fully interactive terminal.">
     <meta property="og:image" content="https://jhemery.xyz/og-image.png">
     <meta property="og:image:type" content="image/png">
     <meta property="og:image:width" content="1200">
@@ -36,28 +39,47 @@
 
     <!-- Twitter -->
     <meta name="twitter:card" content="summary_large_image">
-    <meta name="twitter:title" content="Jules Hémery — Full-Stack Developer, Musician & Gamer">
-    <meta name="twitter:description" content="Full-Stack Developer at In-Leed, based in France. Portfolio with live GitHub/Steam activity, music production and a fully interactive terminal.">
+    <meta name="twitter:title" content="Jules Hémery — Full-Stack Developer, Musician &amp; Gamer">
+    <meta name="twitter:description" content="Jules Hémery (Couvbat) — Full-Stack Developer at In-Leed, based in France. Portfolio with live GitHub/Steam activity, music production and a fully interactive terminal.">
     <meta name="twitter:image" content="https://jhemery.xyz/og-image.png">
     <meta name="twitter:image:alt" content="A terminal window reading: couvbat@portfolio:~$ whoami — Jules Hémery, Full-Stack Developer · Musician · Gamer.">
 
     <script type="application/ld+json">
       {
         "@context": "https://schema.org",
-        "@type": "Person",
-        "name": "Jules Hémery",
-        "alternateName": "Couvbat",
-        "jobTitle": "Full-Stack Developer",
-        "url": "https://jhemery.xyz/",
-        "email": "mailto:contact@jhemery.xyz",
-        "worksFor": {
-          "@type": "Organization",
-          "name": "In-Leed"
-        },
-        "sameAs": [
-          "https://github.com/Couvbat",
-          "https://www.linkedin.com/in/jules-h%C3%A9mery-338134195/",
-          "https://soundcloud.com/couvbat"
+        "@graph": [
+          {
+            "@type": "WebSite",
+            "@id": "https://jhemery.xyz/#website",
+            "url": "https://jhemery.xyz/",
+            "name": "Jules Hémery",
+            "alternateName": ["Couvbat", "jhemery.xyz"],
+            "inLanguage": ["en", "fr"],
+            "publisher": { "@id": "https://jhemery.xyz/#person" }
+          },
+          {
+            "@type": "Person",
+            "@id": "https://jhemery.xyz/#person",
+            "name": "Jules Hémery",
+            "alternateName": "Couvbat",
+            "jobTitle": "Full-Stack Developer",
+            "url": "https://jhemery.xyz/",
+            "email": "mailto:contact@jhemery.xyz",
+            "worksFor": {
+              "@type": "Organization",
+              "name": "In-Leed"
+            },
+            "homeLocation": {
+              "@type": "Country",
+              "name": "France"
+            },
+            "knowsLanguage": ["fr", "en"],
+            "sameAs": [
+              "https://github.com/Couvbat",
+              "https://www.linkedin.com/in/jules-h%C3%A9mery-338134195/",
+              "https://soundcloud.com/couvbat"
+            ]
+          }
         ]
       }
     </script>
@@ -72,7 +94,7 @@
     <noscript>
       <div style="font-family: monospace; max-width: 640px; margin: 40px auto; padding: 0 16px; color: #e6f5e9; background: #0d0f0d;">
         <h1>Jules Hémery (Couvbat)</h1>
-        <p>Full-Stack Developer at In-Leed, based in France. I build web apps, produce hard electronic music, and tinker with AI on the side.</p>
+        <p>Jules Hémery (Couvbat) — Full-Stack Developer at In-Leed, based in France. Portfolio with live GitHub/Steam activity, music production and a fully interactive terminal.</p>
         <p>This site is an interactive, JavaScript-rendered experience — enable JavaScript for the full version, including a hidden terminal.</p>
         <ul>
           <li><a href="https://github.com/Couvbat">GitHub</a></li>

@@ -61,6 +61,13 @@ src/content/
   experience.ts  dated roles and courses, newest first; the current role names profile.employer
   dates.ts       the date maths: daysSince, monthsBetween (both ends count), durationLabel, periodLabel
   now.ts         the /now list and its staleness rule
+  seasons.ts     the six days the field dresses up for, on the visitor's calendar
+  events.ts      SiteEvent[], the appointments Jules hosts, as instants; only the list
+  upcoming.ts    what the readers compute from it (when, which are ahead) and their words;
+                 outside the barrel, so an empty list costs the home page nothing
+  stems.ts       StemTrack[], tracks split into stems for the music section's mixer;
+                 outside the barrel, and only data
+  security.ts    the disclosure policy and security.txt; outside the barrel, like privacy.ts
   docs.ts        githubSlug and headingSlugs, so a link to a doc's heading can be checked
   decisions.ts   Decision[], what the site chose and turned down; read by `why` (§3)
   work.ts        WorkPart[], the case studies at /work/<id>, `projects <id>` and projects/<id>.md
@@ -81,6 +88,15 @@ across every caller), a `t(localised)` resolver, and `setLocale()` which persist
 → `en`.
 
 Surfaces: a `EN/FR` toggle in the navbar, and the `lang [en|fr]` terminal command.
+
+Interface strings live in `i18n/messages.ts`, which loads whole with the first paint. The home
+page sits at its byte budget (`lighthouserc.yml`), so the words of a page or panel that only
+loads on demand can sit in a table beside it instead, imported only by it: `/privacy`'s and
+the save file's (`content/privacy.ts`), `/security`'s (`content/security.ts`), `/legal`'s
+(`content/legal.ts`), the events block's
+(`content/upcoming.ts`) and the stems mixer's (`components/stems/labels.ts`). `i18n.spec.ts`
+walks those tables with the message tree, under the same rules, plus one more for all of
+them: a `{placeholder}` in one language is in the other.
 
 **Trade-off:** full-site i18n roughly doubles the copy that has to be maintained. It is included
 because the profile advertises both languages and a French visitor landing on English copy is a
@@ -113,7 +129,8 @@ interface Command {
 ```
 
 `CommandContext` carries the parsed `args`, the stage's own `raw` text, `stdin` (what a `|`
-handed it), `tty` (false on the left of a `|`, where `capture` and `prompt` throw), the current
+handed it), `tty` (false on the left of a `|`, and for every stage in the touch layout (§9),
+where `capture` and `prompt` throw), the current
 `locale`, the `t()`
 resolver, and the side-effect handles a command may use: `print()`, `clear()`, `close()`,
 `frame()` (a redrawable output region — animations and game boards), `navigate(target)` (anything
@@ -204,7 +221,8 @@ another, because commands return arrays rather than streams. A stage's output, m
 `stderr` lines, is the next stage's `stdin`, `OutputLine`s and their colours included; its
 `stderr` lines (`fail()`, achievement toasts) go to the screen wherever it stands, so
 `fortune | cowsay` keeps the toast outside the cow. A stage on the left of a `|` has `tty`
-false, and its `capture` and `prompt` throw "not a tty". `&&` and `||` read a pipeline as failed
+false, and its `capture` and `prompt` throw "not a tty"; so does every stage in the touch layout
+(§9), where the reason given is that there is no keyboard rather than a pipe. `&&` and `||` read a pipeline as failed
 when a stage throws or prints a failing `stderr` line, which is what `fail()` makes; the error
 *tone* alone counts for nothing, because `btc`'s red sparkline and `diff`'s removed lines are
 colour. One Ctrl+C stops the whole line, with one `^C`. A link runs a pipe or a chain only if
@@ -231,7 +249,8 @@ the résumé plugin also writes as roff (§7).
 `terminal/pager.ts` shows a page twenty rows at a time through `frame` and `capture`: j/k and the
 arrows move a line, space/f and b a page, g and G to the ends, `/` searches and n/N repeat, `q`
 quits and leaves nothing behind. A page that fits is printed outright, as `less -F` does, and
-with no tty (the left of a `|`) the whole page is the output, so `man ls | grep -i all` works.
+with no tty (the left of a `|`, or the touch layout) the whole page is the output, so
+`man ls | grep -i all` works and `man jules` reads on a phone.
 
 `--help` as the very first argument prints the command's usage and flags instead of running it,
 so `projects --json` and `echo hi --help` are untouched. `-<Tab>` completes the flags a usage
@@ -267,10 +286,12 @@ completes against whatever `zz` will actually run.
 
 ### Chrome
 
-- `TerminalLauncher.vue` — sticky bottom-right button, `md:` and up only (see accessibility).
+- `TerminalLauncher.vue` — sticky bottom-right button, at every width; below `md` it opens the
+  touch layout (see accessibility).
 - `TerminalOverlay.vue` — bottom-anchored panel, `max-w-4xl`, with a maximise toggle. Title bar
   matches the existing fake-terminal chrome (three dots + `couvbat@portfolio ~ bash`).
 - `VimPane.vue` — replaces the scrolling buffer while a vim buffer is open (§5.1).
+- `TapBar.vue` — the touch layout's buttons, in place of the prompt below `md` (§9).
 
 Open/close: click the launcher, press `` ` `` (backtick) anywhere outside an input, or `Ctrl+``.
 `Esc` closes — unless the vim pane is open (§5.1), which is the joke.
@@ -284,7 +305,7 @@ required argument — every 3.5 s. A placeholder rather than a buffer line, so i
 submitted or copied. The first keystroke stops it for the session; reduced motion holds one hint.
 
 **Links that run a command** (`composables/useRunLink.ts`, `runLink` in `useTerminal.ts`).
-`?run=<command>` is read once the router is ready, at the launcher's `md` breakpoint only, removed
+`?run=<command>` is read once the router is ready, at every width (below `md` the touch layout runs it), removed
 with `router.replace`, and handed to the lazy chunk through `pendingLinkCommand` — kept apart from
 `pendingInitialCommand`, which only this site's own buttons set. The command must opt in with
 `linkable` on `Command`, and then pass `isLinkable(command, args)`: not hidden, and `writes` is
@@ -321,6 +342,8 @@ Grouped as they appear in `help`.
 | `alias` / `unalias` | Session-persistent command renames, expanded before anything else parses the line |
 | `sha256sum` (aliases `sha1sum`, `sha512sum`) · `base64 [-d]` · `uuidgen` · `jq .` | The shell versions of the hash, encode and JSON tools, each importing the pure module its panel uses. A fake-filesystem name is read as that file, other text as literal text, and with no argument they read what a `\|` hands them |
 | `strace <command>` | Runs the command inside itself (`ctx.run`, so without the visitor's aliases) and then lists the non-background requests made meanwhile, as `GET /weather = 200 · 1.10 kB · 84 ms` with the shapes of the bodies below, and `+++ exited with 0 +++`. No request, no trailer, so `strace ls` is `ls`. Its `writes` is the traced command's, so `?run=strace sign x` is refused like `sign x`; `strace strace` is refused |
+| `du [-s] [-h] [~\|<group>\|<key>]` | Every `couvbat:` key in both storages, by group: size, value and purpose, a secret (`couvbat:sudo`, a room token) as `<secret, N bytes>` and a stale key as its size only. For `~`, then the Cache Storage caches with file counts and sizes, `navigator.storage.estimate()`, and the two things no page can list (§6). `writes: 'none'`, linkable, and out of the curl pages, since its output is the visitor's |
+| `rm [-r] [-f] <key\|group\|~>` | Removes a key, a group, or with `-r ~` the whole namespace, prints each `removed '…'`, then reloads after 1.5 s through `reloadPage()`, which never settles, so the shell can't write the cleared history back after the line. `~` without `-r` is a directory, `-r /` gets GNU's failsafe, and a fake file is `Permission denied`. `writes: 'local'`. `sudo rm -rf /` never reaches it: `sudo` parses its own arguments |
 | `exit` (aliases `quit`, `logout`) | Closes the overlay |
 
 **Colour schemes.** `theme` offers the site's own neon (*cyberpunk*, the default) and the palettes
@@ -336,8 +359,8 @@ choice is saved under `couvbat:theme` and re-applied in `main.ts` before the app
 returning visitor's first frame is already in their colours.
 
 Surfaces: the `theme` command, and a 🎨 menu in the navbar (`components/ThemeMenu.vue`). The menu
-matters most on a phone, where there is no terminal (§9), so without it a phone visitor could never
-leave the default. It lists the same schemes with the same swatch strip (`swatch()` in `themes.ts`),
+matters most on a phone, whose touch layout (§9) has no button for `theme`, since it writes, so
+without it a phone visitor could never leave the default. It lists the same schemes with the same swatch strip (`swatch()` in `themes.ts`),
 each drawn on its scheme's own background so a light one looks light before it is picked. It stays
 open on a pick: the page repaints behind it, so browsing the list is the preview. Both surfaces apply
 through `setTheme` and record through `tryTheme`, so the flash, the saved choice and both
@@ -400,9 +423,11 @@ OKLCH lightness away from the background. base16 follows its documented slot rol
 The last things that ignored the scheme follow it now: the matrix rain draws in `--neon-green`
 over `--background` (and says "press any key" in both languages), the CRT overdrive's fringe is a
 `color-mix()` of the pink and cyan slots, and the SoundCloud widgets (the music section's and the
-radio rooms') take `--neon-green`, read only when the frame mounts, since a new `src` reloads the
-cross-origin player and stops it. `content/music.ts`'s `soundcloudEmbedSrc(colour, autoplay)` is
-pure and lets only a `#rrggbb` into the URL. The window dots of every title bar are one
+radio rooms') take `--neon-green`, read each time a frame is built and never while one is up,
+since a new `src` reloads the cross-origin player and stops it. The music section's frame waits
+behind its load button, so that is when its colour is read, not when the section was set up.
+`content/music.ts`'s `soundcloudEmbedSrc(colour, autoplay)` is pure and lets only a `#rrggbb`
+into the URL. The window dots of every title bar are one
 `WindowDots.vue` in `destructive`, `warning` and `primary`, instead of Tailwind's red, yellow and
 green in thirteen copies. Adding `theme` also tightened "did you mean …?": two edits in a five-letter word make a
 different word (`where` is two from `theme`), so names under six letters get one edit, and a
@@ -418,11 +443,11 @@ refused: it survives a reload, so `alias ls=rickroll` would be a lockout rather 
 ### navigate
 | Command | Behaviour |
 |---|---|
-| `ls [-a] [path]` | Lists sections and views as directories; `ls tools` lists the tools and `ls projects` the case studies, the one section that isn't empty. `-a` also reveals `.secret` and `.env` (§5) |
+| `ls [-a] [path]` | Lists sections and views as directories; `ls tools` lists the tools and `ls projects` the case studies, the one section that isn't empty. `-a` also reveals `.secret` and `.env` (§5). `ls /proc` and `ls /proc/self` list the `/proc` files |
 | `cd <path>` | A section scrolls there and closes the overlay, routing home first from another view; `tools`, `tools/<id>`, `watch/<code>` and `radio/<code>` go through `goTo()` (§11) |
 | `pwd` | The view plus the current section — `/home/couvbat/projects`, `/home/couvbat/tools/image` |
 | `tools [<id>]` | Lists the tools from `tools/registry.ts`, or opens one |
-| `cat <file>` | `about.txt`, `skills.txt`, `contact.txt`, `now.txt`, `projects/<id>.md`, `.secret`, `.env` |
+| `cat <file>` | `about.txt`, `skills.txt`, `contact.txt`, `now.txt`, `projects/<id>.md`, `.secret`, `.env`, `/proc/…` |
 | `diff <a> <b>` | Line diff of any two files the fake filesystem resolves |
 | `ping <section\|view>` | Four paced fake replies and an rtt summary, then `cd`s there |
 | `open <target>` | `github`, `linkedin`, `soundcloud`, `steam`, `email` — opens in a new tab |
@@ -431,15 +456,28 @@ refused: it survives a reload, so `alias ls=rickroll` would be a lockout rather 
 LCS line diff (`terminal/diff.ts`) rendered `-`/`+`/context. No dependency: the files are a few
 dozen lines each, so the O(n·m) table is cheaper than a diffing library.
 
+`/proc` needs no shaped filesystem. `resolveFileLines()` hands any `/proc/…` path to
+`commands/proc.ts`, as it already answered `/etc/shadow` by its absolute path, and `ls` asks
+`listProc()` before `shellPath()` would read `/` as home, once `.` and `..` are folded, so
+`ls /proc/..` lists home as `cd /proc/..` goes there. Each file is computed when it is read.
+`version` is `uname`'s line plus `__BUILD_SHA__` and `__BUILD_TIME__`. `uptime` gives two figures:
+the seconds since `profile.since` (`uptimeSeconds()`, which `neofetch`'s days come from), and as
+idle, those less the tab's own lifetime. `loadavg` prints the presence count only if the stream is
+already open, so `strace cat /proc/loadavg` shows no request. `self/{gpu,hardware,locale,screen}`
+are `readNow()` over the fingerprint tool's `SHELL_GROUPS` (§11), whose rows are all read at once,
+because `cat` can't wait on a render. `cat` offers these paths to Tab only once the word reaches
+into `/proc/`, as it does for `projects/`.
+
 ### content
 Reads from §1, so it can never contradict the page: `about`, `skills [--why]`,
 `projects [--json] [<part>]`, `music`, `gaming`, `hardware [pc|nas|peripherals]`, `contact`, `resume`,
-`neofetch`, `curl`. `skills --why` prints each skill's `usedIn` evidence (a `goTo` path or a repo
+`neofetch`, `calendar`, `curl`. `skills --why` prints each skill's `usedIn` evidence (a `goTo` path or a repo
 URL), and `neofetch` has a `Status` row from `profile.availability`, the same flag the footer and
 both résumés read. `now.txt` is the `/now` list, with the same 90-day staleness rule.
 
 `neofetch` renders an ASCII logo beside a spec block — stack, locale, "uptime" since the first
-commit, and the live Steam status if available. `curl [-I] <domain>[/path]` is a real request to
+commit, a `Season` row on one of the six season days (§5.3), and the live Steam status if
+available. `curl [-I] <domain>[/path]` is a real request to
 this origin, under any name it answers to (§7); any other host gets `curl: (6) Could not resolve
 host` and a note that a browser tab can only reach this site.
 
@@ -463,7 +501,46 @@ scheme shown for three seconds with `previewTheme()`, which saves nothing and is
 the tour ends; the `curl` hint; and the achievement count. It is linkable, so every command it
 runs must be too (`tour.spec.ts`). It runs no game, which would hold the keyboard and switch the
 output's announcements off for the rest of the walk, and names no hidden command. Under reduced
-motion it prints everything at once and shows no scheme.
+motion it prints everything at once and shows no scheme. A stop's `only` keeps it to one layout:
+`?run=tour` is the bio link, mostly opened on a phone, so the touch layout (§9) walks the `why`
+listing instead of the games (which point at `wordle daily`) and leaves out the `curl` hint, and
+names the navbar's 🎨 menu and the stop button where the keyboard walk names `theme` and Ctrl+C.
+
+`xray` (`commands/work.ts`, roadmap §I) toggles `useXray`, and on the way in closes the
+terminal, as `cd` does, since the page is what it shows. `App.vue` then mounts
+`components/XrayLayer.vue` beside `RouterView` (§11: it is fixed chrome). The layer outlines
+every component on screen and gives each distinct file one tag, linked through `lib/source.ts`
+at the build's commit, with the files its words come from. It writes nothing, so it is linkable
+and in the palette. **Build side** (`vite-plugins/xray.ts`): a `nodeTransforms` entry handed to
+`vue()` stamps `data-src="<repo path>"` on each root element of each template under
+`frontend/src`, through `<template v-if>` and the built-ins that render in place. A production
+build keeps a component's `__name` but not its `__file`, so the path has to be written into the
+markup. A template that is one component (`HashTool.vue` is one `<ToolFrame>`) is stamped
+`data-src-outer` instead, because an attribute on a component falls through onto the inner
+root and under the same name would replace the inner file's. The shadcn primitives in
+`components/ui/` aren't stamped. **Words:** `virtual:xray-map` parses each component's imports
+and resolves every name taken from the `@/content` barrel against what the modules in
+`src/content/` export. `types.ts` is left out (shapes and two helpers), and `i18n/messages.ts`
+is added when the component takes `m` from `useLocale()` or imports `messages` itself (the
+toasts do). The map is a chunk of the layer's own, so first paint pays for the attributes
+alone. **Page side** (`lib/xray.ts`, pure but for the DOM it is handed): an element is outlined
+when it is on screen, at least 4 px once its ancestors' overflow has cut it, visible and not
+`inert`. A fixed element covering the screen (the canvas) is tagged in the bottom corner, not
+outlined, and reads `ThreeBackground.vue · N shapes`, N being the spawned and visitor pools from
+`useSceneControl` plus the guestbook's newest entries (`newestSignatures()` over the ticker's
+poll). Repeats of one file share a tag with a count. Tags start at their box's top-left corner
+and stack in document order, so a page's tag sits above its sections'. A tag that has focus
+stays where it was when its component scrolls off, until focus leaves it, rather than taking
+focus down to `<body>` with it. The status chip sits in the bottom-left corner; below `md` it
+stands above the launcher's row with a 44px *exit* button (§9), and the strip beneath it is kept
+free of tags, so the canvas's tag goes above it rather than over the launcher. Turning on is said
+once, in a live region of the layer's own, since the terminal that ran `xray` has closed by
+then. The layer measures again on scroll, resize, transition end and any mutation outside
+itself, at most once a frame. It skips all of this, and leaves `Esc` alone, while something is
+over the page: the terminal or the palette, the matrix rain or the `reboot` replay (each ends on
+any key and claims none), or the swing. CSS alone (`attr(data-src)` in a `::before`) was
+rejected and still is: it would collide with components' own pseudo-elements, and a
+pseudo-element can't carry a link.
 
 ### live
 | Command | Endpoint | Fallback |
@@ -565,7 +642,8 @@ Full design in [the first games spec](superpowers/specs/2026-08-04-terminal-game
 
 ## 4. Command palette
 
-**Where:** `frontend/src/components/CommandPalette.vue`
+**Where:** `frontend/src/components/CommandPalette.vue`, `frontend/src/lib/search.ts`,
+`frontend/vite-plugins/search.ts`
 
 `Ctrl+K` / `Cmd+K` opens a filtered list of the views, the sections and every command flagged
 `palette: true` — `help`, the content and live-data commands, `tools`, `games`, `achievements`,
@@ -575,6 +653,28 @@ opens the terminal with that command already run.
 
 This exists so the ~90% of visitors who will never type into a terminal still get the fast path.
 It shares the registry, so it needs no separate maintenance.
+
+**Content search** (roadmap §I). Matching is `lib/search.ts`: the query is split into words,
+folded as the word games fold with œ and æ spelt out (`coeur` finds *cœur*), and every word
+has to start a word of the entry; a match in a
+title outranks one in a note's heading, which outranks one in body text. The matcher isn't in the
+first paint: it comes by `import()` on the palette's first open, with the registry, and until it
+lands (a frame on a cached site) the list filters by plain substring. If its chunk never comes,
+offline before the precache has it or in a tab older than the deploy, the palette says the
+search didn't load rather than that nothing matches, and asks no more: the module map keeps a
+failed module for the page's life. From three characters
+the palette also fetches `/search.json`, which `vite-plugins/search.ts` writes at build time: one
+entry per case study, per `why` topic, per heading of every design note (with the id the notes
+plugin gave it) and for `/now`, each cut to about two hundred characters, in both languages where
+the source has them and notes in their own, marked. Fetched, not bundled, so the eager chunk
+carries none of it; like the notes, it is out of the precache, off the SPA fallback and
+`no-cache`. Results sit under the palette's own entries, grouped by kind, six at most per kind.
+A case study routes, a note heading is a plain navigation to its anchor, and a `why` result runs
+`why <topic>` through the `?run=` path (so `isLinkable` checks it), at every width: below `md`, in
+the touch layout (§9). Phones have no Ctrl+K, so the navbar menu has a *search* entry that
+opens the palette; there it lists only the commands the touch layout has a button for, and runs
+them there, since `lang`, `play` or `mail` would have nothing to do without a keyboard. `content/__tests__/search.spec.ts` holds every case study, decision and note
+heading to an entry.
 
 ---
 
@@ -605,7 +705,7 @@ It shares the registry, so it needs no separate maintenance.
 | `play` | Scrolls to the music section and starts the SoundCloud embed |
 | `acid [<code>]` | Plays the acid tool's pattern, or a shared code's, with a frame playhead read off the audio clock (§11). `writes: 'local'`, so no link may start it |
 | `cowsay <text>` | ASCII cow |
-| `fortune` | Random dev aphorism |
+| `fortune` | Random dev aphorism, in the visitor's language; on a season's day, from that season's pool (§5.3) |
 | `sl` | ASCII train, animated across the buffer |
 | `rickroll` | Asks for confirmation first, because doing it unprompted is rude |
 | `ps` (aliases `ps aux`, `ps -ef`) | Fake process table of the site's own "services", partly derived from real page state — `crt-shader.ko` only appears while overdrive is on, `soundcloud-embed --autoplay` only after playback starts, and `[rm -rf /] <defunct>` is a permanent zombie |
@@ -758,6 +858,44 @@ mounted, so coming back to *full* or *calm* picks the scene up where it stood.
   push as the ring passes, added to its target like the gravity well's, so the ordinary drift
   carries it out and back. Allocation-free, gone after 2.6 s, and only at *full* motion with the
   loop running; a wave that lands while the field is calm or still isn't drawn.
+- **Seasons** — `content/seasons.ts` lists six days: 31 October, 21 December (the winter
+  solstice, as a fixed date), 1 January, the month and day of `profile.since`, 21 June (the
+  Fête de la Musique) and 1 April. April Fools' mood has the one negative speed, which only
+  multiplies each shape's spin, so the field turns the other way and nothing else changes. `seasonOn(at)`
+  reads the visitor's local calendar, since Halloween starts at their midnight, and the field
+  re-reads it at each midnight and at least once a minute (`components/season.ts`): a timer
+  set for midnight alone would wait out however long the device slept. A season's palette
+  (`components/palette.ts`, which holds every palette and `pickPalette()`'s ranking so a spec
+  can check it without WebGL) ranks under the completionist's and above the view's and the
+  section's. Its speed and opacity are a second `{ speed, opacity }` pair multiplied into the
+  weather's, so they apply whichever palette wins; the season palette's own speed is 1, so the
+  speed counts once. Slots, never colours, so a season repaints inside the visitor's scheme.
+  The same day gives `fortune` its own pool (`content/fortunes.ts`, `Localised` like the
+  everyday lines) and adds one line to `neofetch` and one to the boot log. No achievement:
+  `completionist` would then wait up to a year on the calendar, when every other achievement
+  waits on the visitor.
+- **Guestbook entries** — the newest twelve entries are wireframes, in a third pool beside the
+  visitors' that `spawn`, `scene reset`, the accent count and the constellation never see. They
+  come from the ticker's own poll (§8, live guestbook ticker), so the field makes no request,
+  and with the guestbook off there are none. `components/signatures.ts` holds the pure part:
+  `newestSignatures()` picks the twelve by date, and `shapeLayout()` is the one distribution
+  every shape in the field is drawn from, given `Math.random` for the others and
+  `seededRandom(id)` (FNV-1a, then mulberry32) for an entry. So an entry is the same kind in
+  the same place with the same spin on every visit, and its place scales with the screen's
+  width as any shape's does. A view swing re-homes it to that place rather than to a fresh one,
+  and one that arrives mid-swing is placed in the frame the swing will leave, so it lands there
+  too. An entry that leaves the page, deleted with `sudo rm` or pushed off by a newer one, fades
+  out as a departing visitor does, within one poll; while it fades it can't be clicked. A tab
+  whose ticker has given up (three failed polls in a row) lets them all go, since no later poll
+  would bring it a deletion.
+  A shape carries no text: clicking one reads `<kind> · signed by <name>, <day>`, the day on the
+  visitor's calendar in their language, through the same text interpolation as every label, and
+  never the message. The canvas carries `data-signatures`, the count of entries staying, as the
+  e2e suite's one window into the scene. **Open question:** the backend rejects links but filters
+  nothing else, and the owner's delete is the only moderation. A name chosen to offend is
+  still shown only to whoever clicks its shape, and the ticker's toast already shows every new
+  name to everyone on the page, but it now stays one click away for as long as it is among the
+  twelve newest.
 
 **Terminal control** (`composables/useSceneControl.ts`) adds three more knobs, in the same
 flag-and-watch shape as `useMatrix`/`useBoot` — the commands only ever set, the component is the
@@ -778,7 +916,9 @@ label, and holds the camera's gaze on it for 2.2s before easing back to the orig
 stays `pointer-events-none` — a full-screen canvas that eats clicks is a worse bug than a missing
 easter egg — so the listener is on `window` and ignores anything that belongs to the page: links,
 controls, an open terminal, or a click that ended a text selection. Three of the eighteen opening
-shapes are the accent colour; clicking one of those is the `cyanSpotter` achievement.
+shapes are the accent colour; clicking one of those is the `cyanSpotter` achievement. The label
+is centred on the click and then nudged back inside the screen if it overhangs an edge, and it
+wraps rather than run wider than the screen, which a guestbook name can make it on a phone.
 
 ---
 
@@ -792,6 +932,8 @@ shapes are the accent colour; clicking one of those is the `cyanSpotter` achieve
   runs — no `alreadyBooted` gate, and `finish()` clears the flag so it is immediately repeatable.
   The dismiss listeners are armed 300 ms late: the keypress that submitted `reboot` is still
   propagating when the watcher fires, and a window listener attached synchronously would eat it.
+  On a season's day (§5.3) the log gains one line before "all systems nominal", read when the
+  sequence starts.
 - **404** (`NotFoundView.vue`) — `bash: /<path>: No such file or directory`, a `cd ~` button, and
   (desktop only) a hint to open the terminal. Requires `frontend/public/.htaccess` with an SPA
   rewrite; without it Apache 404s before Vue Router ever sees the URL. This closes a gap already
@@ -806,6 +948,93 @@ shapes are the accent colour; clicking one of those is the `cyanSpotter` achieve
 - **Availability and `/now`** — the footer's status line also carries `profile.availability`
   (a filled or hollow dot and the note) and links `/now`, a route outside the prism
   (`views/NowView.vue`, `content/now.ts`). Past 90 days the page says how old the list is.
+- **Events** (`content/events.ts`) — appointments rather than days: each is an instant with its
+  offset written out, a length, a `Localised` title and note, and a `goTo` path or URL. Its `id`
+  is the feed's `UID`, so it never changes once published. While one hasn't ended, `/now` lists
+  it in the visitor's zone with a relative phrase, `calendar` prints the same, and from
+  `SOON_DAYS` (7) before its start the footer's status line names it through
+  `FooterEvent.vue`, which re-reads the clock each minute. The footer only fetches that
+  component while the list has an entry, and the helpers and words all readers share are in
+  `upcoming.ts`, outside the barrel: with the list empty, the home page pays for one array. `vite-plugins/calendar.ts` writes `/events.ics` and `/events.fr.ics` from RFC 5545
+  by hand: CRLF lines folded at 75 octets without splitting a character or an escape, TEXT
+  escaped, every time in UTC. The feed always carries a `VTIMEZONE` for Europe/Paris that no
+  event refers to, because the grammar requires one component and the list is often empty.
+  `calendar` is kept off the curl pages, which are snapshots and can't know what is ahead.
+- **Stems** (`content/stems.ts`, `components/stems/`) — a mixer under the music section's
+  cards, drawn only while `stemTracks` has a track and loaded as its own chunk. Each stem is
+  a file under `public/stems/<track>/`, AAC or MP3 (older Safari can't decode Opus), all of
+  one excerpt's length, because every stem is held decoded at once: 384 kB a second each at
+  48 kHz stereo float, so `stems.spec.ts` caps a track at `MAX_DECODED_BYTES` and holds each
+  file to the `bytes` the load button announces. `load.ts` fetches only on *load*, counting
+  bytes as they arrive; `engine.ts` starts one looping `AudioBufferSourceNode` per stem at
+  one `when` and offset, through a fader each, a Butterworth low-pass, a transport gain that
+  fades play and pause, and a limiter at −1 dB. No master cut: stems sum back to the
+  master, so the loudest setting is the release as mastered. `mix.ts` is the pure part:
+  squared faders, mute over solo as on a desk, an exponential 40 Hz–20 kHz cutoff, and the
+  code `<track>.<base64url(version, count, level and flags per stem, cutoff)>`, refused when
+  the count doesn't match the track's. A hidden tab pauses it, as it stops `acid`. The
+  mixer's chunk, like `FooterEvent`'s, is kept out of the service worker's precache, since
+  neither is fetched while its list is empty.
+- **Save file** (`lib/save-file.ts`, `components/SaveFile.vue` on `/privacy`) — the visitor's
+  chosen groups (settings, progress, scores, shell; never secrets) as one code:
+  `base64url(version · format · payload)`, the payload a JSON object of key to value,
+  deflated with `CompressionStream` where there is one. It travels as `/privacy#save=<code>`,
+  with a QR of the link up to version 20 (the tool's own encoder, loaded on demand). The
+  fragment never reaches the server, and `lib/save-link.ts`, the first module `main.ts`
+  imports, takes it out of the address as it loads, since the router captures the address
+  when its module is evaluated and the analytics tracker reads `location.href`; a link
+  pasted into `/privacy`'s own address bar is caught by a watch on the route instead.
+  Reading a code trusts nothing: only keys `entryFor()` lists in `localStorage`, not
+  secret and not marked `stays` (the refusal of visit counting, which belongs to its browser:
+  a link must not be able to withdraw it), only strings, 64 kB a value and 256 kB unpacked, the second enforced while
+  inflating. Making one holds to the same limits (`fitSave()`), leaving out and naming a
+  value too big rather than offering a link that restores less than it says. A link being
+  made while the choice or the storage changes is thrown away. The page shows each key
+  against what is already stored and writes the changed ones only on restore, through
+  `writeItems()` in `storage-keys.ts` (the one module allowed to touch storage for keys it
+  doesn't own), then reloads, as a clear does; if a full or blocked storage refuses some,
+  it says how many and stays, so the preview shows what's left. The aliases in a save are
+  listed in full there, since they are the one value that later runs commands.
+  A code is someone else's input, so every reader of a key it can carry treats what it finds
+  as untrusted, and no stored value can break a page or leave something out of reach: the
+  daily wordle record must be one the game could have written, and `resumeDaily` drops a
+  guess the board refuses; unknown achievement ids are dropped, a set missing only
+  `completionist` gets it, and `explorer` is checked on every visit; a stage's real CTF flag
+  replaces a stored one that isn't; a forged scheme whose body or muted text misses its floor
+  is refused (`forge.spec.ts` holds every forge across the seed cube to those two floors);
+  alias names are one word, definitions and history lines at most 4 kB, the history base a
+  safe integer; an alias never shadows the first word of a two-word command; and
+  `parse.ts` finds where quotes close in one pass, where it used to rescan the rest of the
+  line for each one, which made a long line of unclosed quotes freeze the tab.
+- **Disclosure policy** (`content/security.ts`, `views/SecurityView.vue`) — `/security`, outside
+  the prism like `/privacy`, and `security.txt` (RFC 9116), which `vite-plugins/security.ts`
+  builds from the same module: `Contact`, an `Expires` `EXPIRES_DAYS` (180) after the build,
+  `Policy`, `Acknowledgments` and both `Canonical` addresses. The file is at the root and
+  `.htaccess` answers `/.well-known/security.txt` from it, because the frontend deploy's rsync
+  excludes `.well-known/` whole to protect AutoSSL's challenges; `security.spec.ts` holds the
+  rewrite ahead of the SPA fallback and checks the exclude it works around.
+- **What the site keeps** (`lib/storage-keys.ts`, `views/PrivacyView.vue`) — every key the site
+  writes, with its storage, group, owner, purpose and whether it is a secret, in one list that
+  `du`, `rm` and `/privacy` all read. `storage-keys.spec.ts` reads the source for every `couvbat:`
+  string, a template's head included, and fails on one the list lacks, on a row whose owner no
+  longer writes its key, on any other module touching either storage, and on any cookie or
+  IndexedDB use in the app's code (Workbox's expiry database for `async-chunks` is the one, and
+  both surfaces say so). `/privacy` is a route outside the prism, linked from the footer: the
+  list with a clear button per group (two presses on two buttons, the first turning into Cancel
+  in place), the service worker's caches and the browser's estimate, and two things no page can
+  list: the ffmpeg core in the HTTP cache, and the embeds' storage under their own origins. Then
+  the privacy claims, each one the code keeps, with `strace` as the way to check them, a button
+  to refuse Umami (`couvbat:analytics`, read before the tracker is injected, so a refusal sends
+  nothing at all, and Umami's own `umami.disabled` beside it, which stops a tracker already
+  running in any tab), and the GDPR's part: who answers for the data, on what basis, and the
+  visitor's rights. Caches are reported, never cleared: they hold the site's own files, and a
+  clear would only cost a download.
+- **`/legal` and consent** (`views/LegalView.vue`, `content/legal.ts`) — the mentions légales
+  (publisher, host, CDN), the guestbook's rules and a way to report an entry, and the credits the
+  data sources ask for, which `weather` and `btc` also print under their data. Nothing third-party
+  that sets cookies loads unasked: the music section's SoundCloud frame waits behind a button
+  (`useMusicPlayer().playerLoaded`), and `play` counts as pressing it. Nothing remembers the
+  choice, so no banner and no consent record are needed.
 - **`/ctf`** — the 404 page recognises the path `robots.txt` "disallows" and says it is a command,
   not a page.
 - **Screensaver** (`composables/useIdle.ts`) — three idle minutes with the tab visible fade every
@@ -846,7 +1075,9 @@ spec names a reason for each other exclusion (`curl`, `ctf`, `achievements`, `ga
 `resume`, `help`). Each runs in both locales under two clocks years apart, and any line that
 differs is dropped, which removes the uptimes and durations that would otherwise go stale between
 regenerations; `resume` is excluded for that reason, since its durations are the point and the
-bare host already serves them fresh. A harness option makes `capture` and `prompt` throw, so a
+bare host already serves them fresh. Neither clock falls on a season (§5.3) at any UTC offset,
+which the same spec checks, so no page carries a line that belongs to one day of the year.
+A harness option makes `capture` and `prompt` throw, so a
 page can never be half of an interactive command. `.htaccess` serves the pages only to `curl`,
 `wget` and `httpie`, not the crawler list `/` uses (a crawler asking for `/about` wants what a
 browser gets), French when `Accept-Language` starts with `fr`, and only when the file exists.
@@ -1063,6 +1294,12 @@ up entirely after three consecutive failures, or the first response saying the g
 floating notices fighting for the same corner reads as a bug. Clicking it opens the terminal with
 `guestbook` already running.
 
+The same poll keeps the page it fetched, which the field draws as wireframes (§5.3, guestbook
+entries). Each poll replaces it, so a deleted entry drops out on the next one; the guestbook
+saying it is off empties it; a failed poll leaves it as it was, since a blip is not a deletion;
+and a ticker that gives up after three failures empties it, since a deletion could no longer
+reach it.
+
 ### Guestbook
 
 **Off by default.** `GUESTBOOK_ENABLED` must be set to `true`. A publicly writable text field on a
@@ -1173,12 +1410,20 @@ Retrofitting these is painful, so they are part of the definition of done:
   `games`): while a command holds the keyboard the region drops to `aria-live="off"`, because a
   grid redrawn eight times a second through a polite live region is actively hostile. These are
   visual games and a screen reader cannot play them; announcing the redraws would not change that.
-- Command palette: `role="listbox"`, arrow-key navigation, `aria-activedescendant`.
+- Command palette: `role="listbox"`, arrow-key navigation, `aria-activedescendant`. Content
+  results are `role="group"`s labelled by their kind, as in the APG's grouped listbox, and a note
+  in the other language carries `lang` and says which.
 - Achievements modal: same hand-rolled pattern as the terminal overlay — `role="dialog"`,
   `aria-modal="true"`, `Tab`/`Shift+Tab` cycled inside the panel, focus moved to the close button
   on open and restored to the nav button on close.
 - Achievement toast: `role="status"` with `aria-live="polite"`, so an unlock is announced without
   stealing focus from whatever the visitor was doing.
+- X-ray layer (§3 `xray`): the tags are ordinary links in a labelled `<nav>`, and the layer comes
+  after the page in the DOM, so the page's own tab order is untouched and Tab reaches the tags
+  last. Nothing is focused when it opens and nothing traps focus. A tag's arrows are
+  `aria-hidden`, with "words from" and "through" read in their place; the outlines are
+  `aria-hidden`. `Esc` ends it unless a dialog has claimed the key first, and so does an *exit*
+  button, since a phone has no `Esc`. Focus on a tag at that moment goes back where it came from.
 - **Motion control** (WCAG 2.2.2, pause, stop, hide). The wireframes move for as long as the
   page is open, and before this only the OS setting could stop them. `composables/useMotion.ts`
   holds *full · calm · paused*, saved under `couvbat:motion`, restored in `main.ts` before mount
@@ -1215,10 +1460,34 @@ Retrofitting these is painful, so they are part of the definition of done:
   `SectionHeader`'s `<h2>`; a source-scan spec (`views/__tests__/headings.spec.ts`) holds every
   view to exactly one. A *Skip to content* link comes first in the page and focuses the heading
   itself, so its hash never goes through the router.
-- The launcher is `hidden` below `md`. Mobile virtual keyboards fight fixed-position input panels
-  badly enough that a bad terminal is worse than none; mobile users get the full rendered page,
-  which carries the same information. `Ctrl+K` remains available for anyone on a tablet with a
-  keyboard.
+- **No prompt below `md`.** Mobile virtual keyboards fight fixed-position input panels badly
+  enough that a bad prompt is worse than none, and the rendered page carries the same
+  information. So below `md` (`DESKTOP_QUERY` in `composables/useTerminalShell.ts`) the launcher
+  opens the overlay in its **touch layout**, which has no input anywhere, so no keyboard opens:
+  output above, and in place of the prompt one scrolling row of buttons in `help`'s groups
+  (`TapBar.vue`). The buttons are `terminal/tap.ts`'s `tapCommands()`, built from the registry:
+  a command for which `isLinkable(c, [])` holds, and each first argument its `complete()` offers
+  that `isLinkable(c, [arg])` accepts (`projects qr`, `why polling`, `hardware nas`), so a button
+  can run nothing a `?run=` link couldn't. A command with arguments opens a row of its own lines,
+  with an arrow back, so the row stays about thirty buttons long. Left out: the games and their
+  listing, the text commands that read a pipe (`grep`, `head`…), and the arguments of `help`,
+  `man` and `strace` that name another command (`man jules` stays). A tap runs through
+  `runLink()`, and in the touch layout the shell runs every stage with `tty: false`, so anything
+  that would hold the keyboard degrades as it does in a pipe: a game answers "not a tty" (with
+  the reason that there is no keyboard here), and `man` prints instead of paging. A stop button
+  does what Ctrl+C does, while a command runs; the rest of the row is `aria-disabled` then, and
+  never `disabled`, which would drop focus out of the dialog. The title bar is a title and a
+  44px close button; `Esc` still closes. The dialog itself takes focus on open. Targets are at
+  least 44px, the gutters 16px, and the panel and launcher clear `env(safe-area-inset-bottom)`.
+  A batch of output is scrolled to its first line rather than its last, since one `resume` is
+  several screens of a phone. Everything else that runs a line goes the same way below `md`:
+  `?run=` links (`useRunLink` reads them at every width), the guestbook toast and the palette
+  (through `openTerminal()`, which hands a line over as a link there), links in the output, and
+  a case study's *try it* and decisions, except a *try* that is a game, which is named instead
+  (`triesOnPhone()` in `terminal/work.ts`, held to the shell's rule by `tap.spec.ts`). `Ctrl+K`
+  remains available for anyone on a tablet with a keyboard. Phones reach the palette from the
+  navbar menu's *search* (§4); its input is 16px there, since iOS zooms the page into any
+  smaller one on focus.
 
 ## 10. Explicitly out of scope
 
@@ -1226,7 +1495,9 @@ Retrofitting these is painful, so they are part of the definition of done:
   schemes exist only as opt-in choices, through `theme` or the navbar's scheme menu (§3 core), and the achievement for picking one is
   called Flashbang. That is this entry's position, stated as a joke.
 - **Blog** — infrastructure without content is worse than no infrastructure.
-- **Terminal on mobile** — see §9.
+- **A prompt on mobile** — see §9. Phones get the touch layout, which runs what a link could and
+  takes no typing; anything that needs a keyboard (the games, `theme`, `sign`, `ask`) stays a
+  desktop's.
 
 ## 11. Views, the prism swing and the tools page
 
@@ -1241,7 +1512,10 @@ this section only fixes the rules the code cites.
 - **One navigation function.** `goTo(target)` takes anything `cd` accepts and is what the navbar,
   the palette and `CommandContext.navigate` all call. A section on another view routes home with a
   hash and is scrolled to once the swing settles. `resolvePath` is the shared resolver, so `cd`
-  can say "No such file or directory" for the same inputs `goTo` refuses.
+  can say "No such file or directory" for the same inputs `goTo` refuses. `ls`, `cd` and `ping`
+  first rewrite the forms only a shell uses, through `shellPath()`: the `/home/<handle>/…` that
+  `pwd` prints, and `.` and `..` read against where you are. That leaves `resolvePath` reading
+  the same paths for every caller.
 - **The swing is one clock with three readers.** `useViewSwing` eases 0→1 once; `App.vue` binds it
   as CSS custom properties on the stage that rotates the two pages as faces of a prism, and
   `ThreeBackground` yaws the wireframe *field* (not the camera — see the spec for why), re-homes
@@ -1250,7 +1524,7 @@ this section only fixes the rules the code cites.
   The leaving face is `inert` from the `<Transition>`'s `leave` to its removal, so in every frame
   exactly one `<main>` can be reached; and `settled`, a counter bumped when a swing ends or the
   pages swap, is what `usePageFocus` waits on (§9).
-- **Pages outside the prism.** `/now` and `/work/<id>` are routes but not views: they are reached
+- **Pages outside the prism.** `/now`, `/privacy`, `/legal`, `/security` and `/work/<id>` are routes but not views: they are reached
   from links, not the navbar, so the prism keeps its four faces, and `viewIndex()` puts them after
   the faces so a swing to one still has a direction. `cd` doesn't reach them, because
   `resolvePath` is shared by four callers. Each names itself in `tabTitle()`.
@@ -1258,7 +1532,7 @@ this section only fixes the rules the code cites.
   duration of a swing. Fixed chrome lives in `App.vue`, beside `RouterView`.
 - **The tool registry is the API** (`tools/registry.ts`), exactly as §2 says of commands: the page,
   `ls tools`, `cd tools/<id>`, the `tools` command and Tab derive from one array. Metas are plain
-  data in both locales; each tool's maths lives in a pure `.ts` beside its panel and is tested in
+  data in both locales, kept apart from the panels in `content/tools.ts` so the build can read them; each tool's maths lives in a pure `.ts` beside its panel and is tested in
   jsdom. Client-side tools never send a file anywhere; the page says so once.
 - **The image tool checks its own claim** (`tools/image/metadata.ts`). Before converting, it lists
   what the file gives away; afterwards it runs the same parser on its output and shows "0 fields —
@@ -1324,6 +1598,17 @@ this section only fixes the rules the code cites.
   shell's `acid [<code>]` writes `local`, so `isLinkable` keeps every link from starting sound,
   and it stops on Ctrl+C, a hidden tab, the overlay closing, or after two minutes. Under reduced
   motion neither draws the playhead.
+- **`fingerprint` reads only when it is asked to** (`tools/fingerprint/`). `fingerprint.ts` is
+  pure: the browser arrives as a `FingerprintEnv`, which `environment.ts` builds and only the
+  panel (on mount and on *read again*) and a `/proc/self` read (§3) call for, so the rest of the
+  site still reads none of it.
+  Rows read at once (`readNow`) are kept apart from those that render or ask (`readLater`: the
+  canvas, the audio and the high-entropy client hints), and a read that throws is *not
+  available*, never an error. **No uniqueness score**: an honest one needs population
+  frequencies the site doesn't have. Instead, a combined SHA-256 over `id=value` lines of the
+  ticked rows that have a value, so it is the same in either language. A spec spies on `fetch`,
+  XHR and `sendBeacon` during a read and scans the folder, and every module it imports however
+  far down, for any network API.
 - **The admin tier is hidden, not secret** (`download`, `lib/admin.ts`). `visibleTools()` leaves
   it out of the page, `tools`, `ls tools` and Tab until the owner unlocks — `sudo -i` in the
   terminal, or the panel's own field — but `findTool` still resolves it, so `cd tools/download`

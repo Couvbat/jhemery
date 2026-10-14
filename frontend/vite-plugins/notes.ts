@@ -21,7 +21,7 @@ import { escapeHtml, renderMarkdown } from './markdown'
  */
 
 const SPEC_DIR = fileURLToPath(new URL('../../docs/superpowers/specs/', import.meta.url))
-const SPEC_PATH = 'docs/superpowers/specs'
+export const SPEC_PATH = 'docs/superpowers/specs'
 const REPO = 'https://github.com/Couvbat/jhemery'
 
 export interface Note {
@@ -29,9 +29,16 @@ export interface Note {
   slug: string
   /** The `# ` heading, as plain text. */
   title: string
+  /**
+   * The heading without the "Design spec — " half the later specs open with, which is
+   * what every note is: the title of its page, its line on the index and in `llms.txt`.
+   */
+  name: string
   /** `YYYY-MM-DD`, from the file name. */
   date: string
   lang: Locale
+  /** What a search result says under the title, as plain text (`noteDescription`). */
+  description: string
   /** The rendered body. */
   html: string
 }
@@ -64,15 +71,70 @@ export function rewriteLink(href: string, sha: string): string {
   return `${REPO}/blob/${sourceRef(sha)}/${resolved}${anchor}`
 }
 
+/** Markdown inline syntax as the words it marks up: links as their text, no backticks or stars. */
+function plainText(markdown: string): string {
+  return markdown
+    .replace(/\[([^\]]*)\]\([^)]*\)/g, '$1')
+    .replace(/`([^`]*)`/g, '$1')
+    .replace(/(\*\*|__|\*|_)(\S(?:[\s\S]*?\S)?)\1/g, '$2')
+    .replace(/\s+/g, ' ')
+    .trim()
+}
+
+/** At most `max` characters, ending on a full sentence where one ends far enough in. */
+function clip(text: string, max = 200): string {
+  if (text.length <= max) return text
+  const stop = text.lastIndexOf('. ', max - 1)
+  if (stop >= 80) return text.slice(0, stop + 1)
+  return `${text.slice(0, text.lastIndexOf(' ', max - 1)).replace(/[\s,;:—–-]+$/, '')}…`
+}
+
+const GOAL = /\b(Goal|Objectif)\s?:\s*/
+
+/**
+ * What a search result says under a note's title. Every note but one opens with a status
+ * line (how it ended) and then `## Context`, whose first paragraph says what the note is
+ * about, so that is the description, from its *Goal:* where it states one. A paragraph
+ * that ends by introducing a list loses that sentence and runs on into the next one. A
+ * note with no context section has its purpose in the status line, after the first
+ * sentence, which is the status itself.
+ */
+export function noteDescription(markdown: string): string {
+  const blocks = markdown.split(/\n\s*\n/).map((block) => block.trim())
+  const context = blocks.findIndex((block) => /^##\s+(Context|Contexte)\s*$/.test(block.split('\n')[0]!))
+  if (context === -1) {
+    const status = blocks.find((block) => /^(Status|Statut)\s?:/.test(block)) ?? ''
+    return clip(plainText(status.replace(/^[^.]*\.\s*/, '')))
+  }
+  const section: string[] = []
+  for (const block of blocks.slice(context + 1)) {
+    if (block.startsWith('#')) break
+    // Prose only: lists, tables, code and quotes are no sentence to stand alone.
+    if (!/^([-*|>]|```|\d+\.)/.test(block)) section.push(block)
+  }
+  const at = Math.max(0, section.findIndex((block) => GOAL.test(block)))
+  let chosen = section[at] ?? ''
+  if (chosen.endsWith(':')) chosen = `${chosen.replace(/[^.]*:$/, '').trim()} ${section[at + 1] ?? ''}`
+  const goal = GOAL.exec(chosen)
+  if (!goal) return clip(plainText(chosen))
+  // "Goal: show real Steam activity" reads as a sentence once it starts like one.
+  const text = plainText(chosen.slice(goal.index + goal[0].length))
+  return clip(`${text.charAt(0).toUpperCase()}${text.slice(1)}`)
+}
+
 export function readNote(file: string, sha: string): Note {
   const markdown = readFileSync(`${SPEC_DIR}${file}`, 'utf8')
   const { html, title } = renderMarkdown(markdown, { file, rewriteLink: (href) => rewriteLink(href, sha) })
+  const plain = title.replace(/`/g, '')
+  const name = plain.replace(/^Design spec — /, '')
   return {
     file,
     slug: noteSlug(file),
-    title: title.replace(/`/g, ''),
+    title: plain,
+    name: `${name.charAt(0).toUpperCase()}${name.slice(1)}`,
     date: file.slice(0, 10),
     lang: noteLang(markdown),
+    description: noteDescription(markdown),
     html,
   }
 }
@@ -88,16 +150,45 @@ const ABOUT: Record<Locale, { en: string; fr: string }> = {
   },
 }
 
-function page(lang: Locale, title: string, path: string, body: string): string {
+interface Head {
+  lang: Locale
+  title: string
+  /** Served path: `/notes/ctf-flag-chain`. */
+  path: string
+  description: string
+  /** `YYYY-MM-DD`: a note is an article, the index is not. */
+  date?: string
+}
+
+/**
+ * The head a search result and a link preview read: the note's own description, and the
+ * site's card image, since a note has no picture of its own. No JSON-LD: these pages carry
+ * no `<script>` of any kind, and `notes.spec.ts` holds them to it.
+ */
+function page({ lang, title, path, description, date }: Head, body: string): string {
   const base = `https://${profile.domain}`
+  const e = escapeHtml
+  const article = date
+    ? `
+  <meta property="og:type" content="article">
+  <meta property="article:published_time" content="${date}">`
+    : `
+  <meta property="og:type" content="website">`
   return `<!DOCTYPE html>
 <html lang="${lang}">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>${escapeHtml(title)}</title>
-  <meta name="description" content="${escapeHtml(`Design notes written while building ${profile.domain}.`)}">
-  <link rel="canonical" href="${base}${path}">
+  <title>${e(title)}</title>
+  <meta name="description" content="${e(description)}">
+  <link rel="canonical" href="${base}${path}">${article}
+  <meta property="og:site_name" content="${e(profile.name)}">
+  <meta property="og:url" content="${base}${path}">
+  <meta property="og:title" content="${e(title)}">
+  <meta property="og:description" content="${e(description)}">
+  <meta property="og:image" content="${base}/og-image.png">
+  <meta property="og:locale" content="${lang === 'fr' ? 'fr_FR' : 'en_US'}">
+  <meta name="twitter:card" content="summary_large_image">
   <link rel="stylesheet" href="/notes.css">
 </head>
 <body>
@@ -112,9 +203,13 @@ export function buildNote(note: Note, sha: string): string {
   const other: Locale = note.lang === 'en' ? 'fr' : 'en'
   const source = `${REPO}/blob/${sourceRef(sha)}/${SPEC_PATH}/${note.file}`
   return page(
-    note.lang,
-    `${note.title} — design note · ${profile.domain}`,
-    `/notes/${note.slug}`,
+    {
+      lang: note.lang,
+      title: `${note.name} — design note · ${profile.domain}`,
+      path: `/notes/${note.slug}`,
+      description: note.description,
+      date: note.date,
+    },
     `  <nav class="screen-only">
     <a href="/notes/">← all notes</a> · <a href="/">${escapeHtml(profile.domain)}</a> · <a href="${escapeHtml(source)}">source</a>
   </nav>
@@ -132,13 +227,16 @@ export function buildNotesIndex(notes: Note[]): string {
     .sort((a, b) => b.date.localeCompare(a.date))
     .map(
       (note) =>
-        `      <li><time datetime="${note.date}">${note.date}</time> <a href="/notes/${note.slug}" hreflang="${note.lang}">${escapeHtml(note.title)}</a>${note.lang === 'fr' ? ' <span class="tag" lang="en">(in French)</span>' : ''}</li>`,
+        `      <li><time datetime="${note.date}">${note.date}</time> <a href="/notes/${note.slug}" hreflang="${note.lang}">${escapeHtml(note.name)}</a>${note.lang === 'fr' ? ' <span class="tag" lang="en">(in French)</span>' : ''}</li>`,
     )
     .join('\n')
   return page(
-    'en',
-    `Design notes · ${profile.domain}`,
-    '/notes/',
+    {
+      lang: 'en',
+      title: `Design notes · ${profile.domain}`,
+      path: '/notes/',
+      description: `Design notes written while building ${profile.domain}: one per piece of the site, with what was chosen and what was turned down.`,
+    },
     `  <nav class="screen-only"><a href="/">← ${escapeHtml(profile.domain)}</a></nav>
   <main>
     <h1>Design notes</h1>

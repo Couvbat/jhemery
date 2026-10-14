@@ -1,40 +1,96 @@
 <script setup lang="ts">
 import { computed, nextTick, onMounted, onUnmounted, ref, shallowRef, watch } from 'vue'
-import { sections, views } from '@/content'
+import { sections, views, type Locale } from '@/content'
+import type { SearchIndex } from '@/content/search'
 import { useLocale } from '@/i18n'
-import { openTerminal } from '@/composables/useTerminalShell'
+import { DESKTOP_QUERY, openTerminal, openTerminalFromLink } from '@/composables/useTerminalShell'
 import { paletteOpen } from '@/composables/usePalette'
-import { goTo } from '@/composables/useViewSwing'
+import { goTo, routeTo } from '@/composables/useViewSwing'
+import { linkTarget, type LinkTarget } from '@/terminal/links'
 import type { Command } from '@/terminal/types'
 
-const { t, m } = useLocale()
+const { t, m, locale } = useLocale()
 
 const open = paletteOpen
 const query = ref('')
 const cursor = ref(0)
 const inputEl = ref<HTMLInputElement | null>(null)
-const listEl = ref<HTMLUListElement | null>(null)
+const listEl = ref<HTMLElement | null>(null)
 let previouslyFocused: HTMLElement | null = null
 
 interface Entry {
   id: string
   label: string
   hint: string
+  /** A design note's language: the notes aren't translated, so a result can be in the other one. */
+  lang?: Locale
   run: () => void
 }
 
-// The full command registry (every command, the guestbook client, the vim
-// editor...) is a separate chunk — fetched only the first time the palette is
-// actually opened, so it costs nothing for visitors who never press Ctrl+K.
+interface Group {
+  id: string
+  /** None for the palette's own entries, which come first, as they always have. */
+  label?: string
+  entries: Entry[]
+  /** Where the group's first entry sits in the flat list the cursor walks. */
+  start: number
+}
+
+/**
+ * Whether the terminal has a prompt: the launcher's breakpoint (§9). Read when the
+ * palette opens, which below it is only from the navbar menu's *search*. Below it a
+ * command runs in the touch layout, so the palette offers only what has a button there.
+ */
+const wide = ref(true)
+
+function isWide(): boolean {
+  return typeof window.matchMedia !== 'function' || window.matchMedia(DESKTOP_QUERY).matches
+}
+
+// The full command registry (every command, the guestbook client, the vim editor...)
+// is a separate chunk — fetched only the first time the palette is actually opened,
+// so it costs nothing for visitors who never press Ctrl+K.
 const registryCommands = shallowRef<Command[]>([])
+/** The lines the touch layout has a button for: `lang`, `play` or `mail` would have nothing to do there. */
+const tapped = shallowRef<ReadonlySet<string>>(new Set())
 let registryRequested = false
 
+/**
+ * The scorer (`lib/search.ts`) comes on first open too, and only ever through this
+ * `import()`: a static import of anything in it would keep all of it in the first paint,
+ * which the home page's byte budget can't spare. Until it lands, a frame or so on a cached
+ * site, the list filters by plain substring as it did before the scorer existed.
+ */
+const searchLib = shallowRef<typeof import('@/lib/search') | null>(null)
+const scorerFailed = ref(false)
+
+/**
+ * Either chunk can fail to come: offline before the service worker has precached it, in a
+ * window that runs none, or asked for by a tab older than the deploy that removed it. Unlike
+ * the index, it isn't asked for again: the module map keeps a failed module for the page's
+ * life, and Chromium answers a second `import()` from it without a request. So the palette
+ * keeps its sections and views, and says the search didn't load, not that nothing matches.
+ */
 function loadRegistryCommands() {
   if (registryRequested) return
   registryRequested = true
-  void import('@/terminal/registry').then(({ paletteCommands }) => {
-    registryCommands.value = paletteCommands()
-  })
+  Promise.all([import('@/terminal/registry'), import('@/terminal/tap')]).then(
+    ([{ paletteCommands }, { tapLines }]) => {
+      registryCommands.value = paletteCommands()
+      tapped.value = new Set(tapLines())
+    },
+    () => {
+      // The sections and views are the palette's own, and stay.
+    },
+  )
+  import('@/lib/search').then(
+    (lib) => {
+      searchLib.value = lib
+    },
+    () => {
+      scorerFailed.value = true
+    },
+  )
 }
 
 /**
@@ -57,31 +113,96 @@ const entries = computed<Entry[]>(() => [
       hint: t(v.heading),
       run: () => goTo(v.id),
     })),
-  ...registryCommands.value.map((c) => ({
-    id: `cmd:${c.name}`,
-    label: c.name,
-    hint: t(c.description),
-    run: () => openTerminal(c.name),
-  })),
+  // `openTerminal` runs it as a link below `md`, in the touch layout.
+  ...registryCommands.value
+    .filter((c) => wide.value || tapped.value.has(c.name))
+    .map((c) => ({
+      id: `cmd:${c.name}`,
+      label: c.name,
+      hint: t(c.description),
+      run: () => openTerminal(c.name),
+    })),
 ])
 
-const filtered = computed(() => {
-  const needle = query.value.trim().toLowerCase()
-  if (!needle) return entries.value
-  return entries.value.filter(
-    (e) => e.label.toLowerCase().includes(needle) || e.hint.toLowerCase().includes(needle),
-  )
+/** Split into words once per change of list or locale, not once per keystroke. */
+const pool = computed(() => {
+  const lib = searchLib.value
+  return lib ? entries.value.map((e) => lib.searchable(e, { title: e.label, text: e.hint })) : []
 })
 
 /**
+ * `/search.json`: the case studies, the `why` topics, the notes' headings and /now. Not
+ * fetched at load, nor for a query too short to search with: the home page is near its
+ * byte budget, and most visitors never search.
+ */
+const index = shallowRef<SearchIndex | null>(null)
+const indexState = ref<'idle' | 'loading' | 'failed'>('idle')
+
+watch([query, searchLib], ([value, lib]) => {
+  if (!lib || index.value || indexState.value !== 'idle' || !lib.wantsIndex(value)) return
+  indexState.value = 'loading'
+  lib.loadSearchIndex().then(
+    (loaded) => {
+      index.value = loaded
+      indexState.value = 'idle'
+    },
+    () => {
+      // Tried again once the palette is reopened, rather than on every keystroke.
+      indexState.value = 'failed'
+    },
+  )
+})
+
+/** A result's target, followed the way a link in the terminal's output is (`terminal/links.ts`). */
+function follow(target: LinkTarget) {
+  if (target.kind === 'route') routeTo(target.path)
+  else if (target.kind === 'document') window.location.assign(target.href)
+  else if (target.kind === 'external') window.open(target.href, '_blank', 'noopener')
+  // Through the `?run=` path, not `openTerminal`: the line comes from a fetched file, so
+  // the shell checks it the way it checks a link (`why <topic>` passes).
+  else openTerminalFromLink(target.line)
+}
+
+const groups = computed<Group[]>(() => {
+  const lib = searchLib.value
+  const needle = query.value.trim().toLowerCase()
+  const own = !needle
+    ? entries.value
+    : lib
+      ? lib.rank(pool.value, query.value)
+      : entries.value.filter((e) => `${e.label} ${e.hint}`.toLowerCase().includes(needle))
+  const found = lib && index.value ? lib.searchIndex(index.value, query.value, locale.value) : []
+  const list: Group[] = [{ id: 'own', entries: own, start: 0 }]
+  let start = own.length
+  for (const group of found) {
+    list.push({
+      id: group.kind,
+      label: t(m.search[group.kind]),
+      start,
+      entries: group.results.map((result) => ({
+        id: `${group.kind}:${result.entry.target}`,
+        label: result.label,
+        hint: result.hint,
+        lang: result.lang,
+        run: () => follow(linkTarget(result.entry.target)),
+      })),
+    })
+    start += group.results.length
+  }
+  return list
+})
+
+const filtered = computed(() => groups.value.flatMap((group) => group.entries))
+
+/**
  * The list is capped at `max-h-72`, so arrow-key navigation has to drag the
- * viewport along with it. Rect maths rather than `offsetTop` (the `<ul>` is not
+ * viewport along with it. Rect maths rather than `offsetTop` (the list is not
  * the offset parent) and rather than `scrollIntoView` (which would also scroll
  * the page behind the overlay).
  */
 function scrollCursorIntoView() {
   const list = listEl.value
-  const item = list?.children[cursor.value] as HTMLElement | undefined
+  const item = list?.querySelector<HTMLElement>(`#palette-option-${cursor.value}`)
   if (!list || !item) return
   const listBox = list.getBoundingClientRect()
   const itemBox = item.getBoundingClientRect()
@@ -97,20 +218,35 @@ watch(filtered, async () => {
   if (listEl.value) listEl.value.scrollTop = 0
 })
 
-const activeDescendant = computed(() => {
-  const entry = filtered.value[cursor.value]
-  return entry ? `palette-${entry.id}` : undefined
+const activeDescendant = computed(() =>
+  filtered.value[cursor.value] ? `palette-option-${cursor.value}` : undefined,
+)
+
+/**
+ * Nothing matched yet: say whether what would search is still on its way, or never came.
+ * Until the scorer is in, that is the scorer, whatever the query: the substring stand-in
+ * finding nothing isn't the answer, so it doesn't get to say *Nothing matches*.
+ */
+const emptyMessage = computed(() => {
+  const lib = searchLib.value
+  const state = lib ? (lib.wantsIndex(query.value) ? indexState.value : 'idle') : scorerFailed.value ? 'failed' : 'loading'
+  if (state === 'loading') return t(m.search.loading)
+  if (state === 'failed') return t(m.search.failed)
+  return t(m.palette.empty)
 })
 
-async function show() {
+/** Ctrl+K and the navbar menu both just set `paletteOpen`; this is the rest of opening. */
+watch(open, async (isOpen) => {
+  if (!isOpen) return
   previouslyFocused = document.activeElement as HTMLElement | null
-  open.value = true
   query.value = ''
   cursor.value = 0
+  wide.value = isWide()
   loadRegistryCommands()
+  if (indexState.value === 'failed') indexState.value = 'idle'
   await nextTick()
   inputEl.value?.focus()
-}
+})
 
 function hide() {
   open.value = false
@@ -141,7 +277,7 @@ function onGlobalKeydown(event: KeyboardEvent) {
   if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'k') {
     event.preventDefault()
     if (open.value) hide()
-    else void show()
+    else open.value = true
   }
 }
 
@@ -173,9 +309,10 @@ onUnmounted(() => window.removeEventListener('keydown', onGlobalKeydown))
     leave-active-class="transition duration-100 ease-in"
     leave-to-class="opacity-0"
   >
+    <!-- Nearer the top on a phone, where the keyboard takes the bottom half. -->
     <div
       v-if="open"
-      class="fixed inset-0 z-[70] flex items-start justify-center px-4 pt-[15vh] bg-background/70 backdrop-blur-sm"
+      class="fixed inset-0 z-[70] flex items-start justify-center px-4 pt-4 md:pt-[15vh] bg-background/70 backdrop-blur-sm"
       @click.self="hide"
     >
       <div
@@ -184,54 +321,98 @@ onUnmounted(() => window.removeEventListener('keydown', onGlobalKeydown))
         :aria-label="t(m.palette.open)"
         class="w-full max-w-lg rounded border border-primary/40 bg-card overflow-hidden border-glow"
       >
-        <div class="flex items-center gap-2 px-4 py-3 border-b border-border font-mono text-sm">
+        <!-- 16px below `md`: iOS zooms the page into any input whose text is smaller. -->
+        <div class="flex items-center gap-2 px-4 py-3 border-b border-border font-mono text-base md:text-sm">
           <span class="text-primary">&gt;</span>
           <label for="palette-input" class="sr-only">{{ t(m.palette.open) }}</label>
+          <!-- `:value` and `@input` rather than `v-model`, which ignores the input events of
+               a composition until it ends: an Android keyboard composes every Latin word,
+               so on a phone the list sat still until the word was done. -->
           <input
             id="palette-input"
             ref="inputEl"
-            v-model="query"
+            :value="query"
             role="combobox"
             aria-expanded="true"
             aria-controls="palette-list"
             :aria-activedescendant="activeDescendant"
             autocomplete="off"
+            autocapitalize="off"
+            enterkeyhint="go"
             spellcheck="false"
             :placeholder="t(m.palette.placeholder)"
-            class="flex-1 bg-transparent outline-none text-foreground placeholder:text-muted-foreground caret-primary"
+            class="flex-1 min-w-0 bg-transparent outline-none text-foreground placeholder:text-muted-foreground caret-primary"
+            @input="query = ($event.target as HTMLInputElement).value"
             @keydown="onKeydown"
           />
         </div>
 
-        <ul
+        <!-- Grouped as the APG's grouped listbox: a group per kind of result, its
+             heading a presentational row. The palette's own entries are the unnamed
+             first group, so they read as before. -->
+        <div
           id="palette-list"
           ref="listEl"
           role="listbox"
           :aria-label="t(m.palette.open)"
           class="max-h-72 overflow-y-auto py-1 font-mono text-sm"
         >
-          <li
-            v-for="(entry, i) in filtered"
-            :id="`palette-${entry.id}`"
-            :key="entry.id"
-            role="option"
-            :aria-selected="i === cursor"
-            :class="[
-              'flex items-center gap-3 px-4 py-2 cursor-pointer transition-colors',
-              i === cursor ? 'bg-primary/15 text-primary' : 'text-foreground hover:bg-muted',
-            ]"
-            @click="choose(entry)"
-            @mousemove="onItemMousemove($event, i)"
-          >
-            <span class="truncate">{{ entry.label }}</span>
-            <span class="ml-auto text-xs text-muted-foreground truncate">{{ entry.hint }}</span>
-          </li>
-          <li v-if="!filtered.length" class="px-4 py-3 text-muted-foreground">
-            {{ t(m.palette.empty) }}
-          </li>
-        </ul>
+          <template v-for="group in groups" :key="group.id">
+            <ul
+              v-if="group.entries.length"
+              :role="group.label ? 'group' : 'presentation'"
+              :aria-labelledby="group.label ? `palette-group-${group.id}` : undefined"
+            >
+              <li
+                v-if="group.label"
+                :id="`palette-group-${group.id}`"
+                role="presentation"
+                class="px-4 pt-3 pb-1 text-[10px] uppercase tracking-wider text-muted-foreground"
+              >
+                {{ group.label }}
+              </li>
+              <li
+                v-for="(entry, j) in group.entries"
+                :id="`palette-option-${group.start + j}`"
+                :key="entry.id"
+                role="option"
+                :aria-selected="group.start + j === cursor"
+                :class="[
+                  'flex px-4 py-2 cursor-pointer transition-colors',
+                  // A result's title is what it is, and its hint a sentence, so each gets
+                  // a line: side by side, the hint squeezed the title down to an ellipsis.
+                  group.label ? 'flex-col gap-0.5' : 'items-center gap-3',
+                  group.start + j === cursor ? 'bg-primary/15 text-primary' : 'text-foreground hover:bg-muted',
+                ]"
+                @click="choose(entry)"
+                @mousemove="onItemMousemove($event, group.start + j)"
+              >
+                <span class="flex items-center gap-2 min-w-0">
+                  <span class="truncate" :lang="entry.lang">{{ entry.label }}</span>
+                  <span
+                    v-if="entry.lang && entry.lang !== locale"
+                    class="shrink-0 px-1 rounded border border-border text-[10px] uppercase text-muted-foreground"
+                  >
+                    <span aria-hidden="true">{{ entry.lang }}</span>
+                    <span class="sr-only">({{ t(entry.lang === 'fr' ? m.search.inFrench : m.search.inEnglish) }})</span>
+                  </span>
+                </span>
+                <span
+                  :class="['text-xs text-muted-foreground truncate', group.label ? 'max-w-full' : 'ml-auto']"
+                  :lang="entry.lang"
+                >
+                  {{ entry.hint }}
+                </span>
+              </li>
+            </ul>
+          </template>
+          <p v-if="!filtered.length" class="px-4 py-3 text-muted-foreground">
+            {{ emptyMessage }}
+          </p>
+        </div>
 
-        <div class="px-4 py-2 border-t border-border text-[10px] font-mono text-muted-foreground">
+        <!-- Keys a phone doesn't have. -->
+        <div class="hidden md:block px-4 py-2 border-t border-border text-[10px] font-mono text-muted-foreground">
           {{ t(m.palette.hint) }}
         </div>
       </div>

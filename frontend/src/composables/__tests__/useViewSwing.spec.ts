@@ -13,6 +13,7 @@ vi.mock('@/composables/useActiveSection', () => ({
   currentSection: () => 'projects',
 }))
 
+import { profile } from '@/content'
 import { setMotion } from '../useMotion'
 import {
   SWING_MS,
@@ -21,6 +22,7 @@ import {
   goTo,
   installViewSwing,
   resolvePath,
+  shellPath,
   untilSettled,
   useViewSwing,
   type SwingRouter,
@@ -438,7 +440,77 @@ describe('goTo', () => {
   })
 })
 
+describe('shellPath', () => {
+  const home = `/home/${profile.handle}`
+
+  it('reads the absolute path pwd prints as one under home', () => {
+    expect(shellPath(`${home}/projects`, 'about')).toBe('projects')
+    expect(shellPath(`${home}/tools/image`, 'about')).toBe('tools/image')
+    expect(shellPath(home, 'tools')).toBe('')
+    expect(shellPath(`${home}/`, 'tools')).toBe('')
+  })
+
+  it('reads . and .. against where you are', () => {
+    expect(shellPath('..', 'tools/image')).toBe('tools')
+    expect(shellPath('..', 'projects')).toBe('')
+    expect(shellPath('.', 'projects')).toBe('projects')
+    expect(shellPath('./image', 'tools')).toBe('tools/image')
+    expect(shellPath('../projects', 'tools')).toBe('projects')
+  })
+
+  it('stops at home, the way /.. is /', () => {
+    expect(shellPath('../../..', 'tools/image')).toBe('')
+    expect(shellPath('~/..', 'tools')).toBe('')
+  })
+
+  it('keeps a bare name relative to home, wherever you are', () => {
+    expect(shellPath('projects', 'tools/image')).toBe('projects')
+    expect(shellPath('~/tools/', 'projects')).toBe('tools')
+    expect(shellPath('tools/../projects', 'about')).toBe('projects')
+  })
+
+  it('leaves someone else\'s home alone, for resolvePath to refuse', () => {
+    expect(resolvePath(shellPath('/home/someone/projects', 'about'))).toBeUndefined()
+    expect(resolvePath(shellPath(`${home}x/projects`, 'about'))).toBeUndefined()
+  })
+})
+
 describe('currentPath', () => {
+  // A real router lands a push some ticks later, and the shell starts the next stage of
+  // a line before that. `cd .. && cd ..` from tools/image read tools/image twice.
+  it('answers with where goTo sent the router until it lands', () => {
+    const { router, push, hook } = fakeRouter('/tools/image')
+    installViewSwing(router)
+    let land = () => {}
+    push.mockImplementation((to: RouteLocationRaw) => {
+      const from = router.currentRoute.value
+      land = () => {
+        router.currentRoute.value = route(to as string)
+        hook()(router.currentRoute.value, from, undefined)
+      }
+      return Promise.resolve(undefined)
+    })
+
+    expect(goTo(shellPath('..'))).toBe(true)
+    expect(currentPath()).toBe('tools')
+    expect(shellPath('..')).toBe('')
+
+    land()
+    expect(currentPath()).toBe('tools')
+  })
+
+  it('stops answering with it once the router has landed, even on a failure', () => {
+    const { router, push, hook } = fakeRouter('/tools')
+    installViewSwing(router)
+    push.mockImplementation(() => Promise.resolve(undefined))
+    goTo('watch')
+    expect(currentPath()).toBe('watch')
+
+    // A refused or duplicated navigation still runs the after hooks, with a failure.
+    hook()(router.currentRoute.value, router.currentRoute.value, {} as never)
+    expect(currentPath()).toBe('tools')
+  })
+
   it('is the section on the home page and the route path elsewhere', () => {
     const { router, push } = fakeRouter('/')
     installViewSwing(router)

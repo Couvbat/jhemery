@@ -33,21 +33,9 @@ export interface WordleWords {
   accepted: Set<string>
 }
 
-/**
- * Uppercase and strip diacritics, so `épée` and `EPEE` are the same word. NFD
- * splits an accented letter into base + combining mark, and the replaced range
- * is exactly the combining-marks block — which is why this handles every accent
- * French uses without listing any of them.
- *
- * Stays synchronous and outside the lazy chunk: it is pure string work that the
- * games need on every keystroke.
- */
-export function fold(word: string): string {
-  return word
-    .normalize('NFD')
-    .replace(/[̀-ͯ]/g, '')
-    .toUpperCase()
-}
+/** Uppercase with the accents stripped (`lib/fold.ts`), so `épée` and `EPEE` are the
+ *  same word. Synchronous and outside the lazy chunk: the games need it on every keystroke. */
+export { fold } from '@/lib/fold'
 
 /** Written out per locale rather than built from a template string, because
  *  Vite can only split a chunk per `import()` it can see statically. */

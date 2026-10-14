@@ -1,5 +1,10 @@
-import { beforeEach, describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { pick } from '@/content/types'
+import { privacyCopy, privacyLabels, saveFileLabels } from '@/content/privacy'
+import { legalCopy, legalHeadings } from '@/content/legal'
+import { securityCopy, securityLabels } from '@/content/security'
+import { upcomingLabels } from '@/content/upcoming'
+import { stemsLabels } from '@/components/stems/labels'
 import { messages } from '../messages'
 import { currentLocale, setLocale, useLocale } from '../index'
 
@@ -22,7 +27,22 @@ function flatten(node: Node, path: string[] = []): Array<[string, { en: unknown;
   return Object.entries(node).flatMap(([key, child]) => flatten(child as Node, [...path, key]))
 }
 
-const leaves = flatten(messages as unknown as Node)
+/**
+ * The message tree, and the tables of interface words kept out of it so that only the
+ * lazy page that reads them loads them (the home page is at its byte budget). Same rules.
+ */
+const leaves = flatten({
+  messages,
+  privacyLabels,
+  saveFileLabels,
+  privacyCopy,
+  securityLabels,
+  securityCopy,
+  legalHeadings,
+  legalCopy,
+  upcomingLabels,
+  stemsLabels,
+} as unknown as Node)
 
 describe('messages', () => {
   it('finds a non-trivial message tree', () => {
@@ -40,6 +60,13 @@ describe('messages', () => {
     // A string in one locale and an array in the other blows up at the call site,
     // which is usually far from the message that caused it.
     expect(Array.isArray(value.fr), `messages.${path} shape differs`).toBe(Array.isArray(value.en))
+  })
+
+  // `{n}` and friends are replaced by the caller, whichever locale is on: one missing from
+  // a translation drops the number, and one renamed is printed as it is.
+  it.each(leaves)('%s keeps the same placeholders in both locales', (path, value) => {
+    const holes = (text: unknown) => [...String(text).matchAll(/\{[a-z]+\}/g)].map((m) => m[0]).sort()
+    expect(holes(value.fr), `messages.${path}`).toEqual(holes(value.en))
   })
 })
 
@@ -93,6 +120,66 @@ describe('setLocale', () => {
     expect(t(greeting)).toBe('hello')
     set('fr')
     expect(t(greeting)).toBe('salut')
+  })
+})
+
+describe('with site data blocked', () => {
+  // A browser that blocks site data throws on the `localStorage` getter itself, not on
+  // getItem. The locale is read while the module loads, so an unguarded read there
+  // failed the import and the app never mounted: a blank page, in either language.
+  beforeEach(() => {
+    vi.spyOn(window, 'localStorage', 'get').mockImplementation(() => {
+      throw new DOMException('Access is denied for this document.', 'SecurityError')
+    })
+    vi.resetModules()
+  })
+
+  afterEach(() => {
+    vi.restoreAllMocks()
+  })
+
+  it('still loads, in the browser’s language', async () => {
+    // French, because English is also the default a broken fallback would land on.
+    vi.spyOn(navigator, 'language', 'get').mockReturnValue('fr-FR')
+    const { currentLocale: fresh } = await import('../index')
+    expect(fresh()).toBe('fr')
+  })
+
+  it('still switches, for this page load', async () => {
+    const { currentLocale: fresh, setLocale: set } = await import('../index')
+    expect(() => set('fr')).not.toThrow()
+    expect(fresh()).toBe('fr')
+    expect(document.documentElement.lang).toBe('fr')
+  })
+})
+
+// A page's French URL is the same path with `?lang=fr` (content/pages.ts): it is what a
+// French search result links to, so it wins over whatever the visitor had stored.
+describe('a language in the address', () => {
+  beforeEach(() => {
+    window.localStorage.clear()
+    vi.resetModules()
+  })
+
+  afterEach(() => {
+    window.history.replaceState(null, '', '/')
+    vi.restoreAllMocks()
+  })
+
+  it('wins over the stored choice, and becomes it', async () => {
+    window.localStorage.setItem('couvbat:locale', 'en')
+    window.history.replaceState(null, '', '/now?lang=fr')
+    const { currentLocale: fresh } = await import('../index')
+    expect(fresh()).toBe('fr')
+    expect(window.localStorage.getItem('couvbat:locale')).toBe('fr')
+  })
+
+  it('is ignored when it is not a language the site has', async () => {
+    vi.spyOn(navigator, 'language', 'get').mockReturnValue('en-GB')
+    window.history.replaceState(null, '', '/now?lang=de')
+    const { currentLocale: fresh } = await import('../index')
+    expect(fresh()).toBe('en')
+    expect(window.localStorage.getItem('couvbat:locale')).toBeNull()
   })
 })
 

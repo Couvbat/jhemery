@@ -1,12 +1,14 @@
 <script setup lang="ts">
-import { computed, nextTick, onMounted, ref, watch } from 'vue'
+import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
 import { profile } from '@/content'
 import { useLocale } from '@/i18n'
 import { resetRecall, useTerminal } from '@/composables/useTerminal'
 import { usePromptSuggestion } from '@/composables/usePromptSuggestion'
+import { DESKTOP_QUERY, touchLayout as touch } from '@/composables/useTerminalShell'
 import { autosuggest, searchBackward } from '@/terminal/history'
 import { suggestionPool } from '@/terminal/registry'
 import { WINDOW_DOTS } from '@/components/WindowDots.vue'
+import TapBar from './TapBar.vue'
 import TerminalOutput from './TerminalOutput.vue'
 import VimPane from './VimPane.vue'
 
@@ -17,6 +19,7 @@ const {
   busy,
   buffer,
   revision,
+  dropped,
   pendingPrompt,
   capturing,
   captureTakesEscape,
@@ -30,7 +33,22 @@ const {
   recallHistory,
   completeInput,
   history,
+  runLink,
 } = useTerminal()
+
+/**
+ * Below `md` the overlay is the touch layout (features-spec §9): output above, buttons
+ * where the prompt would be, and no input anywhere, so a phone's keyboard never opens.
+ * The shell reads the same flag and runs every stage with `tty: false`. Followed live,
+ * since a rotated tablet can cross the breakpoint with the terminal open.
+ */
+const desktop = typeof window.matchMedia === 'function' ? window.matchMedia(DESKTOP_QUERY) : null
+function syncLayout() {
+  touch.value = desktop ? !desktop.matches : false
+}
+syncLayout()
+desktop?.addEventListener?.('change', syncLayout)
+onUnmounted(() => desktop?.removeEventListener?.('change', syncLayout))
 
 /** Shared chrome for the three title-bar dots (they only differ by colour, which is
  *  `WindowDots`' — the same three tokens every other window's bar uses). */
@@ -59,7 +77,7 @@ const running = computed(() => busy.value && !pendingPrompt.value && !capturing.
 const { suggestion, dismiss } = usePromptSuggestion(
   suggestionPool,
   computed(
-    () => input.value === '' && !pendingPrompt.value && !capturing.value && !running.value && !vimBuffer.value,
+    () => !touch.value && input.value === '' && !pendingPrompt.value && !capturing.value && !running.value && !vimBuffer.value,
   ),
 )
 const placeholder = computed(() =>
@@ -155,17 +173,69 @@ const promptLabel = computed(() => {
   return `${profile.handle}:~$`
 })
 
+/** The number of the line after the last one at the last scroll, so the next one knows where new
+ *  output starts. Numbered with `dropped()`, not by index: a full buffer trims its head under
+ *  every batch, and its length stays at the cap. */
+let seenLines = 0
+/** Where the output written in this task began: a tap's echo and what it printed arrive together. */
+let batchFrom: number | null = null
+
 watch(revision, async () => {
+  const from = seenLines
+  seenLines = dropped() + buffer.value.length
+  if (batchFrom === null) {
+    batchFrom = from
+    setTimeout(() => (batchFrom = null))
+  }
+  const start = batchFrom
   await nextTick()
-  if (scrollEl.value) scrollEl.value.scrollTop = scrollEl.value.scrollHeight
+  const el = scrollEl.value
+  if (!el) return
+  // In the touch layout a new batch of output is read from its first line: on a phone a
+  // `resume` is several screens, and following the bottom would leave the reader at its
+  // end. The browser clamps the scroll, so a batch that fits still ends at the bottom, and
+  // `tour`, whose stops arrive seconds apart, still reads as it goes. 16px is the padding.
+  // A batch longer than the buffer has lost its first lines to the cap: it reads from the top.
+  const index = Math.max(0, start - dropped())
+  const first = touch.value && index < buffer.value.length ? (el.children[index] as HTMLElement | undefined) : undefined
+  el.scrollTop = first ? first.offsetTop - 16 : el.scrollHeight
 })
+
+/** Where the keyboard starts. Nothing to type into in the touch layout: the dialog itself
+ *  takes focus, so Escape and Tab have somewhere to start, and no keyboard opens. */
+function focusHome() {
+  if (touch.value) panelEl.value?.focus()
+  else inputEl.value?.focus()
+}
 
 async function handleOpened() {
   previouslyFocused = document.activeElement as HTMLElement | null
   primeOverlay()
   await nextTick()
-  inputEl.value?.focus()
+  focusHome()
 }
+
+// Crossing md swaps the buttons and the prompt under whatever had focus, which falls to
+// <body>, out of reach of the panel's Escape: a game started at the prompt would carry on
+// with no way to quit it but the stop button. Start the keyboard over in the new layout.
+watch(touch, async () => {
+  if (!open.value) return
+  await nextTick()
+  if (!panelEl.value?.contains(document.activeElement)) focusHome()
+})
+
+/** A tap: through the link path, so it can run nothing a `?run=` link couldn't. */
+function onTap(line: string) {
+  void runLink(line)
+}
+
+// The stop button goes when the command does, and a focused button that goes takes focus
+// to <body>, out of reach of the panel's Escape: hand it back to the panel.
+watch(busy, async (now) => {
+  if (now || !touch.value) return
+  await nextTick()
+  if (!panelEl.value?.contains(document.activeElement)) panelEl.value?.focus()
+})
 
 // This component only mounts because `open` just became true for the first time
 // ever (App.vue gates its very existence on that) — a `watch(open, ...)` alone
@@ -325,7 +395,9 @@ function onPanelKeydown(event: KeyboardEvent) {
   // The input handles Tab itself for completion; only the chrome buttons cycle.
   if (document.activeElement === inputEl.value) return
 
-  if (event.shiftKey && document.activeElement === first) {
+  // The touch layout's dialog takes focus itself, and isn't in its own list: from there
+  // Shift+Tab would leave for the page behind, so it starts the cycle as `first` does.
+  if (event.shiftKey && (document.activeElement === first || document.activeElement === panelEl.value)) {
     event.preventDefault()
     last.focus()
   } else if (!event.shiftKey && document.activeElement === last) {
@@ -342,9 +414,14 @@ function onPanelKeydown(event: KeyboardEvent) {
     leave-active-class="transition duration-150 ease-in"
     leave-to-class="opacity-0 translate-y-4"
   >
+    <!-- The touch layout's gutters are 16px, and its bottom clears a phone's home indicator
+         where the page is laid out under it (0 otherwise). -->
     <div
       v-if="open"
-      class="fixed inset-x-0 bottom-0 z-[60] flex justify-center px-2 pb-2 sm:px-4 sm:pb-4"
+      :class="[
+        'fixed inset-x-0 bottom-0 z-[60] flex justify-center',
+        touch ? 'px-4 pb-[max(1rem,env(safe-area-inset-bottom))]' : 'px-2 pb-2 sm:px-4 sm:pb-4',
+      ]"
       @keydown="onPanelKeydown"
     >
       <div
@@ -352,13 +429,28 @@ function onPanelKeydown(event: KeyboardEvent) {
         role="dialog"
         aria-modal="true"
         :aria-label="t(m.terminal.title)"
+        :tabindex="touch ? -1 : undefined"
         :class="[
-          'w-full rounded border border-primary/40 bg-background/95 backdrop-blur overflow-hidden border-glow flex flex-col',
-          maximised ? 'max-w-6xl h-[85vh]' : 'max-w-4xl h-[60vh]',
+          'w-full rounded border border-primary/40 bg-background/95 backdrop-blur overflow-hidden border-glow flex flex-col outline-none',
+          touch ? 'h-[85dvh]' : maximised ? 'max-w-6xl h-[85vh]' : 'max-w-4xl h-[60vh]',
         ]"
       >
-        <!-- Title bar -->
-        <div class="flex items-center gap-2 px-4 py-2 bg-muted border-b border-border shrink-0">
+        <!-- Title bar. The touch layout's is a title and a close button big enough for a
+             thumb: the traffic lights are 12px, and maximising means nothing there. -->
+        <div v-if="touch" class="flex items-center gap-2 pl-4 pr-1 bg-muted border-b border-border shrink-0">
+          <span class="text-xs text-muted-foreground flex-1 min-w-0 truncate"
+            >{{ profile.handle }}@{{ profile.host }} ~ {{ t(m.terminal.title) }}</span
+          >
+          <button
+            type="button"
+            class="w-11 h-11 flex items-center justify-center rounded text-muted-foreground hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+            :aria-label="t(m.terminal.close)"
+            @click="requestClose()"
+          >
+            <span aria-hidden="true">✕</span>
+          </button>
+        </div>
+        <div v-else class="flex items-center gap-2 px-4 py-2 bg-muted border-b border-border shrink-0">
           <!-- Traffic lights, macOS-style: the dots *are* the controls, and their
                glyphs only show on hover so the idle bar stays quiet. -->
           <div class="group flex items-center gap-2">
@@ -401,7 +493,7 @@ function onPanelKeydown(event: KeyboardEvent) {
           v-if="!vimBuffer"
           ref="scrollEl"
           data-testid="terminal-output"
-          class="flex-1 overflow-y-auto p-4 font-mono text-xs sm:text-sm space-y-0.5"
+          class="relative flex-1 overflow-y-auto p-4 font-mono text-xs sm:text-sm space-y-0.5"
           :aria-live="capturing ? 'off' : 'polite'"
           aria-atomic="false"
           @click="inputEl?.focus()"
@@ -415,12 +507,15 @@ function onPanelKeydown(event: KeyboardEvent) {
              Escape would be dead, which reads exactly like a frozen editor. -->
         <VimPane v-else :buffer="vimBuffer" @click="inputEl?.focus()" />
 
+        <!-- The touch layout's buttons, in place of the prompt below md. -->
+        <TapBar v-if="touch" :running="busy || !!pendingPrompt" @run="onTap" @stop="cancel()" />
         <!-- Input. Never `disabled`, even while a command runs: a disabled input
              loses focus to <body> a frame later, outside every listener here, and
              Ctrl+C then has nothing to land on. `readonly` keeps it focused and
              `aria-disabled` still tells assistive tech (and the dimming) it is
              inert. -->
         <form
+          v-else
           class="flex items-center gap-2 px-4 py-3 border-t border-border bg-card/50 shrink-0 font-mono text-xs sm:text-sm"
           @submit.prevent="onSubmit"
         >

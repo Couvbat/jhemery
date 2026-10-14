@@ -140,6 +140,9 @@ describe('useTheme', () => {
       ['a missing colour', { colours: { ...COLOURS, warning: undefined } }],
       ['a seed that is not hex', { seed: 'javascript:' }],
       ['a mode that is neither', { mode: 'dim' }],
+      // Well-formed, but no forge makes it: a save link can restore someone else's.
+      ['text as dark as the page', { colours: { ...COLOURS, foreground: '#17100c', muted: '#17100c' } }],
+      ['every colour black', { colours: Object.fromEntries(Object.keys(COLOURS).map((name) => [name, '#000000'])) }],
     ])('ignores a stored forge with %s', async (_, overrides) => {
       window.localStorage.setItem('couvbat:theme:custom', stored(overrides))
       window.localStorage.setItem(STORAGE_KEY, 'custom')

@@ -1,25 +1,20 @@
 // @vitest-environment node
 // Reads source files off disk rather than importing them, like content/purity.spec.ts.
-import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs'
-import { dirname, join, relative, resolve } from 'node:path'
-import { fileURLToPath, URL } from 'node:url'
-import ts from 'typescript'
+import { relative } from 'node:path'
 import { describe, expect, it } from 'vitest'
+import { SRC, resolveImport, runtimeImports, scriptOf, sourceFiles } from './imports'
 
 /**
  * No new import cycles. A cycle is harmless until something in it runs at import time,
  * and then it fails only in the one load order nobody tried; the registry's did, during
- * an HMR reload. The walk reads static imports, re-exports and bare side-effect imports
- * with TypeScript's own parser (a regex lost edges across statements), skips type-only
- * ones because they are erased, and skips dynamic `import()` because it runs later.
+ * an HMR reload. The walk (`imports.ts`) reads runtime imports only: type-only ones are
+ * erased, and a dynamic `import()` runs later.
  *
  * The allowlist is the cycles that exist on purpose. The registry's is matched by
  * pattern, so a command module may import the registry (help, alias, and later strace,
  * why, tour and man do) while anything outside `terminal/commands/` joining it fails.
  * `terminal/__tests__/registry-load.spec.ts` is what proves that cycle loads safely.
  */
-
-const SRC = fileURLToPath(new URL('..', import.meta.url))
 
 const ALLOWED: Array<{ name: string; matches: (members: string[]) => boolean }> = [
   exactly('shadcn button', ['components/ui/button/Button.vue', 'components/ui/button/index.ts']),
@@ -34,52 +29,6 @@ const ALLOWED: Array<{ name: string; matches: (members: string[]) => boolean }> 
 
 function exactly(name: string, files: string[]) {
   return { name, matches: (members: string[]) => members.length === files.length && files.every((f) => members.includes(f)) }
-}
-
-function sourceFiles(dir: string): string[] {
-  return readdirSync(dir).flatMap((name) => {
-    const path = join(dir, name)
-    if (statSync(path).isDirectory()) return name === '__tests__' ? [] : sourceFiles(path)
-    return /\.(ts|vue)$/.test(name) && !name.endsWith('.d.ts') ? [path] : []
-  })
-}
-
-/** The code a file contributes: all of a `.ts`, the `<script>` blocks of a `.vue`. */
-function scriptOf(path: string): string {
-  const source = readFileSync(path, 'utf8')
-  if (!path.endsWith('.vue')) return source
-  return [...source.matchAll(/<script\b[^>]*>([\s\S]*?)<\/script>/g)].map((m) => m[1]).join('\n')
-}
-
-/** Runtime specifiers: `import … from`, `export … from` and bare `import '…'`, minus type-only ones. */
-function runtimeImports(code: string): string[] {
-  const out: string[] = []
-  const file = ts.createSourceFile('x.ts', code, ts.ScriptTarget.Latest, false, ts.ScriptKind.TS)
-  for (const statement of file.statements) {
-    if (ts.isImportDeclaration(statement) && ts.isStringLiteral(statement.moduleSpecifier)) {
-      const clause = statement.importClause
-      // `import type …`, or `import { type A, type B }`, imports nothing at runtime.
-      const named = clause?.namedBindings && ts.isNamedImports(clause.namedBindings) ? clause.namedBindings.elements : undefined
-      const typeOnly = clause?.isTypeOnly || (clause && !clause.name && named?.length && named.every((e) => e.isTypeOnly))
-      if (!typeOnly) out.push(statement.moduleSpecifier.text)
-    } else if (ts.isExportDeclaration(statement) && statement.moduleSpecifier && ts.isStringLiteral(statement.moduleSpecifier)) {
-      const named = statement.exportClause && ts.isNamedExports(statement.exportClause) ? statement.exportClause.elements : undefined
-      const typeOnly = statement.isTypeOnly || (named?.length && named.every((e) => e.isTypeOnly))
-      if (!typeOnly) out.push(statement.moduleSpecifier.text)
-    }
-  }
-  return out
-}
-
-function resolveImport(from: string, specifier: string): string | undefined {
-  let base: string
-  if (specifier.startsWith('@/')) base = join(SRC, specifier.slice(2))
-  else if (specifier.startsWith('.')) base = resolve(dirname(from), specifier)
-  else return undefined // a package, not ours
-  for (const candidate of [base, `${base}.ts`, `${base}.vue`, join(base, 'index.ts')]) {
-    if (/\.(ts|vue)$/.test(candidate) && existsSync(candidate) && statSync(candidate).isFile()) return candidate
-  }
-  return undefined // css, json, an asset
 }
 
 /** Tarjan's strongly connected components, keeping only actual cycles. */
