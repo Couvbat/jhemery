@@ -21,7 +21,9 @@ const queue = ref<GuestbookEntry[]>([])
  * The newest page as the last poll found it, newest first: what the field draws as
  * wireframes (`ThreeBackground`). The poll already fetched it to spot new ids, so the field
  * costs no request of its own. Emptied when the guestbook says it is off; a failed poll
- * leaves it as it was, since a blip is not a deletion.
+ * leaves it as it was, since a blip is not a deletion. Emptied too when the ticker gives
+ * up: no poll will correct it after that, and an entry the owner deletes would otherwise
+ * stay in the field for the life of the tab.
  */
 const entries = shallowRef<readonly GuestbookEntry[]>([])
 
@@ -53,7 +55,10 @@ async function poll(seeding = false) {
     if (fresh.length) queue.value = [...queue.value, ...fresh]
   } catch {
     failures += 1
-    if (failures >= MAX_FAILURES) stopGuestbookTicker()
+    if (failures >= MAX_FAILURES) {
+      entries.value = []
+      stopGuestbookTicker()
+    }
   }
 }
 

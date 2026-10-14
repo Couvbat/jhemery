@@ -310,11 +310,19 @@ function easeColours(dt: number) {
   applyColours()
 }
 
-/** A place in the spawn volume, in the field's own axes, each from -0.5 to 0.5 across it.
- *  Its width follows the screen's, so a signature keeps its place on any screen. */
+/**
+ * A place in the spawn volume, in the field's own axes, each from -0.5 to 0.5 across it.
+ * Its width follows the screen's, so a signature keeps its place on any screen. Mid-swing
+ * the place is expressed in the frame the bake will leave behind: rotated by the *inverse*
+ * of the swing's final yaw, so that once the bake rotates everything forward it sits
+ * exactly there. Every home goes through here, the swing's and a shape's added during it:
+ * a signature that arrived mid-swing used to be placed unturned, and the bake carried it
+ * 40° away from where its id puts it.
+ */
 function placeHome({ x, y, z }: Axes, out: THREE.Vector3): THREE.Vector3 {
   const spread = camera ? halfExtents(camera.aspect).x * 2 : 20
-  return out.set(x * spread, y * 14, z * 12)
+  out.set(x * spread, y * 14, z * 12)
+  return swingArmed ? out.applyAxisAngle(Y_AXIS, swingDirection.value * FIELD_YAW) : out
 }
 
 /** A fresh position from the spawn distribution, in the field's own axes — the same
@@ -592,18 +600,23 @@ function handleClick(event: MouseEvent) {
 }
 
 /**
- * Nudges the label back inside the screen once it has a width. It is centred on the click,
- * so a shape near the edge put half of it off-screen, and a signature's label, which carries
- * a name of up to forty characters, can be wider than a phone: that one wraps as well.
+ * Nudges the label back inside the screen once it has a size. It sits centred above the
+ * click, so a shape near a side put half of it off-screen, and one just under the top edge
+ * (clicked through the header) put it above the screen; the bottom can't overhang. A
+ * signature's label, which carries a name of up to forty characters, can be wider than a
+ * phone: that one wraps as well, and is taller for it.
  */
 function keepLabelOnScreen() {
   const label = labelRef.value
   if (!label || !inspected.value) return
   const margin = 8
-  const { left, right } = label.getBoundingClientRect()
+  const { left, right, top } = label.getBoundingClientRect()
   const over = right - (window.innerWidth - margin)
   const nudge = left < margin ? margin - left : over > 0 ? -over : 0
-  if (nudge) inspected.value = { ...inspected.value, x: inspected.value.x + nudge }
+  const down = top < margin ? margin - top : 0
+  if (nudge || down) {
+    inspected.value = { ...inspected.value, x: inspected.value.x + nudge, y: inspected.value.y + down }
+  }
 }
 
 function handleResize() {
@@ -618,21 +631,17 @@ function handleResize() {
 }
 
 /**
- * The first frame of a swing. Every shape draws a new home so the field lands in a
- * fresh composition — but the mesh must not jump, so the offset absorbs the difference
- * and the existing `offset.lerp(target)` drifts it there over the swing (§5.3: "let go
- * is just a zero target, not a special case"). The new home is expressed in the frame
- * the bake will leave behind: rotated by the *inverse* of the swing's final yaw, so
- * that once the bake rotates everything forward again it sits exactly where the
- * distribution put it.
+ * The first frame of a swing, once it is armed. Every shape draws a new home so the field
+ * lands in a fresh composition — but the mesh must not jump, so the offset absorbs the
+ * difference and the existing `offset.lerp(target)` drifts it there over the swing (§5.3:
+ * "let go is just a zero target, not a special case"). `placeHome` puts the new home in
+ * the frame the bake will leave behind, as it does for any shape added before the bake.
  */
 function rehome() {
-  const finalYaw = -swingDirection.value * FIELD_YAW
   forEachShape((shape) => {
     // A signature draws its own place again, so the swing ends with it where it started.
     if (shape.signature) placeHome(shape.signature.place, worldPosition)
     else sampleHome(worldPosition)
-    worldPosition.applyAxisAngle(Y_AXIS, -finalYaw)
     shape.offset.add(shape.home).sub(worldPosition)
     shape.home.copy(worldPosition)
   })
@@ -677,8 +686,8 @@ function animate(now: number) {
   if (field) {
     if (turning) {
       if (!swingArmed) {
-        rehome()
         swingArmed = true
+        rehome()
       }
       field.rotation.y = -swingDirection.value * FIELD_YAW * swing.value
     } else if (swingArmed) {
@@ -932,6 +941,7 @@ onUnmounted(() => {
     <div
       v-if="inspected"
       ref="labelRef"
+      data-testid="inspect-label"
       class="fixed z-[60] -translate-x-1/2 -translate-y-full pointer-events-none rounded border border-primary/40 bg-background/90 backdrop-blur px-2 py-1 font-mono text-[11px] text-primary w-max max-w-[calc(100vw-1rem)] break-words"
       :style="{ left: `${inspected.x}px`, top: `${inspected.y - 8}px` }"
       aria-hidden="true"

@@ -857,10 +857,13 @@ mounted, so coming back to *full* or *calm* picks the scene up where it stood.
   every shape in the field is drawn from, given `Math.random` for the others and
   `seededRandom(id)` (FNV-1a, then mulberry32) for an entry. So an entry is the same kind in
   the same place with the same spin on every visit, and its place scales with the screen's
-  width as any shape's does. A view swing re-homes it to that place rather than to a fresh one.
-  An entry that leaves the page, deleted with `sudo rm` or pushed off by a newer one, fades out
-  as a departing visitor does, within one poll; while it fades it can't be clicked. A shape
-  carries no text: clicking one reads `<kind> · signed by <name>, <day>`, the day on the
+  width as any shape's does. A view swing re-homes it to that place rather than to a fresh one,
+  and one that arrives mid-swing is placed in the frame the swing will leave, so it lands there
+  too. An entry that leaves the page, deleted with `sudo rm` or pushed off by a newer one, fades
+  out as a departing visitor does, within one poll; while it fades it can't be clicked. A tab
+  whose ticker has given up (three failed polls in a row) lets them all go, since no later poll
+  would bring it a deletion.
+  A shape carries no text: clicking one reads `<kind> · signed by <name>, <day>`, the day on the
   visitor's calendar in their language, through the same text interpolation as every label, and
   never the message. The canvas carries `data-signatures`, the count of entries staying, as the
   e2e suite's one window into the scene. **Open question:** the backend rejects links but filters

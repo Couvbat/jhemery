@@ -92,4 +92,25 @@ describe('the entries the ticker exposes', () => {
     expect(entries.value).toEqual([ada])
     ticker.stopGuestbookTicker()
   })
+
+  it('are emptied when the ticker gives up, since no poll will correct them after', async () => {
+    guestbook.mockResolvedValue({ enabled: true, entries: [bob, ada] })
+    const ticker = await load()
+    const { entries } = ticker.useGuestbookTicker()
+    ticker.startGuestbookTicker()
+    await vi.waitFor(() => expect(entries.value).toEqual([bob, ada]))
+
+    guestbook.mockRejectedValue(new Error('offline'))
+    await vi.advanceTimersByTimeAsync(POLL_MS * 2)
+    expect(entries.value).toEqual([bob, ada])
+    await vi.advanceTimersByTimeAsync(POLL_MS)
+    expect(guestbook).toHaveBeenCalledTimes(4)
+    expect(entries.value).toEqual([])
+
+    // The owner deletes bob while the API is back: this tab has stopped asking, and shows neither.
+    guestbook.mockResolvedValue({ enabled: true, entries: [ada] })
+    await vi.advanceTimersByTimeAsync(POLL_MS * 3)
+    expect(guestbook).toHaveBeenCalledTimes(4)
+    expect(entries.value).toEqual([])
+  })
 })
