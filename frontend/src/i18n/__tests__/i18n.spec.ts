@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { pick } from '@/content/types'
 import { messages } from '../messages'
 import { currentLocale, setLocale, useLocale } from '../index'
@@ -93,6 +93,36 @@ describe('setLocale', () => {
     expect(t(greeting)).toBe('hello')
     set('fr')
     expect(t(greeting)).toBe('salut')
+  })
+})
+
+describe('with site data blocked', () => {
+  // A browser that blocks site data throws on the `localStorage` getter itself, not on
+  // getItem. The locale is read while the module loads, so an unguarded read there
+  // failed the import and the app never mounted: a blank page, in either language.
+  beforeEach(() => {
+    vi.spyOn(window, 'localStorage', 'get').mockImplementation(() => {
+      throw new DOMException('Access is denied for this document.', 'SecurityError')
+    })
+    vi.resetModules()
+  })
+
+  afterEach(() => {
+    vi.restoreAllMocks()
+  })
+
+  it('still loads, in the browser’s language', async () => {
+    // French, because English is also the default a broken fallback would land on.
+    vi.spyOn(navigator, 'language', 'get').mockReturnValue('fr-FR')
+    const { currentLocale: fresh } = await import('../index')
+    expect(fresh()).toBe('fr')
+  })
+
+  it('still switches, for this page load', async () => {
+    const { currentLocale: fresh, setLocale: set } = await import('../index')
+    expect(() => set('fr')).not.toThrow()
+    expect(fresh()).toBe('fr')
+    expect(document.documentElement.lang).toBe('fr')
   })
 })
 
