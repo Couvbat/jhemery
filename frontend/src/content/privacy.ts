@@ -1,3 +1,4 @@
+import { profile } from './profile'
 import type { Localised } from './types'
 
 /**
@@ -37,8 +38,52 @@ export const privacyCopy = {
     en: 'Analytics are Umami, self-hosted and cookieless: page views, and one event when the terminal opens.',
     fr: 'Les statistiques de visite viennent d’Umami, auto-hébergé et sans cookie : les pages vues, et un événement à l’ouverture du terminal.',
   },
+  contact: {
+    en: 'The contact form and `mail` send your name, address and message to my inbox, as an email. I use them only to answer you, and delete them at the latest three years after we last wrote.',
+    fr: 'Le formulaire de contact et `mail` envoient votre nom, votre adresse et votre message dans ma boîte, par email. Ils ne servent qu’à vous répondre, et je les supprime au plus tard trois ans après notre dernier échange.',
+  },
+  guestbook: {
+    en: '`sign` publishes the name and message you give, with the date, for every visitor to read. An entry stays until 500 newer ones push it out, or until you ask me to remove it.',
+    fr: '`sign` publie le nom et le message que vous donnez, avec la date, à la vue de tous les visiteurs. Un message reste jusqu’à ce que 500 plus récents le poussent dehors, ou jusqu’à ce que vous me demandiez de le retirer.',
+  },
+  addresses: {
+    en: 'Your IP address reaches the server with every request. The rate limiter keeps it to stop abuse, only in memory, never on disk, and only for its window: an hour at the longest. The host’s access logs record it too, under o2switch’s own retention.',
+    fr: 'Votre adresse IP arrive au serveur avec chaque requête. Le limiteur de débit la garde pour freiner les abus, en mémoire seulement, jamais sur disque, et le temps de sa fenêtre : une heure au plus. Les journaux d’accès de l’hébergeur l’enregistrent aussi, selon la durée de conservation d’o2switch.',
+  },
+  cloudflare: {
+    en: 'Cloudflare carries every request on its way to the server, so it sees your IP address, the page asked for and your browser’s user agent. It acts on my behalf, and its transfers to the US rest on the EU–US Data Privacy Framework.',
+    fr: 'Cloudflare transporte chaque requête jusqu’au serveur : il voit votre adresse IP, la page demandée et l’user agent de votre navigateur. Il agit pour mon compte, et ses transferts vers les États-Unis reposent sur le Data Privacy Framework UE–États-Unis.',
+  },
+  embeds: {
+    en: 'SoundCloud’s player loads only when you press its button or type `play`, and a room’s YouTube or SoundCloud player only when you open a room. Once loaded, those services see your IP address and set their own cookies, under their own policies.',
+    fr: 'Le lecteur SoundCloud ne se charge que si vous appuyez sur son bouton ou tapez `play`, et le lecteur YouTube ou SoundCloud d’un salon que si vous ouvrez ce salon. Une fois chargés, ces services voient votre adresse IP et déposent leurs propres cookies, selon leurs propres règles.',
+  },
+  upstream: {
+    en: 'Weather, prices, Steam and GitHub are fetched by the server, with its own keys and my coordinates: nothing about you goes to them.',
+    fr: 'Météo, cours, Steam et GitHub sont interrogés par le serveur, avec ses propres clés et mes coordonnées : rien sur vous ne leur parvient.',
+  },
   strace: {
     en: 'None of this needs taking on trust. `strace <command>` runs a command and lists every request it made, with the keys of what was sent and never the values.',
     fr: 'Rien de tout cela n’est à croire sur parole. `strace <commande>` lance une commande et liste chaque requête qu’elle a faite, avec les clés de ce qui est parti et jamais les valeurs.',
+  },
+  analyticsOn: {
+    en: 'Visits from this browser are counted. Refusing keeps the tracker from loading at all.',
+    fr: 'Les visites de ce navigateur sont comptées. Refuser empêche le traceur de se charger du tout.',
+  },
+  analyticsOff: {
+    en: 'You refused: this browser loads no tracker and is not counted.',
+    fr: 'Vous avez refusé : ce navigateur ne charge aucun traceur et n’est pas compté.',
+  },
+  controller: {
+    en: `${profile.name}, who publishes the site as a private individual, answers for what it does with your data. Write to ${profile.email}.`,
+    fr: `${profile.name}, qui édite le site à titre de particulier, répond de ce qu’il fait de vos données. Écrivez à ${profile.email}.`,
+  },
+  bases: {
+    en: 'Answering your messages and keeping the site safe rest on my legitimate interest; the guestbook rests on your consent, which you withdraw by asking for your entry to go.',
+    fr: 'Répondre à vos messages et protéger le site reposent sur mon intérêt légitime ; le livre d’or repose sur votre consentement, que vous retirez en demandant le retrait de votre message.',
+  },
+  rights: {
+    en: `You can ask to see, correct or delete what I hold about you, or object to its use, by writing to ${profile.email}. I answer within a month. If you think I got it wrong, you can complain to the CNIL.`,
+    fr: `Vous pouvez demander à voir, corriger ou effacer ce que je détiens sur vous, ou vous opposer à son usage, en écrivant à ${profile.email}. Je réponds sous un mois. Si vous estimez que j’ai mal fait, vous pouvez saisir la CNIL.`,
   },
 } satisfies Record<string, Localised>

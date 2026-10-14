@@ -26,6 +26,7 @@ describe('analytics', () => {
     vi.unstubAllEnvs()
     document.head.querySelectorAll('script').forEach((el) => el.remove())
     delete window.umami
+    localStorage.clear()
   })
 
   it('injects nothing when unconfigured', async () => {
@@ -124,5 +125,37 @@ describe('analytics', () => {
     tracker()?.dispatchEvent(new Event('load'))
 
     expect(umamiTrack).not.toHaveBeenCalled()
+  })
+
+  it('injects nothing and drops every event once the visitor has refused', async () => {
+    const { analyticsRefused, initAnalytics, refuseAnalytics, track } = await load({
+      VITE_UMAMI_SRC: SRC,
+      VITE_UMAMI_WEBSITE_ID: ID,
+    })
+    const umamiTrack = vi.fn()
+    window.umami = { track: umamiTrack }
+
+    refuseAnalytics(true)
+    initAnalytics()
+    track('terminal-opened')
+
+    expect(analyticsRefused()).toBe(true)
+    expect(tracker()).toBeNull()
+    expect(umamiTrack).not.toHaveBeenCalled()
+  })
+
+  it('counts again once the refusal is withdrawn', async () => {
+    const { analyticsRefused, initAnalytics, refuseAnalytics } = await load({
+      VITE_UMAMI_SRC: SRC,
+      VITE_UMAMI_WEBSITE_ID: ID,
+    })
+
+    refuseAnalytics(true)
+    refuseAnalytics(false)
+    initAnalytics()
+
+    expect(analyticsRefused()).toBe(false)
+    expect(localStorage.getItem('couvbat:analytics')).toBeNull()
+    expect(tracker()).not.toBeNull()
   })
 })

@@ -98,6 +98,13 @@ export const STORAGE_KEYS: StorageKey[] = [
     owner: 'composables/useCrt.ts',
   },
   {
+    key: 'couvbat:analytics',
+    area: 'local',
+    group: 'settings',
+    purpose: { en: 'you refused visit counting', fr: 'vous avez refusé la mesure d’audience' },
+    owner: 'lib/analytics.ts',
+  },
+  {
     key: 'couvbat:booted',
     area: 'local',
     group: 'settings',

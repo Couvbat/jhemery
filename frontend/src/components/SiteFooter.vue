@@ -55,6 +55,8 @@ onMounted(startPresence)
 
       <RouterLink to="/privacy" class="hover:text-primary transition-colors">/privacy</RouterLink>
 
+      <RouterLink to="/legal" class="hover:text-primary transition-colors">/legal</RouterLink>
+
       <a
         :href="repo"
         target="_blank"

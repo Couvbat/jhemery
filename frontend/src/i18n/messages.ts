@@ -68,6 +68,12 @@ export const messages = {
     genres: { en: 'Genres', fr: 'Genres' },
     tools: { en: 'Tools', fr: 'Outils' },
     listen: { en: 'Listen on SoundCloud', fr: 'Écouter sur SoundCloud' },
+    // In place of the player until it is asked for: what loading it hands SoundCloud.
+    consent: {
+      en: 'The player comes from SoundCloud, which sets its own cookies and sees your IP address. It loads only when you ask.',
+      fr: 'Le lecteur vient de SoundCloud, qui dépose ses propres cookies et voit votre adresse IP. Il ne se charge que si vous le demandez.',
+    },
+    load: { en: '▶ load the player', fr: '▶ charger le lecteur' },
   },
   gaming: {
     favouriteGenres: { en: 'Favourite genres', fr: 'Genres préférés' },
@@ -106,6 +112,11 @@ export const messages = {
     directLine: { en: 'Prefer a direct line? Find me here:', fr: 'Vous préférez le contact direct ?' },
     resume: { en: 'Résumé', fr: 'CV' },
     resumeNote: { en: 'printable, or save as PDF', fr: 'à imprimer, ou en PDF' },
+    // Under the form: what sending it hands over, where the law wants it said.
+    notice: {
+      en: 'Your name, address and message reach my inbox and serve only to answer you.',
+      fr: 'Votre nom, votre adresse et votre message arrivent dans ma boîte et ne servent qu’à vous répondre.',
+    },
   },
   terminal: {
     open: { en: 'Open terminal', fr: 'Ouvrir le terminal' },
@@ -953,6 +964,22 @@ export const messages = {
       fr: 'Votre navigateur compte {size} utilisés par ce site (`navigator.storage.estimate()`).',
     },
     sends: { en: 'What leaves your browser', fr: 'Ce qui quitte votre navigateur' },
+    // Shown only in a build that counts visits: the CNIL's exemption needs a way to refuse.
+    counting: { en: 'Visit counting', fr: 'Mesure d’audience' },
+    refuse: { en: 'refuse and reload', fr: 'refuser et recharger' },
+    allow: { en: 'count me again and reload', fr: 'me compter à nouveau et recharger' },
+    who: { en: 'Who answers for it', fr: 'Qui en répond' },
+    rights: { en: 'Your rights', fr: 'Vos droits' },
+  },
+  // /legal (views/LegalView.vue); its paragraphs and the credits are content/legal.ts's.
+  legal: {
+    heading: { en: 'Legal notice', fr: 'Mentions légales' },
+    publisher: { en: 'Publisher', fr: 'Éditeur' },
+    host: { en: 'Hosting', fr: 'Hébergement' },
+    guestbook: { en: 'Visitors’ messages', fr: 'Messages des visiteurs' },
+    property: { en: 'Code and trademarks', fr: 'Code et marques' },
+    credits: { en: 'Credits', fr: 'Crédits' },
+    phone: { en: 'phone', fr: 'tél.' },
   },
   footer: {
     built: { en: 'built', fr: 'build' },

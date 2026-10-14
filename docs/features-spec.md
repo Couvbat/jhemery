@@ -938,9 +938,17 @@ wraps rather than run wider than the screen, which a guestbook name can make it 
   list with a clear button per group (two presses on two buttons, the first turning into Cancel
   in place), the service worker's caches and the browser's estimate, and two things no page can
   list: the ffmpeg core in the HTTP cache, and the embeds' storage under their own origins. Then
-  the privacy claims, each one the code keeps, with `strace` as the way to check them. Caches are
-  reported, never cleared: they hold the site's own files, and a clear would only cost a
-  download.
+  the privacy claims, each one the code keeps, with `strace` as the way to check them, a button
+  to refuse Umami (`couvbat:analytics`, read before the tracker is injected, so a refusal sends
+  nothing at all), and the GDPR's part: who answers for the data, on what basis, and the
+  visitor's rights. Caches are reported, never cleared: they hold the site's own files, and a
+  clear would only cost a download.
+- **`/legal` and consent** (`views/LegalView.vue`, `content/legal.ts`) — the mentions légales
+  (publisher, host, CDN), the guestbook's rules and a way to report an entry, and the credits the
+  data sources ask for, which `weather` and `btc` also print under their data. Nothing third-party
+  that sets cookies loads unasked: the music section's SoundCloud frame waits behind a button
+  (`useMusicPlayer().playerLoaded`), and `play` counts as pressing it. Nothing remembers the
+  choice, so no banner and no consent record are needed.
 - **`/ctf`** — the 404 page recognises the path `robots.txt` "disallows" and says it is a command,
   not a page.
 - **Screensaver** (`composables/useIdle.ts`) — three idle minutes with the tab visible fade every
@@ -1430,7 +1438,7 @@ this section only fixes the rules the code cites.
   The leaving face is `inert` from the `<Transition>`'s `leave` to its removal, so in every frame
   exactly one `<main>` can be reached; and `settled`, a counter bumped when a swing ends or the
   pages swap, is what `usePageFocus` waits on (§9).
-- **Pages outside the prism.** `/now`, `/privacy` and `/work/<id>` are routes but not views: they are reached
+- **Pages outside the prism.** `/now`, `/privacy`, `/legal` and `/work/<id>` are routes but not views: they are reached
   from links, not the navbar, so the prism keeps its four faces, and `viewIndex()` puts them after
   the faces so a swing to one still has a direction. `cd` doesn't reach them, because
   `resolvePath` is shared by four callers. Each names itself in `tabTitle()`.

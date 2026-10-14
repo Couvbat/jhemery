@@ -7,6 +7,7 @@ import type { Localised } from '@/content/types'
 import CodeText from '@/components/CodeText.vue'
 import { useStoredItems } from '@/composables/useStoredItems'
 import { useLocale } from '@/i18n'
+import { analyticsConfigured, analyticsRefused, refuseAnalytics } from '@/lib/analytics'
 import {
   EMBEDS_NOTE,
   HTTP_CACHE_NOTE,
@@ -109,7 +110,29 @@ onMounted(async () => {
   report.value = await cacheReport()
 })
 
-const claims = computed(() => [privacyCopy.presence, privacyCopy.stats, privacyCopy.ask, privacyCopy.analytics])
+const claims = [
+  privacyCopy.presence,
+  privacyCopy.stats,
+  privacyCopy.ask,
+  privacyCopy.analytics,
+  privacyCopy.contact,
+  privacyCopy.guestbook,
+  privacyCopy.addresses,
+  privacyCopy.cloudflare,
+  privacyCopy.embeds,
+  privacyCopy.upstream,
+]
+
+// A build that counts nothing has nothing to refuse, so the switch only shows where it acts.
+const counting = analyticsConfigured()
+const refused = analyticsRefused()
+const switching = ref(false)
+
+async function switchCounting() {
+  switching.value = true
+  refuseAnalytics(!refused)
+  await reloadPage()
+}
 </script>
 
 <template>
@@ -218,11 +241,40 @@ const claims = computed(() => [privacyCopy.presence, privacyCopy.stats, privacyC
         <ul class="space-y-3 text-sm text-foreground leading-relaxed">
           <li v-for="(claim, i) in claims" :key="i" class="border-l-2 border-primary/40 pl-4"><CodeText :text="t(claim)" /></li>
         </ul>
+        <div v-if="counting" data-testid="privacy-counting" class="space-y-2">
+          <h3 class="text-accent font-mono text-sm">### {{ t(m.privacy.counting) }}</h3>
+          <div class="flex flex-wrap items-center gap-x-3 gap-y-2">
+            <p class="text-sm text-foreground">{{ t(refused ? privacyCopy.analyticsOff : privacyCopy.analyticsOn) }}</p>
+            <button
+              type="button"
+              class="px-3 py-1 rounded border border-border text-xs text-foreground hover:border-primary hover:text-primary transition-colors disabled:opacity-50 disabled:pointer-events-none"
+              :disabled="switching"
+              @click="switchCounting"
+            >
+              {{ switching ? t(m.privacy.cleared) : t(refused ? m.privacy.allow : m.privacy.refuse) }}
+            </button>
+          </div>
+        </div>
         <p class="text-sm text-foreground leading-relaxed"><CodeText :text="t(privacyCopy.strace)" /></p>
       </section>
 
+      <section class="space-y-3" aria-labelledby="privacy-who">
+        <h2 id="privacy-who" class="text-primary font-mono text-sm">## {{ t(m.privacy.who) }}</h2>
+        <p class="text-sm text-foreground leading-relaxed">{{ t(privacyCopy.controller) }}</p>
+        <p class="text-sm text-foreground leading-relaxed">{{ t(privacyCopy.bases) }}</p>
+      </section>
+
+      <section class="space-y-3" aria-labelledby="privacy-rights">
+        <h2 id="privacy-rights" class="text-primary font-mono text-sm">## {{ t(m.privacy.rights) }}</h2>
+        <p class="text-sm text-foreground leading-relaxed">
+          {{ t(privacyCopy.rights) }}
+          <a href="https://www.cnil.fr/fr/plaintes" target="_blank" rel="noopener noreferrer" class="text-primary hover:underline">cnil.fr ↗</a>
+        </p>
+      </section>
+
       <p class="text-xs text-muted-foreground">
-        <RouterLink to="/now" class="text-primary hover:underline">/now</RouterLink>
+        <RouterLink to="/legal" class="text-primary hover:underline">/legal</RouterLink>
+        · <RouterLink to="/now" class="text-primary hover:underline">/now</RouterLink>
         · <RouterLink to="/" class="text-primary hover:underline">~</RouterLink>
       </p>
     </div>

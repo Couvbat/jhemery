@@ -18,7 +18,9 @@
  *   out of the dashboard by default rather than by remembering a flag.
  *
  * Nothing here identifies anyone: Umami is cookieless and stores aggregates, so
- * the site needs no consent banner for it.
+ * the site needs no consent banner for it. That exemption (the CNIL's, for audience
+ * measurement) still asks that a visitor can refuse, which is `refuseAnalytics()`,
+ * a button on `/privacy`.
  */
 
 interface Umami {
@@ -37,6 +39,35 @@ const src = import.meta.env.VITE_UMAMI_SRC
 const websiteId = import.meta.env.VITE_UMAMI_WEBSITE_ID
 /** Optional comma-separated hostname allowlist, passed through as `data-domains`. */
 const domains = import.meta.env.VITE_UMAMI_DOMAINS
+
+/**
+ * The visitor's refusal, set from `/privacy`. Read when the tracker would be injected,
+ * so a refused visit sends Umami nothing at all, not even the script request; the page
+ * reloads after a change rather than unpicking a tracker that is already running.
+ */
+const REFUSED_KEY = 'couvbat:analytics'
+
+export function analyticsRefused(): boolean {
+  try {
+    return localStorage.getItem(REFUSED_KEY) === 'refused'
+  } catch {
+    return false
+  }
+}
+
+export function refuseAnalytics(refused: boolean): void {
+  try {
+    if (refused) localStorage.setItem(REFUSED_KEY, 'refused')
+    else localStorage.removeItem(REFUSED_KEY)
+  } catch {
+    // Blocked storage keeps nothing, so the refusal can't outlive this page.
+  }
+}
+
+/** Whether this build counts visits at all: off in dev and in any build without the two settings. */
+export function analyticsConfigured(): boolean {
+  return !!src && !!websiteId
+}
 
 type QueuedEvent = [name: string, data: Record<string, unknown> | undefined]
 
@@ -73,7 +104,7 @@ function abandon(): void {
  * call twice (the second call is ignored) — `main.ts` is the only caller.
  */
 export function initAnalytics(): void {
-  if (!src || !websiteId) return
+  if (!src || !websiteId || analyticsRefused()) return
   if (document.querySelector('script[data-umami-tracker]')) return
 
   const script = document.createElement('script')
@@ -97,7 +128,7 @@ export function initAnalytics(): void {
  * surface to a visitor, so this never throws and never returns a status.
  */
 export function track(name: string, data?: Record<string, unknown>): void {
-  if (!src || !websiteId || unavailable) return
+  if (!src || !websiteId || unavailable || analyticsRefused()) return
   if (ready) {
     window.umami?.track(name, data)
     return

@@ -115,7 +115,7 @@ Building locally instead — a `frontend/.env` on your machine, then deploying t
 
 ### Analytics: the self-hosted Umami at umami.jhemery.xyz
 
-Traffic goes to a self-hosted [Umami](https://umami.is) instance rather than to a third party. It is cookieless and stores only aggregates, so it needs no consent banner and nothing personal leaves the visitor's browser.
+Traffic goes to a self-hosted [Umami](https://umami.is) instance rather than to a third party. It is cookieless and stores only aggregates, so it needs no consent banner and nothing personal leaves the visitor's browser. The CNIL's exemption for audience measurement still asks that a visitor can refuse, so `/privacy` has a button that does: it sets `couvbat:analytics`, and [frontend/src/lib/analytics.ts](../frontend/src/lib/analytics.ts) then never injects the tracker.
 
 The tracker is injected by [frontend/src/lib/analytics.ts](../frontend/src/lib/analytics.ts), not hardcoded in `index.html`, and it is configured by three build-time variables — same mechanism as `VITE_API_URL` above, same caveat about a `.env` on the server being inert:
 
