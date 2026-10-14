@@ -1241,7 +1241,10 @@ this section only fixes the rules the code cites.
 - **One navigation function.** `goTo(target)` takes anything `cd` accepts and is what the navbar,
   the palette and `CommandContext.navigate` all call. A section on another view routes home with a
   hash and is scrolled to once the swing settles. `resolvePath` is the shared resolver, so `cd`
-  can say "No such file or directory" for the same inputs `goTo` refuses.
+  can say "No such file or directory" for the same inputs `goTo` refuses. `ls`, `cd` and `ping`
+  first rewrite the forms only a shell uses, through `shellPath()`: the `/home/<handle>/…` that
+  `pwd` prints, and `.` and `..` read against where you are. That leaves `resolvePath` reading
+  the same paths for every caller.
 - **The swing is one clock with three readers.** `useViewSwing` eases 0→1 once; `App.vue` binds it
   as CSS custom properties on the stage that rotates the two pages as faces of a prism, and
   `ThreeBackground` yaws the wireframe *field* (not the camera — see the spec for why), re-homes

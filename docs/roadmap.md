@@ -5,7 +5,8 @@ commands, live information), then games vol. 2 (§E), views and tools (§F), the
 batch (§G), the late-September brainstorm (§H) and the October brainstorm (§I). Built feature by
 feature, across sessions.
 
-**Current state: §A–§H are shipped; §I is proposed.** Anything else still open is
+**Current state: §A–§H are shipped; in §I the *Fixes found on the way* have shipped and the rest
+is proposed.** Anything else still open is
 under [Open](#open) and [Known issues](#known-issues).
 
 **How to use:** tick a box when the feature ships, and append the PR number. Design detail for
@@ -649,8 +650,8 @@ each was checked against the code before its row was written. That check found t
 
 | ✔ | Feature | Approach | Files | Effort |
 |---|---|---|---|---|
-| [ ] | Guard the locale read | `detectInitialLocale()` reads `window.localStorage` when the module loads, with no try/catch, and `setLocale()` writes to it unguarded too. In a browser that blocks site data, reading `localStorage` throws a `SecurityError`, so `i18n` fails to evaluate and the app never mounts. Every other key the site stores is behind a try/catch (`terminal/storage.ts`, `useTheme`, `useMotion`…). Wrap both accesses the same way, falling back to `navigator.language`. A spec loads the module with a `localStorage` getter that throws and expects `en`. | `i18n/index.ts`, `i18n/__tests__/` | S |
-| [ ] | `cd` takes what `pwd` prints | `pwd` prints `/home/couvbat/projects`, but `cd` rejects that path: `resolvePath()` matches `home` to the home view and refuses the two segments after it. `cd ..` fails the same way. Strip a leading `/home/<handle>` (with or without the `/`), and resolve `..` against `currentPath()`. Then `cd "$(pwd)"`-shaped habits work, and the `/proc` row below doesn't add a second kind of absolute path that `cd` can't read. | `composables/useViewSwing.ts`, `terminal/__tests__/` | S |
+| [x] | Guard the locale read | Shipped in #150. `detectInitialLocale()` reads `window.localStorage` when the module loads, with no try/catch, and `setLocale()` writes to it unguarded too. In a browser that blocks site data, reading `localStorage` throws a `SecurityError`, so `i18n` fails to evaluate and the app never mounts. Every other key the site stores is behind a try/catch (`terminal/storage.ts`, `useTheme`, `useMotion`…). Wrap both accesses the same way, falling back to `navigator.language`. A spec loads the module with a `localStorage` getter that throws and expects `en`. | `i18n/index.ts`, `i18n/__tests__/` | S |
+| [x] | `cd` takes what `pwd` prints | Shipped in #150. `pwd` prints `/home/couvbat/projects`, but `cd` rejects that path: `resolvePath()` matches `home` to the home view and refuses the two segments after it. `cd ..` fails the same way. Strip a leading `/home/<handle>` (with or without the `/`), and resolve `..` against `currentPath()`. Then `cd "$(pwd)"`-shaped habits work, and the `/proc` row below doesn't add a second kind of absolute path that `cd` can't read. | `composables/useViewSwing.ts`, `terminal/__tests__/` | S |
 
 ### Phones
 
@@ -697,6 +698,28 @@ The other three stay dropped:
   long-running command that reads no keys appears.
 - **The import graph as the background** and **the repo at `/usr/src`**: x-ray shows the
   structure on the page where it's drawn, and every tag is one click from the code on GitHub.
+
+### Departures from the approach column
+
+Recorded as each row ships.
+
+- **Guard the locale read:** the spec expects the browser's language and runs with a French one,
+  not `en`: English is also the default a broken fallback would land on, so `en` proved nothing.
+- **`cd` takes what `pwd` prints:**
+  - The rewrite is a new `shellPath()` beside `resolvePath()`, not a change to it.
+    `resolvePath()` is also what `goTo()`, the tab titles and the content specs read, and none of
+    them speak `..`. `ls` and `ping` take `shellPath()` as well as `cd`.
+  - A bare name stays relative to home, so `cd projects` works from anywhere; only a path that
+    starts with `.` or `..` is read against where you are. `..` stops at home, as `/..` is `/`.
+  - Found in review: `ping` named its host from the rewritten path and navigated to the raw one,
+    so `ping ..` replied and then went nowhere. It now goes where it pinged, and credits no
+    section visit when it can't.
+  - Found in review too: within one line the cwd lagged a push the router hadn't landed, so
+    `cd .. && cd ..` stopped one level short. `goTo()` records where it sent the router and
+    `currentPath()` answers with it until the after-hook clears it. A scroll within the home page
+    isn't tracked, since `currentSection()` follows the scroll itself.
+  - Left as they were: `cat` still takes no `/home/<handle>` path, and `/now` and `/work/<id>`
+    are still not `cd` targets, so the path `pwd` prints there leads nowhere, as it did before.
 
 ## Build order
 
@@ -761,9 +784,10 @@ further):
 6. **Craft and polish**, in any order. Motion control before `who`/`wall`, whose wave should
    honour it.
 
-**Phase 8 — the October brainstorm (§I):** proposed. One branch per step:
+**Phase 8 — the October brainstorm (§I):** step 1 shipped, the rest proposed. One branch per step:
 
-1. **Fixes found on the way.** Both are S, and neither depends on anything else in §I.
+1. **Fixes found on the way.** ✅ shipped in #150. Both are S, and neither depends on anything
+   else in §I.
 2. **Seasons**, if 31 October is to count: it is eighteen days after this was written. Otherwise
    it can go anywhere in the order.
 3. **The `fingerprint` tool, then `/proc`**, which reads the tool's module. The storage inspector
@@ -776,7 +800,8 @@ further):
 
 ## Open
 
-- Everything in [§I](#i-october-2026-brainstorm) is proposed and not started.
+- Everything in [§I](#i-october-2026-brainstorm) after *Fixes found on the way* is proposed and
+  not started.
 - A curation pass, which is a judgement call rather than a row: retire or fold the weakest joke
   commands, and record each removal here, the way *Dropped* records what never shipped.
 

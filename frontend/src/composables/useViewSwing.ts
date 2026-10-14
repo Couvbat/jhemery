@@ -1,7 +1,7 @@
 import { computed, nextTick, ref } from 'vue'
 import type { RouteLocationRaw, Router } from 'vue-router'
 import type { SectionMeta, ViewMeta } from '@/content'
-import { findSection, findView, sections, viewFor, viewIndex, views } from '@/content'
+import { findSection, findView, profile, sections, viewFor, viewIndex, views } from '@/content'
 import { findTool, type ToolMeta } from '@/tools/registry'
 import { normaliseCode } from '@/rooms/sync'
 import { currentSection, scrollToSection } from './useActiveSection'
@@ -56,6 +56,14 @@ let router: SwingRouter | null = null
 let frame: number | null = null
 /** The `<Transition>`'s own callbacks, held until the stage unfixes — see `untilSettled`. */
 let held: Array<() => void> = []
+
+/**
+ * Where `goTo()` has sent the router, until the router lands there. A push lands some
+ * ticks later, and the shell starts the next stage of a line before that, so without
+ * this `cd .. && cd ..` read the page still on screen twice. A scroll within the home
+ * page isn't tracked: `currentSection()` follows the scroll itself.
+ */
+let landing: string | null = null
 
 function easeInOut(t: number): number {
   return t < 0.5 ? 2 * t * t : 1 - (-2 * t + 2) ** 2 / 2
@@ -142,6 +150,7 @@ function viewIdFor(path: string): string {
 /** Hooks the router. Called once, from `App.vue`. */
 export function installViewSwing(instance: SwingRouter): void {
   router = instance
+  landing = null
   // A fresh router means a fresh clock — nothing can be mid-turn.
   cancelFrame()
   swing.value = 1
@@ -149,6 +158,8 @@ export function installViewSwing(instance: SwingRouter): void {
   activeView.value = viewIdFor(instance.currentRoute.value.path)
 
   instance.afterEach((to, from, failure) => {
+    // A refused or duplicated push still runs these hooks, so this always clears it.
+    landing = null
     if (failure) return
     activeView.value = viewIdFor(to.path)
 
@@ -206,23 +217,48 @@ export function resolvePath(target: string): ResolvedPath | undefined {
   return undefined
 }
 
+/**
+ * A path as the shell takes it, rewritten into one `resolvePath()` reads. `pwd` prints
+ * `/home/<handle>/tools/image`, so `cd` has to take that back, which `resolvePath()`
+ * alone refused: it read `home` as the home view and the rest as too deep. `.` and `..`
+ * start from `cwd`, and `..` stops at home the way `/..` is `/`. A bare name stays
+ * relative to home, so `cd projects` still works from anywhere. That is what a site
+ * with one directory of sections needs, even if a real shell would refuse it.
+ */
+export function shellPath(target: string, cwd: string = currentPath()): string {
+  const home = `/home/${profile.handle}`
+  let path = target.trim()
+  if (path === home || path.startsWith(`${home}/`)) path = path.slice(home.length)
+  else path = path.replace(/^~/, '')
+
+  const relative = /^\.\.?(\/|$)/.test(path)
+  const segments: string[] = []
+  for (const segment of [...(relative ? cwd.split('/') : []), ...path.split('/')]) {
+    if (segment === '..') segments.pop()
+    else if (segment && segment !== '.') segments.push(segment)
+  }
+  return segments.join('/')
+}
+
 /** What `pwd` prints after `/home/<handle>/`: the section on the home page, the
  *  route path everywhere else (`tools`, `tools/image`). */
 export function currentPath(): string {
+  if (landing !== null) return landing
   if (activeView.value === 'home') return currentSection()
   const path = router?.currentRoute.value.path ?? `/${activeView.value}`
   return path.replace(/^\/+/, '')
 }
 
-function push(to: RouteLocationRaw): boolean {
+function push(to: RouteLocationRaw, path: string): boolean {
   if (!router) return false
+  landing = path
   void router.push(to)
   return true
 }
 
 /** Routes to a path of the app as it is (`/now`, `/work/vim`), for a link to one. */
 export function routeTo(path: string): boolean {
-  return push(path)
+  return push(path, path.replace(/^\/+/, ''))
 }
 
 /**
@@ -235,17 +271,19 @@ export function goTo(target: string): boolean {
   if (!resolved) return false
 
   if (resolved.kind === 'section') {
-    if (activeView.value === 'home') return scrollToSection(resolved.section.id)
-    return push({ path: '/', hash: `#${resolved.section.id}` })
+    const { id } = resolved.section
+    if (activeView.value === 'home') return scrollToSection(id)
+    return push({ path: '/', hash: `#${id}` }, id)
   }
 
   const { view, tool, code } = resolved
   if (view.id === 'home') {
     if (activeView.value === 'home') return scrollToSection(sections[0]!.id)
-    return push('/')
+    return push('/', sections[0]!.id)
   }
   const child = tool?.id ?? code
-  return push(child ? `${view.path}/${child}` : view.path)
+  const path = child ? `${view.path}/${child}` : view.path
+  return push(path, path.replace(/^\/+/, ''))
 }
 
 export function useViewSwing() {

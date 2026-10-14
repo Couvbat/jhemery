@@ -10,9 +10,20 @@ function isLocale(value: string | null): value is Locale {
   return value !== null && (LOCALES as string[]).includes(value)
 }
 
+// Read while this module loads, so it must not throw: a browser that blocks site data
+// throws on the `localStorage` getter itself, and an unguarded read here failed the
+// import of everything that shows text, leaving a blank page.
+function readStored(): string | null {
+  try {
+    return window.localStorage.getItem(STORAGE_KEY)
+  } catch {
+    return null
+  }
+}
+
 function detectInitialLocale(): Locale {
   if (typeof window === 'undefined') return 'en'
-  const stored = window.localStorage.getItem(STORAGE_KEY)
+  const stored = readStored()
   if (isLocale(stored)) return stored
   return navigator.language?.toLowerCase().startsWith('fr') ? 'fr' : 'en'
 }
@@ -27,7 +38,11 @@ if (typeof document !== 'undefined') {
 export function setLocale(next: Locale) {
   locale.value = next
   if (typeof window !== 'undefined') {
-    window.localStorage.setItem(STORAGE_KEY, next)
+    try {
+      window.localStorage.setItem(STORAGE_KEY, next)
+    } catch {
+      // Blocked storage: switched for this page load, the browser's language after a reload.
+    }
     document.documentElement.lang = next
   }
 }
