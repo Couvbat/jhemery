@@ -1,6 +1,6 @@
 import { searchKinds, type SearchEntry, type SearchIndex, type SearchKind, type SearchText } from '@/content/search'
 import type { Locale, Localised } from '@/content/types'
-import { fold } from '@/terminal/games/words'
+import { fold } from './fold'
 
 /**
  * What the Ctrl+K palette matches with, for its own entries and for `/search.json`

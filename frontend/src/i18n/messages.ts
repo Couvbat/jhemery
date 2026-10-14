@@ -931,10 +931,6 @@ export const messages = {
   // keeps, and `strace` is how a visitor checks it rather than taking the page's word.
   privacy: {
     heading: { en: 'What this site keeps', fr: 'Ce que ce site garde' },
-    intro: {
-      en: 'Everything the site stores in your browser, what each piece is for, and a way to clear it. None of it is a cookie, so none of it rides along with a request. In the terminal, the same list is `du ~`, and `rm` clears it.',
-      fr: 'Tout ce que le site stocke dans votre navigateur, à quoi sert chaque élément, et de quoi l’effacer. Rien de tout cela n’est un cookie : rien ne part avec une requête. Dans le terminal, la même liste s’obtient avec `du ~`, et `rm` l’efface.',
-    },
     browser: { en: 'In this browser', fr: 'Dans ce navigateur' },
     notSet: { en: 'not set', fr: 'absente' },
     secret: { en: 'secret: only its length is shown', fr: 'secret : seule sa longueur est affichée' },
@@ -945,16 +941,8 @@ export const messages = {
     // turns into Cancel in place, so a double-click lands on Cancel.
     cancel: { en: 'cancel', fr: 'annuler' },
     confirm: { en: 'yes, clear {n} and reload', fr: 'oui, effacer {n} et recharger' },
-    reloadNote: {
-      en: 'The page reloads afterwards, so nothing on screen keeps an old copy.',
-      fr: 'La page se recharge ensuite, pour que rien à l’écran n’en garde une vieille copie.',
-    },
     cleared: { en: 'Cleared. Reloading…', fr: 'Effacé. Rechargement…' },
     caches: { en: 'Caches', fr: 'Caches' },
-    cachesIntro: {
-      en: 'The service worker keeps copies of the site’s own files, so it loads fast and opens offline. Nothing in them is about you, so they are listed here, not cleared.',
-      fr: 'Le service worker garde des copies des fichiers du site, pour qu’il se charge vite et s’ouvre hors ligne. Rien là-dedans ne vous concerne : ils sont listés ici, pas effacés.',
-    },
     files: { en: '{n} files', fr: '{n} fichiers' },
     noCaches: {
       en: 'Nothing cached here: the service worker hasn’t stored anything yet, or isn’t running.',
@@ -965,26 +953,6 @@ export const messages = {
       fr: 'Votre navigateur compte {size} utilisés par ce site (`navigator.storage.estimate()`).',
     },
     sends: { en: 'What leaves your browser', fr: 'Ce qui quitte votre navigateur' },
-    presence: {
-      en: 'Presence is one integer, pushed to the pages listening for it: how many people are here, with no visitor id anywhere behind it. `wall`’s wave carries nothing at all.',
-      fr: 'La présence est un seul entier, poussé aux pages qui l’écoutent : combien de personnes sont là, sans aucun identifiant de visiteur derrière. Le signe de `wall` ne transporte rien du tout.',
-    },
-    stats: {
-      en: 'Stats count sessions, not commands: the terminal reports once a visit that it was opened, never what ran in it. A finished daily `wordle` also sends the day, the language and the number of guesses.',
-      fr: 'Les statistiques comptent des sessions, pas des commandes : le terminal signale une fois par visite qu’il a été ouvert, jamais ce qui y a tourné. Un `wordle` du jour terminé envoie aussi le jour, la langue et le nombre d’essais.',
-    },
-    ask: {
-      en: '`ask` never logs what you asked or what it answered, only how long it took and whether it worked.',
-      fr: '`ask` n’enregistre jamais ce que vous avez demandé ni ce qu’il a répondu, seulement le temps que ça a pris et si ça a marché.',
-    },
-    analytics: {
-      en: 'Analytics are Umami, self-hosted and cookieless: page views, and one event when the terminal opens.',
-      fr: 'Les statistiques de visite viennent d’Umami, auto-hébergé et sans cookie : les pages vues, et un événement à l’ouverture du terminal.',
-    },
-    strace: {
-      en: 'None of this needs taking on trust. `strace <command>` runs a command and lists every request it made, with the keys of what was sent and never the values.',
-      fr: 'Rien de tout cela n’est à croire sur parole. `strace <commande>` lance une commande et liste chaque requête qu’elle a faite, avec les clés de ce qui est parti et jamais les valeurs.',
-    },
   },
   footer: {
     built: { en: 'built', fr: 'build' },

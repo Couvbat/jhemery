@@ -6,7 +6,6 @@ import { useLocale } from '@/i18n'
 import { DESKTOP_QUERY, openTerminal, openTerminalFromLink } from '@/composables/useTerminalShell'
 import { paletteOpen } from '@/composables/usePalette'
 import { goTo, routeTo } from '@/composables/useViewSwing'
-import { loadSearchIndex, rank, searchable, searchIndex, wantsIndex } from '@/lib/search'
 import { linkTarget, type LinkTarget } from '@/terminal/links'
 import type { Command } from '@/terminal/types'
 
@@ -56,6 +55,14 @@ const registryCommands = shallowRef<Command[]>([])
 const tapped = shallowRef<ReadonlySet<string>>(new Set())
 let registryRequested = false
 
+/**
+ * The scorer (`lib/search.ts`) comes on first open too, and only ever through this
+ * `import()`: a static import of anything in it would keep all of it in the first paint,
+ * which the home page's byte budget can't spare. Until it lands, a frame or so on a cached
+ * site, the list filters by plain substring as it did before the scorer existed.
+ */
+const searchLib = shallowRef<typeof import('@/lib/search') | null>(null)
+
 function loadRegistryCommands() {
   if (registryRequested) return
   registryRequested = true
@@ -63,6 +70,14 @@ function loadRegistryCommands() {
     registryCommands.value = paletteCommands()
     tapped.value = new Set(tapLines())
   })
+  void import('@/lib/search').then((lib) => {
+    searchLib.value = lib
+  })
+}
+
+/** Whether a query is long enough to search the content index; false until the scorer is in. */
+function wantsIndex(value: string): boolean {
+  return searchLib.value?.wantsIndex(value) ?? false
 }
 
 /**
@@ -97,7 +112,10 @@ const entries = computed<Entry[]>(() => [
 ])
 
 /** Split into words once per change of list or locale, not once per keystroke. */
-const pool = computed(() => entries.value.map((e) => searchable(e, { title: e.label, text: e.hint })))
+const pool = computed(() => {
+  const lib = searchLib.value
+  return lib ? entries.value.map((e) => lib.searchable(e, { title: e.label, text: e.hint })) : []
+})
 
 /**
  * `/search.json`: the case studies, the `why` topics, the notes' headings and /now. Not
@@ -107,10 +125,10 @@ const pool = computed(() => entries.value.map((e) => searchable(e, { title: e.la
 const index = shallowRef<SearchIndex | null>(null)
 const indexState = ref<'idle' | 'loading' | 'failed'>('idle')
 
-watch(query, (value) => {
-  if (index.value || indexState.value !== 'idle' || !wantsIndex(value)) return
+watch([query, searchLib], ([value, lib]) => {
+  if (!lib || index.value || indexState.value !== 'idle' || !lib.wantsIndex(value)) return
   indexState.value = 'loading'
-  loadSearchIndex().then(
+  lib.loadSearchIndex().then(
     (loaded) => {
       index.value = loaded
       indexState.value = 'idle'
@@ -133,8 +151,14 @@ function follow(target: LinkTarget) {
 }
 
 const groups = computed<Group[]>(() => {
-  const own = query.value.trim() ? rank(pool.value, query.value) : entries.value
-  const found = index.value ? searchIndex(index.value, query.value, locale.value) : []
+  const lib = searchLib.value
+  const needle = query.value.trim().toLowerCase()
+  const own = !needle
+    ? entries.value
+    : lib
+      ? lib.rank(pool.value, query.value)
+      : entries.value.filter((e) => `${e.label} ${e.hint}`.toLowerCase().includes(needle))
+  const found = lib && index.value ? lib.searchIndex(index.value, query.value, locale.value) : []
   const list: Group[] = [{ id: 'own', entries: own, start: 0 }]
   let start = own.length
   for (const group of found) {

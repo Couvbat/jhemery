@@ -2,6 +2,7 @@
 import { computed, onMounted, ref, shallowRef } from 'vue'
 import { RouterLink } from 'vue-router'
 import { profile } from '@/content'
+import { privacyCopy } from '@/content/privacy'
 import type { Localised } from '@/content/types'
 import CodeText from '@/components/CodeText.vue'
 import { useStoredItems } from '@/composables/useStoredItems'
@@ -106,7 +107,7 @@ onMounted(async () => {
   report.value = await cacheReport()
 })
 
-const claims = computed(() => [m.privacy.presence, m.privacy.stats, m.privacy.ask, m.privacy.analytics])
+const claims = computed(() => [privacyCopy.presence, privacyCopy.stats, privacyCopy.ask, privacyCopy.analytics])
 </script>
 
 <template>
@@ -121,7 +122,7 @@ const claims = computed(() => [m.privacy.presence, m.privacy.stats, m.privacy.as
         <h1 tabindex="-1" class="text-2xl md:text-3xl font-bold glow-cyan text-accent rounded-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-4 focus-visible:ring-offset-background">
           <span class="text-accent">#</span> {{ t(m.privacy.heading) }}
         </h1>
-        <p class="mt-3 text-sm text-foreground leading-relaxed"><CodeText :text="t(m.privacy.intro)" /></p>
+        <p class="mt-3 text-sm text-foreground leading-relaxed"><CodeText :text="t(privacyCopy.intro)" /></p>
       </header>
 
       <section class="space-y-6" aria-labelledby="privacy-browser">
@@ -161,7 +162,7 @@ const claims = computed(() => [m.privacy.presence, m.privacy.stats, m.privacy.as
             </div>
           </div>
           <p v-if="armed === group.id" class="text-xs text-muted-foreground" aria-live="polite">
-            {{ t(m.privacy.reloadNote) }}
+            {{ t(privacyCopy.reloadNote) }}
           </p>
 
           <ul class="space-y-2 font-mono text-xs">
@@ -185,7 +186,7 @@ const claims = computed(() => [m.privacy.presence, m.privacy.stats, m.privacy.as
 
       <section class="space-y-3" aria-labelledby="privacy-caches">
         <h2 id="privacy-caches" class="text-primary font-mono text-sm">## {{ t(m.privacy.caches) }}</h2>
-        <p class="text-sm text-foreground leading-relaxed">{{ t(m.privacy.cachesIntro) }}</p>
+        <p class="text-sm text-foreground leading-relaxed">{{ t(privacyCopy.cachesIntro) }}</p>
         <template v-if="report">
           <ul v-if="report.caches?.length" class="space-y-2 font-mono text-xs" data-testid="privacy-caches">
             <li
@@ -215,7 +216,7 @@ const claims = computed(() => [m.privacy.presence, m.privacy.stats, m.privacy.as
         <ul class="space-y-3 text-sm text-foreground leading-relaxed">
           <li v-for="(claim, i) in claims" :key="i" class="border-l-2 border-primary/40 pl-4"><CodeText :text="t(claim)" /></li>
         </ul>
-        <p class="text-sm text-foreground leading-relaxed"><CodeText :text="t(m.privacy.strace)" /></p>
+        <p class="text-sm text-foreground leading-relaxed"><CodeText :text="t(privacyCopy.strace)" /></p>
       </section>
 
       <p class="text-xs text-muted-foreground">
