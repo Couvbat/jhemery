@@ -197,6 +197,31 @@ test('the matrix rain and the boot replay keep their own Esc', async ({ page, te
   await expect(layer).toHaveCount(0)
 })
 
+test('a first visit’s boot keeps its own Esc too', async ({ page, app }) => {
+  test.skip(onPhone(), 'Esc is a keyboard’s.')
+
+  // The clock is paused before the page loads, so a run link that fetches two chunks can't
+  // lose the race with a boot that is over in under two seconds: time moves only when told.
+  const start = new Date('2026-10-14T09:00:00Z')
+  await app.seed({ booted: false })
+  await page.clock.install({ time: start })
+  await page.clock.pauseAt(start)
+  await page.goto('/?run=xray')
+  const boot = page.getByText('couvsh 1.0 booting…')
+  const layer = page.getByTestId('xray-layer')
+  const exit = layer.getByRole('button', { name: messages.xray.exitLabel.en })
+  await expect(boot).toBeVisible()
+  await expect(layer).toHaveCount(1, { timeout: 15_000 })
+  // Standing aside while the boot plays, so the boot's Esc can't reach it.
+  await expect(exit).toBeHidden()
+
+  await page.clock.runFor(400)
+  await page.keyboard.press('Escape')
+  await page.clock.runFor(1_000)
+  await expect(boot).toBeHidden()
+  await expect(exit).toBeVisible()
+})
+
 test('a focused tag keeps focus when its component scrolls away', async ({ page }) => {
   test.skip(onPhone(), 'End, pressed on a focused link, is a keyboard’s.')
 

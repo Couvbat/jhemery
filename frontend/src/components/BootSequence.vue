@@ -3,7 +3,7 @@ import { onMounted, onUnmounted, ref, watch } from 'vue'
 import { profile, seasonOn } from '@/content'
 import { useLocale } from '@/i18n'
 import { decorativeMotion } from '@/composables/useMotion'
-import { useBoot } from '@/composables/useBoot'
+import { setBootPlaying, useBoot } from '@/composables/useBoot'
 
 const STORAGE_KEY = 'couvbat:booted'
 const STEP_MS = 130
@@ -49,6 +49,7 @@ function disarm() {
 function finish() {
   clearTimeout(timer)
   visible.value = false
+  setBootPlaying(false)
   disarm()
   // Clears the `reboot` flag, so the command can be run again straight away.
   ackBoot()
@@ -75,6 +76,7 @@ function start() {
   disarm()
   shown.value = []
   visible.value = true
+  setBootPlaying(true)
   // The keypress or click that ran `reboot` is still propagating when the watcher
   // fires, and a window listener attached now would catch it and dismiss the
   // replay instantly. Arming a beat later leaves the sequence a chance to play.
@@ -115,6 +117,7 @@ watch(bootActive, (requested) => {
 })
 
 onUnmounted(() => {
+  setBootPlaying(false)
   clearTimeout(timer)
   disarm()
 })

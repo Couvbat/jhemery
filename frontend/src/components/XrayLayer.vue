@@ -49,7 +49,7 @@ import {
 const { t, m, locale } = useLocale()
 const { swinging } = useViewSwing()
 const { matrixActive } = useMatrix()
-const { bootActive } = useBoot()
+const { bootPlaying } = useBoot()
 const { shapeCount, visitorShapes } = useSceneControl()
 // The field's third pool, the guestbook's newest entries, counted the way the field picks them.
 const { entries: guestbookEntries } = useGuestbookTicker()
@@ -76,10 +76,10 @@ const boxes = shallowRef<Rect[]>([])
 const tags = shallowRef<ShownTag[]>([])
 const files = ref(0)
 
-// The rain and the boot replay end on any key and claim none, and their listeners come after
-// this layer's: under them, an Esc is theirs alone.
+// The rain and the boot sequence (a first visit's as well as a `reboot`) end on any key and
+// claim none, and their listeners may come after this layer's: under them, an Esc is theirs alone.
 const hidden = computed(
-  () => terminalOpen.value || paletteOpen.value || swinging.value || matrixActive.value || bootActive.value,
+  () => terminalOpen.value || paletteOpen.value || swinging.value || matrixActive.value || bootPlaying.value,
 )
 
 const status = computed(() =>

@@ -1202,7 +1202,9 @@ floating notices fighting for the same corner reads as a bug. Clicking it opens 
 
 The same poll keeps the page it fetched, which the field draws as wireframes (§5.3, guestbook
 entries). Each poll replaces it, so a deleted entry drops out on the next one; the guestbook
-saying it is off empties it; a failed poll leaves it as it was, since a blip is not a deletion.
+saying it is off empties it; a failed poll leaves it as it was, since a blip is not a deletion;
+and a ticker that gives up after three failures empties it, since a deletion could no longer
+reach it.
 
 ### Guestbook
 
