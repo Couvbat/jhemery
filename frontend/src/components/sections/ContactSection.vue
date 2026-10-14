@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
+import { RouterLink } from 'vue-router'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
@@ -126,6 +127,10 @@ async function submit() {
               <span v-if="status === 'sending'">{{ t(m.contact.sending) }}</span>
               <span v-else>{{ t(m.contact.send) }}</span>
             </Button>
+            <p class="text-xs text-muted-foreground">
+              {{ t(m.contact.notice) }}
+              <RouterLink to="/privacy" class="text-primary hover:underline">/privacy</RouterLink>
+            </p>
           </form>
         </div>
 

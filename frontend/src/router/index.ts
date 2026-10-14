@@ -55,6 +55,13 @@ const router = createRouter({
       component: () => import('../views/PrivacyView.vue'),
     },
     {
+      // The mentions légales and the credits, beside /privacy in the footer and outside
+      // the prism for the same reason.
+      path: '/legal',
+      name: 'legal',
+      component: () => import('../views/LegalView.vue'),
+    },
+    {
       // The case studies (content/work.ts). Like /now, not a face of the prism: they are
       // reached from the projects section, and `viewIndex()` puts them after the faces.
       path: '/work/:id',

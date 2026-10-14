@@ -105,8 +105,16 @@ export const pages: PageMeta[] = [
     '/privacy',
     { en: 'What this site keeps', fr: 'Ce que ce site garde' },
     {
-      en: 'Everything this site stores in your browser, what each piece is for, and a way to clear it. None of it is a cookie.',
-      fr: 'Tout ce que ce site stocke dans votre navigateur, à quoi sert chaque élément, et de quoi l’effacer. Rien de tout cela n’est un cookie.',
+      en: 'Everything this site stores in your browser, what each piece is for, and a way to clear it. None of it is a cookie. Also who handles your data, and your rights under the GDPR.',
+      fr: 'Tout ce que ce site stocke dans votre navigateur, à quoi sert chaque élément, et de quoi l’effacer. Rien de tout cela n’est un cookie. Et qui traite vos données, et vos droits au titre du RGPD.',
+    },
+  ),
+  page(
+    '/legal',
+    { en: 'Legal notice', fr: 'Mentions légales' },
+    {
+      en: 'Who publishes this site, who hosts it, the guestbook’s rules and how to report an entry, and credits for the data sources and open-source code it uses.',
+      fr: 'Qui publie ce site, qui l’héberge, les règles du livre d’or et comment signaler un message, et les crédits des sources de données et du code open source utilisés.',
     },
   ),
   ...work.map((part) => page(`/work/${part.id}`, part.name, part.summary)),

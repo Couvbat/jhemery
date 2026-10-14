@@ -31,12 +31,13 @@ export function pageUrl(path: string, locale: Locale): string {
   return `${SITE}${path}${locale === 'en' ? '' : `?${LANG_PARAM}=${locale}`}`
 }
 
-/** Every public page, by path: the views, the public tools, `/now`, `/privacy`, the case studies. */
+/** Every public page, by path: the views, the public tools, `/now`, `/privacy`, `/legal`, the case studies. */
 export const pagePaths: string[] = [
   ...views.map((view) => view.path),
   ...toolInfo.filter((tool) => tool.tier !== 'admin').map((tool) => `/tools/${tool.id}`),
   '/now',
   '/privacy',
+  '/legal',
   ...work.map((part) => `/work/${part.id}`),
 ]
 

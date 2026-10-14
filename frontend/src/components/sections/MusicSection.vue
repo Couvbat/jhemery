@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue'
+import { computed, nextTick, ref, watch } from 'vue'
 import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import SectionHeader from '@/components/SectionHeader.vue'
@@ -10,8 +10,7 @@ import { useMusicPlayer } from '@/composables/useMusicPlayer'
 import { embedColour } from '@/composables/useTheme'
 
 const { t, m } = useLocale()
-const { autoplayNonce } = useMusicPlayer()
-
+const { autoplayNonce, playerLoaded, loadPlayer } = useMusicPlayer()
 
 // The player is drawn in the scheme's green, read when the frame mounts and again on each
 // `play` remount — never on a scheme change: a new `src` reloads the cross-origin player
@@ -23,6 +22,14 @@ watch(autoplayNonce, () => {
   colour.value = embedColour()
 })
 const src = computed(() => soundcloudEmbedSrc(colour.value, autoplayNonce.value > 0))
+
+// The button goes when the frame comes, and focus would fall to `<body>` with it.
+const frameEl = ref<HTMLIFrameElement | null>(null)
+async function load() {
+  loadPlayer()
+  await nextTick()
+  frameEl.value?.focus()
+}
 </script>
 
 <template>
@@ -77,14 +84,14 @@ const src = computed(() => soundcloudEmbedSrc(colour.value, autoplayNonce.value 
           </div>
           <div class="p-4 space-y-2">
             <!--
+              Behind a button until asked for. SoundCloud's frame sets its own cookies and
+              sees the visitor's address the moment it loads, and the CNIL wants consent
+              before a third party's trackers, not a banner after them: pressing the button
+              is that consent, and so is typing `play`. Nothing is remembered, so the next
+              visit asks again, which is the whole of the consent management.
+
               The `key` remounts the iframe when the terminal `play` command fires, which is
               the only way to hand SoundCloud an autoplay flag it will honour.
-
-              Lazy on first mount: this section is well below the fold, and SoundCloud's
-              player drags in a widget bundle, a DataDome script and a pile of third-party
-              cookie warnings that nobody who never scrolls here should pay for. The `play`
-              remount switches to eager — that iframe is wanted *now*, and waiting on the
-              smooth scroll to cross the lazy-load threshold would delay playback.
 
               `allow` rides along with the same nonce, for the same reason. The grant only
               does anything for the remount, which starts playing with no user gesture
@@ -99,9 +106,10 @@ const src = computed(() => soundcloudEmbedSrc(colour.value, autoplayNonce.value 
               feature to match — in exchange for a permission the page was not yet using.
             -->
             <iframe
+              v-if="playerLoaded"
+              ref="frameEl"
               :key="autoplayNonce"
               :src="src"
-              :loading="autoplayNonce > 0 ? 'eager' : 'lazy'"
               :allow="autoplayNonce > 0 ? 'autoplay' : undefined"
               width="100%"
               height="400"
@@ -109,6 +117,20 @@ const src = computed(() => soundcloudEmbedSrc(colour.value, autoplayNonce.value 
               class="rounded"
               :title="t(m.music.listen)"
             ></iframe>
+            <div
+              v-else
+              data-testid="music-consent"
+              class="h-[400px] flex flex-col items-center justify-center gap-4 rounded border border-dashed border-border p-6 text-center"
+            >
+              <p class="text-sm text-muted-foreground max-w-xs leading-relaxed">{{ t(m.music.consent) }}</p>
+              <button
+                type="button"
+                class="px-4 py-2 rounded border border-accent/50 font-mono text-sm text-accent hover:border-accent hover:bg-accent/10 transition-colors"
+                @click="load"
+              >
+                {{ t(m.music.load) }}
+              </button>
+            </div>
             <p class="text-muted-foreground font-mono text-xs pt-2 border-t border-border">
               {{ t(m.music.listen) }}:
               <a
