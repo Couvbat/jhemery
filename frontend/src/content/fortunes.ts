@@ -102,6 +102,34 @@ export const seasonalFortunes: Record<SeasonId, readonly Localised[]> = {
       fr: 'Chaque anniversaire rappelle que le premier commit s’appelait « initial commit ».',
     },
   ],
+  'music-day': [
+    {
+      en: 'Tonight every street is a stage, and every stage has a dodgy cable.',
+      fr: 'Ce soir, chaque rue est une scène, et chaque scène a un câble qui grésille.',
+    },
+    {
+      en: 'Four on the floor is just a for loop with better speakers.',
+      fr: 'Un kick en quatre temps, c’est une boucle for avec de meilleures enceintes.',
+    },
+    {
+      en: 'The longest day of the year, and the drop still comes too early.',
+      fr: 'Le jour le plus long de l’année, et le drop arrive quand même trop tôt.',
+    },
+  ],
+  'april-fools': [
+    {
+      en: 'Today every test passes on the first run. Check the date.',
+      fr: 'Aujourd’hui, tous les tests passent du premier coup. Vérifiez la date.',
+    },
+    {
+      en: 'This fortune is 100% accurate. So is the estimate on your ticket.',
+      fr: 'Cette fortune est exacte à 100 %. Comme l’estimation de votre ticket.',
+    },
+    {
+      en: 'Look behind you: a fish is taped to your monitor.',
+      fr: 'Regardez dans votre dos : il y a un poisson collé à votre écran.',
+    },
+  ],
 }
 
 /** The lines `fortune` picks from on `at`'s day: the season's if it is one, otherwise the everyday ones. */

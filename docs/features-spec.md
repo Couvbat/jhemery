@@ -458,7 +458,7 @@ URL), and `neofetch` has a `Status` row from `profile.availability`, the same fl
 both résumés read. `now.txt` is the `/now` list, with the same 90-day staleness rule.
 
 `neofetch` renders an ASCII logo beside a spec block — stack, locale, "uptime" since the first
-commit, a `Season` row on one of the four season days (§5.3), and the live Steam status if
+commit, a `Season` row on one of the six season days (§5.3), and the live Steam status if
 available. `curl [-I] <domain>[/path]` is a real request to
 this origin, under any name it answers to (§7); any other host gets `curl: (6) Could not resolve
 host` and a note that a browser tab can only reach this site.
@@ -840,8 +840,10 @@ mounted, so coming back to *full* or *calm* picks the scene up where it stood.
   push as the ring passes, added to its target like the gravity well's, so the ordinary drift
   carries it out and back. Allocation-free, gone after 2.6 s, and only at *full* motion with the
   loop running; a wave that lands while the field is calm or still isn't drawn.
-- **Seasons** — `content/seasons.ts` lists four days: 31 October, 21 December (the winter
-  solstice, as a fixed date), 1 January and the month and day of `profile.since`. `seasonOn(at)`
+- **Seasons** — `content/seasons.ts` lists six days: 31 October, 21 December (the winter
+  solstice, as a fixed date), 1 January, the month and day of `profile.since`, 21 June (the
+  Fête de la Musique) and 1 April. April Fools' mood has the one negative speed, which only
+  multiplies each shape's spin, so the field turns the other way and nothing else changes. `seasonOn(at)`
   reads the visitor's local calendar, since Halloween starts at their midnight, and the field
   re-reads it at each midnight and at least once a minute (`components/season.ts`): a timer
   set for midnight alone would wait out however long the device slept. A season's palette

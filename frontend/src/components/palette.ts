@@ -52,18 +52,26 @@ export const SEASON_PALETTES: Record<SeasonId, Palette> = {
   solstice: { base: 'purple', accent: 'cyan', speed: 1 },
   'new-year': { base: 'pink', accent: 'green', speed: 1 },
   birthday: { base: 'green', accent: 'pink', speed: 1 },
+  'music-day': { base: 'purple', accent: 'pink', speed: 1 },
+  'april-fools': { base: 'cyan', accent: 'pink', speed: 1 },
 }
 
 /**
  * A season's nudge to speed and opacity, multiplied in beside the weather's. Unlike the
  * colours it isn't ranked: a completionist still sees the field slow for the longest night,
  * in the palette they earned.
+ *
+ * April Fools' speed is the one below zero. The speed only multiplies each shape's spin,
+ * so a negative one turns the whole field the other way for the day and touches nothing
+ * else: drift, the pointer's pull and the swing don't read it.
  */
 export const SEASON_MOODS: Record<SeasonId, WeatherMood> = {
   halloween: { speed: 0.75, opacity: 0.8 },
   solstice: { speed: 0.5, opacity: 0.7 },
   'new-year': { speed: 1.8, opacity: 1.25 },
   birthday: { speed: 1.3, opacity: 1.15 },
+  'music-day': { speed: 1.6, opacity: 1.2 },
+  'april-fools': { speed: -1, opacity: 1 },
 }
 
 /**

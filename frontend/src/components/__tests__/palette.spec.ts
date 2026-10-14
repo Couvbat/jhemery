@@ -50,13 +50,18 @@ describe('seasons in the field', () => {
   })
 
   // The weather's moods run from 0.5 to 1.7: a season is the same kind of nudge, not a
-  // field that stops or one that blinds.
+  // field that stops or one that blinds. Reversed is allowed, at the same pace.
   it('keeps each mood a nudge', () => {
     for (const [id, mood] of Object.entries(SEASON_MOODS)) {
-      expect(mood.speed, id).toBeGreaterThanOrEqual(0.5)
-      expect(mood.speed, id).toBeLessThanOrEqual(2)
+      expect(Math.abs(mood.speed), id).toBeGreaterThanOrEqual(0.5)
+      expect(Math.abs(mood.speed), id).toBeLessThanOrEqual(2)
       expect(mood.opacity, id).toBeGreaterThanOrEqual(0.5)
       expect(mood.opacity, id).toBeLessThanOrEqual(1.5)
     }
+  })
+
+  it('turns the field backwards on April Fools’ alone', () => {
+    const reversed = Object.entries(SEASON_MOODS).filter(([, mood]) => mood.speed < 0).map(([id]) => id)
+    expect(reversed).toEqual(['april-fools'])
   })
 })
