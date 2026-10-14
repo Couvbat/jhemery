@@ -1,4 +1,6 @@
-import { computed, ref } from 'vue'
+import { computed, ref, watch } from 'vue'
+import { soundcloudEmbedSrc } from '@/content'
+import { embedColour } from './useTheme'
 
 /**
  * Lets the terminal's `play` command start the SoundCloud embed in the music section.
@@ -28,5 +30,31 @@ export function useMusicPlayer() {
     playerLoaded: computed(() => requested.value || nonce.value > 0),
     requestPlayback,
     loadPlayer,
+  }
+}
+
+/**
+ * The music section's frame: its `src`, and `load` for the button. Here rather than in
+ * `MusicSection` so a spec can press the button, since the unit suite compiles no `.vue`.
+ *
+ * The player is drawn in the scheme's green, read each time a frame is built: during setup
+ * (a player asked for earlier mounts with the section), when the button mounts it, and on
+ * each `play` remount. Never on a scheme change while one is up: a new `src` reloads the
+ * cross-origin player and stops whatever it was playing. `embedColour()` is the scheme's
+ * green, but never a forged one's: that would follow the visitor to SoundCloud on every visit.
+ */
+export function useMusicEmbed() {
+  const { autoplayNonce } = useMusicPlayer()
+  const colour = ref(embedColour())
+  watch(autoplayNonce, () => {
+    colour.value = embedColour()
+  })
+  return {
+    src: computed(() => soundcloudEmbedSrc(colour.value, autoplayNonce.value > 0)),
+    load() {
+      // The scheme may have changed since setup, and there is no frame yet to reload.
+      colour.value = embedColour()
+      loadPlayer()
+    },
   }
 }

@@ -1,37 +1,28 @@
 <script setup lang="ts">
-import { computed, defineAsyncComponent, nextTick, ref, watch } from 'vue'
+import { defineAsyncComponent, nextTick, ref } from 'vue'
 import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import SectionHeader from '@/components/SectionHeader.vue'
 import WindowDots from '@/components/WindowDots.vue'
-import { music, soundcloudEmbedSrc } from '@/content'
+import { music } from '@/content'
 import { stemTracks } from '@/content/stems'
 import { useLocale } from '@/i18n'
-import { useMusicPlayer } from '@/composables/useMusicPlayer'
-import { embedColour } from '@/composables/useTheme'
+import { useMusicEmbed, useMusicPlayer } from '@/composables/useMusicPlayer'
 
 const { t, m } = useLocale()
-const { autoplayNonce, playerLoaded, loadPlayer } = useMusicPlayer()
+const { autoplayNonce, playerLoaded } = useMusicPlayer()
+// `src` takes the scheme's colour each time a frame is built, never while one is up (see
+// `useMusicEmbed`).
+const { src, load: loadFrame } = useMusicEmbed()
 
 // Its own chunk, fetched only when there is a track to mix (`content/stems.ts`): with the
 // list empty the home page never asks for it.
 const StemsMixer = defineAsyncComponent(() => import('@/components/stems/StemsMixer.vue'))
 
-// The player is drawn in the scheme's green, read when the frame mounts and again on each
-// `play` remount — never on a scheme change: a new `src` reloads the cross-origin player
-// and stops whatever it was playing. During setup, so the first `src` is already right.
-// `embedColour()` is the scheme's green, but never a forged one's: that would follow the
-// visitor to SoundCloud on every visit.
-const colour = ref(embedColour())
-watch(autoplayNonce, () => {
-  colour.value = embedColour()
-})
-const src = computed(() => soundcloudEmbedSrc(colour.value, autoplayNonce.value > 0))
-
 // The button goes when the frame comes, and focus would fall to `<body>` with it.
 const frameEl = ref<HTMLIFrameElement | null>(null)
 async function load() {
-  loadPlayer()
+  loadFrame()
   await nextTick()
   frameEl.value?.focus()
 }
