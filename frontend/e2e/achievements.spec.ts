@@ -122,7 +122,7 @@ test.describe('the completionist cascade', () => {
   })
 
   test('does not fire while anything is still missing', async ({ page, app, terminal }) => {
-    test.skip(test.info().project.name === 'mobile', 'Unlocked through the terminal.')
+    test.skip(test.info().project.name === 'mobile', 'Unlocked by `cowsay`, typed at the prompt, which a phone doesn’t have.')
 
     // Two short of the set: earning one of them must not cascade.
     await app.seed({
@@ -143,7 +143,7 @@ test.describe('the completionist cascade', () => {
 test.describe('the terminal route', () => {
   test.skip(
     () => test.info().project.name === 'mobile',
-    'There is deliberately no terminal on a phone.',
+    'Typed at the prompt, which a phone doesn’t have; `cowsay` is hidden, so no button runs it either.',
   )
 
   test('a command unlock toasts and persists', async ({ page, app, terminal }) => {

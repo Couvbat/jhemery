@@ -16,7 +16,7 @@ import { profile } from '@/content/profile'
 test.describe('terminal', () => {
   test.skip(
     () => test.info().project.name === 'mobile',
-    'The launcher is `hidden md:flex`: a fixed input panel fights a mobile virtual keyboard badly enough that no terminal beats a broken one.',
+    'The prompt is a desktop’s: below md the terminal is the touch layout, with no input to fight a virtual keyboard (tap-shell.spec.ts).',
   )
 
   test.beforeEach(async ({ page }) => {

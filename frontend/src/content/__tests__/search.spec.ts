@@ -3,7 +3,6 @@
 import { describe, expect, it } from 'vitest'
 import { buildSearchIndex, cut, TEXT_LIMIT } from '../../../vite-plugins/search'
 import { buildNotes, noteFiles, readNote } from '../../../vite-plugins/notes'
-import { docUrl } from '@/lib/source'
 import { linkTarget } from '@/terminal/links'
 import { decisions } from '../decisions'
 import { searchKinds, type SearchEntry } from '../search'
@@ -43,14 +42,13 @@ describe('the search index', () => {
     expect(of('work')).toHaveLength(work.length)
   })
 
-  // `why <id>` in the terminal; where there's no terminal, the same design `why` links to.
-  it('lists every decision as `why <topic>`, falling back to its design', () => {
+  // `why <id>` in the terminal, at any width: below `md` it runs in the touch layout.
+  it('lists every decision as `why <topic>`', () => {
     for (const decision of decisions) {
       const entry = byTarget.get(`/?run=${encodeURIComponent(`why ${decision.id}`)}`)
       expect(entry, decision.id).toBeDefined()
       expect(entry!.kind).toBe('why')
       expect(entry!.title).toEqual(decision.topic)
-      expect(entry!.fallback, decision.id).toBe(docUrl(decision.source, SHA))
       expect(linkTarget(entry!.target)).toEqual({ kind: 'run', line: `why ${decision.id}` })
     }
     expect(of('why')).toHaveLength(decisions.length)
@@ -91,7 +89,7 @@ describe('the search index', () => {
       expect(searchKinds).toContain(entry.kind)
       const target = linkTarget(entry.target)
       if (entry.kind === 'note') expect(target.kind, entry.target).toBe('document')
-      else if (entry.kind === 'why') expect(['document', 'external']).toContain(linkTarget(entry.fallback!).kind)
+      else if (entry.kind === 'why') expect(target.kind, entry.target).toBe('run')
       else expect(target.kind, entry.target).toBe('route')
     }
     expect(new Set(index.entries.map((entry) => entry.target)).size).toBe(index.entries.length)

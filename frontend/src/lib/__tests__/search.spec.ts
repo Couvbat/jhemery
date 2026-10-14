@@ -2,12 +2,12 @@ import { describe, expect, it, vi } from 'vitest'
 import { decisions } from '@/content/decisions'
 import { searchKinds, type SearchEntry, type SearchIndex } from '@/content/search'
 import { isLinkable, resolveLink } from '@/terminal/registry'
+import { tapRuns } from '@/terminal/tap'
 import {
   MIN_QUERY,
   PER_KIND,
   rank,
   readIndex,
-  resultTarget,
   SEARCH_URL,
   searchable,
   searchIndex,
@@ -121,29 +121,14 @@ describe('searchIndex', () => {
   })
 })
 
-describe('resultTarget', () => {
-  const why = entry({ kind: 'why', target: '/?run=why%20polling', fallback: '/notes/september-batch#backend' })
-
-  it('runs `why` in the terminal where there is one, and opens its design where there isn’t', () => {
-    expect(resultTarget(why, true)).toEqual({ kind: 'run', line: 'why polling' })
-    expect(resultTarget(why, false)).toEqual({ kind: 'document', href: '/notes/september-batch#backend' })
-  })
-
-  it('routes a page and opens a note the same on either', () => {
-    for (const desktop of [true, false]) {
-      expect(resultTarget(entry({ kind: 'work', target: '/work/qr' }), desktop)).toEqual({ kind: 'route', path: '/work/qr' })
-      expect(resultTarget(entry({ kind: 'note', target: '/notes/vim-pane#key-mapping' }), desktop)).toEqual({
-        kind: 'document',
-        href: '/notes/vim-pane#key-mapping',
-      })
-    }
-  })
-
-  // The palette runs a `why` result through the `?run=` path, which refuses anything else.
-  it('only ever asks the terminal for a line a link may run', () => {
+describe('a `why` result', () => {
+  // The palette runs a `why` result through the `?run=` path, which refuses anything else,
+  // at every width: below `md`, in the touch layout.
+  it('only ever asks the terminal for a line a link may run, and a phone can', () => {
     for (const decision of decisions) {
       const link = resolveLink(`why ${decision.id}`)!
       expect(isLinkable(link.command, link.args), decision.id).toBe(true)
+      expect(tapRuns(`why ${decision.id}`), decision.id).toBe(true)
     }
   })
 })

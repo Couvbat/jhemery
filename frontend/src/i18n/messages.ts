@@ -170,6 +170,24 @@ export const messages = {
     broadcast: { en: 'Broadcast message from', fr: 'Message diffusé par' },
     broadcastNote: { en: '(a wave, and nothing else: no message, no name)', fr: '(un signe de la main, rien d’autre : ni message, ni nom)' },
   },
+  // The terminal's touch layout, below `md`: buttons where the prompt would be (§9).
+  tapShell: {
+    hint: {
+      en: 'Tap a command below to run it. Nothing here needs typing.',
+      fr: 'Touchez une commande ci-dessous pour la lancer. Rien ici ne demande de taper.',
+    },
+    // A game, or a prompt, reached through a link on a phone: `notATty`'s pipe is the wrong reason there.
+    notATty: {
+      en: 'not a tty: it needs a keyboard, and there is none here. Try it on a wider screen',
+      fr: 'pas un tty : il lui faut un clavier, et il n’y en a pas ici. Essayez sur un écran plus large',
+    },
+    commands: { en: 'Commands', fr: 'Commandes' },
+    // `{command}` is a command's name, `{n}` how many lines its row offers.
+    more: { en: '{command}, {n} choices', fr: '{command}, {n} choix' },
+    back: { en: 'All commands', fr: 'Toutes les commandes' },
+    stop: { en: 'Stop', fr: 'Stop' },
+    stopLabel: { en: 'Stop the running command', fr: 'Arrêter la commande en cours' },
+  },
   // Chrome around `ask` only. The *answer* is generated in the requested locale
   // by the model itself and is never translated client-side.
   ask: {

@@ -36,7 +36,7 @@ test('the palette fetches the index on the first long enough query, once, and ru
   page,
   terminal,
 }) => {
-  test.skip(test.info().project.name === 'mobile', 'Ctrl+K and the terminal are a desktop’s.')
+  test.skip(test.info().project.name === 'mobile', 'Ctrl+K is a desktop’s; a phone’s `why` result is tap-shell.spec.ts’s.')
   const requests = indexRequests(page)
 
   await page.goto('/')

@@ -3,6 +3,7 @@ import { resolvePath } from '@/composables/useViewSwing'
 import { messages } from '@/i18n/messages'
 import { docUrl, isNote, sourceUrl } from '@/lib/source'
 import { blank, line, link, pre } from './format'
+import { isGame } from './games/scores'
 import type { OutputLine } from './types'
 
 /**
@@ -36,6 +37,16 @@ export function designLabel(part: WorkPart, t: <T>(value: Localised<T>) => T): s
 /** Whether `try` names a place on the site rather than a command line. */
 export function triesPath(target: string): boolean {
   return resolvePath(target) !== undefined
+}
+
+/**
+ * Whether a phone can follow `try`: a place always, and a command line unless it starts a
+ * game, which needs the keyboard the touch layout hasn't got (`wordle daily`). The case
+ * study's page reads this and mustn't load the registry to ask it, so `tap.spec.ts`
+ * holds it to the touch layout's own rule, `tapRuns`, for every case study.
+ */
+export function triesOnPhone(target: string): boolean {
+  return triesPath(target) || !isGame(target.trim().split(/\s+/)[0] ?? '')
 }
 
 /**

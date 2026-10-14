@@ -38,7 +38,7 @@ test.describe('the fingerprint tool', () => {
   // jsdom proves `cat` and the panel call the same function; only a real browser proves
   // they land on the same values, with the terminal's chunk carrying its own copy of it.
   test('cat /proc/self prints what the panel shows', async ({ page, terminal }) => {
-    test.skip(test.info().project.name === 'mobile', 'No terminal on a phone.')
+    test.skip(test.info().project.name === 'mobile', '`cat` is typed at the prompt, which a phone doesn’t have.')
     await page.goto('/tools/fingerprint')
     const region = page.getByRole('region', { name: /browser fingerprint/i })
     const value = (row: string) => region.locator(`[data-row="${row}"]`).getByTestId('fingerprint-value')

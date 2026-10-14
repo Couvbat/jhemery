@@ -40,7 +40,7 @@ test.describe('the boot sequence', () => {
   test('replays on demand, and the flag survives it', async ({ page, app, terminal }) => {
     test.skip(
       test.info().project.name === 'mobile',
-      'Driven by the `reboot` command, which needs a terminal.',
+      'Driven by `reboot`, typed at the prompt, which a phone doesn’t have.',
     )
 
     await page.goto('/')
@@ -139,7 +139,7 @@ test.describe('the three.js background', () => {
     })
 
     test('and the site is completely usable without it', async ({ page, terminal }) => {
-      test.skip(test.info().project.name === 'mobile', 'No terminal on a phone.')
+      test.skip(test.info().project.name === 'mobile', 'Typed at the prompt, which a phone doesn’t have: its touch layout runs the same commands (tap-shell.spec.ts).')
 
       await page.goto('/')
       await terminal.open()

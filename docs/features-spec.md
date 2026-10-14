@@ -113,7 +113,8 @@ interface Command {
 ```
 
 `CommandContext` carries the parsed `args`, the stage's own `raw` text, `stdin` (what a `|`
-handed it), `tty` (false on the left of a `|`, where `capture` and `prompt` throw), the current
+handed it), `tty` (false on the left of a `|`, and for every stage in the touch layout (§9),
+where `capture` and `prompt` throw), the current
 `locale`, the `t()`
 resolver, and the side-effect handles a command may use: `print()`, `clear()`, `close()`,
 `frame()` (a redrawable output region — animations and game boards), `navigate(target)` (anything
@@ -204,7 +205,8 @@ another, because commands return arrays rather than streams. A stage's output, m
 `stderr` lines, is the next stage's `stdin`, `OutputLine`s and their colours included; its
 `stderr` lines (`fail()`, achievement toasts) go to the screen wherever it stands, so
 `fortune | cowsay` keeps the toast outside the cow. A stage on the left of a `|` has `tty`
-false, and its `capture` and `prompt` throw "not a tty". `&&` and `||` read a pipeline as failed
+false, and its `capture` and `prompt` throw "not a tty"; so does every stage in the touch layout
+(§9), where the reason given is that there is no keyboard rather than a pipe. `&&` and `||` read a pipeline as failed
 when a stage throws or prints a failing `stderr` line, which is what `fail()` makes; the error
 *tone* alone counts for nothing, because `btc`'s red sparkline and `diff`'s removed lines are
 colour. One Ctrl+C stops the whole line, with one `^C`. A link runs a pipe or a chain only if
@@ -231,7 +233,8 @@ the résumé plugin also writes as roff (§7).
 `terminal/pager.ts` shows a page twenty rows at a time through `frame` and `capture`: j/k and the
 arrows move a line, space/f and b a page, g and G to the ends, `/` searches and n/N repeat, `q`
 quits and leaves nothing behind. A page that fits is printed outright, as `less -F` does, and
-with no tty (the left of a `|`) the whole page is the output, so `man ls | grep -i all` works.
+with no tty (the left of a `|`, or the touch layout) the whole page is the output, so
+`man ls | grep -i all` works and `man jules` reads on a phone.
 
 `--help` as the very first argument prints the command's usage and flags instead of running it,
 so `projects --json` and `echo hi --help` are untouched. `-<Tab>` completes the flags a usage
@@ -267,10 +270,12 @@ completes against whatever `zz` will actually run.
 
 ### Chrome
 
-- `TerminalLauncher.vue` — sticky bottom-right button, `md:` and up only (see accessibility).
+- `TerminalLauncher.vue` — sticky bottom-right button, at every width; below `md` it opens the
+  touch layout (see accessibility).
 - `TerminalOverlay.vue` — bottom-anchored panel, `max-w-4xl`, with a maximise toggle. Title bar
   matches the existing fake-terminal chrome (three dots + `couvbat@portfolio ~ bash`).
 - `VimPane.vue` — replaces the scrolling buffer while a vim buffer is open (§5.1).
+- `TapBar.vue` — the touch layout's buttons, in place of the prompt below `md` (§9).
 
 Open/close: click the launcher, press `` ` `` (backtick) anywhere outside an input, or `Ctrl+``.
 `Esc` closes — unless the vim pane is open (§5.1), which is the joke.
@@ -284,7 +289,7 @@ required argument — every 3.5 s. A placeholder rather than a buffer line, so i
 submitted or copied. The first keystroke stops it for the session; reduced motion holds one hint.
 
 **Links that run a command** (`composables/useRunLink.ts`, `runLink` in `useTerminal.ts`).
-`?run=<command>` is read once the router is ready, at the launcher's `md` breakpoint only, removed
+`?run=<command>` is read once the router is ready, at every width (below `md` the touch layout runs it), removed
 with `router.replace`, and handed to the lazy chunk through `pendingLinkCommand` — kept apart from
 `pendingInitialCommand`, which only this site's own buttons set. The command must opt in with
 `linkable` on `Command`, and then pass `isLinkable(command, args)`: not hidden, and `writes` is
@@ -338,8 +343,8 @@ choice is saved under `couvbat:theme` and re-applied in `main.ts` before the app
 returning visitor's first frame is already in their colours.
 
 Surfaces: the `theme` command, and a 🎨 menu in the navbar (`components/ThemeMenu.vue`). The menu
-matters most on a phone, where there is no terminal (§9), so without it a phone visitor could never
-leave the default. It lists the same schemes with the same swatch strip (`swatch()` in `themes.ts`),
+matters most on a phone, whose touch layout (§9) has no button for `theme`, since it writes, so
+without it a phone visitor could never leave the default. It lists the same schemes with the same swatch strip (`swatch()` in `themes.ts`),
 each drawn on its scheme's own background so a light one looks light before it is picked. It stays
 open on a pick: the page repaints behind it, so browsing the list is the preview. Both surfaces apply
 through `setTheme` and record through `tryTheme`, so the flash, the saved choice and both
@@ -477,7 +482,10 @@ scheme shown for three seconds with `previewTheme()`, which saves nothing and is
 the tour ends; the `curl` hint; and the achievement count. It is linkable, so every command it
 runs must be too (`tour.spec.ts`). It runs no game, which would hold the keyboard and switch the
 output's announcements off for the rest of the walk, and names no hidden command. Under reduced
-motion it prints everything at once and shows no scheme.
+motion it prints everything at once and shows no scheme. A stop's `only` keeps it to one layout:
+`?run=tour` is the bio link, mostly opened on a phone, so the touch layout (§9) walks the `why`
+listing instead of the games (which point at `wordle daily`) and leaves out the `curl` hint, and
+names the navbar's 🎨 menu and the stop button where the keyboard walk names `theme` and Ctrl+C.
 
 ### live
 | Command | Endpoint | Fallback |
@@ -601,10 +609,10 @@ the source has them and notes in their own, marked. Fetched, not bundled, so the
 pays only for the matcher; like the notes, it is out of the precache, off the SPA fallback and
 `no-cache`. Results sit under the palette's own entries, grouped by kind, six at most per kind.
 A case study routes, a note heading is a plain navigation to its anchor, and a `why` result runs
-`why <topic>` through the `?run=` path (so `isLinkable` checks it); below `md` it opens the
-decision's design instead. Phones have no Ctrl+K, so the navbar menu has a *search* entry that
-opens the palette; there it lists no registry commands, since each would open the terminal §9
-keeps off phones. `content/__tests__/search.spec.ts` holds every case study, decision and note
+`why <topic>` through the `?run=` path (so `isLinkable` checks it), at every width: below `md`, in
+the touch layout (§9). Phones have no Ctrl+K, so the navbar menu has a *search* entry that
+opens the palette; there it lists only the commands the touch layout has a button for, and runs
+them there, since `lang`, `play` or `mail` would have nothing to do without a keyboard. `content/__tests__/search.spec.ts` holds every case study, decision and note
 heading to an entry.
 
 ---
@@ -1277,11 +1285,34 @@ Retrofitting these is painful, so they are part of the definition of done:
   `SectionHeader`'s `<h2>`; a source-scan spec (`views/__tests__/headings.spec.ts`) holds every
   view to exactly one. A *Skip to content* link comes first in the page and focuses the heading
   itself, so its hash never goes through the router.
-- The launcher is `hidden` below `md`. Mobile virtual keyboards fight fixed-position input panels
-  badly enough that a bad terminal is worse than none; mobile users get the full rendered page,
-  which carries the same information. `Ctrl+K` remains available for anyone on a tablet with a
-  keyboard. Phones reach the palette from the navbar menu's *search* (§4), without its commands;
-  its input is 16px there, since iOS zooms the page into any smaller one on focus.
+- **No prompt below `md`.** Mobile virtual keyboards fight fixed-position input panels badly
+  enough that a bad prompt is worse than none, and the rendered page carries the same
+  information. So below `md` (`DESKTOP_QUERY` in `composables/useTerminalShell.ts`) the launcher
+  opens the overlay in its **touch layout**, which has no input anywhere, so no keyboard opens:
+  output above, and in place of the prompt one scrolling row of buttons in `help`'s groups
+  (`TapBar.vue`). The buttons are `terminal/tap.ts`'s `tapCommands()`, built from the registry:
+  a command for which `isLinkable(c, [])` holds, and each first argument its `complete()` offers
+  that `isLinkable(c, [arg])` accepts (`projects qr`, `why polling`, `hardware nas`), so a button
+  can run nothing a `?run=` link couldn't. A command with arguments opens a row of its own lines,
+  with an arrow back, so the row stays about thirty buttons long. Left out: the games and their
+  listing, the text commands that read a pipe (`grep`, `head`…), and the arguments of `help`,
+  `man` and `strace` that name another command (`man jules` stays). A tap runs through
+  `runLink()`, and in the touch layout the shell runs every stage with `tty: false`, so anything
+  that would hold the keyboard degrades as it does in a pipe: a game answers "not a tty" (with
+  the reason that there is no keyboard here), and `man` prints instead of paging. A stop button
+  does what Ctrl+C does, while a command runs; the rest of the row is `aria-disabled` then, and
+  never `disabled`, which would drop focus out of the dialog. The title bar is a title and a
+  44px close button; `Esc` still closes. The dialog itself takes focus on open. Targets are at
+  least 44px, the gutters 16px, and the panel and launcher clear `env(safe-area-inset-bottom)`.
+  A batch of output is scrolled to its first line rather than its last, since one `resume` is
+  several screens of a phone. Everything else that runs a line goes the same way below `md`:
+  `?run=` links (`useRunLink` reads them at every width), the guestbook toast and the palette
+  (through `openTerminal()`, which hands a line over as a link there), links in the output, and
+  a case study's *try it* and decisions, except a *try* that is a game, which is named instead
+  (`triesOnPhone()` in `terminal/work.ts`, held to the shell's rule by `tap.spec.ts`). `Ctrl+K`
+  remains available for anyone on a tablet with a keyboard. Phones reach the palette from the
+  navbar menu's *search* (§4); its input is 16px there, since iOS zooms the page into any
+  smaller one on focus.
 
 ## 10. Explicitly out of scope
 
@@ -1289,7 +1320,9 @@ Retrofitting these is painful, so they are part of the definition of done:
   schemes exist only as opt-in choices, through `theme` or the navbar's scheme menu (§3 core), and the achievement for picking one is
   called Flashbang. That is this entry's position, stated as a joke.
 - **Blog** — infrastructure without content is worse than no infrastructure.
-- **Terminal on mobile** — see §9.
+- **A prompt on mobile** — see §9. Phones get the touch layout, which runs what a link could and
+  takes no typing; anything that needs a keyboard (the games, `theme`, `sign`, `ask`) stays a
+  desktop's.
 
 ## 11. Views, the prism swing and the tools page
 

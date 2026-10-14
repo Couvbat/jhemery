@@ -36,6 +36,7 @@ import {
   terminalCapturing,
   terminalOpen as open,
   terminalTrapped as trapped,
+  touchLayout,
 } from './useTerminalShell'
 import { goTo } from './useViewSwing'
 import { setCrt, glitch } from './useCrt'
@@ -253,7 +254,8 @@ function localeOf(env: Record<string, string>): Locale | undefined {
 
 function notATty(raw: string): Error {
   const name = raw.trim().split(/\s+/)[0] ?? ''
-  return new Error(`${name}: ${messages.terminal.notATty[currentLocale()]}`)
+  const reason = touchLayout.value ? messages.tapShell.notATty : messages.terminal.notATty
+  return new Error(`${name}: ${reason[currentLocale()]}`)
 }
 
 function buildContext(args: string[], raw: string, scope: Scope, stdin?: OutputLine[]): CommandContext {
@@ -418,7 +420,9 @@ async function runPipeline(stages: ResolvedStage[], signal: AbortSignal): Promis
     const sink = last ? screen() : collector()
     // Each stage starts with the keyboard free: a stage before it can't leave a handler.
     keyCapture.value = null
-    const scope: Scope = { signal, sink, tty: last, locale: localeOf(stage.env) }
+    // In the touch layout nobody can type at any stage, the last one included: a game
+    // answers "not a tty" rather than holding a keyboard the phone hasn't shown.
+    const scope: Scope = { signal, sink, tty: last && !touchLayout.value, locale: localeOf(stage.env) }
     // `--help` as the very first argument, and only there: `projects --json` and
     // `echo hi --help` mean what they always meant.
     if (stage.args[0] === '--help') {
@@ -842,7 +846,7 @@ export function primeOverlay() {
   if (buffer.value.length === 0) {
     append([
       { text: messages.terminal.welcome[currentLocale()], tone: 'primary' },
-      { text: messages.terminal.hint[currentLocale()], tone: 'muted' },
+      { text: (touchLayout.value ? messages.tapShell.hint : messages.terminal.hint)[currentLocale()], tone: 'muted' },
       { text: '' },
     ])
   }

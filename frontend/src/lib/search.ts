@@ -1,7 +1,6 @@
 import { searchKinds, type SearchEntry, type SearchIndex, type SearchKind, type SearchText } from '@/content/search'
 import type { Locale } from '@/content/types'
 import { fold } from '@/terminal/games/words'
-import { linkTarget, type LinkTarget } from '@/terminal/links'
 
 /**
  * What the Ctrl+K palette matches with, for its own entries and for `/search.json`
@@ -138,15 +137,6 @@ export function searchIndex(index: SearchIndex, query: string, locale: Locale): 
   return searchKinds
     .map((kind) => ({ kind, results: found.filter((result) => result.entry.kind === kind).slice(0, PER_KIND) }))
     .filter((group) => group.results.length)
-}
-
-/**
- * Where choosing a result goes. A `why` result runs `why <topic>` in the terminal, which
- * a phone doesn't have (§9), so there it opens the decision's design instead.
- */
-export function resultTarget(entry: SearchEntry, desktop: boolean): LinkTarget {
-  const target = linkTarget(entry.target)
-  return target.kind === 'run' && !desktop && entry.fallback ? linkTarget(entry.fallback) : target
 }
 
 /** An index this page can't read, a newer shape or not an index at all, searches as empty. */

@@ -3,12 +3,11 @@ import { computed, nextTick, onMounted, onUnmounted, ref, shallowRef, watch } fr
 import { sections, views, type Locale } from '@/content'
 import type { SearchIndex } from '@/content/search'
 import { useLocale } from '@/i18n'
-import { openTerminal, openTerminalFromLink } from '@/composables/useTerminalShell'
+import { DESKTOP_QUERY, openTerminal, openTerminalFromLink } from '@/composables/useTerminalShell'
 import { paletteOpen } from '@/composables/usePalette'
-import { DESKTOP_QUERY } from '@/composables/useRunLink'
 import { goTo, routeTo } from '@/composables/useViewSwing'
-import { loadSearchIndex, rank, resultTarget, searchable, searchIndex, wantsIndex } from '@/lib/search'
-import type { LinkTarget } from '@/terminal/links'
+import { loadSearchIndex, rank, searchable, searchIndex, wantsIndex } from '@/lib/search'
+import { linkTarget, type LinkTarget } from '@/terminal/links'
 import type { Command } from '@/terminal/types'
 
 const { t, m, locale } = useLocale()
@@ -39,8 +38,9 @@ interface Group {
 }
 
 /**
- * Whether there is a terminal to run things in: the launcher's breakpoint (§9). Read
- * when the palette opens, which below it is only from the navbar menu's *search*.
+ * Whether the terminal has a prompt: the launcher's breakpoint (§9). Read when the
+ * palette opens, which below it is only from the navbar menu's *search*. Below it a
+ * command runs in the touch layout, so the palette offers only what has a button there.
  */
 const wide = ref(true)
 
@@ -50,16 +50,18 @@ function isWide(): boolean {
 
 // The full command registry (every command, the guestbook client, the vim editor...)
 // is a separate chunk — fetched only the first time the palette is actually opened,
-// so it costs nothing for visitors who never press Ctrl+K. A phone never fetches it:
-// each command opens the terminal, which §9 keeps off phones.
+// so it costs nothing for visitors who never press Ctrl+K.
 const registryCommands = shallowRef<Command[]>([])
+/** The lines the touch layout has a button for: `lang`, `play` or `mail` would have nothing to do there. */
+const tapped = shallowRef<ReadonlySet<string>>(new Set())
 let registryRequested = false
 
 function loadRegistryCommands() {
   if (registryRequested) return
   registryRequested = true
-  void import('@/terminal/registry').then(({ paletteCommands }) => {
+  void Promise.all([import('@/terminal/registry'), import('@/terminal/tap')]).then(([{ paletteCommands }, { tapLines }]) => {
     registryCommands.value = paletteCommands()
+    tapped.value = new Set(tapLines())
   })
 }
 
@@ -83,12 +85,15 @@ const entries = computed<Entry[]>(() => [
       hint: t(v.heading),
       run: () => goTo(v.id),
     })),
-  ...(wide.value ? registryCommands.value : []).map((c) => ({
-    id: `cmd:${c.name}`,
-    label: c.name,
-    hint: t(c.description),
-    run: () => openTerminal(c.name),
-  })),
+  // `openTerminal` runs it as a link below `md`, in the touch layout.
+  ...registryCommands.value
+    .filter((c) => wide.value || tapped.value.has(c.name))
+    .map((c) => ({
+      id: `cmd:${c.name}`,
+      label: c.name,
+      hint: t(c.description),
+      run: () => openTerminal(c.name),
+    })),
 ])
 
 /** Split into words once per change of list or locale, not once per keystroke. */
@@ -142,7 +147,7 @@ const groups = computed<Group[]>(() => {
         label: result.label,
         hint: result.hint,
         lang: result.lang,
-        run: () => follow(resultTarget(result.entry, wide.value)),
+        run: () => follow(linkTarget(result.entry.target)),
       })),
     })
     start += group.results.length
@@ -194,7 +199,7 @@ watch(open, async (isOpen) => {
   query.value = ''
   cursor.value = 0
   wide.value = isWide()
-  if (wide.value) loadRegistryCommands()
+  loadRegistryCommands()
   if (indexState.value === 'failed') indexState.value = 'idle'
   await nextTick()
   inputEl.value?.focus()

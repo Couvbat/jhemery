@@ -1,12 +1,11 @@
-import { posix } from 'node:path'
 import type { Plugin } from 'vite'
 import { decisions } from '../src/content/decisions'
 import { now } from '../src/content/now'
 import type { SearchEntry, SearchIndex } from '../src/content/search'
-import type { DocRef, Localised } from '../src/content/types'
+import type { Localised } from '../src/content/types'
 import { work } from '../src/content/work'
 import { commitSha } from './git'
-import { noteFiles, readNote, rewriteLink, SPEC_PATH } from './notes'
+import { noteFiles, readNote } from './notes'
 
 /**
  * `/search.json`: what the Ctrl+K palette searches besides its own commands. One entry
@@ -37,12 +36,6 @@ export function cut(text: string, limit = TEXT_LIMIT): string {
 
 function both(value: Localised, limit?: number): Localised {
   return { en: cut(value.en, limit), fr: cut(value.fr, limit) }
-}
-
-/** Where a doc reference goes: a spec is a note on the site, anything else GitHub at `sha`. */
-function docHref(ref: DocRef, sha: string): string {
-  const anchor = ref.anchor ? `#${ref.anchor}` : ''
-  return rewriteLink(`${posix.relative(SPEC_PATH, ref.doc)}${anchor}`, sha)
 }
 
 /**
@@ -93,13 +86,12 @@ export function buildSearchIndex(sha = commitSha()): SearchIndex {
       text: both(part.summary),
       target: `/work/${part.id}`,
     })),
-    // `why` on a desktop, where it runs in the terminal; its design where there's none.
+    // `why <topic>` in the terminal, which runs it at any width: below `md`, in the touch layout.
     ...decisions.map((decision) => ({
       kind: 'why' as const,
       title: decision.topic,
       text: both(decision.chose),
       target: `/?run=${encodeURIComponent(`why ${decision.id}`)}`,
-      fallback: docHref(decision.source, sha),
     })),
     ...noteFiles().flatMap((file) => noteEntries(file, sha)),
     {

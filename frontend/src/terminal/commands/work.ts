@@ -1,6 +1,7 @@
 import { decisions, findDecision, profile, type Decision, type Localised } from '@/content'
 import { decorativeMotion } from '@/composables/useMotion'
 import { previewTheme, useTheme } from '@/composables/useTheme'
+import { touchLayout } from '@/composables/useTerminalShell'
 import { findTheme } from '@/lib/themes'
 import { docUrl } from '@/lib/source'
 import { achievementList, unlockedCount } from '../achievements'
@@ -55,10 +56,14 @@ function listing(t: <T>(value: Localised<T>) => T): OutputLine[] {
  * something in a real terminal, and the achievement count. No game (it would hold the keyboard and turn the
  * output's announcements off for the rest of the walk) and no hidden command (naming
  * one hands out an easter egg).
+ *
+ * `only` keeps a stop to one layout. A bio link is mostly opened on a phone, whose touch
+ * layout has no keyboard: there the games' stop (which points at `wordle daily`) and the
+ * `curl` hint would point at things the visitor can't do, so it walks the decisions instead.
  */
 export const TOUR_STOPS: Array<
-  | { caption: Localised; run: string; then?: Localised }
-  | { caption: Localised; show: 'scheme' | 'curl' | 'count' }
+  | { caption: Localised; run: string; then?: Localised; only?: 'keyboard' | 'touch' }
+  | { caption: Localised; show: 'scheme' | 'curl' | 'count'; only?: 'keyboard' | 'touch' }
 > = [
   {
     caption: {
@@ -81,6 +86,19 @@ export const TOUR_STOPS: Array<
       en: 'wordle daily gives everyone the same word each day, in either language.',
       fr: 'wordle daily donne à tous le même mot chaque jour, dans les deux langues.',
     },
+    only: 'keyboard',
+  },
+  {
+    caption: {
+      en: 'Every choice behind the site is written down, with what it turned down.',
+      fr: 'Chaque choix derrière le site est écrit, avec ce qu’il a écarté.',
+    },
+    run: 'why',
+    then: {
+      en: 'Each one is a button under why.',
+      fr: 'Chacun est un bouton sous why.',
+    },
+    only: 'touch',
   },
   {
     caption: {
@@ -88,6 +106,7 @@ export const TOUR_STOPS: Array<
       fr: 'Le CV répond aussi à un vrai terminal. Essayez ceci dans le vôtre :',
     },
     show: 'curl',
+    only: 'keyboard',
   },
   {
     caption: {
@@ -128,9 +147,13 @@ async function tourStop(ctx: CommandContext, stop: (typeof TOUR_STOPS)[number], 
   }
   // A scheme shown, not saved, and put back however the tour ends. A whole-page repaint
   // that undoes itself is decoration, so it needs `full` motion: `calm` leaves it out,
-  // and so does reduced motion, which forces `paused`.
+  // and so does reduced motion, which forces `paused`. `theme` writes, so the touch
+  // layout has no button for it: there, the navbar's menu is the way to the list.
+  const lister = touchLayout.value
+    ? { en: 'The navbar’s 🎨 menu', fr: 'Le menu 🎨 de la barre de navigation' }
+    : { en: '`theme`', fr: '`theme`' }
   if (!repaint) {
-    print(line(`  ${t({ en: '`theme` lists them.', fr: '`theme` les liste.' })}`, 'muted'))
+    print(line(`  ${t({ en: `${lister.en} lists them.`, fr: `${lister.fr} les liste.` })}`, 'muted'))
     return
   }
   const id = SCHEMES.find((scheme) => scheme !== useTheme().chosen.value.id)!
@@ -142,7 +165,7 @@ async function tourStop(ctx: CommandContext, stop: (typeof TOUR_STOPS)[number], 
   } finally {
     restore?.()
   }
-  print(line(`  ${t({ en: '…and back. `theme` lists them all.', fr: '…et retour. `theme` les liste tous.' })}`, 'muted'))
+  print(line(`  ${t({ en: `…and back. ${lister.en} lists them all.`, fr: `…et retour. ${lister.fr} les liste tous.` })}`, 'muted'))
 }
 
 export const workCommands: Command[] = [
@@ -188,11 +211,16 @@ export const workCommands: Command[] = [
       // pauses are the pacing of something typed, so `calm` keeps them.
       const motion = decorativeMotion()
       const still = motion === 'paused'
-      for (const [i, stop] of TOUR_STOPS.entries()) {
+      const touch = touchLayout.value
+      const stops = TOUR_STOPS.filter((stop) => stop.only !== (touch ? 'keyboard' : 'touch'))
+      for (const [i, stop] of stops.entries()) {
         if (i > 0 && !still) await sleep(STOP_MS, ctx.signal)
         await tourStop(ctx, stop, motion === 'full')
       }
-      ctx.print([blank, line(ctx.t({ en: 'End of the tour. Ctrl+C stops one, `tour` starts another.', fr: 'Fin de la visite. Ctrl+C en arrête une, `tour` en relance une.' }), 'muted')])
+      const end = touch
+        ? { en: 'End of the tour. The stop button stops one, `tour` starts another.', fr: 'Fin de la visite. Le bouton stop en arrête une, `tour` en relance une.' }
+        : { en: 'End of the tour. Ctrl+C stops one, `tour` starts another.', fr: 'Fin de la visite. Ctrl+C en arrête une, `tour` en relance une.' }
+      ctx.print([blank, line(ctx.t(end), 'muted')])
     },
   },
 ]

@@ -83,11 +83,10 @@ export default defineConfig({
   projects: [
     { name: 'chromium', use: { ...devices['Desktop Chrome'] } },
 
-    // The terminal launcher is `hidden md:flex`: on a phone there is deliberately no
-    // terminal at all, and the navbar collapses to a burger (at `lg`, since it has to
-    // fit nine destinations plus two buttons). That is a different
-    // application surface, not a narrower one, so it gets its own project rather
-    // than a viewport tweak inside a test.
+    // Below `md` the terminal is its touch layout, buttons and no prompt, and the navbar
+    // collapses to a burger (at `lg`, since it has to fit nine destinations plus two
+    // buttons). That is a different application surface, not a narrower one, so it
+    // gets its own project rather than a viewport tweak inside a test.
     { name: 'mobile', use: { ...devices['Pixel 5'] } },
 
     /**

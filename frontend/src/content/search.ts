@@ -28,11 +28,6 @@ export interface SearchEntry {
   lang?: Locale
   /** A route (`/work/qr`), a document (`/notes/<slug>#<id>`) or a `/?run=` link. */
   target: string
-  /**
-   * Where a `/?run=` target goes where there is no terminal to run it in (below `md`):
-   * the decision's design note, or its doc on GitHub.
-   */
-  fallback?: string
 }
 
 export interface SearchIndex {
