@@ -3,11 +3,13 @@ import { computed, onBeforeUnmount, onMounted, ref, shallowRef, watch } from 'vu
 import map from 'virtual:xray-map'
 import { useLocale } from '@/i18n'
 import { paletteOpen } from '@/composables/usePalette'
+import { useGuestbookTicker } from '@/composables/useGuestbookTicker'
 import { useSceneControl } from '@/composables/useSceneControl'
 import { terminalOpen } from '@/composables/useTerminalShell'
 import { useViewSwing } from '@/composables/useViewSwing'
 import { setXray } from '@/composables/useXray'
 import { sourceUrl } from '@/lib/source'
+import { newestSignatures } from './signatures'
 import {
   baseName,
   CANVAS_FILE,
@@ -42,6 +44,10 @@ import {
 const { t, m, locale } = useLocale()
 const { swinging } = useViewSwing()
 const { shapeCount, visitorShapes } = useSceneControl()
+// The field's third pool, the guestbook's newest entries, counted the way the field picks them.
+const { entries: guestbookEntries } = useGuestbookTicker()
+const signatureShapes = computed(() => newestSignatures(guestbookEntries.value).length)
+const fieldShapes = computed(() => shapeCount.value + visitorShapes.value + signatureShapes.value)
 
 interface ShownTag {
   key: string
@@ -69,7 +75,7 @@ const status = computed(() =>
 
 function extraFor(names: string[]): string {
   if (!names.includes(CANVAS_FILE)) return ''
-  return ` · ${t(m.xray.shapes).replace('{n}', String(shapeCount.value + visitorShapes.value))}`
+  return ` · ${t(m.xray.shapes).replace('{n}', String(fieldShapes.value))}`
 }
 
 /**
@@ -139,7 +145,7 @@ function onFocusin(event: FocusEvent) {
   if (from instanceof HTMLElement && !layerEl.value?.contains(from)) returnTo = from
 }
 
-watch([hidden, locale, shapeCount, visitorShapes], () => schedule())
+watch([hidden, locale, fieldShapes], () => schedule())
 
 onMounted(() => {
   window.addEventListener('scroll', schedule, { capture: true, passive: true })
