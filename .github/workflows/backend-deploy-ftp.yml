@@ -145,9 +145,11 @@ jobs:
             echo "Dependencies unchanged — nothing to do in cPanel." >> "$GITHUB_STEP_SUMMARY"
           fi
 
+      # Only on success, so "Re-run failed jobs" still finds the build (see
+      # backend-deploy.yml).
       - name: Cleaning artifacts
         uses: geekyeggo/delete-artifact@v6
-        if: always()
+        if: success()
         with:
           name: backend-build
           failOnError: false

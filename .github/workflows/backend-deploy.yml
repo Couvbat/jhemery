@@ -54,8 +54,15 @@ jobs:
           CPANEL_SERVER: ${{ secrets.CPANEL_SERVER }}
           IP: ${{ steps.ip.outputs.ipv4 }}
         run: |
-          response=$(curl -sm 45 -H "Authorization: $CPANEL_AUTH" \
-            "https://$CPANEL_SERVER:2083/execute/SshWhitelist/add?address=$IP&port=22&direction=in")
+          # Under `bash -e` a curl failure ended the step with nothing but its exit
+          # code: 28, the 45 s timeout, is all the 14 October run said. Not retried:
+          # a request that timed out may still have been applied, and nothing says a
+          # second `add` for the same address is safe.
+          response=$(curl -sSm 45 -H "Authorization: $CPANEL_AUTH" \
+            "https://$CPANEL_SERVER:2083/execute/SshWhitelist/add?address=$IP&port=22&direction=in") || {
+            echo "::error title=cPanel API unreachable::cPanel did not answer the whitelist request (curl exit $?). Usually brief: Re-run failed jobs, or run Deploy Backend (FTP) if it persists."
+            exit 1
+          }
           if [ "$(jq -r '.status // empty' <<<"$response" 2>/dev/null)" != "1" ]; then
             # An unauthenticated call returns the cPanel login page, not JSON, so
             # jq fails outright here rather than falling back to its own default.
@@ -77,8 +84,11 @@ jobs:
           CPANEL_SERVER: ${{ secrets.CPANEL_SERVER }}
           IP: ${{ steps.ip.outputs.ipv4 }}
         run: |
-          response=$(curl -sm 45 -H "Authorization: $CPANEL_AUTH" \
-            "https://$CPANEL_SERVER:2083/execute/SshWhitelist/list")
+          response=$(curl -sSm 45 -H "Authorization: $CPANEL_AUTH" \
+            "https://$CPANEL_SERVER:2083/execute/SshWhitelist/list") || {
+            echo "::error title=cPanel API unreachable::cPanel did not answer the whitelist check (curl exit $?). Usually brief: Re-run failed jobs, or run Deploy Backend (FTP) if it persists."
+            exit 1
+          }
           if ! jq -e --arg ip "$IP" \
             '.data.list[]? | select(.address == $ip and .direction == "in")' \
             <<<"$response" >/dev/null 2>&1; then
@@ -157,9 +167,13 @@ jobs:
         if: always()
         run: rm -fr ~/.ssh
 
+      # Only once the deploy has landed. "Re-run failed jobs" reuses the build job,
+      # so a failed run has to keep its build for the re-run to find: deleted on
+      # failure, the 14 October re-run died on "Artifact not found" instead. The
+      # build uploads with `overwrite` for "Re-run all jobs", and expires leftovers.
       - name: Cleaning artifacts
         uses: geekyeggo/delete-artifact@v6
-        if: always()
+        if: success()
         with:
           name: backend-build
           failOnError: false
