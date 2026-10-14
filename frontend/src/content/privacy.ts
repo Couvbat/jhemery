@@ -21,6 +21,14 @@ export const privacyCopy = {
     en: 'The service worker keeps copies of the site’s own files, so it loads fast and opens offline. Nothing in them is about you, so they are listed here, not cleared.',
     fr: 'Le service worker garde des copies des fichiers du site, pour qu’il se charge vite et s’ouvre hors ligne. Rien là-dedans ne vous concerne : ils sont listés ici, pas effacés.',
   },
+  saveIntro: {
+    en: 'Your progress, scores, settings and aliases can move to another browser without an account. The link holds the values themselves, after the `#`, which a browser never sends: it goes nowhere but where you paste it. Whoever has it can restore it, so send it to yourself. The secrets never go in.',
+    fr: 'Votre progression, vos scores, vos réglages et vos alias peuvent passer dans un autre navigateur sans compte. Le lien contient les valeurs elles-mêmes, après le `#`, qu’un navigateur n’envoie jamais : il ne va nulle part ailleurs que là où vous le collez. Quiconque l’a peut le restaurer, alors envoyez-le à vous-même. Les secrets n’y entrent jamais.',
+  },
+  restoreIntro: {
+    en: 'Paste a link or a code, or open a save link. Either way nothing is written until you press restore, and only keys listed above are taken. What it holds replaces what is here, and anything else stays.',
+    fr: 'Collez un lien ou un code, ou ouvrez un lien de sauvegarde. Dans les deux cas, rien n’est écrit avant que vous appuyiez sur restaurer, et seules les clés listées plus haut sont prises. Ce qu’il contient remplace ce qui est ici, et le reste ne bouge pas.',
+  },
   presence: {
     en: 'Presence is one integer, pushed to the pages listening for it: how many people are here, with no visitor id anywhere behind it. `wall`’s wave carries nothing at all.',
     fr: 'La présence est un seul entier, poussé aux pages qui l’écoutent : combien de personnes sont là, sans aucun identifiant de visiteur derrière. Le signe de `wall` ne transporte rien du tout.',

@@ -943,6 +943,20 @@ wraps rather than run wider than the screen, which a guestbook name can make it 
   escaped, every time in UTC. The feed always carries a `VTIMEZONE` for Europe/Paris that no
   event refers to, because the grammar requires one component and the list is often empty.
   `calendar` is kept off the curl pages, which are snapshots and can't know what is ahead.
+- **Save file** (`lib/save-file.ts`, `components/SaveFile.vue` on `/privacy`) — the visitor's
+  chosen groups (settings, progress, scores, shell; never secrets) as one code:
+  `base64url(version · format · payload)`, the payload a JSON object of key to value,
+  deflated with `CompressionStream` where there is one. It travels as `/privacy#save=<code>`,
+  with a QR of the link up to version 20 (the tool's own encoder, loaded on demand). The
+  fragment never reaches the server, and `lib/save-link.ts`, the first module `main.ts`
+  imports, takes it out of the address as it loads, since the router captures the address
+  when its module is evaluated and the analytics tracker reads `location.href`; a link
+  pasted into `/privacy`'s own address bar is caught by a watch on the route instead.
+  Reading a code trusts nothing: only keys `entryFor()` lists in `localStorage` and not
+  secret, only strings, 64 kB a value and 256 kB unpacked, the second enforced while
+  inflating. The page shows each key against what is already stored and writes the
+  changed ones only on restore, through `writeItems()` in `storage-keys.ts` (the one module
+  allowed to touch storage for keys it doesn't own), then reloads, as a clear does.
 - **Disclosure policy** (`content/security.ts`, `views/SecurityView.vue`) — `/security`, outside
   the prism like `/privacy`, and `security.txt` (RFC 9116), which `vite-plugins/security.ts`
   builds from the same module: `Contact`, an `Expires` `EXPIRES_DAYS` (180) after the build,

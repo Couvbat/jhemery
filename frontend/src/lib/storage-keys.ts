@@ -337,6 +337,26 @@ export function removeItems(items: readonly StoredItem[]): StoredItem[] {
   })
 }
 
+/**
+ * Writes each value to the key it names, in `localStorage`, and returns the keys that took.
+ * Only for keys on the list: a save file (`save-file.ts`) restores through this and has
+ * already dropped anything else. Never throws: a full quota keeps what fitted.
+ */
+export function writeItems(items: readonly { key: string; value: string }[]): string[] {
+  const store = storageFor('local')
+  if (!store) return []
+  return items
+    .filter((item) => entryFor(item.key, 'local'))
+    .flatMap(({ key, value }) => {
+      try {
+        store.setItem(key, value)
+        return [key]
+      } catch {
+        return []
+      }
+    })
+}
+
 /** One Cache Storage cache, as `du` prints it. */
 export interface CachedStore {
   name: string

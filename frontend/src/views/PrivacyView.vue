@@ -5,6 +5,7 @@ import { profile } from '@/content'
 import { privacyCopy } from '@/content/privacy'
 import type { Localised } from '@/content/types'
 import CodeText from '@/components/CodeText.vue'
+import SaveFile from '@/components/SaveFile.vue'
 import { useStoredItems } from '@/composables/useStoredItems'
 import { useLocale } from '@/i18n'
 import {
@@ -185,6 +186,8 @@ const claims = computed(() => [privacyCopy.presence, privacyCopy.stats, privacyC
           </ul>
         </section>
       </section>
+
+      <SaveFile />
 
       <section class="space-y-3" aria-labelledby="privacy-caches">
         <h2 id="privacy-caches" class="text-primary font-mono text-sm">## {{ t(m.privacy.caches) }}</h2>
