@@ -54,31 +54,40 @@ test('a code that isn’t one says so, and writes nothing', async ({ page }) => 
   await expect(page.getByTestId('save-preview')).toHaveCount(0)
 })
 
-test('a link still being made when the choice changes is thrown away', async ({ page }) => {
-  await page.goto('/privacy')
-  await page.evaluate(() => window.localStorage.setItem('couvbat:history', JSON.stringify(['ls', 'secret plans'])))
-  await page.getByRole('checkbox', { name: /shell/ }).check()
-  // Hold the QR encoder back, so the link is still being made when the shell is unticked.
-  let release!: () => void
-  const held = new Promise<void>((resolve) => (release = resolve))
-  await page.route(/\/assets\/qr-[^/]+\.js$/, async (route) => {
-    await held
-    await route.continue()
+test.describe('with no service worker', () => {
+  // So the QR chunk reaches the route. The service worker precaches it, and `page.route`
+  // never sees a request the worker answers: once the worker had claimed the page, the
+  // chunk came from its cache, unheld, before `waitForResponse` was listening, and the
+  // test waited out its timeout. Whether it had claimed it by the press was a race, which
+  // the push run of a merge won and its pull request run lost.
+  test.use({ serviceWorkers: 'block' })
+
+  test('a link still being made when the choice changes is thrown away', async ({ page }) => {
+    await page.goto('/privacy')
+    await page.evaluate(() => window.localStorage.setItem('couvbat:history', JSON.stringify(['ls', 'secret plans'])))
+    await page.getByRole('checkbox', { name: /shell/ }).check()
+    // Hold the QR encoder back, so the link is still being made when the shell is unticked.
+    let release!: () => void
+    const held = new Promise<void>((resolve) => (release = resolve))
+    await page.route(/\/assets\/qr-[^/]+\.js$/, async (route) => {
+      await held
+      await route.continue()
+    })
+    await page.getByTestId('save-make').click()
+    await page.getByRole('checkbox', { name: /shell/ }).uncheck()
+    const loaded = page.waitForResponse(/\/assets\/qr-[^/]+\.js$/)
+    release()
+    await loaded
+    // Two frames: the module has run and the press's continuation with it.
+    await page.evaluate(() => new Promise((done) => requestAnimationFrame(() => requestAnimationFrame(done))))
+    // Nothing from the first press is published; a fresh one leaves the history out.
+    await expect(page.getByTestId('save-made')).toHaveCount(0)
+    await page.getByTestId('save-make').click()
+    const link = await page.getByTestId('save-link').inputValue()
+    await page.goto('/now')
+    await page.goto(link)
+    await expect(page.getByTestId('save-preview')).not.toContainText('couvbat:history')
   })
-  await page.getByTestId('save-make').click()
-  await page.getByRole('checkbox', { name: /shell/ }).uncheck()
-  const loaded = page.waitForResponse(/\/assets\/qr-[^/]+\.js$/)
-  release()
-  await loaded
-  // Two frames: the module has run and the press's continuation with it.
-  await page.evaluate(() => new Promise((done) => requestAnimationFrame(() => requestAnimationFrame(done))))
-  // Nothing from the first press is published; a fresh one leaves the history out.
-  await expect(page.getByTestId('save-made')).toHaveCount(0)
-  await page.getByTestId('save-make').click()
-  const link = await page.getByTestId('save-link').inputValue()
-  await page.goto('/now')
-  await page.goto(link)
-  await expect(page.getByTestId('save-preview')).not.toContainText('couvbat:history')
 })
 
 test('a restore the storage refuses says so and stays, rather than reloading', async ({ page }) => {
