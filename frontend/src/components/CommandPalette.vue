@@ -282,10 +282,13 @@ onUnmounted(() => window.removeEventListener('keydown', onGlobalKeydown))
         <div class="flex items-center gap-2 px-4 py-3 border-b border-border font-mono text-base md:text-sm">
           <span class="text-primary">&gt;</span>
           <label for="palette-input" class="sr-only">{{ t(m.palette.open) }}</label>
+          <!-- `:value` and `@input` rather than `v-model`, which ignores the input events of
+               a composition until it ends: an Android keyboard composes every Latin word,
+               so on a phone the list sat still until the word was done. -->
           <input
             id="palette-input"
             ref="inputEl"
-            v-model="query"
+            :value="query"
             role="combobox"
             aria-expanded="true"
             aria-controls="palette-list"
@@ -296,6 +299,7 @@ onUnmounted(() => window.removeEventListener('keydown', onGlobalKeydown))
             spellcheck="false"
             :placeholder="t(m.palette.placeholder)"
             class="flex-1 min-w-0 bg-transparent outline-none text-foreground placeholder:text-muted-foreground caret-primary"
+            @input="query = ($event.target as HTMLInputElement).value"
             @keydown="onKeydown"
           />
         </div>

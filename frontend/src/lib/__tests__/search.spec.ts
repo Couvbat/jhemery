@@ -36,6 +36,13 @@ describe('words', () => {
     expect(words('vim-style `ctx.capture()`')).toEqual(['VIM', 'STYLE', 'CTX', 'CAPTURE'])
     expect(words('  ')).toEqual([])
   })
+
+  // NFD leaves a ligature whole, and an AZERTY keyboard has no œ: `coeur` is how it's typed.
+  it('spells out œ and æ, so a word written with one is found without it, and the other way round', () => {
+    expect(words('Le cœur, ex æquo')).toEqual(['LE', 'COEUR', 'EX', 'AEQUO'])
+    expect(rank([searchable('cœur', { text: 'Sur un seul cœur' })], 'seul coeur')).toEqual(['cœur'])
+    expect(rank([searchable('coeur', { text: 'un coeur' })], 'cœur')).toEqual(['coeur'])
+  })
 })
 
 describe('rank', () => {
@@ -136,10 +143,35 @@ describe('a `why` result', () => {
 describe('readIndex', () => {
   it('reads an index of its own version, and searches anything else as empty', () => {
     const index = { version: 1, entries: [entry({ kind: 'now', target: '/now' })] }
-    expect(readIndex(index)).toBe(index)
+    expect(readIndex(index)).toEqual(index)
     expect(readIndex({ version: 2, entries: index.entries })).toEqual({ version: 1, entries: [] })
     expect(readIndex('<!DOCTYPE html>')).toEqual({ version: 1, entries: [] })
     expect(readIndex(null)).toEqual({ version: 1, entries: [] })
+  })
+
+  // The build can't write one (`content/__tests__/search.spec.ts`), but a stale or edited file
+  // can: one entry the scorer threw on stopped the palette matching its own commands too.
+  it('leaves out an entry it can’t read, and keeps the rest', () => {
+    const good = [
+      entry({ kind: 'work', title: { en: 'The QR encoder', fr: 'L’encodeur QR' }, text: 'An encoder', target: '/work/qr' }),
+      entry({ kind: 'note', title: 'Notes', heading: 'Encoding', text: 'x', lang: 'fr', target: '/notes/x#encoding' }),
+      entry({ kind: 'why', title: 'Encoders', text: 'x', target: '/?run=why%20qr' }),
+    ]
+    const bad = [
+      { kind: 'work', title: 'Encoder', target: '/work/x' },
+      { kind: 'work', title: { en: 'Encoder' }, text: 'x', target: '/work/x' },
+      { kind: 'page', title: 'Encoder', text: 'x', target: '/x' },
+      { kind: 'note', title: 'Encoder', heading: 3, text: 'x', target: '/notes/x' },
+      { kind: 'note', title: 'Encoder', text: 'x', lang: 'de', target: '/notes/x' },
+      { kind: 'work', title: 'Encoder', text: 'x', target: 7 },
+      null,
+      'Encoder',
+    ]
+    const index = readIndex({ version: 1, entries: [bad[0], good[0], ...bad.slice(1), ...good.slice(1)] })
+    expect(index.entries).toEqual(good)
+    for (const locale of ['en', 'fr'] as const) {
+      expect(searchIndex(index, 'encod', locale).flatMap((group) => group.results.map((result) => result.entry))).toHaveLength(3)
+    }
   })
 })
 

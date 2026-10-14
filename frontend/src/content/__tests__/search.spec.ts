@@ -3,6 +3,7 @@
 import { describe, expect, it } from 'vitest'
 import { buildSearchIndex, cut, TEXT_LIMIT } from '../../../vite-plugins/search'
 import { buildNotes, noteFiles, readNote } from '../../../vite-plugins/notes'
+import { readIndex } from '@/lib/search'
 import { linkTarget } from '@/terminal/links'
 import { decisions } from '../decisions'
 import { searchKinds, type SearchEntry } from '../search'
@@ -93,6 +94,11 @@ describe('the search index', () => {
       else expect(target.kind, entry.target).toBe('route')
     }
     expect(new Set(index.entries.map((entry) => entry.target)).size).toBe(index.entries.length)
+  })
+
+  // The page leaves out any entry it can't read, so one the build writes must be readable.
+  it('is read back whole by the page, as the file it is served as', () => {
+    expect(readIndex(JSON.parse(JSON.stringify(index)))).toEqual(index)
   })
 
   it('cuts every text short, and leaves no markup in it', () => {

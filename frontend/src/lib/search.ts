@@ -1,5 +1,5 @@
 import { searchKinds, type SearchEntry, type SearchIndex, type SearchKind, type SearchText } from '@/content/search'
-import type { Locale } from '@/content/types'
+import type { Locale, Localised } from '@/content/types'
 import { fold } from '@/terminal/games/words'
 
 /**
@@ -37,9 +37,16 @@ export interface Searchable<T> {
   words: Words
 }
 
-/** Folded, then split on anything that isn't a letter or a digit: `l’écran` is `L`, `ECRAN`. */
+/**
+ * Folded, then split on anything that isn't a letter or a digit: `l’écran` is `L`, `ECRAN`.
+ * The ligatures are spelt out too, which NFD leaves whole: the notes write *cœur*, and an
+ * AZERTY keyboard has no œ, so a visitor types `coeur`. Here rather than in `fold`, whose
+ * alphabet is the word games' too.
+ */
 export function words(text: string): string[] {
   return fold(text)
+    .replace(/Œ/g, 'OE')
+    .replace(/Æ/g, 'AE')
     .split(/[^\p{L}\p{N}]+/u)
     .filter(Boolean)
 }
@@ -139,11 +146,36 @@ export function searchIndex(index: SearchIndex, query: string, locale: Locale): 
     .filter((group) => group.results.length)
 }
 
-/** An index this page can't read, a newer shape or not an index at all, searches as empty. */
+const isString = (value: unknown): value is string => typeof value === 'string'
+
+function isText(value: unknown): value is SearchText {
+  const text = value as Partial<Localised<unknown>> | null
+  return isString(value) || (isString(text?.en) && isString(text?.fr))
+}
+
+/** Every field the palette reads, of the type it reads it as. */
+function isEntry(value: unknown): value is SearchEntry {
+  const entry = (value ?? {}) as Partial<Record<keyof SearchEntry, unknown>>
+  return (
+    searchKinds.includes(entry.kind as SearchKind) &&
+    isText(entry.title) &&
+    isText(entry.text) &&
+    isString(entry.target) &&
+    (entry.heading === undefined || isString(entry.heading)) &&
+    (entry.lang === undefined || entry.lang === 'en' || entry.lang === 'fr')
+  )
+}
+
+/**
+ * An index this page can't read, a newer shape or not an index at all, searches as empty,
+ * and an entry it can't read is left out. The build can't write one, but a stale or edited
+ * file can, and a single entry the scorer threw on stopped the palette matching anything
+ * past two characters, its own commands included.
+ */
 export function readIndex(data: unknown): SearchIndex {
   const index = data as Partial<SearchIndex> | null
   if (index?.version !== 1 || !Array.isArray(index.entries)) return { version: 1, entries: [] }
-  return index as SearchIndex
+  return { version: 1, entries: index.entries.filter(isEntry) }
 }
 
 let loading: Promise<SearchIndex> | null = null

@@ -32,7 +32,14 @@ function go(target: string) {
   menuOpen.value = false
 }
 
+const toggleEl = ref<HTMLButtonElement | null>(null)
+
+/**
+ * Focus onto the menu's toggle first: the palette gives focus back to whatever had it when
+ * it opened, and this button goes with the menu it is in, which left that to <body>.
+ */
 function search() {
+  toggleEl.value?.focus()
   menuOpen.value = false
   openPalette()
 }
@@ -158,6 +165,7 @@ onUnmounted(() => window.removeEventListener('scroll', onScroll))
           <span :lang="otherLocale">{{ otherLocale.toUpperCase() }}</span>
         </button>
         <button
+          ref="toggleEl"
           class="text-primary p-2"
           @click="menuOpen = !menuOpen"
           :aria-label="t(m.nav.toggleMenu)"

@@ -629,7 +629,8 @@ This exists so the ~90% of visitors who will never type into a terminal still ge
 It shares the registry, so it needs no separate maintenance.
 
 **Content search** (roadmap §I). Matching is `lib/search.ts`: the query is split into words,
-folded as the word games fold, and every word has to start a word of the entry; a match in a
+folded as the word games fold with œ and æ spelt out (`coeur` finds *cœur*), and every word
+has to start a word of the entry; a match in a
 title outranks one in a note's heading, which outranks one in body text. From three characters
 the palette also fetches `/search.json`, which `vite-plugins/search.ts` writes at build time: one
 entry per case study, per `why` topic, per heading of every design note (with the id the notes
