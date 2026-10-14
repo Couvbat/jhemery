@@ -192,6 +192,19 @@ describe('ls /proc', () => {
   it('leaves the home directory as it was: no proc/ in ls /', async () => {
     expect((await runCommand(ls, ['/'])).text).not.toContain('proc')
   })
+
+  // `..` is folded before the path is matched, so a way out of `/proc` lists where `cd`
+  // takes it, and one that stays inside lists what it reaches.
+  it('reads . and .. in and out of /proc, as cd does', async () => {
+    const listing = async (path: string) => (await runCommand(ls, [path])).text
+    const cd = async (path: string) => (await runCommand(resolve('cd')!, [path])).navigated
+    expect(await listing('/proc/..')).toBe(await listing('/'))
+    expect(await cd('/proc/..')).toEqual([''])
+    expect(await listing('/proc/../tools')).toBe(await listing('tools'))
+    expect(await cd('/proc/../tools')).toEqual(['tools'])
+    expect(await listing('/proc/self/..')).toBe(await listing('/proc'))
+    expect(await listing('/proc/./self/')).toBe(await listing('/proc/self'))
+  })
 })
 
 describe('Tab', () => {

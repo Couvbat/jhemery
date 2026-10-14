@@ -30,9 +30,26 @@ export function isProcPath(path: string): boolean {
   return path === '/proc' || path.startsWith('/proc/')
 }
 
-/** What `ls` prints for a `/proc` path: a directory's entries, a file's own name. */
-export function listProc(path: string): OutputLine[] | undefined {
-  const target = path.replace(/(.)\/+$/, '$1')
+/**
+ * An absolute path with its `.` and `..` folded, when it ends up in `/proc`: what `ls`
+ * lists. Folding first is what leaves `/proc/..` and `/proc/../tools` to `shellPath()`,
+ * which reads them as home and the tools, as `cd` does; matching the path as typed
+ * refused both. `/proc/self/..` is `/proc`.
+ */
+export function procPath(path: string): string | undefined {
+  if (!path.startsWith('/')) return undefined
+  const segments: string[] = []
+  for (const segment of path.split('/')) {
+    if (segment === '..') segments.pop()
+    else if (segment && segment !== '.') segments.push(segment)
+  }
+  const folded = `/${segments.join('/')}`
+  return isProcPath(folded) ? folded : undefined
+}
+
+/** What `ls` prints for a `/proc` path `procPath()` folded: a directory's entries, a
+ *  file's own name. */
+export function listProc(target: string): OutputLine[] | undefined {
   if (target === '/proc') return [pre('self/', 'primary'), ...TOP.map((name) => pre(name))]
   if (target === '/proc/self') return SHELL_GROUPS.map((group) => pre(group))
   return procFiles().includes(target) ? [pre(target)] : undefined

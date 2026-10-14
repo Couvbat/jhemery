@@ -8,7 +8,7 @@ import { sleep } from '../timing'
 import type { Command, OutputLine } from '../types'
 import { blank, fail, line, pre, segmented } from '../format'
 import { FILES, FILE_ACHIEVEMENTS, HIDDEN_FILES, listFiles, resolveFileLines } from './files'
-import { isProcPath, listProc, procFiles } from './proc'
+import { listProc, procFiles, procPath } from './proc'
 import { toolRows } from './tools'
 
 const PING_COUNT = 4
@@ -73,8 +73,9 @@ export const navigateCommands: Command[] = [
 
       if (target) {
         // `/proc` is not a page, so it is read before `shellPath()` turns `/` into home.
-        if (isProcPath(target)) {
-          return listProc(target) ?? [fail(`ls: cannot access '${target}': No such file or directory`)]
+        const proc = procPath(target)
+        if (proc) {
+          return listProc(proc) ?? [fail(`ls: cannot access '${target}': No such file or directory`)]
         }
         const resolved = resolvePath(shellPath(target))
         if (!resolved) {

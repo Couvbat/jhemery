@@ -440,7 +440,8 @@ dozen lines each, so the O(n·m) table is cheaper than a diffing library.
 
 `/proc` needs no shaped filesystem. `resolveFileLines()` hands any `/proc/…` path to
 `commands/proc.ts`, as it already answered `/etc/shadow` by its absolute path, and `ls` asks
-`listProc()` before `shellPath()` would read `/` as home. Each file is computed when it is read.
+`listProc()` before `shellPath()` would read `/` as home, once `.` and `..` are folded, so
+`ls /proc/..` lists home as `cd /proc/..` goes there. Each file is computed when it is read.
 `version` is `uname`'s line plus `__BUILD_SHA__` and `__BUILD_TIME__`. `uptime` gives two figures:
 the seconds since `profile.since` (`uptimeSeconds()`, which `neofetch`'s days come from), and as
 idle, those less the tab's own lifetime. `loadavg` prints the presence count only if the stream is
@@ -1493,7 +1494,8 @@ this section only fixes the rules the code cites.
   available*, never an error. **No uniqueness score**: an honest one needs population
   frequencies the site doesn't have. Instead, a combined SHA-256 over `id=value` lines of the
   ticked rows that have a value, so it is the same in either language. A spec spies on `fetch`,
-  XHR and `sendBeacon` during a read and scans the folder for any network API.
+  XHR and `sendBeacon` during a read and scans the folder, and every module it imports however
+  far down, for any network API.
 - **The admin tier is hidden, not secret** (`download`, `lib/admin.ts`). `visibleTools()` leaves
   it out of the page, `tools`, `ls tools` and Tab until the owner unlocks — `sudo -i` in the
   terminal, or the panel's own field — but `findTool` still resolves it, so `cd tools/download`

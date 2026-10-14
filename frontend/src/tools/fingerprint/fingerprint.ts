@@ -436,7 +436,9 @@ export const ROWS: readonly Spec[] = [
   {
     id: 'webgl_vendor',
     group: 'gpu',
-    source: 'WEBGL_debug_renderer_info',
+    // Both ways `readGl()` takes. Firefox is never asked for the extension, so a source
+    // naming only the extension named, there, an API the page never called.
+    source: 'getParameter(VENDOR), or UNMASKED_VENDOR_WEBGL when masked',
     label: { en: 'WebGL vendor', fr: 'Fournisseur WebGL' },
     use: {
       en: 'Who made the graphics driver, as WebGL reports it. Ordinary use: a 3D page working around one driver’s bug. This site draws its background with WebGL and never asks.',
@@ -448,7 +450,7 @@ export const ROWS: readonly Spec[] = [
   {
     id: 'webgl_renderer',
     group: 'gpu',
-    source: 'WEBGL_debug_renderer_info',
+    source: 'getParameter(RENDERER), or UNMASKED_RENDERER_WEBGL when masked',
     label: { en: 'WebGL renderer', fr: 'Moteur de rendu WebGL' },
     use: {
       en: 'Often the exact graphics card and driver, which is why it varies so much between machines. Ordinary use: picking a game’s quality settings.',

@@ -1,7 +1,8 @@
-import { readdirSync, readFileSync, statSync } from 'node:fs'
+import { readFileSync } from 'node:fs'
 import { webcrypto } from 'node:crypto'
 import { join, relative } from 'node:path'
 import { afterEach, describe, expect, it, vi } from 'vitest'
+import { SRC, resolveImport, runtimeImports, scriptOf, sourceFiles } from '@/__tests__/imports'
 import {
   GROUPS,
   ROWS,
@@ -22,17 +23,27 @@ const UNMASKED_RENDERER = 0x9246
  *  the debug extension. */
 function fakeGl(plain = { vendor: 'WebKit', renderer: 'WebKit WebGL' }) {
   const asked: string[] = []
+  /** The parameters read, by their constants' names. */
+  const read: string[] = []
   const lost = vi.fn()
+  const names: Record<number, string> = {
+    0x1f00: 'VENDOR',
+    0x1f01: 'RENDERER',
+    [UNMASKED_VENDOR]: 'UNMASKED_VENDOR_WEBGL',
+    [UNMASKED_RENDERER]: 'UNMASKED_RENDERER_WEBGL',
+  }
   const gl = {
     VENDOR: 0x1f00,
     RENDERER: 0x1f01,
-    getParameter: (p: number) =>
-      ({
+    getParameter: (p: number) => {
+      read.push(names[p] ?? String(p))
+      return {
         0x1f00: plain.vendor,
         0x1f01: plain.renderer,
         [UNMASKED_VENDOR]: 'Google Inc. (Intel)',
         [UNMASKED_RENDERER]: 'ANGLE (Intel, Mesa Intel(R) UHD Graphics 620)',
-      })[p],
+      }[p]
+    },
     getExtension: (name: string) => {
       asked.push(name)
       if (name === 'WEBGL_debug_renderer_info') {
@@ -41,7 +52,7 @@ function fakeGl(plain = { vendor: 'WebKit', renderer: 'WebKit WebGL' }) {
       return name === 'WEBGL_lose_context' ? { loseContext: lost } : null
     },
   }
-  return { gl, asked, lost }
+  return { gl, asked, read, lost }
 }
 
 /** A canvas whose pixels are the calls made on it, so the same drawing reads back the
@@ -214,6 +225,22 @@ describe('reading a browser', () => {
     expect(asked).not.toContain('WEBGL_debug_renderer_info')
   })
 
+  // A row's source is static, so it has to name whichever way this browser was read: the
+  // extension alone named, in Firefox, an API the page never called.
+  it.each([
+    ['Chromium', undefined],
+    ['Firefox', { vendor: 'Mozilla', renderer: 'Intel(R) HD Graphics, or similar' }],
+  ])('names in each WebGL row every parameter %s is read for', (_browser, plain) => {
+    const { gl, read } = fakeGl(plain)
+    readNow(browser({ canvas: () => fakeCanvas(gl) }), ['gpu'])
+    for (const [id, kind] of [['webgl_vendor', 'VENDOR'], ['webgl_renderer', 'RENDERER']] as const) {
+      const { source } = ROWS.find((row) => row.id === id)!
+      const params = read.filter((name) => name === kind || name === `UNMASKED_${kind}_WEBGL`)
+      expect(params.length, id).toBeGreaterThan(0)
+      for (const param of params) expect(source, id).toMatch(new RegExp(`\\b${param}\\b`))
+    }
+  })
+
   it('renders the canvas and the audio into short hashes, the same each time', async () => {
     const first = await readLater(browser())
     const second = await readLater(browser())
@@ -315,16 +342,31 @@ describe('the combined hash', () => {
   })
 })
 
-/** Every source file under a directory, relative to `src/`. */
-function sources(dir: string): string[] {
-  return readdirSync(dir).flatMap((name) => {
-    const path = join(dir, name)
-    if (statSync(path).isDirectory()) return name === '__tests__' ? [] : sources(path)
-    return /\.(ts|vue)$/.test(name) ? [path] : []
-  })
+/**
+ * Every module the tool runs, relative to `src/`: its folder, then each file's runtime
+ * imports, followed through the site's own source as far as they go. Vue is the one
+ * package it may use; any other, or an import the walk can't open, is listed rather than
+ * skipped, since a module nobody read can't be vouched for. A dynamic `import()` is not
+ * followed, which is why the scan below refuses one outright.
+ */
+function reach(roots: readonly string[]): { files: string[]; unread: string[] } {
+  const files = new Set<string>()
+  const unread: string[] = []
+  const queue = [...roots]
+  for (let file = queue.pop(); file; file = queue.pop()) {
+    if (files.has(file)) continue
+    files.add(file)
+    for (const specifier of runtimeImports(scriptOf(file))) {
+      if (specifier === 'vue') continue
+      const target = resolveImport(file, specifier)
+      if (target) queue.push(target)
+      else unread.push(`${relative(SRC, file)} imports ${specifier}`)
+    }
+  }
+  return { files: [...files].map((path) => relative(SRC, path)).sort(), unread }
 }
 
-const SRC = join(process.cwd(), 'src')
+const TOOL = reach(sourceFiles(join(SRC, 'tools/fingerprint')))
 
 describe('what the tool never does', () => {
   it('makes no request while it reads, renders and hashes', async () => {
@@ -346,23 +388,26 @@ describe('what the tool never does', () => {
   })
 
   // The spy above only sees the paths a fake browser takes. The source has no way to
-  // send at all: no network API, and nothing imported that has one.
-  it.each(sources(join(SRC, 'tools/fingerprint')).map((path) => relative(SRC, path)))(
-    '%s names no network API',
-    (file) => {
-      const code = readFileSync(join(SRC, file), 'utf8')
-      for (const api of ['fetch(', 'XMLHttpRequest', 'sendBeacon', 'WebSocket', 'EventSource', '@/lib/api', 'import(']) {
-        expect(code, `${file} uses ${api}`).not.toContain(api)
-      }
-      const imports = [...code.matchAll(/from\s+'([^']+)'/g)].map((m) => m[1]!)
-      expect(imports.filter((spec) => !/^(vue|@\/i18n|@\/content\/types|\.\.?\/)/.test(spec)), file).toEqual([])
-    },
-  )
+  // send at all: no network API in the tool, nor in anything it imports, however far
+  // down. An allow-list of specifiers let any `../` through unread.
+  it('reads every module the tool runs, out of its folder too', () => {
+    expect(TOOL.unread).toEqual([])
+    expect(TOOL.files).toEqual(
+      expect.arrayContaining(['tools/hash/hash.ts', 'tools/ToolFrame.vue', 'components/WindowDots.vue', 'i18n/index.ts']),
+    )
+  })
+
+  it.each(TOOL.files)('%s names no network API', (file) => {
+    const code = readFileSync(join(SRC, file), 'utf8')
+    for (const api of ['fetch(', 'XMLHttpRequest', 'sendBeacon', 'WebSocket', 'EventSource', '@/lib/api', 'import(']) {
+      expect(code, `${file} uses ${api}`).not.toContain(api)
+    }
+  })
 
   // The site reads these only when the panel or `/proc/self` asks: the real browser is
   // handed over in one place, and only those two may call for it.
   it('hands the real browser only to the panel and /proc', () => {
-    const callers = sources(SRC)
+    const callers = sourceFiles(SRC)
       .filter((path) => /fingerprint\/environment'|\.\/environment'/.test(readFileSync(path, 'utf8')))
       .map((path) => relative(SRC, path))
     expect(callers.sort()).toEqual(['terminal/commands/proc.ts', 'tools/fingerprint/FingerprintTool.vue'])
