@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { pick } from '@/content/types'
 import { privacyCopy, privacyLabels, saveFileLabels } from '@/content/privacy'
+import { legalCopy, legalHeadings } from '@/content/legal'
 import { securityCopy, securityLabels } from '@/content/security'
 import { upcomingLabels } from '@/content/upcoming'
 import { stemsLabels } from '@/components/stems/labels'
@@ -37,6 +38,8 @@ const leaves = flatten({
   privacyCopy,
   securityLabels,
   securityCopy,
+  legalHeadings,
+  legalCopy,
   upcomingLabels,
   stemsLabels,
 } as unknown as Node)

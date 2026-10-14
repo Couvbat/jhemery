@@ -31,6 +31,13 @@ export interface StorageKey {
    * screenshotted, and these two would let someone else act as the visitor.
    */
   secret?: boolean
+  /**
+   * Kept out of a save (`lib/save-file.ts`): it belongs to the browser it was set in. The
+   * refusal of visit counting is one. A link that carried it could withdraw it, and a
+   * restore would write the record without Umami's own switch, the half-refusal
+   * `lib/analytics.ts` was written to avoid.
+   */
+  stays?: boolean
 }
 
 /** Every key the site writes starts with this; a stored key that does and isn't listed is stale. */
@@ -101,6 +108,7 @@ export const STORAGE_KEYS: StorageKey[] = [
     key: 'couvbat:analytics',
     area: 'local',
     group: 'settings',
+    stays: true,
     // Umami's own `umami.disabled` is written beside it, outside the namespace, so the row says so.
     purpose: {
       en: 'you refused visit counting; `umami.disabled`, the tracker’s own switch, is set beside it',

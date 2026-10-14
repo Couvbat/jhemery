@@ -92,7 +92,8 @@ Surfaces: a `EN/FR` toggle in the navbar, and the `lang [en|fr]` terminal comman
 Interface strings live in `i18n/messages.ts`, which loads whole with the first paint. The home
 page sits at its byte budget (`lighthouserc.yml`), so the words of a page or panel that only
 loads on demand can sit in a table beside it instead, imported only by it: `/privacy`'s and
-the save file's (`content/privacy.ts`), `/security`'s (`content/security.ts`), the events block's
+the save file's (`content/privacy.ts`), `/security`'s (`content/security.ts`), `/legal`'s
+(`content/legal.ts`), the events block's
 (`content/upcoming.ts`) and the stems mixer's (`components/stems/labels.ts`). `i18n.spec.ts`
 walks those tables with the message tree, under the same rules, plus one more for all of
 them: a `{placeholder}` in one language is in the other.
@@ -981,8 +982,9 @@ wraps rather than run wider than the screen, which a guestbook name can make it 
   imports, takes it out of the address as it loads, since the router captures the address
   when its module is evaluated and the analytics tracker reads `location.href`; a link
   pasted into `/privacy`'s own address bar is caught by a watch on the route instead.
-  Reading a code trusts nothing: only keys `entryFor()` lists in `localStorage` and not
-  secret, only strings, 64 kB a value and 256 kB unpacked, the second enforced while
+  Reading a code trusts nothing: only keys `entryFor()` lists in `localStorage`, not
+  secret and not marked `stays` (the refusal of visit counting, which belongs to its browser:
+  a link must not be able to withdraw it), only strings, 64 kB a value and 256 kB unpacked, the second enforced while
   inflating. Making one holds to the same limits (`fitSave()`), leaving out and naming a
   value too big rather than offering a link that restores less than it says. A link being
   made while the choice or the storage changes is thrown away. The page shows each key

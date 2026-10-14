@@ -40,10 +40,10 @@ export interface SavedItem {
   value: string
 }
 
-/** Whether a key may travel in a save: on the list, in `localStorage`, and not a secret. */
+/** Whether a key may travel in a save: on the list, in `localStorage`, not a secret, and not one that `stays`. */
 export function isPortable(key: string): boolean {
   const entry = entryFor(key, 'local')
-  return !!entry && !entry.secret && (PORTABLE_GROUPS as readonly string[]).includes(entry.group)
+  return !!entry && !entry.secret && !entry.stays && (PORTABLE_GROUPS as readonly string[]).includes(entry.group)
 }
 
 /** What is stored now in `groups`, as a save would carry it. */

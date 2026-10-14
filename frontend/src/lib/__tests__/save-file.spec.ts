@@ -41,6 +41,8 @@ describe('what a save may carry', () => {
     expect(isPortable('couvbat:room:AB3DE')).toBe(false)
     expect(isPortable('couvbat:old-thing')).toBe(false)
     expect(isPortable('umami.disabled')).toBe(false)
+    // A refusal of visit counting belongs to its browser: a link must not withdraw one.
+    expect(isPortable('couvbat:analytics')).toBe(false)
   })
 
   it('carries the groups asked for, from what is stored', () => {
@@ -104,6 +106,7 @@ describe('a save code', () => {
         'couvbat:theme': 'nord',
         'couvbat:sudo': 'hunter2',
         'couvbat:room:AB3DE': 'token',
+        'couvbat:analytics': 'counted',
         'evil:key': 'x',
         'couvbat:games:snake': 42,
         'couvbat:history': 'x'.repeat(MAX_VALUE_BYTES + 1),
@@ -112,7 +115,7 @@ describe('a save code', () => {
     expect(read).toEqual({
       ok: true,
       items: [{ key: 'couvbat:theme', value: 'nord' }],
-      dropped: ['couvbat:sudo', 'couvbat:room:AB3DE', 'evil:key', 'couvbat:games:snake', 'couvbat:history'],
+      dropped: ['couvbat:sudo', 'couvbat:room:AB3DE', 'couvbat:analytics', 'evil:key', 'couvbat:games:snake', 'couvbat:history'],
     })
   })
 
