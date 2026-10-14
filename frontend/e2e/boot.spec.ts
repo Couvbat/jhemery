@@ -1,6 +1,7 @@
 import type { Page } from '@playwright/test'
 import { expect, test } from './fixtures'
 import { messages } from '@/i18n/messages'
+import { seasonOnDay } from '@/content/seasons'
 
 /**
  * First contact: the boot sequence, and the two performance decisions that are only
@@ -52,6 +53,19 @@ test.describe('the boot sequence', () => {
     await page.keyboard.press('Enter')
     await expect(page.getByText('welcome.')).toBeHidden()
     expect(await app.read('booted')).toBe('1')
+  })
+
+  // A season's line in the log, read off the browser's own calendar. Here and not in
+  // vitest because the log lives in a component, which the unit suite doesn't compile.
+  test('gains a line on a season’s day', async ({ page, app }) => {
+    // Noon UTC is still 31 October at every offset from −12 to +11, so the browser's
+    // time zone can't move it off the day. A fixed clock leaves the timers running.
+    await page.clock.setFixedTime(new Date('2026-10-31T12:00:00Z'))
+    await app.seed({ booted: false })
+    await page.goto('/')
+
+    await expect(page.getByText(seasonOnDay(10, 31)!.boot)).toBeVisible()
+    await expect(page.getByText('welcome.')).toBeVisible()
   })
 })
 

@@ -1,10 +1,12 @@
 <script setup lang="ts">
-import { onMounted, onUnmounted, ref, watch } from 'vue'
+import { computed, onMounted, onUnmounted, ref, shallowRef, watch } from 'vue'
 import * as THREE from 'three'
+import { seasonOn, untilTomorrow } from '@/content'
 import { useCrt } from '@/composables/useCrt'
 import { useMotion } from '@/composables/useMotion'
 import { usePresence } from '@/composables/usePresence'
 import { RIPPLE_SECONDS, rippleOffset } from './ripple'
+import { fieldMood, pickPalette, type Hue, type Palette } from './palette'
 import { activeSection } from '@/composables/useActiveSection'
 import { terminalOpen } from '@/composables/useTerminalShell'
 import { BASE_SHAPE_COUNT, MAX_SHAPE_COUNT, useSceneControl } from '@/composables/useSceneControl'
@@ -31,6 +33,15 @@ const { theme } = useTheme()
 const { level: motion } = useMotion()
 // `wall`: someone else waved, and the field ripples outward from its centre.
 const { wave } = usePresence()
+/**
+ * Today's season (`content/seasons.ts`), if today is one. Re-read at the visitor's
+ * midnight, so a tab left open across the 31st doesn't keep Halloween into November.
+ */
+const season = shallowRef(seasonOn())
+let midnightTimer: ReturnType<typeof setTimeout> | undefined
+/** The weather's speed and opacity with the season's multiplied in. Everything below reads
+ *  this rather than the weather alone; it is recomputed when either changes, never per frame. */
+const mood = computed(() => fieldMood(weatherMood.value, season.value?.id))
 
 const canvasRef = ref<HTMLCanvasElement | null>(null)
 /** What `click-to-inspect` is currently showing, if anything. */
@@ -170,9 +181,7 @@ let mouseY = 0
 let pointerActive = false
 let pointerIdleTimer: ReturnType<typeof setTimeout> | undefined
 
-/** The four hue slots a palette picks from, by their historical names (§3: under Gruvbox
- *  `green` is orange). */
-type Hue = 'green' | 'cyan' | 'purple' | 'pink'
+/** The four hue slots a palette picks from (`palette.ts`), in the order they're read. */
 const HUES: readonly Hue[] = ['green', 'cyan', 'purple', 'pink']
 /** What each slot reads when the property is empty, the default's own hex. */
 const HUE_FALLBACKS: Record<Hue, string> = { green: '#00ff41', cyan: '#00ffff', purple: '#bf00ff', pink: '#ff0080' }
@@ -194,35 +203,6 @@ const neonTo = hueColours()
 const RECOLOUR_MS = 450
 /** How far through the current ease, 0 → 1. At rest it is 1. */
 let recolour = 1
-
-interface Palette {
-  base: Hue
-  accent: Hue
-  /** Multiplies the rotation speed, on top of the CRT boost. */
-  speed: number
-}
-
-/** Each section gets its own mood. Falls back to the first entry for anything
- *  unknown, so adding a section can never leave the background unstyled. */
-const SECTION_PALETTES: Record<string, Palette> = {
-  about: { base: 'green', accent: 'cyan', speed: 1 },
-  projects: { base: 'cyan', accent: 'green', speed: 1.25 },
-  music: { base: 'purple', accent: 'pink', speed: 1.6 },
-  gaming: { base: 'pink', accent: 'purple', speed: 1.45 },
-  hardware: { base: 'green', accent: 'purple', speed: 0.85 },
-  contact: { base: 'cyan', accent: 'pink', speed: 1 },
-}
-
-/** The other views get a mood of their own, the way each section does. Anything not
- *  listed here (the 404, say) falls back to the section palette below. */
-const VIEW_PALETTES: Record<string, Palette> = {
-  tools: { base: 'cyan', accent: 'purple', speed: 1.1 },
-  watch: { base: 'pink', accent: 'cyan', speed: 0.9 },
-  radio: { base: 'purple', accent: 'green', speed: 1.2 },
-}
-
-/** The reward for finding everything: a palette no section can produce. */
-const COMPLETIONIST_PALETTE: Palette = { base: 'pink', accent: 'cyan', speed: 1.35 }
 
 let sectionSpeed = 1
 
@@ -264,10 +244,7 @@ function halfExtents(aspect: number): { x: number; y: number } {
 }
 
 function currentPalette(): Palette {
-  if (unlocked.value.has('completionist')) return COMPLETIONIST_PALETTE
-  const view = activeView.value
-  if (view !== 'home' && VIEW_PALETTES[view]) return VIEW_PALETTES[view]
-  return SECTION_PALETTES[activeSection.value] ?? SECTION_PALETTES.about!
+  return pickPalette(unlocked.value.has('completionist'), season.value?.id, activeView.value, activeSection.value)
 }
 
 /** The colour half of `applyPalette`: every material takes its hue from `neon` as it
@@ -287,11 +264,11 @@ function applyPalette() {
   sectionSpeed = currentPalette().speed
   applyColours()
 
-  const mood = weatherMood.value
+  const { opacity } = mood.value
   for (const { mesh, baseOpacity } of shapes) {
     // Scaled from `baseOpacity` rather than from the current value, so a run of
     // weather changes can't ratchet every shape down to invisible.
-    ;(mesh.material as THREE.MeshBasicMaterial).opacity = Math.min(baseOpacity * mood.opacity, 0.6)
+    ;(mesh.material as THREE.MeshBasicMaterial).opacity = Math.min(baseOpacity * opacity, 0.6)
   }
   for (const shape of visitors) (shape.mesh.material as THREE.MeshBasicMaterial).opacity = visitorOpacity(shape)
 
@@ -329,7 +306,7 @@ function addShape(accent: boolean, pool: AnimatedShape[] = shapes) {
     color: neon[accent ? palette.accent : palette.base],
     wireframe: true,
     transparent: true,
-    opacity: baseOpacity * weatherMood.value.opacity,
+    opacity: baseOpacity * mood.value.opacity,
   })
   const mesh = new THREE.Mesh(kind.make(), material)
 
@@ -367,9 +344,9 @@ function disposeShape(shape: AnimatedShape) {
   ;(shape.mesh.material as THREE.Material).dispose()
 }
 
-/** A visitor's opacity: what any shape would have under this weather, times its fade. */
+/** A visitor's opacity: what any shape would have under this weather and day, times its fade. */
 function visitorOpacity(shape: AnimatedShape): number {
-  return Math.min(shape.baseOpacity * weatherMood.value.opacity, 0.6) * (shape.presence?.level ?? 1)
+  return Math.min(shape.baseOpacity * mood.value.opacity, 0.6) * (shape.presence?.level ?? 1)
 }
 
 /**
@@ -613,7 +590,7 @@ function animate(now: number) {
   const f = lastFrame ? Math.min(MAX_STEP, (now - lastFrame) / REFERENCE_MS) : 1
   lastFrame = now
 
-  const boost = speedMultiplier.value * sectionSpeed * weatherMood.value.speed * (calm ? CALM_SPEED : 1) * f
+  const boost = speedMultiplier.value * sectionSpeed * mood.value.speed * (calm ? CALM_SPEED : 1) * f
   const shaking = glitching.value
   const turning = swinging.value
   // The well's z=0-plane maths is wrong in a rotated frame; off for the 650 ms. `calm`
@@ -765,8 +742,9 @@ watch(wave, () => {
 // Both the section and the completionist unlock change how the scene looks; one
 // watcher covers them because `currentPalette()` already knows which wins.
 // The weather rides along on the same watcher: it only ever scales what the
-// palette already decided, so there is nothing for it to apply separately.
-watch([activeSection, activeView, unlocked, weatherMood], applyPalette)
+// palette already decided, so there is nothing for it to apply separately. So does
+// the season, which is one more rank in the palette and one more factor in the mood.
+watch([activeSection, activeView, unlocked, mood, season], applyPalette)
 // A scheme changes what the palette's names mean, not which names it picks — so the
 // same recolour, after re-reading the hues. `useTheme` has already written the new
 // properties by the time this runs (inside the view transition's callback, when the
@@ -823,7 +801,17 @@ onMounted(() => {
   // component is never mounted while motion is paused, so the call is not made
   // for a scene that would sit still anyway.
   void fetchWeather()
+  watchMidnight()
 })
+
+/** Re-reads the season at each of the visitor's midnights while the field is mounted. A
+ *  timer that fires a little early just re-arms for the few milliseconds left. */
+function watchMidnight() {
+  midnightTimer = setTimeout(() => {
+    season.value = seasonOn()
+    watchMidnight()
+  }, untilTomorrow())
+}
 
 onUnmounted(() => {
   if (animationFrameId !== null) {
@@ -832,6 +820,7 @@ onUnmounted(() => {
   }
   clearTimeout(pointerIdleTimer)
   clearTimeout(inspectTimer)
+  clearTimeout(midnightTimer)
   window.removeEventListener('resize', handleResize)
   window.removeEventListener('mousemove', handleMouseMove)
   window.removeEventListener('click', handleClick)

@@ -1,4 +1,5 @@
 import { profile } from '@/content'
+import { fortunePool } from '@/content/fortunes'
 import { decorativeMotion } from '@/composables/useMotion'
 import {
   MAX_SHAPE_COUNT,
@@ -47,17 +48,6 @@ const SSH_STAGES = [
   'debug1: Authenticating with public key "id_ed25519"',
   'debug1: Authentication succeeded (publickey).',
   'Last login: never — nobody has ever actually logged in here',
-]
-
-const FORTUNES = [
-  'Weeks of coding can save you hours of planning.',
-  'There are two hard problems in computer science: cache invalidation, naming things, and off-by-one errors.',
-  'It works on my machine is a valid bug report if you ship the machine.',
-  'The best code is no code. The second best is code you deleted last week.',
-  'A TODO comment is a promise you make to a stranger.',
-  'Any sufficiently advanced configuration is indistinguishable from code.',
-  'Premature optimisation is the root of all evil. Mature optimisation is a full-time job.',
-  'The bug is in the last place you look, because you stop looking.',
 ]
 
 const RM_STAGES = [
@@ -517,10 +507,9 @@ export const eggCommands: Command[] = [
     writes: 'none',
     hidden: true,
     run({ t }) {
-      return [
-        line(FORTUNES[Math.floor(Math.random() * FORTUNES.length)]!, 'accent'),
-        ...announce('fortune', t),
-      ]
+      // Today's pool (`content/fortunes.ts`): a season's day has lines of its own.
+      const pool = fortunePool()
+      return [line(t(pool[Math.floor(Math.random() * pool.length)]!), 'accent'), ...announce('fortune', t)]
     },
   },
   {

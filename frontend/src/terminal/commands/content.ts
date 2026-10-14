@@ -11,6 +11,7 @@ import {
   peripherals,
   profile,
   projects,
+  seasonOn,
   skillNames,
   skills,
   socials,
@@ -328,6 +329,10 @@ export const contentCommands: Command[] = [
           `${profile.availability.open ? t({ en: 'open', fr: 'disponible' }) : t({ en: 'closed', fr: 'indisponible' })} — ${t(profile.availability.note)}`,
         ],
       ]
+      // One line on a season's day (`content/seasons.ts`), on the visitor's calendar. The
+      // curl pages run under two clocks that fall on no season, so it never reaches them.
+      const season = seasonOn()
+      if (season) info.push(['Season', t(season.neofetch)])
       if (steam) {
         info.push(['Steam', steam.inGame ? `${steam.name} — ${steam.inGame}` : steam.status])
       }

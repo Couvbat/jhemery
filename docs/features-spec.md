@@ -439,7 +439,8 @@ URL), and `neofetch` has a `Status` row from `profile.availability`, the same fl
 both résumés read. `now.txt` is the `/now` list, with the same 90-day staleness rule.
 
 `neofetch` renders an ASCII logo beside a spec block — stack, locale, "uptime" since the first
-commit, and the live Steam status if available. `curl [-I] <domain>[/path]` is a real request to
+commit, a `Season` row on one of the four season days (§5.3), and the live Steam status if
+available. `curl [-I] <domain>[/path]` is a real request to
 this origin, under any name it answers to (§7); any other host gets `curl: (6) Could not resolve
 host` and a note that a browser tab can only reach this site.
 
@@ -605,7 +606,7 @@ It shares the registry, so it needs no separate maintenance.
 | `play` | Scrolls to the music section and starts the SoundCloud embed |
 | `acid [<code>]` | Plays the acid tool's pattern, or a shared code's, with a frame playhead read off the audio clock (§11). `writes: 'local'`, so no link may start it |
 | `cowsay <text>` | ASCII cow |
-| `fortune` | Random dev aphorism |
+| `fortune` | Random dev aphorism, in the visitor's language; on a season's day, from that season's pool (§5.3) |
 | `sl` | ASCII train, animated across the buffer |
 | `rickroll` | Asks for confirmation first, because doing it unprompted is rude |
 | `ps` (aliases `ps aux`, `ps -ef`) | Fake process table of the site's own "services", partly derived from real page state — `crt-shader.ko` only appears while overdrive is on, `soundcloud-embed --autoplay` only after playback starts, and `[rm -rf /] <defunct>` is a permanent zombie |
@@ -758,6 +759,18 @@ mounted, so coming back to *full* or *calm* picks the scene up where it stood.
   push as the ring passes, added to its target like the gravity well's, so the ordinary drift
   carries it out and back. Allocation-free, gone after 2.6 s, and only at *full* motion with the
   loop running; a wave that lands while the field is calm or still isn't drawn.
+- **Seasons** — `content/seasons.ts` lists four days: 31 October, 21 December (the winter
+  solstice, as a fixed date), 1 January and the month and day of `profile.since`. `seasonOn(at)`
+  reads the visitor's local calendar, since Halloween starts at their midnight, and the field
+  re-reads it at each midnight. A season's palette (`components/palette.ts`, which holds every
+  palette and `pickPalette()`'s ranking so a spec can check it without WebGL) ranks under the
+  completionist's and above the view's and the section's. Its speed and opacity are a second
+  `{ speed, opacity }` pair multiplied into the weather's, so they apply whichever palette wins;
+  the season palette's own speed is 1, so the speed counts once. Slots, never colours, so a
+  season repaints inside the visitor's scheme. The same day gives `fortune` its own pool
+  (`content/fortunes.ts`, `Localised` like the everyday lines) and adds one line to `neofetch`
+  and one to the boot log. No achievement: `completionist` would then wait up to a year on the
+  calendar, when every other achievement waits on the visitor.
 
 **Terminal control** (`composables/useSceneControl.ts`) adds three more knobs, in the same
 flag-and-watch shape as `useMatrix`/`useBoot` — the commands only ever set, the component is the
@@ -792,6 +805,8 @@ shapes are the accent colour; clicking one of those is the `cyanSpotter` achieve
   runs — no `alreadyBooted` gate, and `finish()` clears the flag so it is immediately repeatable.
   The dismiss listeners are armed 300 ms late: the keypress that submitted `reboot` is still
   propagating when the watcher fires, and a window listener attached synchronously would eat it.
+  On a season's day (§5.3) the log gains one line before "all systems nominal", read when the
+  sequence starts.
 - **404** (`NotFoundView.vue`) — `bash: /<path>: No such file or directory`, a `cd ~` button, and
   (desktop only) a hint to open the terminal. Requires `frontend/public/.htaccess` with an SPA
   rewrite; without it Apache 404s before Vue Router ever sees the URL. This closes a gap already
@@ -846,7 +861,9 @@ spec names a reason for each other exclusion (`curl`, `ctf`, `achievements`, `ga
 `resume`, `help`). Each runs in both locales under two clocks years apart, and any line that
 differs is dropped, which removes the uptimes and durations that would otherwise go stale between
 regenerations; `resume` is excluded for that reason, since its durations are the point and the
-bare host already serves them fresh. A harness option makes `capture` and `prompt` throw, so a
+bare host already serves them fresh. Neither clock falls on a season (§5.3) at any UTC offset,
+which the same spec checks, so no page carries a line that belongs to one day of the year.
+A harness option makes `capture` and `prompt` throw, so a
 page can never be half of an interactive command. `.htaccess` serves the pages only to `curl`,
 `wget` and `httpie`, not the crawler list `/` uses (a crawler asking for `/about` wants what a
 browser gets), French when `Accept-Language` starts with `fr`, and only when the file exists.
