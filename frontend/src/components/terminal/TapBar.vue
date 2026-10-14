@@ -25,8 +25,9 @@ const rowEl = ref<HTMLElement | null>(null)
 /** The commands' row was scrolled here, so coming back from a command's lines lands where it left. */
 let rowScroll = 0
 
+// 44px each way (features-spec §9): the ← is one glyph, and padding alone leaves it 34px wide.
 const BUTTON =
-  'shrink-0 min-h-11 px-3 rounded border font-mono text-sm whitespace-nowrap transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary aria-disabled:opacity-50'
+  'shrink-0 min-h-11 min-w-11 px-3 rounded border font-mono text-sm whitespace-nowrap transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary aria-disabled:opacity-50'
 
 function tap(command: TapCommand) {
   if (command.lines.length === 1) return run(command.lines[0]!)

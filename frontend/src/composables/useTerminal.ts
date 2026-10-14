@@ -80,16 +80,29 @@ watch(keyCapture, (handler) => {
 let abortController: AbortController | null = null
 /** Bumped on every append so the view knows to scroll. */
 const revision = ref(0)
+/**
+ * How many lines have left the buffer's head, to MAX_LINES or to `clear`. Added to an
+ * index it numbers a line for good, which is how the view finds where a batch of output
+ * began once the head has moved under it: a full buffer's length no longer changes.
+ */
+let dropped = 0
+
+/** The buffer becomes `lines`, less what MAX_LINES trims from their head. */
+function keep(lines: OutputLine[]) {
+  dropped += Math.max(0, lines.length - MAX_LINES)
+  buffer.value = lines.slice(-MAX_LINES)
+}
 
 function append(input: OutputLine | OutputLine[] | string) {
   const incoming: OutputLine[] =
     typeof input === 'string' ? [{ text: input }] : Array.isArray(input) ? input : [input]
 
-  buffer.value = [...buffer.value, ...incoming].slice(-MAX_LINES)
+  keep([...buffer.value, ...incoming])
   revision.value += 1
 }
 
 function clearBuffer() {
+  dropped += buffer.value.length
   buffer.value = []
   revision.value += 1
 }
@@ -102,7 +115,7 @@ function openFrame(): (input: OutputLine[]) => void {
 
   return (input: OutputLine[]) => {
     const kept = buffer.value.slice(0, Math.max(0, buffer.value.length - height))
-    buffer.value = [...kept, ...input].slice(-MAX_LINES)
+    keep([...kept, ...input])
     // A frame taller than the whole buffer keeps only its own tail.
     height = Math.min(input.length, MAX_LINES)
     revision.value += 1
@@ -875,6 +888,8 @@ export function useTerminal() {
     handleCaptureKeydown,
     buffer: computed(() => buffer.value),
     revision: computed(() => revision.value),
+    /** Lines gone from the buffer's head so far; read on a `revision`, not watched. */
+    dropped: () => dropped,
     pendingPrompt: computed(() => pendingPrompt.value),
     history: computed(() => history.value),
     primeOverlay,

@@ -19,6 +19,7 @@ const {
   busy,
   buffer,
   revision,
+  dropped,
   pendingPrompt,
   capturing,
   captureTakesEscape,
@@ -172,14 +173,16 @@ const promptLabel = computed(() => {
   return `${profile.handle}:~$`
 })
 
-/** How many lines the buffer had at the last scroll, so the next one knows where new output starts. */
+/** The number of the line after the last one at the last scroll, so the next one knows where new
+ *  output starts. Numbered with `dropped()`, not by index: a full buffer trims its head under
+ *  every batch, and its length stays at the cap. */
 let seenLines = 0
 /** Where the output written in this task began: a tap's echo and what it printed arrive together. */
 let batchFrom: number | null = null
 
 watch(revision, async () => {
   const from = seenLines
-  seenLines = buffer.value.length
+  seenLines = dropped() + buffer.value.length
   if (batchFrom === null) {
     batchFrom = from
     setTimeout(() => (batchFrom = null))
@@ -192,19 +195,34 @@ watch(revision, async () => {
   // `resume` is several screens, and following the bottom would leave the reader at its
   // end. The browser clamps the scroll, so a batch that fits still ends at the bottom, and
   // `tour`, whose stops arrive seconds apart, still reads as it goes. 16px is the padding.
-  const first = touch.value && start < buffer.value.length ? (el.children[start] as HTMLElement | undefined) : undefined
+  // A batch longer than the buffer has lost its first lines to the cap: it reads from the top.
+  const index = Math.max(0, start - dropped())
+  const first = touch.value && index < buffer.value.length ? (el.children[index] as HTMLElement | undefined) : undefined
   el.scrollTop = first ? first.offsetTop - 16 : el.scrollHeight
 })
+
+/** Where the keyboard starts. Nothing to type into in the touch layout: the dialog itself
+ *  takes focus, so Escape and Tab have somewhere to start, and no keyboard opens. */
+function focusHome() {
+  if (touch.value) panelEl.value?.focus()
+  else inputEl.value?.focus()
+}
 
 async function handleOpened() {
   previouslyFocused = document.activeElement as HTMLElement | null
   primeOverlay()
   await nextTick()
-  // Nothing to type into in the touch layout: the dialog itself takes focus, so Escape
-  // and Tab have somewhere to start, and no keyboard opens.
-  if (touch.value) panelEl.value?.focus()
-  else inputEl.value?.focus()
+  focusHome()
 }
+
+// Crossing md swaps the buttons and the prompt under whatever had focus, which falls to
+// <body>, out of reach of the panel's Escape: a game started at the prompt would carry on
+// with no way to quit it but the stop button. Start the keyboard over in the new layout.
+watch(touch, async () => {
+  if (!open.value) return
+  await nextTick()
+  if (!panelEl.value?.contains(document.activeElement)) focusHome()
+})
 
 /** A tap: through the link path, so it can run nothing a `?run=` link couldn't. */
 function onTap(line: string) {
@@ -377,7 +395,9 @@ function onPanelKeydown(event: KeyboardEvent) {
   // The input handles Tab itself for completion; only the chrome buttons cycle.
   if (document.activeElement === inputEl.value) return
 
-  if (event.shiftKey && document.activeElement === first) {
+  // The touch layout's dialog takes focus itself, and isn't in its own list: from there
+  // Shift+Tab would leave for the page behind, so it starts the cycle as `first` does.
+  if (event.shiftKey && (document.activeElement === first || document.activeElement === panelEl.value)) {
     event.preventDefault()
     last.focus()
   } else if (!event.shiftKey && document.activeElement === last) {
