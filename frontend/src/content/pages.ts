@@ -1,6 +1,6 @@
 import { profile } from './profile'
 import { toolInfo } from './tools'
-import type { Localised } from './types'
+import { LANG_PARAM, type Locale, type Localised } from './types'
 import { viewFor, views } from './views'
 import { work } from './work'
 
@@ -14,8 +14,15 @@ import { work } from './work'
  * `vite-plugins/pages.ts` writes each page its own copy of `index.html` with the head
  * below, and `usePageMeta` keeps the same head in step as the visitor moves around.
  *
+ * Each page exists in both languages, and each language has its own URL, since a search
+ * engine indexes URLs, not settings: the English one is the bare path, the French one
+ * adds `?lang=fr` (`pageUrl`). A query rather than a `/fr/` prefix, because the router,
+ * the terminal's `cd` and every link in the app take paths, and none of them has to learn
+ * a second form of each. The app reads the parameter as it loads (`i18n/index.ts`), and
+ * every copy names both URLs as alternates, so each language is found from the other.
+ *
  * Titles are the tab's (`useTabTitle`), not new copy: `pages.spec.ts` holds every entry
- * to `tabTitle()` in both languages, and every URL in the sitemap to an entry here.
+ * to `tabTitle()` in both languages, and the sitemap is generated from this list.
  */
 export interface PageMeta {
   /** The route path, with no trailing slash. */
@@ -25,6 +32,13 @@ export interface PageMeta {
   /** What the page is, on its own: the heading a crawler without JavaScript reads. */
   heading: Localised
   description: Localised
+}
+
+export const SITE = `https://${profile.domain}`
+
+/** The page's URL in a language. English is the default, so its URL is the bare path. */
+export function pageUrl(path: string, locale: Locale): string {
+  return `${SITE}${path}${locale === 'en' ? '' : `?${LANG_PARAM}=${locale}`}`
 }
 
 /** Markdown code spans read as stray backticks in a search result. */
@@ -62,7 +76,12 @@ function sentence(text: string): string {
 }
 
 export const pages: PageMeta[] = [
-  { path: '/', title: siteTitle, heading: { en: profile.name, fr: profile.name }, description: home.description },
+  {
+    path: '/',
+    title: siteTitle,
+    heading: { en: `${profile.name} (${profile.alias})`, fr: `${profile.name} (${profile.alias})` },
+    description: home.description,
+  },
   ...views.filter((view) => view !== home).map((view) => page(view.path, view.heading, view.description)),
   ...toolInfo
     .filter((tool) => tool.tier !== 'admin')

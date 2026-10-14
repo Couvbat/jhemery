@@ -38,6 +38,15 @@
   # Without it every route answers with the home page's head, canonical included,
   # and a crawler files them all under /. After the curl pages, so `curl /tools`
   # still gets text; a path with no copy (a room code, the 404) gets index.html.
+  #
+  # French first: ?lang=fr is the French URL of the same page (src/content/pages.ts),
+  # and its copy is pages/fr/<path>.html, the home page's pages/fr/index.html. The
+  # query string passes through untouched, so the app still reads it.
+  RewriteCond %{QUERY_STRING} (^|&)lang=fr(&|$)
+  RewriteRule ^$ /pages/fr/index.html [L]
+  RewriteCond %{QUERY_STRING} (^|&)lang=fr(&|$)
+  RewriteCond %{DOCUMENT_ROOT}/pages/fr/$1.html -f
+  RewriteRule ^([a-z0-9/-]+?)/?$ /pages/fr/$1.html [L]
   RewriteCond %{DOCUMENT_ROOT}/pages/$1.html -f
   RewriteRule ^([a-z0-9/-]+?)/?$ /pages/$1.html [L]
 

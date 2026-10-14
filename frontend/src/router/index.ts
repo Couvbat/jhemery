@@ -4,11 +4,14 @@ import { decorativeMotion } from '../composables/useMotion'
 
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
-  scrollBehavior(to) {
+  scrollBehavior(to, from) {
     if (to.hash) {
       // Jumps with motion paused, as `scrollToSection` does.
       return { el: to.hash, behavior: decorativeMotion() === 'paused' ? 'auto' : 'smooth' }
     }
+    // The same page with another query: `?lang=` or `?run=` taken out of the address.
+    // The visitor hasn't gone anywhere, so the page stays where it was.
+    if (from.matched.length && to.path === from.path) return false
     return { top: 0 }
   },
   routes: [
