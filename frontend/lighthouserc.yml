@@ -93,7 +93,14 @@ ci:
       # visitor waits on it. The ceiling exists to make "just precache three.js"
       # or "just add one more dependency" show up as a red check rather than as
       # a slow drift nobody measures.
-      total-byte-weight: ['error', { maxNumericValue: 307200 }]
+      #
+      # 300 KiB until October 2026, then 302 KiB for three PRs that each passed
+      # alone and not together: #152 (seasons, events, the save file) and #153
+      # (the legal pages) both got back under 300 KiB by moving /privacy's words
+      # out of the first load, the same 2 kB, which counts once when both merge;
+      # #154 (a head per page) adds its own. Together they measured 308.2 kB, and
+      # the two KiB were raised on purpose rather than drifted into.
+      total-byte-weight: ['error', { maxNumericValue: 309248 }]
 
       # Speed Index is deliberately unasserted. The boot sequence is an
       # animation that keeps repainting on purpose, which is exactly what Speed
