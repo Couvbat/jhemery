@@ -33,19 +33,21 @@ onUnmounted(() => window.removeEventListener('keydown', onKeydown))
 
 <template>
   <!--
-    Desktop only: a fixed input panel fights mobile virtual keyboards badly enough
-    that no terminal beats a broken one. The rendered page carries the same content.
+    At every width. Below md it opens the touch layout, buttons and no input (features-spec
+    §9): a fixed input fights a phone's virtual keyboard badly enough that no input beats a
+    broken one. 44px tall there, 16px from the edges, and clear of a home indicator where
+    the page is laid out under one. The backtick hint is a keyboard's.
   -->
   <button
     v-show="!open"
-    class="hidden md:flex fixed bottom-6 right-6 z-50 items-center gap-2 rounded border border-primary/50 bg-background/90 backdrop-blur px-4 py-2.5 font-mono text-sm text-primary border-glow hover:bg-primary/10 hover:border-primary transition-all group"
+    class="flex fixed bottom-[max(1rem,env(safe-area-inset-bottom))] right-4 md:bottom-6 md:right-6 z-50 min-h-11 md:min-h-0 items-center gap-2 rounded border border-primary/50 bg-background/90 backdrop-blur px-4 py-2.5 font-mono text-sm text-primary border-glow hover:bg-primary/10 hover:border-primary transition-all group"
     :aria-label="t(m.terminal.open)"
     :title="`${t(m.terminal.open)} (\`)`"
     @click="openTerminal()"
   >
     <span class="text-primary">&gt;_</span>
     <span class="group-hover:glow-green transition-all">{{ t(m.terminal.title) }}</span>
-    <kbd class="ml-1 text-[10px] text-muted-foreground border border-border rounded px-1 py-0.5"
+    <kbd class="hidden md:inline ml-1 text-[10px] text-muted-foreground border border-border rounded px-1 py-0.5"
       >`</kbd
     >
   </button>

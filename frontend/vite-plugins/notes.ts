@@ -21,7 +21,7 @@ import { escapeHtml, renderMarkdown } from './markdown'
  */
 
 const SPEC_DIR = fileURLToPath(new URL('../../docs/superpowers/specs/', import.meta.url))
-const SPEC_PATH = 'docs/superpowers/specs'
+export const SPEC_PATH = 'docs/superpowers/specs'
 const REPO = 'https://github.com/Couvbat/jhemery'
 
 export interface Note {

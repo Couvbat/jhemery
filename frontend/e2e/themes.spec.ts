@@ -60,7 +60,7 @@ test('the menu forges a scheme from the colour picker', async ({ page, app }) =>
 test('a light scheme repaints the page and drops the glows', async ({ page, app, terminal }) => {
   test.skip(
     test.info().project.name === 'mobile',
-    'Driven through `theme`, and a phone has no terminal: the launcher is `hidden md:flex`.',
+    'Driven through `theme` at the prompt; `theme` writes, so a phone’s touch layout has no button for it.',
   )
 
   await page.goto('/')
@@ -77,7 +77,7 @@ test('a light scheme repaints the page and drops the glows', async ({ page, app,
 
 test('the navbar menu switches scheme, on a phone too', async ({ page, app }) => {
   // No skip for `mobile`: this menu is the only way a phone has to change scheme,
-  // since the terminal launcher is `hidden md:flex`. Desktop and phone each render
+  // since `theme` writes and the terminal's touch layout runs only what a link could. Desktop and phone each render
   // their own trigger and hide the other, so the role query finds the one on screen.
   await page.goto('/')
 

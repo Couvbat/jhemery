@@ -1,9 +1,9 @@
 <script setup lang="ts">
 import { onMounted, onUnmounted, ref, watch } from 'vue'
-import { profile } from '@/content'
+import { profile, seasonOn } from '@/content'
 import { useLocale } from '@/i18n'
 import { decorativeMotion } from '@/composables/useMotion'
-import { useBoot } from '@/composables/useBoot'
+import { setBootPlaying, useBoot } from '@/composables/useBoot'
 
 const STORAGE_KEY = 'couvbat:booted'
 const STEP_MS = 130
@@ -29,6 +29,16 @@ const STEPS = [
   '',
   'welcome.',
 ]
+/** Where a season's line goes: ahead of the closing three, so "all systems nominal" stays last. */
+const SEASON_AT = STEPS.length - 3
+
+/** The log for today: the fixed lines, plus one on a season's day (`content/seasons.ts`).
+ *  Read when the sequence starts, so a `reboot` after midnight sees the new day. */
+function steps(): string[] {
+  const season = seasonOn()
+  if (!season) return STEPS
+  return [...STEPS.slice(0, SEASON_AT), `[    0.739551] ${season.boot}`, ...STEPS.slice(SEASON_AT)]
+}
 
 function disarm() {
   clearTimeout(armTimer)
@@ -39,6 +49,7 @@ function disarm() {
 function finish() {
   clearTimeout(timer)
   visible.value = false
+  setBootPlaying(false)
   disarm()
   // Clears the `reboot` flag, so the command can be run again straight away.
   ackBoot()
@@ -49,13 +60,13 @@ function finish() {
   }
 }
 
-function step(index: number) {
-  if (index >= STEPS.length) {
+function step(lines: string[], index: number) {
+  if (index >= lines.length) {
     timer = setTimeout(finish, 450)
     return
   }
-  shown.value = [...shown.value, STEPS[index]!]
-  timer = setTimeout(() => step(index + 1), STEP_MS)
+  shown.value = [...shown.value, lines[index]!]
+  timer = setTimeout(() => step(lines, index + 1), STEP_MS)
 }
 
 /** Plays the sequence from the top. Shared by the first visit and by `reboot`,
@@ -65,6 +76,7 @@ function start() {
   disarm()
   shown.value = []
   visible.value = true
+  setBootPlaying(true)
   // The keypress or click that ran `reboot` is still propagating when the watcher
   // fires, and a window listener attached now would catch it and dismiss the
   // replay instantly. Arming a beat later leaves the sequence a chance to play.
@@ -72,7 +84,7 @@ function start() {
     window.addEventListener('keydown', finish)
     window.addEventListener('click', finish)
   }, 300)
-  step(0)
+  step(steps(), 0)
 }
 
 /**
@@ -105,6 +117,7 @@ watch(bootActive, (requested) => {
 })
 
 onUnmounted(() => {
+  setBootPlaying(false)
   clearTimeout(timer)
   disarm()
 })

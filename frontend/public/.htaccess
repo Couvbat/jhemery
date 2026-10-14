@@ -152,6 +152,12 @@
     Header set Cache-Control "no-cache"
   </FilesMatch>
 
+  # The palette's search index (vite-plugins/search.ts): unhashed and rebuilt by every
+  # deploy, so a cached copy would offer headings a note no longer has.
+  <FilesMatch "^search\.json$">
+    Header set Cache-Control "no-cache"
+  </FilesMatch>
+
   # `/` is the résumé to curl and the app to a browser, and any path with a curl page
   # is that page to curl: the same URL, a different body by User-Agent, which a cache
   # has to be told. Cloudflare doesn't cache HTML by default; this keeps any cache honest.

@@ -170,6 +170,24 @@ export const messages = {
     broadcast: { en: 'Broadcast message from', fr: 'Message diffusé par' },
     broadcastNote: { en: '(a wave, and nothing else: no message, no name)', fr: '(un signe de la main, rien d’autre : ni message, ni nom)' },
   },
+  // The terminal's touch layout, below `md`: buttons where the prompt would be (§9).
+  tapShell: {
+    hint: {
+      en: 'Tap a command below to run it. Nothing here needs typing.',
+      fr: 'Touchez une commande ci-dessous pour la lancer. Rien ici ne demande de taper.',
+    },
+    // A game, or a prompt, reached through a link on a phone: `notATty`'s pipe is the wrong reason there.
+    notATty: {
+      en: 'not a tty: it needs a keyboard, and there is none here. Try it on a wider screen',
+      fr: 'pas un tty : il lui faut un clavier, et il n’y en a pas ici. Essayez sur un écran plus large',
+    },
+    commands: { en: 'Commands', fr: 'Commandes' },
+    // `{command}` is a command's name, `{n}` how many lines its row offers.
+    more: { en: '{command}, {n} choices', fr: '{command}, {n} choix' },
+    back: { en: 'All commands', fr: 'Toutes les commandes' },
+    stop: { en: 'Stop', fr: 'Stop' },
+    stopLabel: { en: 'Stop the running command', fr: 'Arrêter la commande en cours' },
+  },
   // Chrome around `ask` only. The *answer* is generated in the requested locale
   // by the model itself and is never translated client-side.
   ask: {
@@ -196,9 +214,26 @@ export const messages = {
   },
   palette: {
     placeholder: { en: 'Type a command or search…', fr: 'Tapez une commande ou cherchez…' },
-    empty: { en: 'No matching command', fr: 'Aucune commande correspondante' },
+    empty: { en: 'Nothing matches', fr: 'Aucun résultat' },
     hint: { en: '↑↓ navigate · ↵ run · esc close', fr: '↑↓ naviguer · ↵ lancer · échap fermer' },
     open: { en: 'Command palette', fr: 'Palette de commandes' },
+  },
+  // The palette's content search (`lib/search.ts`): the kinds it groups `/search.json`'s
+  // results under, and the navbar menu's way in on a phone, which has no Ctrl+K.
+  search: {
+    open: { en: 'search', fr: 'rechercher' },
+    loading: { en: 'Searching…', fr: 'Recherche…' },
+    failed: {
+      en: 'The search index didn’t load. Commands still work.',
+      fr: 'L’index de recherche n’a pas pu être chargé. Les commandes fonctionnent toujours.',
+    },
+    work: { en: 'Case studies', fr: 'Études de cas' },
+    why: { en: 'Decisions', fr: 'Décisions' },
+    note: { en: 'Design notes', fr: 'Notes de conception' },
+    now: { en: 'Now', fr: 'En ce moment' },
+    // Read after a note in the other language: the notes aren't translated.
+    inEnglish: { en: 'in English', fr: 'en anglais' },
+    inFrench: { en: 'in French', fr: 'en français' },
   },
   notFound: {
     // What the page is announced as, and called in `pageLabel()`: the tab keeps the
@@ -698,6 +733,37 @@ export const messages = {
       fr: "Un fichier attend au plus 30 minutes sur le serveur, et disparaît dès qu'il est enregistré.",
     },
   },
+  toolFingerprint: {
+    intro: {
+      en: 'What any page can read about this browser without a prompt or a permission, and whether a site has any ordinary use for it. Read when this panel opened; none of it leaves the page.',
+      fr: 'Ce que n’importe quelle page peut lire de ce navigateur sans invite ni permission, et si un site en a un usage ordinaire. Lu à l’ouverture de ce panneau ; rien ne quitte la page.',
+    },
+    hash: { en: 'combined hash · SHA-256', fr: 'hash combiné · SHA-256' },
+    fed: {
+      en: 'Fed by the {n} ticked rows of {total}: untick one and the hash changes. A row this browser doesn’t give is left out.',
+      fr: 'Alimenté par les {n} lignes cochées sur {total} : décochez-en une et le hash change. Une ligne que ce navigateur ne donne pas est laissée de côté.',
+    },
+    same: {
+      en: 'The same browser, unchanged, gives the same hash to any page that reads the same rows. No cookie is needed for that.',
+      fr: 'Le même navigateur, inchangé, donne le même hash à toute page qui lit les mêmes lignes. Nul besoin de cookie pour cela.',
+    },
+    noScore: {
+      en: 'No uniqueness score: an honest one needs to know how many other browsers share each value, and this site doesn’t. A “1 in 200,000” without that would be a guess dressed as a measurement.',
+      fr: 'Pas de score d’unicité : un score honnête demande de savoir combien d’autres navigateurs partagent chaque valeur, et ce site ne le sait pas. Un « 1 sur 200 000 » sans cela serait une supposition déguisée en mesure.',
+    },
+    noCrypto: {
+      en: 'Web Crypto is not available on this connection, so there is no hash.',
+      fr: 'Web Crypto n’est pas disponible sur cette connexion, donc pas de hash.',
+    },
+    inHash: { en: '{label}: in the hash', fr: '{label} : dans le hash' },
+    reading: { en: 'reading…', fr: 'lecture…' },
+    again: { en: 'read again', fr: 'relire' },
+    sent: { en: 'nothing sent', fr: 'rien envoyé' },
+    common: { en: 'ordinary use', fr: 'usage ordinaire' },
+    rare: { en: 'rarely needed', fr: 'rarement utile' },
+    none: { en: 'no ordinary use', fr: 'aucun usage ordinaire' },
+    shell: { en: 'in the terminal: cat {path}', fr: 'dans le terminal : cat {path}' },
+  },
   rooms: {
     introWatch: {
       en: 'A watch party: one code, one YouTube video, everyone at the same second. The host presses play; every other player follows.',
@@ -829,6 +895,9 @@ export const messages = {
   scene: {
     visitor: { en: 'someone else, here now', fr: 'quelqu’un d’autre, ici en ce moment' },
     wake: { en: 'move the mouse or press a key', fr: 'bougez la souris ou appuyez sur une touche' },
+    // A guestbook entry's wireframe, after its kind: `components/signatures.ts` fills in the
+    // name and the day. Never the message.
+    signature: { en: 'signed by {name}, {date}', fr: 'signé par {name}, le {date}' },
   },
   now: {
     heading: { en: 'What I’m doing now', fr: 'Ce que je fais en ce moment' },
@@ -840,6 +909,50 @@ export const messages = {
       fr: 'Cette liste date de {n} jours. Une partie n’est sans doute plus vraie.',
     },
     about: { en: 'A /now page, as in', fr: 'Une page /now, comme sur' },
+  },
+  // X-ray mode (components/XrayLayer.vue). File names are facts and stay as they are;
+  // `{n}` is substituted by the caller.
+  xray: {
+    label: { en: 'X-ray: the components on screen', fr: 'Rayons X : les composants à l’écran' },
+    status: { en: 'x-ray · {n} components', fr: 'rayons X · {n} composants' },
+    statusOne: { en: 'x-ray · 1 component', fr: 'rayons X · 1 composant' },
+    hint: { en: 'Esc ends it', fr: 'Échap pour quitter' },
+    exit: { en: 'exit', fr: 'quitter' },
+    exitLabel: { en: 'Exit x-ray', fr: 'Quitter les rayons X' },
+    // Read before the files a tag's words come from, in place of the arrow drawn there.
+    words: { en: 'words from', fr: 'textes tirés de' },
+    // Between a component and the one its template is nothing but, in place of `›`.
+    through: { en: 'through', fr: 'via' },
+    times: { en: '{n} on screen', fr: '{n} à l’écran' },
+    shapes: { en: '{n} shapes', fr: '{n} formes' },
+  },
+  // /privacy (views/PrivacyView.vue). The keys and their purposes are lib/storage-keys.ts's,
+  // shared with `du`; this is the page around them. Every claim below is one the code
+  // keeps, and `strace` is how a visitor checks it rather than taking the page's word.
+  privacy: {
+    heading: { en: 'What this site keeps', fr: 'Ce que ce site garde' },
+    browser: { en: 'In this browser', fr: 'Dans ce navigateur' },
+    notSet: { en: 'not set', fr: 'absente' },
+    secret: { en: 'secret: only its length is shown', fr: 'secret : seule sa longueur est affichée' },
+    // `{n}` keys, `{size}` bytes: a group's total, beside its clear button.
+    stored: { en: 'stored: {n} · {size}', fr: 'stockées : {n} · {size}' },
+    clear: { en: 'clear', fr: 'effacer' },
+    // The first press arms; the second, on a different button, clears. The armed button
+    // turns into Cancel in place, so a double-click lands on Cancel.
+    cancel: { en: 'cancel', fr: 'annuler' },
+    confirm: { en: 'yes, clear {n} and reload', fr: 'oui, effacer {n} et recharger' },
+    cleared: { en: 'Cleared. Reloading…', fr: 'Effacé. Rechargement…' },
+    caches: { en: 'Caches', fr: 'Caches' },
+    files: { en: '{n} files', fr: '{n} fichiers' },
+    noCaches: {
+      en: 'Nothing cached here: the service worker hasn’t stored anything yet, or isn’t running.',
+      fr: 'Rien en cache ici : le service worker n’a encore rien stocké, ou ne tourne pas.',
+    },
+    estimate: {
+      en: 'Your browser counts {size} in use by this site (`navigator.storage.estimate()`).',
+      fr: 'Votre navigateur compte {size} utilisés par ce site (`navigator.storage.estimate()`).',
+    },
+    sends: { en: 'What leaves your browser', fr: 'Ce qui quitte votre navigateur' },
   },
   footer: {
     built: { en: 'built', fr: 'build' },

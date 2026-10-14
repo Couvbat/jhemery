@@ -7,6 +7,7 @@ import { workLines } from '../work'
 import { SECRET_FILE, secretContents } from './secret'
 import { ENV_FILE, envFileContents } from './env-file'
 import { guestbookFilenames, resolveGuestbookFile } from './guestbook-fs'
+import { isProcPath, resolveProcFile } from './proc'
 
 type TFunction = <T>(value: Localised<T>) => T
 
@@ -131,6 +132,7 @@ export function resolveFileLines(file: string, t: TFunction): OutputLine[] | und
       return envFileContents(t)
 
     default: {
+      if (isProcPath(file)) return resolveProcFile(file, t)
       // The case studies, one file each in the projects directory.
       const study = /^(?:~\/)?projects\/([a-z0-9-]+)\.md$/.exec(file)
       if (study) {

@@ -17,3 +17,9 @@ interface ImportMetaEnv {
 interface ImportMeta {
   readonly env: ImportMetaEnv
 }
+
+/** X-ray mode's words map, built by `vite-plugins/xray.ts`: component → the files its words come from. */
+declare module 'virtual:xray-map' {
+  const map: Record<string, string[]>
+  export default map
+}

@@ -10,7 +10,8 @@ import { page } from '../pager'
 import type { Command, CommandGroup, OutputLine } from '../types'
 import { blank, fail, line, pre, segmented } from '../format'
 
-const GROUP_LABELS: Record<CommandGroup, { en: string; fr: string }> = {
+/** `help`'s headings, in its order; the tap shell's button groups are the same ones. */
+export const GROUP_LABELS: Record<CommandGroup, { en: string; fr: string }> = {
   core: { en: 'shell', fr: 'shell' },
   navigate: { en: 'navigation', fr: 'navigation' },
   content: { en: 'content', fr: 'contenu' },

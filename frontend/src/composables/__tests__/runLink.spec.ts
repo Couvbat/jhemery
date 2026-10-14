@@ -188,14 +188,16 @@ describe('consumeRunParam', () => {
     expect(router.currentRoute.value.hash).toBe('#about')
   })
 
-  it('does nothing on a phone, where there is no terminal', async () => {
+  // A link in a bio is mostly opened on a phone, where the touch layout runs it.
+  it('does the same on a phone', async () => {
     screen(false)
     const router = makeRouter()
     await router.push('/?run=neofetch')
     await consumeRunParam(router)
 
-    expect(terminalOpen.value).toBe(false)
-    expect(pendingLinkCommand.value).toBeNull()
+    expect(terminalOpen.value).toBe(true)
+    expect(pendingLinkCommand.value).toBe('neofetch')
+    expect(router.currentRoute.value.query).toEqual({})
   })
 
   it('does nothing without the parameter', async () => {

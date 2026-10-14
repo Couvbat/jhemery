@@ -8,6 +8,7 @@ vi.mock('@/composables/useCrt', async (importOriginal) => ({
 }))
 
 import { profile } from '@/content'
+import { seasonOnDay } from '@/content/seasons'
 import type { Locale, Localised } from '@/content/types'
 import { setLocale } from '@/i18n'
 import { toAnsi } from '../ansi'
@@ -42,6 +43,8 @@ const EXCLUDED: Record<string, string> = {
   // host already serves `resume.txt`, which the build dates afresh on every deploy.
   resume: 'the bare host is the résumé',
   help: 'help.txt is a generated index of these pages instead',
+  du: 'the visitor’s own browser storage',
+  xray: 'it draws over the page, which a terminal hasn’t got',
 }
 
 const ORIGIN = `https://${profile.domain}`
@@ -111,6 +114,21 @@ function steadyColumns(row: OutputLine, other: string): OutputLine[] {
   })
   return [{ ...row, text: kept, segments }]
 }
+
+/**
+ * A page is served all year, so it must never carry a season's line (`content/seasons.ts`):
+ * neofetch's `Season` row would otherwise sit in `/neofetch` until the next regeneration.
+ * The season is the local day, so each clock is checked as every UTC offset from −12 to +14
+ * would read it, and the pages come out the same wherever they are regenerated.
+ */
+describe('curl page clocks', () => {
+  it.each(CLOCKS.map((clock) => [clock.toISOString(), clock] as const))('%s is no season in any time zone', (_iso, clock) => {
+    for (let quarter = -12 * 4; quarter <= 14 * 4; quarter++) {
+      const local = new Date(clock.getTime() + quarter * 15 * 60_000)
+      expect(seasonOnDay(local.getUTCMonth() + 1, local.getUTCDate()), `UTC${quarter / 4}`).toBeUndefined()
+    }
+  })
+})
 
 afterAll(() => {
   vi.useRealTimers()

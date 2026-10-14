@@ -30,6 +30,11 @@ const GAMES: Record<GameId, { key: string; better: 'higher' | 'lower' }> = {
   connect4: { key: 'couvbat:games:connect4', better: 'higher' },
 }
 
+/** Whether `name` is a game's own name: every game has a row here, scored or not. */
+export function isGame(name: string): name is GameId {
+  return Object.hasOwn(GAMES, name)
+}
+
 export function isLowerBetter(game: GameId): boolean {
   return GAMES[game].better === 'lower'
 }

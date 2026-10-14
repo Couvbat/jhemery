@@ -38,6 +38,13 @@ describe('tabTitle', () => {
     expect(tabTitle('/work/nope')).toBe(`How this site is built — ${profile.name}`)
   })
 
+  it('names /privacy, in both languages', () => {
+    expect(tabTitle('/privacy')).toBe(`What this site keeps — ${profile.name}`)
+    expect(pageLabel('/privacy')).toBe(`What this site keeps — ${profile.name}`)
+    setLocale('fr')
+    expect(tabTitle('/privacy')).toBe(`Ce que ce site garde — ${profile.name}`)
+  })
+
   it('follows the locale', () => {
     setLocale('fr')
     expect(tabTitle('/tools')).toBe(`Outils & utilitaires — ${profile.name}`)

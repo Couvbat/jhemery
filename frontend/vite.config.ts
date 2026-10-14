@@ -8,18 +8,24 @@ import { VitePWA } from 'vite-plugin-pwa'
 import { commitSha } from './vite-plugins/git'
 import { notesPlugin } from './vite-plugins/notes'
 import { resumePlugin } from './vite-plugins/resume'
+import { searchPlugin } from './vite-plugins/search'
 import { thirdPartyPlugin } from './vite-plugins/third-party'
+import { stampSource, xrayPlugin } from './vite-plugins/xray'
 import { profile } from './src/content/profile'
 
 // https://vite.dev/config/
 export default defineConfig({
   plugins: [
-    vue(),
+    // `xray`: every root element of every component carries its file's path, since a
+    // production build keeps no `__file` (`vite-plugins/xray.ts`).
+    vue({ template: { compilerOptions: { nodeTransforms: [stampSource()] } } }),
     vueDevTools(),
     tailwindcss(),
     resumePlugin(),
     notesPlugin(),
+    searchPlugin(),
     thirdPartyPlugin(),
+    xrayPlugin(),
     VitePWA({
       registerType: 'autoUpdate',
       // Left off in dev: a service worker sitting in front of the dev server
@@ -112,6 +118,9 @@ export default defineConfig({
           // The design notes (`vite-plugins/notes.ts`): static documents, like the résumés.
           /^\/notes(\/.*)?$/,
           /^\/notes\.css$/,
+          // The palette's search index (`vite-plugins/search.ts`). The palette fetches it,
+          // which the fallback never answers; this is for a browser opening it by hand.
+          /^\/search\.json$/,
         ],
         cleanupOutdatedCaches: true,
         clientsClaim: true,

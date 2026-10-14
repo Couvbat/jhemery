@@ -99,7 +99,7 @@ test.describe('the résumé', () => {
   })
 
   test('reads the same through the terminal', async ({ page, terminal }) => {
-    test.skip(test.info().project.name === 'mobile', 'No terminal on a phone.')
+    test.skip(test.info().project.name === 'mobile', 'Typed at the prompt, which a phone doesn’t have: its touch layout runs the same commands (tap-shell.spec.ts).')
 
     await page.goto('/')
     await terminal.open()

@@ -5,8 +5,7 @@ commands, live information), then games vol. 2 (§E), views and tools (§F), the
 batch (§G), the late-September brainstorm (§H) and the October brainstorm (§I). Built feature by
 feature, across sessions.
 
-**Current state: §A–§H are shipped; in §I the *Fixes found on the way* have shipped and the rest
-is proposed.** Anything else still open is
+**Current state: §A–§H are shipped, and so is §I.** Anything else still open is
 under [Open](#open) and [Known issues](#known-issues).
 
 **How to use:** tick a box when the feature ships, and append the PR number. Design detail for
@@ -644,7 +643,8 @@ shell, the games and the tools. This one looks at three other things: the visito
 out (phones get neither the shell nor the palette), what the site keeps in a visitor's browser,
 and the site explaining its own structure. The owner picked seven ideas from a longer list, and
 each was checked against the code before its row was written. That check found the two
-*fixes* below, and several approach cells record what it changed. Nothing here is built yet.
+*fixes* below, and several approach cells record what it changed. All of it has shipped: the
+fixes in #150, the rest in #151, where each row's *Departures* say what changed on the way.
 
 ### Fixes found on the way
 
@@ -657,28 +657,28 @@ each was checked against the code before its row was written. That check found t
 
 | ✔ | Feature | Approach | Files | Effort |
 |---|---|---|---|---|
-| [ ] | A tap shell | **Narrows features-spec §10's "terminal on mobile".** The reason given there is the virtual keyboard fighting a fixed input, and this has no input. Below `md` (768px, `useRunLink`'s `DESKTOP_QUERY`), the launcher opens the same overlay in a touch layout: output above, and in place of the prompt a scrolling row of buttons in `help`'s groups. Each button is a command for which `isLinkable(c, [])` holds, or one argument its `complete()` offers that `isLinkable(c, [arg])` accepts (`projects qr`, `why polling`, `hardware nas`). So a button can run nothing a `?run=` link couldn't. Two kinds are left out: the games, and commands that only read stdin (`grep`, `head`…), which print nothing without a pipe. A button runs through `runLink()`, and in the touch layout the shell runs every stage with `tty: false`. Anything that would hold the keyboard then degrades as it does inside a pipe: `play()` already answers "not a tty", and `man` prints instead of paging. A stop button does what Ctrl+C does. Three gaps close with it. **`?run=` works on phones**, where bio links get opened: today `useRunLink` returns early below 768px and leaves the parameter in the URL. **The guestbook toast and the palette** open the full overlay, input and all, on a phone today, which is what §9 rules out; they open the touch layout instead. **Links in output** (the `?run=` hrefs in `why` and `projects`) stay inside it. `tour` gains a touch branch, since it points at `wordle daily` and the `curl` hint, and a phone can use neither. A vitest asserts that every button passes `isLinkable` and none needs a tty. An e2e at 375px runs `?run=tour` in the touch layout and checks the parameter is dropped; it has to be e2e because the breakpoint is a real viewport's. | `components/terminal/TerminalLauncher.vue`, `components/terminal/TerminalOverlay.vue`, `composables/useRunLink.ts`, `composables/useTerminal.ts`, `composables/useTerminalShell.ts`, `components/GuestbookTicker.vue`, `components/CommandPalette.vue`, `terminal/registry.ts`, `terminal/commands/work.ts`, `e2e/`, `features-spec.md` §9–10 | M |
+| [x] | A tap shell | Shipped in #151. **Narrows features-spec §10's "terminal on mobile".** The reason given there is the virtual keyboard fighting a fixed input, and this has no input. Below `md` (768px, `useRunLink`'s `DESKTOP_QUERY`), the launcher opens the same overlay in a touch layout: output above, and in place of the prompt a scrolling row of buttons in `help`'s groups. Each button is a command for which `isLinkable(c, [])` holds, or one argument its `complete()` offers that `isLinkable(c, [arg])` accepts (`projects qr`, `why polling`, `hardware nas`). So a button can run nothing a `?run=` link couldn't. Two kinds are left out: the games, and commands that only read stdin (`grep`, `head`…), which print nothing without a pipe. A button runs through `runLink()`, and in the touch layout the shell runs every stage with `tty: false`. Anything that would hold the keyboard then degrades as it does inside a pipe: `play()` already answers "not a tty", and `man` prints instead of paging. A stop button does what Ctrl+C does. Three gaps close with it. **`?run=` works on phones**, where bio links get opened: today `useRunLink` returns early below 768px and leaves the parameter in the URL. **The guestbook toast and the palette** open the full overlay, input and all, on a phone today, which is what §9 rules out; they open the touch layout instead. **Links in output** (the `?run=` hrefs in `why` and `projects`) stay inside it. `tour` gains a touch branch, since it points at `wordle daily` and the `curl` hint, and a phone can use neither. A vitest asserts that every button passes `isLinkable` and none needs a tty. An e2e at 375px runs `?run=tour` in the touch layout and checks the parameter is dropped; it has to be e2e because the breakpoint is a real viewport's. | `components/terminal/TerminalLauncher.vue`, `components/terminal/TerminalOverlay.vue`, `composables/useRunLink.ts`, `composables/useTerminal.ts`, `composables/useTerminalShell.ts`, `components/GuestbookTicker.vue`, `components/CommandPalette.vue`, `terminal/registry.ts`, `terminal/commands/work.ts`, `e2e/`, `features-spec.md` §9–10 | M |
 
 ### What the site keeps
 
 | ✔ | Feature | Approach | Files | Effort |
 |---|---|---|---|---|
-| [ ] | Storage inspector | The site writes 22 `localStorage` keys (settings, progress, eight best scores, history, aliases, the daily board) and two kinds of `sessionStorage` key: the admin password and a room's host token. No module lists them all, because each one declares its own key. `lib/storage-keys.ts` becomes that list: key or prefix, storage area, purpose (`Localised`), the file that owns it, and a `secret` flag. A source-scan spec in the manner of `discovery.spec.ts` fails on any `couvbat:` literal that isn't on the list, so a new key can't ship without being disclosed. **Shell:** `du ~` prints each key with its size and purpose, and the value when it is the visitor's own data. `couvbat:sudo` and the host tokens print as `<secret, N bytes>` and never show their value, since screens get shared. `rm <key\|group>` clears one key or group, and `rm -rf ~` clears everything; `sudo rm -rf /` keeps its joke, because `sudo` parses its own arguments. A clear ends in a reload: achievements, the locale and the theme are read once at load, and reloading is the only way nothing on screen keeps a stale copy. `du` writes nothing and is linkable; `rm` writes `local`. **Page:** `/privacy`, a route outside the prism like `/now`, linked from the footer, so phones get it too. It shows the same list with a clear button per group, and states the privacy claims, which today only the README makes, with `strace` named as the way to check them. Both surfaces also report `navigator.storage.estimate()` and the `async-chunks` Cache Storage cache (three.js, the word lists, ffmpeg's loader). They say that the 32 MB ffmpeg core sits in the HTTP cache, which a page can neither list nor clear. The new route has to be added to `sitemap.xml` and `llms.txt`, since `discovery.spec.ts` checks both for every router path. | `lib/storage-keys.ts` (new), `lib/__tests__/storage-keys.spec.ts` (new), `terminal/commands/system.ts`, `views/PrivacyView.vue` (new), `router/index.ts`, `components/SiteFooter.vue`, `public/sitemap.xml`, `public/llms.txt` | S–M |
-| [ ] | `fingerprint` tool | Lists what any page can read without a permission prompt, and reads it only when the panel opens: the user agent and its client hints, languages, time zone, screen size, pixel ratio and colour depth, cores, memory, touch points, the `prefers-*` media queries, the WebGL renderer string, and a canvas render and an audio render hashed by the `hash` tool's digest code. Each row says what the value is and whether a site has any ordinary use for it. **No uniqueness score.** An honest one needs population frequencies the site doesn't have, and an invented "1 in 200 000" is the kind of number the case studies refuse to print. The tool shows a combined hash instead, and which rows change it. The logic lives in a pure `fingerprint.ts`, which the panel and `/proc/self` (below) both read, so the shell and the page can't disagree. Nothing leaves the page, and a spec holds the module to never calling `fetch`. For the copy: the site itself reads none of these values today. Its only `navigator` uses are the language and the clipboard. | `tools/fingerprint/` (new), `tools/registry.ts`, `tools/hash/*`, `public/sitemap.xml`, `public/llms.txt` | S–M |
+| [x] | Storage inspector | Shipped in #151. The site writes 22 `localStorage` keys (settings, progress, eight best scores, history, aliases, the daily board) and two kinds of `sessionStorage` key: the admin password and a room's host token. No module lists them all, because each one declares its own key. `lib/storage-keys.ts` becomes that list: key or prefix, storage area, purpose (`Localised`), the file that owns it, and a `secret` flag. A source-scan spec in the manner of `discovery.spec.ts` fails on any `couvbat:` literal that isn't on the list, so a new key can't ship without being disclosed. **Shell:** `du ~` prints each key with its size and purpose, and the value when it is the visitor's own data. `couvbat:sudo` and the host tokens print as `<secret, N bytes>` and never show their value, since screens get shared. `rm <key\|group>` clears one key or group, and `rm -rf ~` clears everything; `sudo rm -rf /` keeps its joke, because `sudo` parses its own arguments. A clear ends in a reload: achievements, the locale and the theme are read once at load, and reloading is the only way nothing on screen keeps a stale copy. `du` writes nothing and is linkable; `rm` writes `local`. **Page:** `/privacy`, a route outside the prism like `/now`, linked from the footer, so phones get it too. It shows the same list with a clear button per group, and states the privacy claims, which today only the README makes, with `strace` named as the way to check them. Both surfaces also report `navigator.storage.estimate()` and the `async-chunks` Cache Storage cache (three.js, the word lists, ffmpeg's loader). They say that the 32 MB ffmpeg core sits in the HTTP cache, which a page can neither list nor clear. The new route has to be added to `sitemap.xml` and `llms.txt`, since `discovery.spec.ts` checks both for every router path. | `lib/storage-keys.ts` (new), `lib/__tests__/storage-keys.spec.ts` (new), `terminal/commands/system.ts`, `views/PrivacyView.vue` (new), `router/index.ts`, `components/SiteFooter.vue`, `public/sitemap.xml`, `public/llms.txt` | S–M |
+| [x] | `fingerprint` tool | Shipped in #151. Lists what any page can read without a permission prompt, and reads it only when the panel opens: the user agent and its client hints, languages, time zone, screen size, pixel ratio and colour depth, cores, memory, touch points, the `prefers-*` media queries, the WebGL renderer string, and a canvas render and an audio render hashed by the `hash` tool's digest code. Each row says what the value is and whether a site has any ordinary use for it. **No uniqueness score.** An honest one needs population frequencies the site doesn't have, and an invented "1 in 200 000" is the kind of number the case studies refuse to print. The tool shows a combined hash instead, and which rows change it. The logic lives in a pure `fingerprint.ts`, which the panel and `/proc/self` (below) both read, so the shell and the page can't disagree. Nothing leaves the page, and a spec holds the module to never calling `fetch`. For the copy: the site itself reads none of these values today. Its only `navigator` uses are the language and the clipboard. | `tools/fingerprint/` (new), `tools/registry.ts`, `tools/hash/*`, `public/sitemap.xml`, `public/llms.txt` | S–M |
 
 ### The site explains itself
 
 | ✔ | Feature | Approach | Files | Effort |
 |---|---|---|---|---|
-| [ ] | X-ray mode | `xray` (also in the palette) outlines every component on the page with a tag naming its file and the content modules its words come from. Each tag links to that file at `__BUILD_SHA__` through `lib/source.ts`, the helper the case studies already use. `Esc` or a second `xray` ends it. **Build side:** `vue()` takes no options today. A `template.compilerOptions.nodeTransforms` entry stamps `data-src` on each template's root elements, using the compiler's `filename`. Only roots are stamped, so it adds a few dozen attributes. It has to be stamped because production builds keep a component's `__name` but not its `__file`. **Content is the hard part.** Components import from the `@/content` barrel, so an import only says "content". The plugin resolves each named import (`work`, `profile`) against what `content/*.ts` exports, and serves the resulting map as a lazy virtual module, fetched only when x-ray turns on. First paint pays for the attributes and nothing else. The canvas reads `ThreeBackground.vue · N shapes`. `xray` writes nothing and is linkable, so `?run=xray` and a tap-shell button both work. The cheaper alternative, CSS alone (`attr(data-src)` in a `::before`), was rejected: it would collide with components' own pseudo-elements, and a pseudo-element can't carry a link. Tests: a vitest compiles a fixture SFC through the transform; a spec checks that every stamped path exists; an e2e checks that `?run=xray` tags the hero. | `vite.config.ts`, `vite-plugins/xray.ts` (new), `composables/useXray.ts` (new), `components/XrayLayer.vue` (new), `App.vue`, `terminal/commands/work.ts` | M |
-| [ ] | Content search in Ctrl+K | The palette matches a query against each entry's label and hint with a plain `includes`, though the README calls it fuzzy. It holds sections, views and 29 commands, so the case studies, the fifteen `why` topics, `/now` and the notes can't be found from it. **Index:** a plugin emits `/search.json` at build time, as `resume.ts` emits `content.json`. It has one entry per case study, per decision, per note heading (with the `githubSlug` id the notes plugin already assigns) and for `/now`. Each entry is `{ kind, title, text, target }`, with the text cut to a couple of hundred characters, in both locales where the source has them; notes stay in their own language, marked as such. The index is fetched on the first query of three characters or more, never at load, so the 300 KiB home budget (278 KiB measured) is untouched, and it stays out of the precache like the notes. **Matching:** a small tokenised prefix scorer, accent-folded like the word games, that ranks a title above a heading above body text. It also replaces `includes` for the existing entries. No dependency: at this size a linear scan is instant. Results go under the commands, grouped by kind. A result's target is a route (`/work/qr`), a note anchor or a `?run=why polling` link. A spec holds every work id, decision id and note to an entry, as `discovery.spec.ts` does for the sitemap. **Phones:** the palette opens only on Ctrl+K, so phones never see it. A *search* entry in the navbar's mobile menu opens it there. Try that dialog with a real phone's keyboard before shipping, since §9's objection was about inputs. | `vite-plugins/search.ts` (new), `vite.config.ts`, `lib/search.ts` (new), `components/CommandPalette.vue`, `components/NavBar.vue`, `content/__tests__/search.spec.ts` (new), README | M |
+| [x] | X-ray mode | Shipped in #151. `xray` (also in the palette) outlines every component on the page with a tag naming its file and the content modules its words come from. Each tag links to that file at `__BUILD_SHA__` through `lib/source.ts`, the helper the case studies already use. `Esc` or a second `xray` ends it. **Build side:** `vue()` takes no options today. A `template.compilerOptions.nodeTransforms` entry stamps `data-src` on each template's root elements, using the compiler's `filename`. Only roots are stamped, so it adds a few dozen attributes. It has to be stamped because production builds keep a component's `__name` but not its `__file`. **Content is the hard part.** Components import from the `@/content` barrel, so an import only says "content". The plugin resolves each named import (`work`, `profile`) against what `content/*.ts` exports, and serves the resulting map as a lazy virtual module, fetched only when x-ray turns on. First paint pays for the attributes and nothing else. The canvas reads `ThreeBackground.vue · N shapes`. `xray` writes nothing and is linkable, so `?run=xray` and a tap-shell button both work. The cheaper alternative, CSS alone (`attr(data-src)` in a `::before`), was rejected: it would collide with components' own pseudo-elements, and a pseudo-element can't carry a link. Tests: a vitest compiles a fixture SFC through the transform; a spec checks that every stamped path exists; an e2e checks that `?run=xray` tags the hero. | `vite.config.ts`, `vite-plugins/xray.ts` (new), `composables/useXray.ts` (new), `components/XrayLayer.vue` (new), `App.vue`, `terminal/commands/work.ts` | M |
+| [x] | Content search in Ctrl+K | Shipped in #151. The palette matches a query against each entry's label and hint with a plain `includes`, though the README calls it fuzzy. It holds sections, views and 29 commands, so the case studies, the fifteen `why` topics, `/now` and the notes can't be found from it. **Index:** a plugin emits `/search.json` at build time, as `resume.ts` emits `content.json`. It has one entry per case study, per decision, per note heading (with the `githubSlug` id the notes plugin already assigns) and for `/now`. Each entry is `{ kind, title, text, target }`, with the text cut to a couple of hundred characters, in both locales where the source has them; notes stay in their own language, marked as such. The index is fetched on the first query of three characters or more, never at load, so the 300 KiB home budget (278 KiB measured) is untouched, and it stays out of the precache like the notes. **Matching:** a small tokenised prefix scorer, accent-folded like the word games, that ranks a title above a heading above body text. It also replaces `includes` for the existing entries. No dependency: at this size a linear scan is instant. Results go under the commands, grouped by kind. A result's target is a route (`/work/qr`), a note anchor or a `?run=why polling` link. A spec holds every work id, decision id and note to an entry, as `discovery.spec.ts` does for the sitemap. **Phones:** the palette opens only on Ctrl+K, so phones never see it. A *search* entry in the navbar's mobile menu opens it there. Try that dialog with a real phone's keyboard before shipping, since §9's objection was about inputs. | `vite-plugins/search.ts` (new), `vite.config.ts`, `lib/search.ts` (new), `components/CommandPalette.vue`, `components/NavBar.vue`, `content/__tests__/search.spec.ts` (new), README | M |
 
 ### Time and the field
 
 | ✔ | Feature | Approach | Files | Effort |
 |---|---|---|---|---|
-| [ ] | Seasons | `content/seasons.ts` is a short list of dates. Its lookup takes `at`, as `dates.ts` does, so specs and the build pin the clock: purity allows `Date`, and specs already use `vi.setSystemTime`. It uses the visitor's local date, since Halloween is local. Proposed days are 31 October, the winter solstice, 1 January and 16 June, which `profile.since` gives as the site's first commit. The repository's own history starts on 2026-05-13, so decide which date counts as the birthday. A season stays inside rules already in force. **The field:** a season names a palette in the same four-slot vocabulary as `SECTION_PALETTES`, which `currentPalette()` ranks under the completionist palette and above the view and section palettes. It also carries a speed and opacity pair, multiplied in where the weather's are. It uses slots rather than literal colours, so a season repaints within the visitor's scheme and never overrides it. It lasts one day, so the section palettes are lost for a day at most. **Words:** `fortune` draws from the day's pool. The pool moves to `content/` as `Localised` lines, since today's eight lines in `eggs.ts` are English only. **Small marks:** one line each in `neofetch` and the boot log. **No seasonal achievement:** `completionist` would then wait on the calendar, up to a year, when every other achievement waits on persistence. The curl pages must never show seasonal output, because they are snapshots served all year. A spec checks that their fixed clocks fall on no season. | `content/seasons.ts` (new), `content/fortunes.ts` (new), `terminal/commands/eggs.ts`, `components/ThreeBackground.vue`, `terminal/commands/content.ts`, `components/BootSequence.vue`, `content/__tests__/` | S–M |
-| [ ] | Guestbook entries as wireframes | `useGuestbookTicker` already fetches the newest page of entries (25, newest first) on every route from page load, but only keeps their ids to spot new ones. It now exposes the entries as well. `ThreeBackground` keeps them in a third pool beside `visitors[]`, capped at the newest 12. `spawn`, `scene reset` and the accent count never see that pool, and the field stays at most 18 + 12 + 12 = 42 shapes, under the cap of 60. Each entry's kind, position and spin come from a hash of its `id`, so it is the same shape in the same place on every visit and every screen. Clicking one reads `${kind} · ${name}, ${date}`, through the same text interpolation as today's label, so no markup is possible. It shows the name and date, not the message, which can run to 280 characters. When the owner deletes an entry (`sudo rm <id>`), its shape fades on the next poll, within 20 s. With the guestbook off (`GUESTBOOK_ENABLED`, off by default) the ticker stops and there are no such shapes. **Weigh this before building:** the backend rejects links but filters nothing else. A name chosen to offend would then sit in the background of every page, where today it shows only in `guestbook` and a passing toast, and the owner's delete is the only moderation. | `composables/useGuestbookTicker.ts`, `components/ThreeBackground.vue`, `i18n/messages.ts` | S |
+| [x] | Seasons | Shipped in #151. `content/seasons.ts` is a short list of dates. Its lookup takes `at`, as `dates.ts` does, so specs and the build pin the clock: purity allows `Date`, and specs already use `vi.setSystemTime`. It uses the visitor's local date, since Halloween is local. Proposed days are 31 October, the winter solstice, 1 January and 16 June, which `profile.since` gives as the site's first commit. The repository's own history starts on 2026-05-13, so decide which date counts as the birthday. A season stays inside rules already in force. **The field:** a season names a palette in the same four-slot vocabulary as `SECTION_PALETTES`, which `currentPalette()` ranks under the completionist palette and above the view and section palettes. It also carries a speed and opacity pair, multiplied in where the weather's are. It uses slots rather than literal colours, so a season repaints within the visitor's scheme and never overrides it. It lasts one day, so the section palettes are lost for a day at most. **Words:** `fortune` draws from the day's pool. The pool moves to `content/` as `Localised` lines, since today's eight lines in `eggs.ts` are English only. **Small marks:** one line each in `neofetch` and the boot log. **No seasonal achievement:** `completionist` would then wait on the calendar, up to a year, when every other achievement waits on persistence. The curl pages must never show seasonal output, because they are snapshots served all year. A spec checks that their fixed clocks fall on no season. | `content/seasons.ts` (new), `content/fortunes.ts` (new), `terminal/commands/eggs.ts`, `components/ThreeBackground.vue`, `terminal/commands/content.ts`, `components/BootSequence.vue`, `content/__tests__/` | S–M |
+| [x] | Guestbook entries as wireframes | Shipped in #151. `useGuestbookTicker` already fetches the newest page of entries (25, newest first) on every route from page load, but only keeps their ids to spot new ones. It now exposes the entries as well. `ThreeBackground` keeps them in a third pool beside `visitors[]`, capped at the newest 12. `spawn`, `scene reset` and the accent count never see that pool, and the field stays at most 18 + 12 + 12 = 42 shapes, under the cap of 60. Each entry's kind, position and spin come from a hash of its `id`, so it is the same shape in the same place on every visit and every screen. Clicking one reads `${kind} · ${name}, ${date}`, through the same text interpolation as today's label, so no markup is possible. It shows the name and date, not the message, which can run to 280 characters. When the owner deletes an entry (`sudo rm <id>`), its shape fades on the next poll, within 20 s. With the guestbook off (`GUESTBOOK_ENABLED`, off by default) the ticker stops and there are no such shapes. **Weigh this before building:** the backend rejects links but filters nothing else. A name chosen to offend would then sit in the background of every page, where today it shows only in `guestbook` and a passing toast, and the owner's delete is the only moderation. | `composables/useGuestbookTicker.ts`, `components/ThreeBackground.vue`, `i18n/messages.ts` | S |
 
 ### Revisited from *Dropped*
 
@@ -688,7 +688,7 @@ pipes". The shell now has pipes.
 
 | ✔ | Feature | Approach | Files | Effort |
 |---|---|---|---|---|
-| [ ] | `/proc` | It needs no shaped filesystem after all. `resolveFileLines()` is a flat switch that already answers one absolute path (`/etc/shadow`), so `/proc` is a few names in it, plus `listFiles()` entries for `ls /proc`. Each file reads something real. `/proc/version` is `uname`'s line plus `__BUILD_SHA__`. `/proc/uptime` is the seconds since `profile.since`, the same `uptime()` `neofetch` uses. `/proc/loadavg` is the presence count, through `whenPresent`. `/proc/self/{screen,gpu,locale,hardware}` are the fingerprint tool's groups, read from its pure module, so `cat /proc/self/gpu` and the panel can't disagree. Build it after the fingerprint tool. `ps` and `top` stay fixed jokes. | `terminal/commands/files.ts`, `terminal/commands/navigate.ts`, `tools/fingerprint/fingerprint.ts`, `terminal/__tests__/` | S |
+| [x] | `/proc` | Shipped in #151. It needs no shaped filesystem after all. `resolveFileLines()` is a flat switch that already answers one absolute path (`/etc/shadow`), so `/proc` is a few names in it, plus `listFiles()` entries for `ls /proc`. Each file reads something real. `/proc/version` is `uname`'s line plus `__BUILD_SHA__`. `/proc/uptime` is the seconds since `profile.since`, the same `uptime()` `neofetch` uses. `/proc/loadavg` is the presence count, through `whenPresent`. `/proc/self/{screen,gpu,locale,hardware}` are the fingerprint tool's groups, read from its pure module, so `cat /proc/self/gpu` and the panel can't disagree. Build it after the fingerprint tool. `ps` and `top` stay fixed jokes. | `terminal/commands/files.ts`, `terminal/commands/navigate.ts`, `tools/fingerprint/fingerprint.ts`, `terminal/__tests__/` | S |
 
 The other three stay dropped:
 
@@ -720,6 +720,192 @@ Recorded as each row ships.
     isn't tracked, since `currentSection()` follows the scroll itself.
   - Left as they were: `cat` still takes no `/home/<handle>` path, and `/now` and `/work/<id>`
     are still not `cd` targets, so the path `pwd` prints there leads nowhere, as it did before.
+- **Seasons:**
+  - The palette tables and the ranking moved out of `ThreeBackground.vue` into a pure
+    `components/palette.ts` (`pickPalette()`, `fieldMood()`), so the ranking is tested without
+    WebGL, as `ripple.ts` already was.
+  - A season's palette has a speed of 1, and all of its speed and opacity are in the pair
+    multiplied into the weather's. So the pair applies whichever palette wins: someone with every
+    achievement still sees the solstice slow and dim, in the palette they earned.
+  - The field re-reads the season at each of the visitor's midnights (one timer, cleared on
+    unmount), or a tab left open across the 31st would keep Halloween into November. The commands
+    and the boot log read the clock each time they run.
+  - `content/fortunes.ts` is imported directly and not re-exported by the content barrel: through
+    the barrel, 1.6 kB of gzip for a hidden command loaded on every first paint. Only `seasons.ts`
+    joins the barrel, since the boot log needs it.
+  - The birthday is derived from `profile.since`, not written as a second date, so it and
+    `neofetch`'s uptime can't disagree; choosing the other date is a change to one field.
+  - The boot-log line stays English in the kernel log's voice, like its neighbours; `neofetch`'s
+    new `Season` row is `Localised`. The solstice copy says "north of the equator".
+  - The spec on the curl pages' clocks checks every UTC offset from −12 to +14, in 15-minute
+    steps, since a season is the local day wherever the pages are regenerated.
+  - The boot line is covered by an e2e with the browser clock frozen on 31 October: vitest has no
+    Vue plugin, so it can't mount `BootSequence.vue`.
+  - Found in review: a timer set for midnight alone waited out a laptop's sleep, so the field kept
+    yesterday's season after waking. `components/season.ts` checks the wall clock at least once a
+    minute. The boot e2e pins its browser to Auckland, since the host's zone could move noon UTC
+    off the 31st.
+- **`fingerprint` tool:**
+  - Nineteen rows in seven groups. Each names its API and carries a three-level verdict
+    (ordinary use, rarely needed, no ordinary use) beside its sentence.
+  - One row beyond the list: the high-entropy client hints (`getHighEntropyValues()`), which any
+    page gets without a prompt; leaving them out would understate what a page can read.
+  - "Which rows change it" is a tick per row: unticking one recomputes the combined hash, a
+    SHA-256 over `id=value` lines, so it is the same in either language.
+  - WebGL's plain `VENDOR`/`RENDERER` are read first, and `WEBGL_debug_renderer_info` only when
+    Chromium or Safari mask them; Firefox warns in the console when the extension is asked for.
+  - `tools` and `ls tools` now pad ids to the longest one: `fingerprint` is the first id longer
+    than ten characters. The tools curl pages were regenerated.
+  - The panel's ticks and hash are tested in e2e, since vitest can't load `.vue` files.
+  - Found in review: the WebGL rows named the debug extension as their source even where it is
+    never asked for, and the "names no network API" spec let any `../` import through unread; it
+    now follows the tool's imports through `src/` and scans every file it reaches.
+- **`/proc`:**
+  - `/proc/loadavg` reads the count presence already holds, not `whenPresent`, which would open
+    the stream: `strace cat /proc/loadavg` stays empty. Unconnected, it says so and that `who`
+    connects it. The count fills all three averages, then `1/N`, with a line saying presence keeps
+    no history to average, rather than inventing three different numbers.
+  - `/proc/uptime`'s second figure, idle time, is the uptime less how long the tab has been open:
+    the one stretch the site knows wasn't idle.
+  - `/proc/version` adds the build time to the SHA. Its `uname` text is a copy, tied to the
+    command's output by `proc.spec.ts`.
+  - `/proc/self` has four files covering four of the tool's seven groups. `cat` is synchronous,
+    so the renders and the high-entropy hints, which are read later, have no file.
+  - `ls` offers `/proc/` and `/proc/self/` to a word starting with `/`; `cd /proc` still refuses,
+    since it isn't a page. `useStatus.ts` gained `uptimeSeconds()`, which `uptime()` now reads.
+  - Found in review: `ls` matched `/proc` on the path as typed, so `ls /proc/..` failed where `cd`
+    resolved it. `procPath()` folds `.` and `..` first.
+- **Storage inspector:**
+  - `rm` waits 1.5 s, reloads, and never settles: the shell writes a line into history only after
+    its command returns, so a returning `rm -rf ~` would write the old history straight back.
+  - `couvbat:` keys not on the list show as "left by an older version" (size only) and `rm -rf ~`
+    clears them. Keys outside the namespace are neither listed nor cleared: they aren't the
+    site's.
+  - The source scan does more than the row asked: it also fails on a module other than the owner
+    touching storage, on any cookie or IndexedDB use, and on an owner file that no longer writes
+    its key. It runs under jsdom, so the same file tests the read and clear helpers.
+  - Two disclosures beyond the row: Workbox's `workbox-expiration` IndexedDB, the site's only
+    database, and the SoundCloud and YouTube embeds' own storage, which no page can see.
+  - Caches are reported, never cleared: they hold the site's public files, and clearing them only
+    costs a re-download. Sizes are read in parallel, after the e2e caught 6 s on the phone profile.
+  - `rm` behaves like real `rm` at the edges (`rm ~` is a directory, `rm -rf /` gets GNU's
+    failsafe, a file `cat` can read is "Permission denied"), and `du -sh ~` works.
+  - The page shows sizes, never values, and lists every key, set or not, since it is the
+    disclosure. Clearing takes two presses, and a double click cancels rather than clears.
+  - The claims were tightened to what the code does: `ask` logs how long a request took and
+    whether it worked, the stats also take the daily wordle's one report, and analytics are page
+    views plus one terminal-opened event.
+  - `du` stays out of the curl pages, since its output is the visitor's own storage.
+  - Found in review: `/privacy` read storage once, so a scheme picked on the page showed as unset
+    and its clear left it; it re-reads after every change now. Escape on the armed button lost
+    focus; the stale group's button read "clear left by an older version"; `du` and `rm` read `--`,
+    long options and `rm -f` alone as GNU does; `?run=du -sh ~` is accepted; `rm` in a pipe still
+    prints what it removed; and the real `reloadPage()` is tested to never settle.
+  - The page's paragraphs are copy, so they live in `content/privacy.ts`, imported by the lazy page
+    alone and kept out of the barrel: in `i18n/messages.ts` they put the home page over its byte
+    budget.
+- **Content search in Ctrl+K:**
+  - The index's shape lives in a new `content/search.ts`, the one layer both the plugin and the
+    browser can import.
+  - Note headings are read off the rendered page, not re-slugged, so every anchor is one the
+    published page carries, numbered repeats included.
+  - A `why` result runs through `openTerminalFromLink`, so the shell checks the fetched line with
+    `isLinkable`. It first fell back below `md` to the decision's design note; the tap shell made
+    that unnecessary and removed the field.
+  - Results come in a fixed order of kinds (case studies, decisions, notes, now), six at most per
+    kind, so the 131 note headings can't push the rest off the list. The three-character
+    threshold applies to showing results as well as fetching them.
+  - On a phone the palette first loaded no commands, since each would have opened the full
+    terminal; the tap shell put back the ones it has a button for. Its input is 16px so iOS
+    doesn't zoom. `search.json` is `no-cache` in `.htaccess` and carries a `version`.
+  - The scorer is not in the first paint: the palette imports `lib/search.ts` on first open, with
+    the registry, and filters by plain substring for the frame or so before it lands. `fold()`
+    moved to `lib/fold.ts`, which the word games re-export, so the search no longer pulls their
+    loaders in either. The dialog was checked in the Pixel 5 emulation, not yet on a real
+    phone's keyboard.
+  - Found in review: focus now returns to the menu toggle when a palette opened from the phone
+    menu closes; the input reads every `input` event, since `v-model` waits out an Android
+    keyboard's composition and the phone search didn't filter mid-word; an index entry of the
+    wrong shape is dropped rather than stopping all matching; and `coeur` finds *cœur*.
+  - Found in the second review, after the scorer went lazy: a scorer chunk that failed to load was
+    an unhandled rejection under "Nothing matches"; the palette now says it is loading, or that
+    search is unavailable. It doesn't retry on reopen, since Chromium keeps a failed dynamic import
+    in its module map and a second `import()` fails at once.
+- **A tap shell:**
+  - A command that offers arguments is one button, `name …`, that swaps the row for its own lines
+    with ← back. Taken literally the rule gives about 125 lines (`ls` alone offers 25).
+  - `help`, `man` and `strace` lose the arguments that name another command: their rows would be
+    every command again, and `strace snake` would need a tty. Decided by what a command offers,
+    not by its name, so `man jules` and the flags (`skills --why`, `du -s`) stay.
+  - `games`, the listing, is left out with the games: every name it prints is one a phone can't
+    play.
+  - The flag is a registry-free `touchLayout` ref in `useTerminalShell.ts`, set by the overlay from
+    `DESKTOP_QUERY` (moved there from `useRunLink`), not a new `CommandContext` field. A game,
+    prompt or capture says there is no keyboard here rather than "not a tty".
+  - `openTerminal(line)` sends its line down the link path below `md`, so the guestbook toast, the
+    palette and anything else that opens the shell with a line get the touch layout with no branch
+    of their own. The palette lists only the commands that have a bare button.
+  - A `why` search result runs `why <topic>` on a phone as on a desktop, so the index's `fallback`
+    field and `resultTarget()` went. Case studies link their decisions and every `try` but a game
+    at every width (`triesOnPhone()`, held equal to the shell's own list by a spec).
+  - `tour`'s touch branch is an `only` field on its stops: on a phone it walks the `why` listing
+    instead of the games and drops the `curl` hint.
+  - The stop button appears only while a command runs, and the rest of the row stays
+    `aria-disabled`, so focus never leaves the dialog. In the touch layout a batch of output
+    scrolls to its first line, since one `resume` is several screens of a phone.
+  - Found on the way: `sleep()` ignored an abort that came before the wait, so a stop between two
+    of `tour`'s stops let it walk on. Fixed in its own commit.
+  - The specs typed at the prompt still skip the mobile project, now because a phone has no
+    prompt rather than no terminal. Checked in Chromium's Pixel 5 emulation only, not on iOS.
+  - Found in review: once the scrollback reached its 500-line cap, a batch no longer opened at its
+    first line, so the overlay now counts the lines dropped from the head. Shift+Tab from the panel
+    left the dialog, crossing 768px with the terminal open dropped focus to `<body>`, and the ←
+    button was 34px wide: every tap target is now 44px each way.
+- **X-ray mode:**
+  - A template whose only root is a component is stamped `data-src-outer`, since an attribute on a
+    component falls through to the inner root and would overwrite the inner file's name; the tag
+    reads `HashTool.vue ← messages.ts › ToolFrame.vue`. A multi-root template (`App.vue`) leaves its
+    component roots alone, or it would claim the navbar it merely holds.
+  - The shadcn primitives in `components/ui/` aren't stamped: generated, and everywhere.
+  - A tag names `i18n/messages.ts` too when the component reads `m`, since interface strings are
+    words. `content/types.ts` and type-only imports are left out.
+  - One tag per file with a count (`WindowDots.vue ×3`), every instance outlined, outlines clipped
+    to what their ancestors show, and a full-screen fixed element (the canvas) tagged in a corner.
+    The canvas count adds the guestbook's wireframes.
+  - `xray` closes the terminal on the way in, as `cd` does; the layer hides while the terminal, the
+    palette or a swing is up; and there is an exit button, since a phone has no Esc.
+  - The tags are ordinary links in a labelled `<nav>` after the page: the page's tab order is
+    unchanged and nothing takes or traps focus.
+  - The work spans more files than the row lists: the page logic is a pure `lib/xray.ts`, the
+    attribute names a DOM-free `lib/xray-stamp.ts` the plugin shares, and `env.d.ts` declares
+    `virtual:xray-map`.
+  - Found in review: an Esc meant for the privacy page's disarm, the matrix rain or the boot ended
+    x-ray as well. The page claims its Esc, and the layer stands aside while the rain or the boot
+    plays, through a `bootPlaying` flag that a first visit's boot sets too (`bootActive` only ever
+    saw `reboot`). Also: a direct `messages` import now counts as words, the phone chip no longer
+    covers the launcher and its exit button is a full target, turning x-ray on is announced, focus
+    on a tag whose component scrolls away stays in the layer, and the touch layout's message names
+    the exit button rather than Esc.
+- **Guestbook entries as wireframes:**
+  - The click reads `<kind> · signed by <name>, <day>`: a bare name beside a polyhedron didn't say
+    whose it was. The day is in long form, since short month names vary between ICU builds.
+  - The field's ceiling is 84 shapes, not 42: `spawn` alone reaches 60. Nothing is sized by the
+    total, and the constellation still links only `spawn`'s pool.
+  - Every shape is drawn from one `shapeLayout()`, with `Math.random` for the others and
+    `seededRandom(id)` (FNV-1a, then mulberry32) for an entry, so a signature is always a shape the
+    ordinary distribution could have made, and a view swing re-homes it to its own place.
+  - A fading signature can't be clicked, so a deleted entry's name is never shown again once the
+    poll has dropped it. A failed poll keeps the last page; only the guestbook reporting itself
+    off empties it.
+  - The click label is nudged back on screen and wraps within the viewport: centred on the click,
+    a 40-character name was wider than a phone.
+  - The canvas carries `data-signatures`, a count and never a name, as the e2e suite's hook.
+  - The moderation question is still the owner's: a shape carries no text and a name shows only
+    to whoever clicks it, but the backend filters nothing but links.
+  - Found in review: a signature added during a swing landed rotated away from its place, and now
+    starts counter-rotated as `rehome()` does; a ticker that gives up after three failed polls
+    empties the field, since a deletion could no longer reach it; the label nudge covers the top
+    edge; and the e2e for a closed guestbook couldn't fail.
 
 ## Build order
 
@@ -784,7 +970,8 @@ further):
 6. **Craft and polish**, in any order. Motion control before `who`/`wall`, whose wave should
    honour it.
 
-**Phase 8 — the October brainstorm (§I):** step 1 shipped, the rest proposed. One branch per step:
+**Phase 8 — the October brainstorm (§I):** ✅ all shipped, step 1 in #150 and the rest together in
+#151. Built as two batches of parallel branches, then reviewed and merged as one:
 
 1. **Fixes found on the way.** ✅ shipped in #150. Both are S, and neither depends on anything
    else in §I.
@@ -800,8 +987,6 @@ further):
 
 ## Open
 
-- Everything in [§I](#i-october-2026-brainstorm) after *Fixes found on the way* is proposed and
-  not started.
 - A curation pass, which is a judgement call rather than a row: retire or fold the weakest joke
   commands, and record each removal here, the way *Dropped* records what never shipped.
 

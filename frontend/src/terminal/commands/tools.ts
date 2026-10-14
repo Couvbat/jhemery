@@ -3,7 +3,7 @@ import { terminalOpen } from '@/composables/useTerminalShell'
 import { closeAfterFade, openAudioContext } from '@/tools/acid/audio'
 import type { AcidEngine } from '@/tools/acid/engine'
 import type * as AcidPattern from '@/tools/acid/pattern'
-import { findTool, visibleTools } from '@/tools/registry'
+import { findTool, tools, visibleTools, type ToolMeta } from '@/tools/registry'
 import { decodeBase64, encodeBase64 } from '@/tools/encode/encode'
 import { digestText, toHex, type Algorithm } from '@/tools/hash/hash'
 import { formatJson } from '@/tools/json/json'
@@ -134,6 +134,21 @@ function acidRows(acid: typeof AcidPattern, pattern: AcidPattern.Pattern, at: nu
 }
 
 /**
+ * One row per tool: its id, then its description. The ids are padded to the longest
+ * one there is, hidden ones included, so `ls tools/<id>` lines up with `tools` and a
+ * long id never runs into its own description.
+ */
+export function toolRows(list: readonly ToolMeta[], t: CommandContext['t']): OutputLine[] {
+  const width = Math.max(...tools.map((tool) => tool.id.length)) + 2
+  return list.map((tool) =>
+    segmented([
+      { text: tool.id.padEnd(width), tone: 'primary' },
+      { text: t(tool.description), tone: 'muted' },
+    ]),
+  )
+}
+
+/**
  * The terminal's view of the tools page — derived from the same registry the page
  * renders, so a tool that exists on one exists on the other. `cd tools/<id>` is the
  * long form; this is the discoverable one, and the palette entry.
@@ -156,12 +171,7 @@ export const toolCommands: Command[] = [
       if (!id) {
         return [
           line('~/tools', 'muted'),
-          ...visibleTools().map((tool) =>
-            segmented([
-              { text: tool.id.padEnd(10), tone: 'primary' },
-              { text: t(tool.description), tone: 'muted' },
-            ]),
-          ),
+          ...toolRows(visibleTools(), t),
           blank,
           line(
             t({

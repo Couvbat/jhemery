@@ -1,10 +1,14 @@
 <script setup lang="ts">
-import { onMounted, onUnmounted, ref, watch } from 'vue'
+import { computed, nextTick, onMounted, onUnmounted, ref, shallowRef, watch } from 'vue'
 import * as THREE from 'three'
+import { seasonOn } from '@/content'
 import { useCrt } from '@/composables/useCrt'
 import { useMotion } from '@/composables/useMotion'
 import { usePresence } from '@/composables/usePresence'
 import { RIPPLE_SECONDS, rippleOffset } from './ripple'
+import { followSeason } from './season'
+import { fieldMood, pickPalette, type Hue, type Palette } from './palette'
+import { newestSignatures, seededRandom, shapeLayout, signatureLabel, type Axes } from './signatures'
 import { activeSection } from '@/composables/useActiveSection'
 import { terminalOpen } from '@/composables/useTerminalShell'
 import { BASE_SHAPE_COUNT, MAX_SHAPE_COUNT, useSceneControl } from '@/composables/useSceneControl'
@@ -12,7 +16,9 @@ import { fetchWeather, weatherMood } from '@/composables/useWeather'
 import { useTheme } from '@/composables/useTheme'
 import { useViewSwing } from '@/composables/useViewSwing'
 import { startScreensaver, useScreensaver } from '@/composables/useIdle'
+import { useGuestbookTicker } from '@/composables/useGuestbookTicker'
 import { useLocale } from '@/i18n'
+import type { GuestbookEntry } from '@/lib/api'
 import { unlock, unlocked } from '@/terminal/achievements'
 
 // CRT overdrive spins the wireframes up; reading the ref inside the loop keeps the
@@ -21,7 +27,7 @@ import { unlock, unlocked } from '@/terminal/achievements'
 const { speedMultiplier, glitching } = useCrt()
 const { shapeCount, gravityOn, constellationOn, visitorShapes } = useSceneControl()
 const { screensaver } = useScreensaver()
-const { t, m } = useLocale()
+const { t, m, locale } = useLocale()
 // The prism swing between views (features-spec §11). The router drives one eased
 // clock; the DOM turns the pages by it and this component turns the field by it.
 const { swing, swingDirection, swinging, activeView } = useViewSwing()
@@ -31,10 +37,25 @@ const { theme } = useTheme()
 const { level: motion } = useMotion()
 // `wall`: someone else waved, and the field ripples outward from its centre.
 const { wave } = usePresence()
+/**
+ * Today's season (`content/seasons.ts`), if today is one. Followed across the visitor's
+ * midnight (`./season.ts`), so a tab left open across the 31st doesn't keep Halloween into
+ * November, nor a laptop asleep through it.
+ */
+const season = shallowRef(seasonOn())
+let stopSeason: (() => void) | null = null
+/** The weather's speed and opacity with the season's multiplied in. Everything below reads
+ *  this rather than the weather alone; it is recomputed when either changes, never per frame. */
+const mood = computed(() => fieldMood(weatherMood.value, season.value?.id))
+/** The guestbook's newest entries, one wireframe each (`signatures.ts`). Read from the
+ *  ticker's own poll, so the field adds no request; empty while the guestbook is off. */
+const { entries: guestbookEntries } = useGuestbookTicker()
+const signatureEntries = computed(() => newestSignatures(guestbookEntries.value))
 
 const canvasRef = ref<HTMLCanvasElement | null>(null)
 /** What `click-to-inspect` is currently showing, if anything. */
 const inspected = ref<{ text: string; x: number; y: number } | null>(null)
+const labelRef = ref<HTMLElement | null>(null)
 let inspectTimer: ReturnType<typeof setTimeout> | undefined
 
 let renderer: THREE.WebGLRenderer | null = null
@@ -72,8 +93,10 @@ interface AnimatedShape {
   /** Opacity before the weather mood scales it, so the nudge stays reversible. */
   baseOpacity: number
   kind: ShapeKind
-  /** Only on a visitor's shape: how far it has faded in, and whether it is going. */
+  /** Only on a visitor's or a signature's shape: how far it has faded in, and whether it is going. */
   presence?: { level: number; leaving: boolean }
+  /** Only on a signature's shape: whose it is, and the place its id gave it. Never the message. */
+  signature?: { id: string; name: string; date: string; place: Axes }
 }
 
 const shapes: AnimatedShape[] = []
@@ -87,11 +110,19 @@ const meshes: THREE.Mesh[] = []
 const visitors: AnimatedShape[] = []
 /** How much of the way to its target a visitor's fade moves each frame. */
 const VISITOR_FADE = 0.025
+/**
+ * One shape per guestbook entry among the newest twelve (`signatureEntries`), a third pool
+ * that `spawn`, `scene reset` and the accent count never see either. Each shape's kind,
+ * place and spin come from its entry's id, and it fades in and out as the visitors' do: out
+ * when the entry leaves the page, which is how the owner's `sudo rm` reaches every open tab.
+ */
+const signatures: AnimatedShape[] = []
 
-/** Both pools, without allocating — the swing and the render loop visit every shape. */
+/** Every pool, without allocating — the swing and the render loop visit every shape. */
 function forEachShape(fn: (shape: AnimatedShape) => void) {
   for (const shape of shapes) fn(shape)
   for (const shape of visitors) fn(shape)
+  for (const shape of signatures) fn(shape)
 }
 
 const accentSeeds = 3
@@ -170,9 +201,7 @@ let mouseY = 0
 let pointerActive = false
 let pointerIdleTimer: ReturnType<typeof setTimeout> | undefined
 
-/** The four hue slots a palette picks from, by their historical names (§3: under Gruvbox
- *  `green` is orange). */
-type Hue = 'green' | 'cyan' | 'purple' | 'pink'
+/** The four hue slots a palette picks from (`palette.ts`), in the order they're read. */
 const HUES: readonly Hue[] = ['green', 'cyan', 'purple', 'pink']
 /** What each slot reads when the property is empty, the default's own hex. */
 const HUE_FALLBACKS: Record<Hue, string> = { green: '#00ff41', cyan: '#00ffff', purple: '#bf00ff', pink: '#ff0080' }
@@ -194,35 +223,6 @@ const neonTo = hueColours()
 const RECOLOUR_MS = 450
 /** How far through the current ease, 0 → 1. At rest it is 1. */
 let recolour = 1
-
-interface Palette {
-  base: Hue
-  accent: Hue
-  /** Multiplies the rotation speed, on top of the CRT boost. */
-  speed: number
-}
-
-/** Each section gets its own mood. Falls back to the first entry for anything
- *  unknown, so adding a section can never leave the background unstyled. */
-const SECTION_PALETTES: Record<string, Palette> = {
-  about: { base: 'green', accent: 'cyan', speed: 1 },
-  projects: { base: 'cyan', accent: 'green', speed: 1.25 },
-  music: { base: 'purple', accent: 'pink', speed: 1.6 },
-  gaming: { base: 'pink', accent: 'purple', speed: 1.45 },
-  hardware: { base: 'green', accent: 'purple', speed: 0.85 },
-  contact: { base: 'cyan', accent: 'pink', speed: 1 },
-}
-
-/** The other views get a mood of their own, the way each section does. Anything not
- *  listed here (the 404, say) falls back to the section palette below. */
-const VIEW_PALETTES: Record<string, Palette> = {
-  tools: { base: 'cyan', accent: 'purple', speed: 1.1 },
-  watch: { base: 'pink', accent: 'cyan', speed: 0.9 },
-  radio: { base: 'purple', accent: 'green', speed: 1.2 },
-}
-
-/** The reward for finding everything: a palette no section can produce. */
-const COMPLETIONIST_PALETTE: Palette = { base: 'pink', accent: 'cyan', speed: 1.35 }
 
 let sectionSpeed = 1
 
@@ -264,10 +264,7 @@ function halfExtents(aspect: number): { x: number; y: number } {
 }
 
 function currentPalette(): Palette {
-  if (unlocked.value.has('completionist')) return COMPLETIONIST_PALETTE
-  const view = activeView.value
-  if (view !== 'home' && VIEW_PALETTES[view]) return VIEW_PALETTES[view]
-  return SECTION_PALETTES[activeSection.value] ?? SECTION_PALETTES.about!
+  return pickPalette(unlocked.value.has('completionist'), season.value?.id, activeView.value, activeSection.value)
 }
 
 /** The colour half of `applyPalette`: every material takes its hue from `neon` as it
@@ -278,6 +275,7 @@ function applyColours() {
     ;(mesh.material as THREE.MeshBasicMaterial).color.copy(neon[accent ? palette.accent : palette.base])
   }
   for (const shape of visitors) (shape.mesh.material as THREE.MeshBasicMaterial).color.copy(neon[palette.base])
+  for (const shape of signatures) (shape.mesh.material as THREE.MeshBasicMaterial).color.copy(neon[palette.base])
   if (links) (links.material as THREE.LineBasicMaterial).color.copy(neon[palette.base])
 }
 
@@ -287,13 +285,14 @@ function applyPalette() {
   sectionSpeed = currentPalette().speed
   applyColours()
 
-  const mood = weatherMood.value
+  const { opacity } = mood.value
   for (const { mesh, baseOpacity } of shapes) {
     // Scaled from `baseOpacity` rather than from the current value, so a run of
     // weather changes can't ratchet every shape down to invisible.
-    ;(mesh.material as THREE.MeshBasicMaterial).opacity = Math.min(baseOpacity * mood.opacity, 0.6)
+    ;(mesh.material as THREE.MeshBasicMaterial).opacity = Math.min(baseOpacity * opacity, 0.6)
   }
   for (const shape of visitors) (shape.mesh.material as THREE.MeshBasicMaterial).opacity = visitorOpacity(shape)
+  for (const shape of signatures) (shape.mesh.material as THREE.MeshBasicMaterial).opacity = visitorOpacity(shape)
 
   // Nothing is redrawing on its own while motion is paused.
   if (animationFrameId === null && renderer && scene && camera) renderer.render(scene, camera)
@@ -311,46 +310,53 @@ function easeColours(dt: number) {
   applyColours()
 }
 
+/**
+ * A place in the spawn volume, in the field's own axes, each from -0.5 to 0.5 across it.
+ * Its width follows the screen's, so a signature keeps its place on any screen. Mid-swing
+ * the place is expressed in the frame the bake will leave behind: rotated by the *inverse*
+ * of the swing's final yaw, so that once the bake rotates everything forward it sits
+ * exactly there. Every home goes through here, the swing's and a shape's added during it:
+ * a signature that arrived mid-swing used to be placed unturned, and the bake carried it
+ * 40° away from where its id puts it.
+ */
+function placeHome({ x, y, z }: Axes, out: THREE.Vector3): THREE.Vector3 {
+  const spread = camera ? halfExtents(camera.aspect).x * 2 : 20
+  out.set(x * spread, y * 14, z * 12)
+  return swingArmed ? out.applyAxisAngle(Y_AXIS, swingDirection.value * FIELD_YAW) : out
+}
+
 /** A fresh position from the spawn distribution, in the field's own axes — the same
  *  distribution `addShape` uses and the swing re-homes to, so the scene never drifts
  *  toward a composition the opening one could not have produced. */
 function sampleHome(out: THREE.Vector3): THREE.Vector3 {
-  const spread = camera ? halfExtents(camera.aspect).x * 2 : 20
-  return out.set((Math.random() - 0.5) * spread, (Math.random() - 0.5) * 14, (Math.random() - 0.5) * 12)
+  return placeHome({ x: Math.random() - 0.5, y: Math.random() - 0.5, z: Math.random() - 0.5 }, out)
 }
 
-function addShape(accent: boolean, pool: AnimatedShape[] = shapes) {
+/** `entry` makes it a signature's: its layout is drawn from the entry's id instead. */
+function addShape(accent: boolean, pool: AnimatedShape[] = shapes, entry?: GuestbookEntry) {
   if (!field || !camera) return
 
-  const kind = KINDS[Math.floor(Math.random() * KINDS.length)]!
+  const { kind: index, baseOpacity, place, rotation, speed } = shapeLayout(
+    entry ? seededRandom(entry.id) : Math.random,
+    KINDS.length,
+  )
+  const kind = KINDS[index]!
   const palette = currentPalette()
-  const baseOpacity = 0.15 + Math.random() * 0.25
   const material = new THREE.MeshBasicMaterial({
     color: neon[accent ? palette.accent : palette.base],
     wireframe: true,
     transparent: true,
-    opacity: baseOpacity * weatherMood.value.opacity,
+    opacity: baseOpacity * mood.value.opacity,
   })
   const mesh = new THREE.Mesh(kind.make(), material)
 
-  const home = sampleHome(new THREE.Vector3())
+  const home = placeHome(place, new THREE.Vector3())
   mesh.position.copy(home)
-  mesh.rotation.set(Math.random() * Math.PI, Math.random() * Math.PI, Math.random() * Math.PI)
+  mesh.rotation.set(rotation.x, rotation.y, rotation.z)
 
   field.add(mesh)
-  const shape: AnimatedShape = {
-    mesh,
-    home,
-    offset: new THREE.Vector3(),
-    accent,
-    baseOpacity,
-    kind,
-    speed: {
-      x: (Math.random() - 0.5) * 0.006,
-      y: (Math.random() - 0.5) * 0.006,
-      z: (Math.random() - 0.5) * 0.004,
-    },
-  }
+  const shape: AnimatedShape = { mesh, home, offset: new THREE.Vector3(), accent, baseOpacity, kind, speed }
+  if (entry) shape.signature = { id: entry.id, name: entry.name, date: entry.date, place }
   pool.push(shape)
   if (pool === shapes) meshes.push(mesh)
   else {
@@ -367,9 +373,10 @@ function disposeShape(shape: AnimatedShape) {
   ;(shape.mesh.material as THREE.Material).dispose()
 }
 
-/** A visitor's opacity: what any shape would have under this weather, times its fade. */
+/** A visitor's or a signature's opacity: what any shape would have under this weather and
+ *  day, times its fade. */
 function visitorOpacity(shape: AnimatedShape): number {
-  return Math.min(shape.baseOpacity * weatherMood.value.opacity, 0.6) * (shape.presence?.level ?? 1)
+  return Math.min(shape.baseOpacity * mood.value.opacity, 0.6) * (shape.presence?.level ?? 1)
 }
 
 /**
@@ -396,14 +403,43 @@ function syncVisitors() {
   }
 }
 
-/** One frame of the visitors' fades, `k` of the way; removes whoever has finished leaving. */
-function fadeVisitors(k: number) {
-  for (let i = visitors.length - 1; i >= 0; i--) {
-    const shape = visitors[i]!
+/**
+ * Brings the signature pool to `signatureEntries`, as `syncVisitors` does by count but by
+ * id: a new entry's shape is added at zero opacity, one whose entry has left the page
+ * (deleted, or pushed off by a newer one) is marked to fade out, and one whose entry is
+ * back while it still fades is taken back.
+ */
+function syncSignatures() {
+  const wanted = signatureEntries.value
+  for (const shape of signatures) {
+    shape.presence!.leaving = !wanted.some((entry) => entry.id === shape.signature!.id)
+  }
+  for (const entry of wanted) {
+    if (!signatures.some((shape) => shape.signature!.id === entry.id)) addShape(false, signatures, entry)
+  }
+
+  // With no loop running there is no fade: settle the pool now.
+  if (animationFrameId === null) {
+    for (let i = signatures.length - 1; i >= 0; i--) {
+      if (signatures[i]!.presence!.leaving) disposeShape(signatures.splice(i, 1)[0]!)
+    }
+    if (renderer && scene && camera) renderer.render(scene, camera)
+  }
+
+  // The e2e suite's one window into the field (`e2e/guestbook-field.spec.ts`): how many
+  // signatures are staying, which no pixel says reliably. A count, never a name.
+  const staying = signatures.filter((shape) => !shape.presence!.leaving).length
+  canvasRef.value?.setAttribute('data-signatures', String(staying))
+}
+
+/** One frame of a pool's fades, `k` of the way; removes whoever has finished leaving. */
+function fadePool(pool: AnimatedShape[], k: number) {
+  for (let i = pool.length - 1; i >= 0; i--) {
+    const shape = pool[i]!
     const presence = shape.presence!
     presence.level += ((presence.leaving ? 0 : 1) - presence.level) * k
     if (presence.leaving && presence.level < 0.01) {
-      disposeShape(visitors.splice(i, 1)[0]!)
+      disposeShape(pool.splice(i, 1)[0]!)
       continue
     }
     ;(shape.mesh.material as THREE.MeshBasicMaterial).opacity = visitorOpacity(shape)
@@ -527,24 +563,32 @@ function handleClick(event: MouseEvent) {
   )
   raycaster.setFromCamera(pointerNdc, camera)
 
-  const hit = raycaster.intersectObjects([...meshes, ...visitors.map((v) => v.mesh)], false)[0]
+  // A signature on its way out has left the guestbook, so its name is no longer shown.
+  const present = signatures.filter((s) => !s.presence!.leaving).map((s) => s.mesh)
+  const hit = raycaster.intersectObjects([...meshes, ...visitors.map((v) => v.mesh), ...present], false)[0]
   if (!hit) return
 
-  const shape = shapes.find((s) => s.mesh === hit.object) ?? visitors.find((v) => v.mesh === hit.object)
+  const shape =
+    shapes.find((s) => s.mesh === hit.object) ??
+    visitors.find((v) => v.mesh === hit.object) ??
+    signatures.find((s) => s.mesh === hit.object)
   if (!shape) return
 
   focused = shape
   focusUntil = performance.now() + FOCUS_MS
 
   inspected.value = {
-    text: shape.presence
-      ? `${shape.kind.label} · ${t(m.scene.visitor)}`
-      : shape.accent
-        ? `${shape.kind.label} · accent`
-        : shape.kind.label,
+    text: shape.signature
+      ? signatureLabel(shape.kind.label, shape.signature, locale.value)
+      : shape.presence
+        ? `${shape.kind.label} · ${t(m.scene.visitor)}`
+        : shape.accent
+          ? `${shape.kind.label} · accent`
+          : shape.kind.label,
     x: event.clientX,
     y: event.clientY,
   }
+  void nextTick(keepLabelOnScreen)
   clearTimeout(inspectTimer)
   inspectTimer = setTimeout(() => {
     inspected.value = null
@@ -553,6 +597,26 @@ function handleClick(event: MouseEvent) {
   // Three of eighteen are a different colour. Noticing that, and then acting on
   // it, is the whole achievement.
   if (shape.accent) unlock('cyanSpotter')
+}
+
+/**
+ * Nudges the label back inside the screen once it has a size. It sits centred above the
+ * click, so a shape near a side put half of it off-screen, and one just under the top edge
+ * (clicked through the header) put it above the screen; the bottom can't overhang. A
+ * signature's label, which carries a name of up to forty characters, can be wider than a
+ * phone: that one wraps as well, and is taller for it.
+ */
+function keepLabelOnScreen() {
+  const label = labelRef.value
+  if (!label || !inspected.value) return
+  const margin = 8
+  const { left, right, top } = label.getBoundingClientRect()
+  const over = right - (window.innerWidth - margin)
+  const nudge = left < margin ? margin - left : over > 0 ? -over : 0
+  const down = top < margin ? margin - top : 0
+  if (nudge || down) {
+    inspected.value = { ...inspected.value, x: inspected.value.x + nudge, y: inspected.value.y + down }
+  }
 }
 
 function handleResize() {
@@ -567,18 +631,17 @@ function handleResize() {
 }
 
 /**
- * The first frame of a swing. Every shape draws a new home so the field lands in a
- * fresh composition — but the mesh must not jump, so the offset absorbs the difference
- * and the existing `offset.lerp(target)` drifts it there over the swing (§5.3: "let go
- * is just a zero target, not a special case"). The new home is expressed in the frame
- * the bake will leave behind: rotated by the *inverse* of the swing's final yaw, so
- * that once the bake rotates everything forward again it sits exactly where the
- * distribution put it.
+ * The first frame of a swing, once it is armed. Every shape draws a new home so the field
+ * lands in a fresh composition — but the mesh must not jump, so the offset absorbs the
+ * difference and the existing `offset.lerp(target)` drifts it there over the swing (§5.3:
+ * "let go is just a zero target, not a special case"). `placeHome` puts the new home in
+ * the frame the bake will leave behind, as it does for any shape added before the bake.
  */
 function rehome() {
-  const finalYaw = -swingDirection.value * FIELD_YAW
   forEachShape((shape) => {
-    sampleHome(worldPosition).applyAxisAngle(Y_AXIS, -finalYaw)
+    // A signature draws its own place again, so the swing ends with it where it started.
+    if (shape.signature) placeHome(shape.signature.place, worldPosition)
+    else sampleHome(worldPosition)
     shape.offset.add(shape.home).sub(worldPosition)
     shape.home.copy(worldPosition)
   })
@@ -613,7 +676,7 @@ function animate(now: number) {
   const f = lastFrame ? Math.min(MAX_STEP, (now - lastFrame) / REFERENCE_MS) : 1
   lastFrame = now
 
-  const boost = speedMultiplier.value * sectionSpeed * weatherMood.value.speed * (calm ? CALM_SPEED : 1) * f
+  const boost = speedMultiplier.value * sectionSpeed * mood.value.speed * (calm ? CALM_SPEED : 1) * f
   const shaking = glitching.value
   const turning = swinging.value
   // The well's z=0-plane maths is wrong in a rotated frame; off for the 650 ms. `calm`
@@ -623,8 +686,8 @@ function animate(now: number) {
   if (field) {
     if (turning) {
       if (!swingArmed) {
-        rehome()
         swingArmed = true
+        rehome()
       }
       field.rotation.y = -swingDirection.value * FIELD_YAW * swing.value
     } else if (swingArmed) {
@@ -638,7 +701,9 @@ function animate(now: number) {
     pointerWorld.set(mouseX * half.x, -mouseY * half.y, 0)
   }
 
-  fadeVisitors(ease(VISITOR_FADE, f))
+  const fade = ease(VISITOR_FADE, f)
+  fadePool(visitors, fade)
+  fadePool(signatures, fade)
   if (recolour < 1) easeColours(f * REFERENCE_MS)
   // Snap during a glitch, drift the rest of the time.
   const drift = ease(shaking ? 0.65 : 0.045, f)
@@ -743,13 +808,16 @@ function pauseLoop() {
   // Nor will a scheme's ease: the still frame is in the new colours.
   if (recolour < 1) easeColours(RECOLOUR_MS)
   // No fade will finish now: whoever is arriving is here, and whoever is leaving goes
-  // (`syncVisitors` disposes them when nothing loops, and draws the frame).
-  for (const shape of visitors) {
-    if (shape.presence!.leaving) continue
-    shape.presence!.level = 1
-    ;(shape.mesh.material as THREE.MeshBasicMaterial).opacity = visitorOpacity(shape)
+  // (the syncs dispose them when nothing loops, and draw the frame).
+  for (const pool of [visitors, signatures]) {
+    for (const shape of pool) {
+      if (shape.presence!.leaving) continue
+      shape.presence!.level = 1
+      ;(shape.mesh.material as THREE.MeshBasicMaterial).opacity = visitorOpacity(shape)
+    }
   }
   syncVisitors()
+  syncSignatures()
 }
 
 watch(motion, (level) => (level === 'paused' ? pauseLoop() : startLoop()))
@@ -765,8 +833,9 @@ watch(wave, () => {
 // Both the section and the completionist unlock change how the scene looks; one
 // watcher covers them because `currentPalette()` already knows which wins.
 // The weather rides along on the same watcher: it only ever scales what the
-// palette already decided, so there is nothing for it to apply separately.
-watch([activeSection, activeView, unlocked, weatherMood], applyPalette)
+// palette already decided, so there is nothing for it to apply separately. So does
+// the season, which is one more rank in the palette and one more factor in the mood.
+watch([activeSection, activeView, unlocked, mood, season], applyPalette)
 // A scheme changes what the palette's names mean, not which names it picks — so the
 // same recolour, after re-reading the hues. `useTheme` has already written the new
 // properties by the time this runs (inside the view transition's callback, when the
@@ -783,6 +852,7 @@ watch(theme, () => {
 })
 watch(shapeCount, syncShapeCount)
 watch(visitorShapes, syncVisitors)
+watch(signatureEntries, syncSignatures)
 watch(constellationOn, (on) => (on ? ensureLinks() : disposeLinks()))
 
 onMounted(() => {
@@ -803,6 +873,7 @@ onMounted(() => {
     createInitialShapes()
     if (constellationOn.value) ensureLinks()
     syncVisitors()
+    syncSignatures()
   } catch (error) {
     console.warn('ThreeBackground: WebGL unavailable, skipping animated background.', error)
     return
@@ -823,6 +894,7 @@ onMounted(() => {
   // component is never mounted while motion is paused, so the call is not made
   // for a scene that would sit still anyway.
   void fetchWeather()
+  stopSeason = followSeason((today) => (season.value = today))
 })
 
 onUnmounted(() => {
@@ -832,6 +904,8 @@ onUnmounted(() => {
   }
   clearTimeout(pointerIdleTimer)
   clearTimeout(inspectTimer)
+  stopSeason?.()
+  stopSeason = null
   window.removeEventListener('resize', handleResize)
   window.removeEventListener('mousemove', handleMouseMove)
   window.removeEventListener('click', handleClick)
@@ -841,6 +915,7 @@ onUnmounted(() => {
   disposeLinks()
   while (shapes.length) removeShape()
   while (visitors.length) disposeShape(visitors.pop()!)
+  while (signatures.length) disposeShape(signatures.pop()!)
 
   renderer?.forceContextLoss()
   renderer?.dispose()
@@ -865,7 +940,9 @@ onUnmounted(() => {
   >
     <div
       v-if="inspected"
-      class="fixed z-[60] -translate-x-1/2 -translate-y-full pointer-events-none rounded border border-primary/40 bg-background/90 backdrop-blur px-2 py-1 font-mono text-[11px] text-primary whitespace-nowrap"
+      ref="labelRef"
+      data-testid="inspect-label"
+      class="fixed z-[60] -translate-x-1/2 -translate-y-full pointer-events-none rounded border border-primary/40 bg-background/90 backdrop-blur px-2 py-1 font-mono text-[11px] text-primary w-max max-w-[calc(100vw-1rem)] break-words"
       :style="{ left: `${inspected.x}px`, top: `${inspected.y - 8}px` }"
       aria-hidden="true"
     >

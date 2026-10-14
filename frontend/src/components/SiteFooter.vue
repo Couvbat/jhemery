@@ -53,6 +53,8 @@ onMounted(startPresence)
 
       <RouterLink to="/now" class="ml-auto hover:text-primary transition-colors">/now</RouterLink>
 
+      <RouterLink to="/privacy" class="hover:text-primary transition-colors">/privacy</RouterLink>
+
       <a
         :href="repo"
         target="_blank"

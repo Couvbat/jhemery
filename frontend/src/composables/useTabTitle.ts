@@ -22,6 +22,7 @@ export function tabTitle(path: string, home: string = siteTitle): string {
   const { t, m } = useLocale()
   // Routes outside the prism have no view, so they name themselves.
   if (/^\/now\/?$/.test(path)) return `${t(m.now.heading)} — ${profile.name}`
+  if (/^\/privacy\/?$/.test(path)) return `${t(m.privacy.heading)} — ${profile.name}`
   const study = /^\/work\/([^/]+)\/?$/.exec(path)
   if (study) {
     const part = findWork(study[1]!)
@@ -48,7 +49,7 @@ export function tabTitle(path: string, home: string = siteTitle): string {
  */
 export function pageLabel(path: string): string {
   const { t, m } = useLocale()
-  const outside = /^\/(now|work\/[^/]+)\/?$/.test(path)
+  const outside = /^\/(now|privacy|work\/[^/]+)\/?$/.test(path)
   if (!outside && !viewFor(path)) return `${t(m.notFound.label)} — ${profile.name}`
   return tabTitle(path)
 }

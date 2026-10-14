@@ -113,7 +113,7 @@ test.describe('the prism', () => {
   })
 
   test('cd tools from the terminal changes the page', async ({ page, terminal }) => {
-    test.skip(test.info().project.name === 'mobile', 'No terminal on a phone.')
+    test.skip(test.info().project.name === 'mobile', 'Typed at the prompt, which a phone doesn’t have.')
     await page.goto('/')
     await terminal.open()
     await terminal.run('cd tools/hash')
@@ -184,7 +184,7 @@ test.describe('page changes, for a keyboard and a screen reader', () => {
 
   // `cd` closes the terminal, so the page it goes to is the one the keyboard goes to.
   test('cd tools hands focus to the tools page, once it has turned', async ({ page, terminal }) => {
-    test.skip(test.info().project.name === 'mobile', 'No terminal on a phone.')
+    test.skip(test.info().project.name === 'mobile', 'Typed at the prompt, which a phone doesn’t have.')
     await page.goto('/')
     await terminal.open()
     await terminal.input.fill('cd tools')
@@ -197,7 +197,7 @@ test.describe('page changes, for a keyboard and a screen reader', () => {
   // The guard: a page changing behind an open terminal (here, Back) leaves the keyboard
   // where the visitor is typing.
   test('a page change under the open terminal keeps focus in the terminal', async ({ page, terminal }) => {
-    test.skip(test.info().project.name === 'mobile', 'No terminal on a phone.')
+    test.skip(test.info().project.name === 'mobile', 'About the prompt’s focus, which a phone doesn’t have.')
     await page.goto('/')
     await openNav(page)
     await navToTools(page).click()
@@ -274,19 +274,28 @@ test.describe('the case studies', () => {
     expect(await page.evaluate(() => (window as unknown as { __flipped: boolean }).__flipped)).toBe(false)
   })
 
-  // Below md there is no terminal to read a `?run=` link, so none is offered.
-  test('offers run links where there is a terminal', async ({ page }) => {
-    test.skip(test.info().project.name === 'mobile', 'No terminal on a phone.')
+  // Below md a `?run=` link runs in the terminal's touch layout, so the decisions are
+  // offered as `why` at every width.
+  test('offers run links at every width', async ({ page }) => {
     await page.goto('/work/wordlists')
-    await expect(page.locator('a[href^="/?run="]').first()).toBeVisible()
+    await expect(page.locator('a[href^="/?run=why"]').first()).toBeVisible()
   })
 
-  test('names the command on a phone instead, and links the decisions’ notes', async ({ page }) => {
+  // A game needs a keyboard the touch layout hasn't got, so a phone is told where to play it.
+  test('names a game on a phone rather than linking it', async ({ page }) => {
     test.skip(test.info().project.name !== 'mobile', 'The phone layout.')
     await page.goto('/work/wordlists')
-    await expect(page.locator('a[href^="/?run="]').first()).toBeHidden()
+    await expect(page.locator(`a[href="/?run=${encodeURIComponent('wordle daily')}"]`)).toBeHidden()
     await expect(page.getByText('wordle daily', { exact: true })).toBeVisible()
-    await expect(page.locator('a[href^="/notes/"]:visible').first()).toBeVisible()
+  })
+
+  test('runs any other `try` on a phone, in the touch layout', async ({ page }) => {
+    test.skip(test.info().project.name !== 'mobile', 'The phone layout.')
+    await page.goto('/work/presence')
+    await page.getByRole('link', { name: /systemctl status presence\.service/ }).click()
+    await expect(page.getByRole('dialog', { name: messages.terminal.title.en })).toBeVisible({ timeout: 15_000 })
+    await expect(page.getByTestId('terminal-output')).toContainText('presence.service')
+    await expect(page).not.toHaveURL(/run=/)
   })
 
   test('an unknown one lists the ones there are', async ({ page }) => {
