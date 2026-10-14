@@ -1,11 +1,12 @@
 <script setup lang="ts">
 import { computed, nextTick, onMounted, onUnmounted, ref, shallowRef, watch } from 'vue'
 import * as THREE from 'three'
-import { seasonOn, untilTomorrow } from '@/content'
+import { seasonOn } from '@/content'
 import { useCrt } from '@/composables/useCrt'
 import { useMotion } from '@/composables/useMotion'
 import { usePresence } from '@/composables/usePresence'
 import { RIPPLE_SECONDS, rippleOffset } from './ripple'
+import { followSeason } from './season'
 import { fieldMood, pickPalette, type Hue, type Palette } from './palette'
 import { newestSignatures, seededRandom, shapeLayout, signatureLabel, type Axes } from './signatures'
 import { activeSection } from '@/composables/useActiveSection'
@@ -37,11 +38,12 @@ const { level: motion } = useMotion()
 // `wall`: someone else waved, and the field ripples outward from its centre.
 const { wave } = usePresence()
 /**
- * Today's season (`content/seasons.ts`), if today is one. Re-read at the visitor's
- * midnight, so a tab left open across the 31st doesn't keep Halloween into November.
+ * Today's season (`content/seasons.ts`), if today is one. Followed across the visitor's
+ * midnight (`./season.ts`), so a tab left open across the 31st doesn't keep Halloween into
+ * November, nor a laptop asleep through it.
  */
 const season = shallowRef(seasonOn())
-let midnightTimer: ReturnType<typeof setTimeout> | undefined
+let stopSeason: (() => void) | null = null
 /** The weather's speed and opacity with the season's multiplied in. Everything below reads
  *  this rather than the weather alone; it is recomputed when either changes, never per frame. */
 const mood = computed(() => fieldMood(weatherMood.value, season.value?.id))
@@ -883,17 +885,8 @@ onMounted(() => {
   // component is never mounted while motion is paused, so the call is not made
   // for a scene that would sit still anyway.
   void fetchWeather()
-  watchMidnight()
+  stopSeason = followSeason((today) => (season.value = today))
 })
-
-/** Re-reads the season at each of the visitor's midnights while the field is mounted. A
- *  timer that fires a little early just re-arms for the few milliseconds left. */
-function watchMidnight() {
-  midnightTimer = setTimeout(() => {
-    season.value = seasonOn()
-    watchMidnight()
-  }, untilTomorrow())
-}
 
 onUnmounted(() => {
   if (animationFrameId !== null) {
@@ -902,7 +895,8 @@ onUnmounted(() => {
   }
   clearTimeout(pointerIdleTimer)
   clearTimeout(inspectTimer)
-  clearTimeout(midnightTimer)
+  stopSeason?.()
+  stopSeason = null
   window.removeEventListener('resize', handleResize)
   window.removeEventListener('mousemove', handleMouseMove)
   window.removeEventListener('click', handleClick)

@@ -828,15 +828,17 @@ mounted, so coming back to *full* or *calm* picks the scene up where it stood.
 - **Seasons** — `content/seasons.ts` lists four days: 31 October, 21 December (the winter
   solstice, as a fixed date), 1 January and the month and day of `profile.since`. `seasonOn(at)`
   reads the visitor's local calendar, since Halloween starts at their midnight, and the field
-  re-reads it at each midnight. A season's palette (`components/palette.ts`, which holds every
-  palette and `pickPalette()`'s ranking so a spec can check it without WebGL) ranks under the
-  completionist's and above the view's and the section's. Its speed and opacity are a second
-  `{ speed, opacity }` pair multiplied into the weather's, so they apply whichever palette wins;
-  the season palette's own speed is 1, so the speed counts once. Slots, never colours, so a
-  season repaints inside the visitor's scheme. The same day gives `fortune` its own pool
-  (`content/fortunes.ts`, `Localised` like the everyday lines) and adds one line to `neofetch`
-  and one to the boot log. No achievement: `completionist` would then wait up to a year on the
-  calendar, when every other achievement waits on the visitor.
+  re-reads it at each midnight and at least once a minute (`components/season.ts`): a timer
+  set for midnight alone would wait out however long the device slept. A season's palette
+  (`components/palette.ts`, which holds every palette and `pickPalette()`'s ranking so a spec
+  can check it without WebGL) ranks under the completionist's and above the view's and the
+  section's. Its speed and opacity are a second `{ speed, opacity }` pair multiplied into the
+  weather's, so they apply whichever palette wins; the season palette's own speed is 1, so the
+  speed counts once. Slots, never colours, so a season repaints inside the visitor's scheme.
+  The same day gives `fortune` its own pool (`content/fortunes.ts`, `Localised` like the
+  everyday lines) and adds one line to `neofetch` and one to the boot log. No achievement:
+  `completionist` would then wait up to a year on the calendar, when every other achievement
+  waits on the visitor.
 - **Guestbook entries** — the newest twelve entries are wireframes, in a third pool beside the
   visitors' that `spawn`, `scene reset`, the accent count and the constellation never see. They
   come from the ticker's own poll (§8, live guestbook ticker), so the field makes no request,

@@ -57,15 +57,22 @@ test.describe('the boot sequence', () => {
 
   // A season's line in the log, read off the browser's own calendar. Here and not in
   // vitest because the log lives in a component, which the unit suite doesn't compile.
-  test('gains a line on a season’s day', async ({ page, app }) => {
-    // Noon UTC is still 31 October at every offset from −12 to +11, so the browser's
-    // time zone can't move it off the day. A fixed clock leaves the timers running.
-    await page.clock.setFixedTime(new Date('2026-10-31T12:00:00Z'))
-    await app.seed({ booted: false })
-    await page.goto('/')
+  test.describe('in Auckland', () => {
+    // The zone is pinned, not left to the machine running the suite: no single instant
+    // is 31 October at every offset from −12 to +14, so an unpinned run passed in Paris
+    // and failed in Auckland. Pinned east of UTC, the instant below is the 31st there and
+    // still the 30th in London, which also proves the day is the visitor's and not UTC's.
+    test.use({ timezoneId: 'Pacific/Auckland' })
 
-    await expect(page.getByText(seasonOnDay(10, 31)!.boot)).toBeVisible()
-    await expect(page.getByText('welcome.')).toBeVisible()
+    test('gains a line on a season’s day', async ({ page, app }) => {
+      // 03:00 on the 31st in Auckland. A fixed clock leaves the timers running.
+      await page.clock.setFixedTime(new Date('2026-10-30T14:00:00Z'))
+      await app.seed({ booted: false })
+      await page.goto('/')
+
+      await expect(page.getByText(seasonOnDay(10, 31)!.boot)).toBeVisible()
+      await expect(page.getByText('welcome.')).toBeVisible()
+    })
   })
 })
 
