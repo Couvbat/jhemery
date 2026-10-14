@@ -698,6 +698,36 @@ export const messages = {
       fr: "Un fichier attend au plus 30 minutes sur le serveur, et disparaît dès qu'il est enregistré.",
     },
   },
+  toolFingerprint: {
+    intro: {
+      en: 'What any page can read about this browser without a prompt or a permission, and whether a site has any ordinary use for it. Read when this panel opened; none of it leaves the page.',
+      fr: 'Ce que n’importe quelle page peut lire de ce navigateur sans invite ni permission, et si un site en a un usage ordinaire. Lu à l’ouverture de ce panneau ; rien ne quitte la page.',
+    },
+    hash: { en: 'combined hash · SHA-256', fr: 'hash combiné · SHA-256' },
+    fed: {
+      en: 'Fed by the {n} ticked rows of {total}: untick one and the hash changes. A row this browser doesn’t give is left out.',
+      fr: 'Alimenté par les {n} lignes cochées sur {total} : décochez-en une et le hash change. Une ligne que ce navigateur ne donne pas est laissée de côté.',
+    },
+    same: {
+      en: 'The same browser, unchanged, gives the same hash to any page that reads the same rows. No cookie is needed for that.',
+      fr: 'Le même navigateur, inchangé, donne le même hash à toute page qui lit les mêmes lignes. Nul besoin de cookie pour cela.',
+    },
+    noScore: {
+      en: 'No uniqueness score: an honest one needs to know how many other browsers share each value, and this site doesn’t. A “1 in 200,000” without that would be a guess dressed as a measurement.',
+      fr: 'Pas de score d’unicité : un score honnête demande de savoir combien d’autres navigateurs partagent chaque valeur, et ce site ne le sait pas. Un « 1 sur 200 000 » sans cela serait une supposition déguisée en mesure.',
+    },
+    noCrypto: {
+      en: 'Web Crypto is not available on this connection, so there is no hash.',
+      fr: 'Web Crypto n’est pas disponible sur cette connexion, donc pas de hash.',
+    },
+    inHash: { en: '{label}: in the hash', fr: '{label} : dans le hash' },
+    reading: { en: 'reading…', fr: 'lecture…' },
+    again: { en: 'read again', fr: 'relire' },
+    sent: { en: 'nothing sent', fr: 'rien envoyé' },
+    common: { en: 'ordinary use', fr: 'usage ordinaire' },
+    rare: { en: 'rarely needed', fr: 'rarement utile' },
+    none: { en: 'no ordinary use', fr: 'aucun usage ordinaire' },
+  },
   rooms: {
     introWatch: {
       en: 'A watch party: one code, one YouTube video, everyone at the same second. The host presses play; every other player follows.',

@@ -180,6 +180,17 @@ export const tools: ToolMeta[] = [
     load: () => import('./acid/AcidTool.vue'),
   },
   {
+    id: 'fingerprint',
+    name: { en: 'Browser fingerprint', fr: 'Empreinte du navigateur' },
+    description: {
+      en: 'What any page can read about your browser without asking, and what each value is for. Read here, sent nowhere',
+      fr: 'Ce que toute page peut lire de votre navigateur sans rien demander, et à quoi sert chaque valeur. Lu ici, envoyé nulle part',
+    },
+    keywords: ['fingerprint', 'privacy', 'tracking', 'user agent', 'client hints', 'webgl', 'canvas', 'audio'],
+    tier: 'client',
+    load: () => import('./fingerprint/FingerprintTool.vue'),
+  },
+  {
     id: 'ffmpeg',
     name: { en: 'Audio & video converter', fr: 'Convertisseur audio & vidéo' },
     description: {

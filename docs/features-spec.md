@@ -1344,6 +1344,15 @@ this section only fixes the rules the code cites.
   shell's `acid [<code>]` writes `local`, so `isLinkable` keeps every link from starting sound,
   and it stops on Ctrl+C, a hidden tab, the overlay closing, or after two minutes. Under reduced
   motion neither draws the playhead.
+- **`fingerprint` reads only when it is asked to** (`tools/fingerprint/`). `fingerprint.ts` is
+  pure: the browser arrives as a `FingerprintEnv`, which `environment.ts` builds and only the
+  panel calls for (on mount and on *read again*), so the rest of the site still reads none of it.
+  Rows read at once (`readNow`) are kept apart from those that render or ask (`readLater`: the
+  canvas, the audio and the high-entropy client hints), and a read that throws is *not
+  available*, never an error. **No uniqueness score**: an honest one needs population
+  frequencies the site doesn't have. Instead, a combined SHA-256 over `id=value` lines of the
+  ticked rows that have a value, so it is the same in either language. A spec spies on `fetch`,
+  XHR and `sendBeacon` during a read and scans the folder for any network API.
 - **The admin tier is hidden, not secret** (`download`, `lib/admin.ts`). `visibleTools()` leaves
   it out of the page, `tools`, `ls tools` and Tab until the owner unlocks — `sudo -i` in the
   terminal, or the panel's own field — but `findTool` still resolves it, so `cd tools/download`

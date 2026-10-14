@@ -8,6 +8,7 @@ import { sleep } from '../timing'
 import type { Command, OutputLine } from '../types'
 import { blank, fail, line, pre, segmented } from '../format'
 import { FILES, FILE_ACHIEVEMENTS, HIDDEN_FILES, listFiles, resolveFileLines } from './files'
+import { toolRows } from './tools'
 
 const PING_COUNT = 4
 
@@ -75,13 +76,7 @@ export const navigateCommands: Command[] = [
           return [fail(`ls: cannot access '${target}': No such file or directory`)]
         }
         if (resolved.kind === 'view' && resolved.view.id === 'tools') {
-          const listed = resolved.tool ? [resolved.tool] : visibleTools()
-          return listed.map((tool) =>
-            segmented([
-              { text: tool.id.padEnd(10), tone: 'primary' },
-              { text: t(tool.description), tone: 'muted' },
-            ]),
-          )
+          return toolRows(resolved.tool ? [resolved.tool] : visibleTools(), t)
         }
         // The projects section holds the case studies, one `.md` each.
         if (resolved.kind === 'section' && resolved.section.id === 'projects' && work.length) {
