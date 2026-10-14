@@ -1,5 +1,5 @@
 import { profile, sectionIds, sections, socials, viewIds, views, work } from '@/content'
-import { currentPath, resolvePath } from '@/composables/useViewSwing'
+import { currentPath, resolvePath, shellPath } from '@/composables/useViewSwing'
 import { decorativeMotion } from '@/composables/useMotion'
 import { visibleTools } from '@/tools/registry'
 import { announce, toast, visitSection } from '../achievements'
@@ -70,7 +70,7 @@ export const navigateCommands: Command[] = [
       const target = args.find((a) => !a.startsWith('-'))
 
       if (target) {
-        const resolved = resolvePath(target)
+        const resolved = resolvePath(shellPath(target))
         if (!resolved) {
           return [fail(`ls: cannot access '${target}': No such file or directory`)]
         }
@@ -117,8 +117,9 @@ export const navigateCommands: Command[] = [
     complete: ({ index }) => (index === 0 ? destinations() : []),
     run({ args, navigate, t }) {
       const [target = ''] = args
-      const resolved = resolvePath(target)
-      if (!resolved || !navigate(target)) {
+      const path = shellPath(target)
+      const resolved = resolvePath(path)
+      if (!resolved || !navigate(path)) {
         return [fail(`cd: ${target}: No such file or directory`)]
       }
 
@@ -234,7 +235,8 @@ export const navigateCommands: Command[] = [
         return [fail('ping: usage error: Destination address required')]
       }
 
-      const resolved = resolvePath(target)
+      const path = shellPath(target)
+      const resolved = resolvePath(path)
       if (!resolved) {
         return [fail(`ping: ${target}: Name or service not known`)]
       }
@@ -284,8 +286,7 @@ export const navigateCommands: Command[] = [
       ])
 
       // The payoff: a reachable host is one you can go to.
-      ctx.navigate(target)
-      if (resolved.kind !== 'section') return undefined
+      if (!ctx.navigate(path) || resolved.kind !== 'section') return undefined
       return toast(visitSection(resolved.section.id, sectionIds), ctx.t)
     },
   },

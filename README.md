@@ -238,7 +238,7 @@ never show two different contents.
 | Command | Usage |
 |---|---|
 | `ls` | `ls [-a] [path]`: list sections, pages and files (`-a` shows more than you were meant to see). `ls tools` lists the tools, and `ls projects` the case studies |
-| `cd` | `cd <section>` scrolls there, routing home first if you're on another page. `cd tools` and `cd tools/<tool>` open the tools page or a single tool. `cd watch/<code>` and `cd radio/<code>` join a room. `cd`, `cd ~` and `cd /` go home |
+| `cd` | `cd <section>` scrolls there, routing home first if you're on another page. `cd tools` and `cd tools/<tool>` open the tools page or a single tool. `cd watch/<code>` and `cd radio/<code>` join a room. `cd`, `cd ~` and `cd /` go home, `cd ..` goes up one level, and the path `pwd` prints works too on every page `cd` can reach |
 | `pwd` | Print where you are: `/home/couvbat/projects` on the page, `/home/couvbat/tools/image` with a tool open, `/home/couvbat/watch/AB3DE` in a room |
 | `tools` | `tools [<tool>]`: list the tools with their descriptions, or open one |
 | `cat` | `cat <file>`: `about.txt`, `skills.txt`, `contact.txt`, `now.txt`, `projects/<part>.md`, guestbook entries, … |
