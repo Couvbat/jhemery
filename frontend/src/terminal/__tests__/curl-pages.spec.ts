@@ -43,6 +43,7 @@ const EXCLUDED: Record<string, string> = {
   // host already serves `resume.txt`, which the build dates afresh on every deploy.
   resume: 'the bare host is the résumé',
   help: 'help.txt is a generated index of these pages instead',
+  du: 'the visitor’s own browser storage',
 }
 
 const ORIGIN = `https://${profile.domain}`
