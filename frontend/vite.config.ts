@@ -130,6 +130,8 @@ export default defineConfig({
           // RFC 9116's file, at the root and at the path `.htaccess` answers from it.
           /^\/security\.txt$/,
           /^\/\.well-known\//,
+          // The stems the music section's mixer fetches (`content/stems.ts`).
+          /^\/stems\//,
         ],
         cleanupOutdatedCaches: true,
         clientsClaim: true,

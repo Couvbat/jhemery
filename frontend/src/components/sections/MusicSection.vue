@@ -1,16 +1,20 @@
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue'
+import { computed, defineAsyncComponent, ref, watch } from 'vue'
 import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import SectionHeader from '@/components/SectionHeader.vue'
 import WindowDots from '@/components/WindowDots.vue'
-import { music, soundcloudEmbedSrc } from '@/content'
+import { music, soundcloudEmbedSrc, stemTracks } from '@/content'
 import { useLocale } from '@/i18n'
 import { useMusicPlayer } from '@/composables/useMusicPlayer'
 import { embedColour } from '@/composables/useTheme'
 
 const { t, m } = useLocale()
 const { autoplayNonce } = useMusicPlayer()
+
+// Its own chunk, fetched only when there is a track to mix (`content/stems.ts`): with the
+// list empty the home page never asks for it.
+const StemsMixer = defineAsyncComponent(() => import('@/components/stems/StemsMixer.vue'))
 
 
 // The player is drawn in the scheme's green, read when the frame mounts and again on each
@@ -122,6 +126,8 @@ const src = computed(() => soundcloudEmbedSrc(colour.value, autoplayNonce.value 
           </div>
         </div>
       </div>
+
+      <StemsMixer v-if="stemTracks.length" class="mt-4" />
     </div>
   </section>
 </template>

@@ -64,6 +64,8 @@ src/content/
   seasons.ts     the six days the field dresses up for, on the visitor's calendar
   events.ts      SiteEvent[], the appointments Jules hosts, as instants; read by `calendar`,
                  /now, the footer and the .ics feeds
+  stems.ts       StemTrack[], tracks split into stems for the music section's mixer
+  security.ts    the disclosure policy and security.txt; outside the barrel, like privacy.ts
   docs.ts        githubSlug and headingSlugs, so a link to a doc's heading can be checked
   decisions.ts   Decision[], what the site chose and turned down; read by `why` (§3)
   work.ts        WorkPart[], the case studies at /work/<id>, `projects <id>` and projects/<id>.md
@@ -943,6 +945,19 @@ wraps rather than run wider than the screen, which a guestbook name can make it 
   escaped, every time in UTC. The feed always carries a `VTIMEZONE` for Europe/Paris that no
   event refers to, because the grammar requires one component and the list is often empty.
   `calendar` is kept off the curl pages, which are snapshots and can't know what is ahead.
+- **Stems** (`content/stems.ts`, `components/stems/`) — a mixer under the music section's
+  cards, drawn only while `stemTracks` has a track and loaded as its own chunk. Each stem is
+  a file under `public/stems/<track>/`, AAC or MP3 (older Safari can't decode Opus), all of
+  one excerpt's length, because every stem is held decoded at once: 384 kB a second each at
+  48 kHz stereo float, so `stems.spec.ts` caps a track at `MAX_DECODED_BYTES` and holds each
+  file to the `bytes` the load button announces. `load.ts` fetches only on *load*, counting
+  bytes as they arrive; `engine.ts` starts one looping `AudioBufferSourceNode` per stem at
+  one `when` and offset, through a fader each, a Butterworth low-pass, a transport gain that
+  fades play and pause, and a limiter at −1 dB. No master cut: stems sum back to the
+  master, so the loudest setting is the release as mastered. `mix.ts` is the pure part:
+  squared faders, mute over solo as on a desk, an exponential 40 Hz–20 kHz cutoff, and the
+  code `<track>.<base64url(version, count, level and flags per stem, cutoff)>`, refused when
+  the count doesn't match the track's. A hidden tab pauses it, as it stops `acid`.
 - **Save file** (`lib/save-file.ts`, `components/SaveFile.vue` on `/privacy`) — the visitor's
   chosen groups (settings, progress, scores, shell; never secrets) as one code:
   `base64url(version · format · payload)`, the payload a JSON object of key to value,
