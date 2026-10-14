@@ -38,6 +38,23 @@
   RewriteCond %{DOCUMENT_ROOT}/notes/$1.html -f
   RewriteRule ^notes/([a-z0-9-]+)/?$ /notes/$1.html [L]
 
+  # Each public page's copy of index.html with its own title, description and
+  # canonical URL (vite-plugins/pages.ts): /tools/json is pages/tools/json.html.
+  # Without it every route answers with the home page's head, canonical included,
+  # and a crawler files them all under /. After the curl pages, so `curl /tools`
+  # still gets text; a path with no copy (a room code, the 404) gets index.html.
+  #
+  # French first: ?lang=fr is the French URL of the same page (src/content/pages.ts),
+  # and its copy is pages/fr/<path>.html, the home page's pages/fr/index.html. The
+  # query string passes through untouched, so the app still reads it.
+  RewriteCond %{QUERY_STRING} (^|&)lang=fr(&|$)
+  RewriteRule ^$ /pages/fr/index.html [L]
+  RewriteCond %{QUERY_STRING} (^|&)lang=fr(&|$)
+  RewriteCond %{DOCUMENT_ROOT}/pages/fr/$1.html -f
+  RewriteRule ^([a-z0-9/-]+?)/?$ /pages/fr/$1.html [L]
+  RewriteCond %{DOCUMENT_ROOT}/pages/$1.html -f
+  RewriteRule ^([a-z0-9/-]+?)/?$ /pages/$1.html [L]
+
   # SPA fallback: hand every non-file request to index.html so Vue Router owns
   # routing. Without this, a hard refresh on any path other than / 404s.
   RewriteCond %{REQUEST_FILENAME} !-f
@@ -182,6 +199,15 @@
   <FilesMatch "^(index\.html|resume\.txt)$">
     Header merge Vary "User-Agent"
   </FilesMatch>
+
+  # The pages' copies of index.html name this deploy's hashed assets, as it does, so
+  # they can't be kept either; and /tools is text to curl, so they vary as / does.
+  # The file names repeat the routes', so they are matched by path.
+  <IfModule mod_setenvif.c>
+    SetEnvIf Request_URI "^/pages/" PAGE_COPY=1
+    Header set Cache-Control "no-cache" env=PAGE_COPY
+    Header merge Vary "User-Agent" env=PAGE_COPY
+  </IfModule>
 
   # The curl pages differ by client and by language too.
   <IfModule mod_setenvif.c>

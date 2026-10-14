@@ -10,6 +10,7 @@ import { restoreCrt, setCrt } from '@/composables/useCrt'
 import { useMatrix } from '@/composables/useMatrix'
 import { useXray } from '@/composables/useXray'
 import { useMotion } from '@/composables/useMotion'
+import { usePageMeta } from '@/composables/usePageMeta'
 import { useTabTitle } from '@/composables/useTabTitle'
 import { focusPageHeading, pageAnnouncement, usePageFocus } from '@/composables/usePageFocus'
 import { useLocale } from '@/i18n'
@@ -77,6 +78,7 @@ const stageStyle = computed(() => ({
 }))
 
 useTabTitle()
+usePageMeta()
 usePageFocus(router)
 const { t, m } = useLocale()
 
