@@ -1,3 +1,6 @@
+// First of all, as it loads: a save link's code comes out of the address before the router
+// or the analytics script can read it (`lib/save-link.ts`).
+import './lib/save-link'
 import './assets/main.css'
 
 import { createApp } from 'vue'

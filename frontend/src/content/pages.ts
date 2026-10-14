@@ -117,6 +117,14 @@ export const pages: PageMeta[] = [
       fr: 'Qui publie ce site, qui l’héberge, les règles du livre d’or et comment signaler un message, et les crédits des sources de données et du code open source utilisés.',
     },
   ),
+  page(
+    '/security',
+    { en: 'Reporting a security problem', fr: 'Signaler un problème de sécurité' },
+    {
+      en: 'How to report a security problem with this site or its API: what counts, what doesn’t, how to write, what happens next, and a good-faith testing clause.',
+      fr: 'Comment signaler un problème de sécurité sur ce site ou son API : ce qui compte, ce qui ne compte pas, comment écrire, ce qui se passe ensuite, et une clause de test de bonne foi.',
+    },
+  ),
   ...work.map((part) => page(`/work/${part.id}`, part.name, part.summary)),
 ]
 

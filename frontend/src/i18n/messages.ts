@@ -937,6 +937,11 @@ export const messages = {
     times: { en: '{n} on screen', fr: '{n} à l’écran' },
     shapes: { en: '{n} shapes', fr: '{n} formes' },
   },
+  // `/security`'s heading, which the tab title names too. The rest of the page's words are
+  // in `content/security.ts`, which only the page loads.
+  security: {
+    heading: { en: 'Reporting a security problem', fr: 'Signaler un problème de sécurité' },
+  },
   // /privacy (views/PrivacyView.vue). The heading, which the tab title needs from the main
   // bundle, and one line that can't move; the page's other words are content/privacy.ts's,
   // loaded with the page.

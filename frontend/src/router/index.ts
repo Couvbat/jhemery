@@ -62,6 +62,12 @@ const router = createRouter({
       component: () => import('../views/LegalView.vue'),
     },
     {
+      // The disclosure policy (content/security.ts), outside the prism like /privacy.
+      path: '/security',
+      name: 'security',
+      component: () => import('../views/SecurityView.vue'),
+    },
+    {
       // The case studies (content/work.ts). Like /now, not a face of the prism: they are
       // reached from the projects section, and `viewIndex()` puts them after the faces.
       path: '/work/:id',

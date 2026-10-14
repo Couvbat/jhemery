@@ -5,12 +5,14 @@ import vue from '@vitejs/plugin-vue'
 import vueDevTools from 'vite-plugin-vue-devtools'
 import tailwindcss from '@tailwindcss/vite'
 import { VitePWA } from 'vite-plugin-pwa'
+import { calendarPlugin } from './vite-plugins/calendar'
 import { discoveryPlugin } from './vite-plugins/discovery'
 import { commitSha } from './vite-plugins/git'
 import { notesPlugin } from './vite-plugins/notes'
 import { pagesPlugin } from './vite-plugins/pages'
 import { resumePlugin } from './vite-plugins/resume'
 import { searchPlugin } from './vite-plugins/search'
+import { securityPlugin } from './vite-plugins/security'
 import { thirdPartyPlugin } from './vite-plugins/third-party'
 import { stampSource, xrayPlugin } from './vite-plugins/xray'
 import { profile } from './src/content/profile'
@@ -24,6 +26,8 @@ export default defineConfig({
     vueDevTools(),
     tailwindcss(),
     resumePlugin(),
+    calendarPlugin(),
+    securityPlugin(),
     notesPlugin(),
     pagesPlugin(),
     discoveryPlugin(),
@@ -88,6 +92,11 @@ export default defineConfig({
           // `/assets/` header in public/.htaccess, not on the service worker.
           '**/ffmpeg-core-*.js',
           '**/ffmpeg.worker-*.js',
+          // The stems mixer and the footer's event line: each is only ever fetched while
+          // its list in `src/content/` has an entry, and both ship empty. Precaching them
+          // would download on every install what no visitor can be shown.
+          '**/StemsMixer-*.js',
+          '**/FooterEvent-*.js',
           // The printable résumés and the design notes: documents a few visitors read,
           // matched by the html and css globs above. Precaching them would charge every
           // install for pages almost nobody opens.
@@ -129,6 +138,13 @@ export default defineConfig({
           // The palette's search index (`vite-plugins/search.ts`). The palette fetches it,
           // which the fallback never answers; this is for a browser opening it by hand.
           /^\/search\.json$/,
+          // The calendar feeds (`vite-plugins/calendar.ts`), which a calendar app reads.
+          /^\/events(\.fr)?\.ics$/,
+          // RFC 9116's file, at the root and at the path `.htaccess` answers from it.
+          /^\/security\.txt$/,
+          /^\/\.well-known\//,
+          // The stems the music section's mixer fetches (`content/stems.ts`).
+          /^\/stems\//,
         ],
         cleanupOutdatedCaches: true,
         clientsClaim: true,

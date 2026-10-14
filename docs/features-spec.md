@@ -61,6 +61,13 @@ src/content/
   experience.ts  dated roles and courses, newest first; the current role names profile.employer
   dates.ts       the date maths: daysSince, monthsBetween (both ends count), durationLabel, periodLabel
   now.ts         the /now list and its staleness rule
+  seasons.ts     the six days the field dresses up for, on the visitor's calendar
+  events.ts      SiteEvent[], the appointments Jules hosts, as instants; only the list
+  upcoming.ts    what the readers compute from it (when, which are ahead) and their words;
+                 outside the barrel, so an empty list costs the home page nothing
+  stems.ts       StemTrack[], tracks split into stems for the music section's mixer;
+                 outside the barrel, and only data
+  security.ts    the disclosure policy and security.txt; outside the barrel, like privacy.ts
   docs.ts        githubSlug and headingSlugs, so a link to a doc's heading can be checked
   decisions.ts   Decision[], what the site chose and turned down; read by `why` (§3)
   work.ts        WorkPart[], the case studies at /work/<id>, `projects <id>` and projects/<id>.md
@@ -81,6 +88,15 @@ across every caller), a `t(localised)` resolver, and `setLocale()` which persist
 → `en`.
 
 Surfaces: a `EN/FR` toggle in the navbar, and the `lang [en|fr]` terminal command.
+
+Interface strings live in `i18n/messages.ts`, which loads whole with the first paint. The home
+page sits at its byte budget (`lighthouserc.yml`), so the words of a page or panel that only
+loads on demand can sit in a table beside it instead, imported only by it: `/privacy`'s and
+the save file's (`content/privacy.ts`), `/security`'s (`content/security.ts`), `/legal`'s
+(`content/legal.ts`), the events block's
+(`content/upcoming.ts`) and the stems mixer's (`components/stems/labels.ts`). `i18n.spec.ts`
+walks those tables with the message tree, under the same rules, plus one more for all of
+them: a `{placeholder}` in one language is in the other.
 
 **Trade-off:** full-site i18n roughly doubles the copy that has to be maintained. It is included
 because the profile advertises both languages and a French visitor landing on English copy is a
@@ -453,12 +469,12 @@ into `/proc/`, as it does for `projects/`.
 ### content
 Reads from §1, so it can never contradict the page: `about`, `skills [--why]`,
 `projects [--json] [<part>]`, `music`, `gaming`, `hardware [pc|nas|peripherals]`, `contact`, `resume`,
-`neofetch`, `curl`. `skills --why` prints each skill's `usedIn` evidence (a `goTo` path or a repo
+`neofetch`, `calendar`, `curl`. `skills --why` prints each skill's `usedIn` evidence (a `goTo` path or a repo
 URL), and `neofetch` has a `Status` row from `profile.availability`, the same flag the footer and
 both résumés read. `now.txt` is the `/now` list, with the same 90-day staleness rule.
 
 `neofetch` renders an ASCII logo beside a spec block — stack, locale, "uptime" since the first
-commit, a `Season` row on one of the four season days (§5.3), and the live Steam status if
+commit, a `Season` row on one of the six season days (§5.3), and the live Steam status if
 available. `curl [-I] <domain>[/path]` is a real request to
 this origin, under any name it answers to (§7); any other host gets `curl: (6) Could not resolve
 host` and a note that a browser tab can only reach this site.
@@ -840,8 +856,10 @@ mounted, so coming back to *full* or *calm* picks the scene up where it stood.
   push as the ring passes, added to its target like the gravity well's, so the ordinary drift
   carries it out and back. Allocation-free, gone after 2.6 s, and only at *full* motion with the
   loop running; a wave that lands while the field is calm or still isn't drawn.
-- **Seasons** — `content/seasons.ts` lists four days: 31 October, 21 December (the winter
-  solstice, as a fixed date), 1 January and the month and day of `profile.since`. `seasonOn(at)`
+- **Seasons** — `content/seasons.ts` lists six days: 31 October, 21 December (the winter
+  solstice, as a fixed date), 1 January, the month and day of `profile.since`, 21 June (the
+  Fête de la Musique) and 1 April. April Fools' mood has the one negative speed, which only
+  multiplies each shape's spin, so the field turns the other way and nothing else changes. `seasonOn(at)`
   reads the visitor's local calendar, since Halloween starts at their midnight, and the field
   re-reads it at each midnight and at least once a minute (`components/season.ts`): a timer
   set for midnight alone would wait out however long the device slept. A season's palette
@@ -928,6 +946,71 @@ wraps rather than run wider than the screen, which a guestbook name can make it 
 - **Availability and `/now`** — the footer's status line also carries `profile.availability`
   (a filled or hollow dot and the note) and links `/now`, a route outside the prism
   (`views/NowView.vue`, `content/now.ts`). Past 90 days the page says how old the list is.
+- **Events** (`content/events.ts`) — appointments rather than days: each is an instant with its
+  offset written out, a length, a `Localised` title and note, and a `goTo` path or URL. Its `id`
+  is the feed's `UID`, so it never changes once published. While one hasn't ended, `/now` lists
+  it in the visitor's zone with a relative phrase, `calendar` prints the same, and from
+  `SOON_DAYS` (7) before its start the footer's status line names it through
+  `FooterEvent.vue`, which re-reads the clock each minute. The footer only fetches that
+  component while the list has an entry, and the helpers and words all readers share are in
+  `upcoming.ts`, outside the barrel: with the list empty, the home page pays for one array. `vite-plugins/calendar.ts` writes `/events.ics` and `/events.fr.ics` from RFC 5545
+  by hand: CRLF lines folded at 75 octets without splitting a character or an escape, TEXT
+  escaped, every time in UTC. The feed always carries a `VTIMEZONE` for Europe/Paris that no
+  event refers to, because the grammar requires one component and the list is often empty.
+  `calendar` is kept off the curl pages, which are snapshots and can't know what is ahead.
+- **Stems** (`content/stems.ts`, `components/stems/`) — a mixer under the music section's
+  cards, drawn only while `stemTracks` has a track and loaded as its own chunk. Each stem is
+  a file under `public/stems/<track>/`, AAC or MP3 (older Safari can't decode Opus), all of
+  one excerpt's length, because every stem is held decoded at once: 384 kB a second each at
+  48 kHz stereo float, so `stems.spec.ts` caps a track at `MAX_DECODED_BYTES` and holds each
+  file to the `bytes` the load button announces. `load.ts` fetches only on *load*, counting
+  bytes as they arrive; `engine.ts` starts one looping `AudioBufferSourceNode` per stem at
+  one `when` and offset, through a fader each, a Butterworth low-pass, a transport gain that
+  fades play and pause, and a limiter at −1 dB. No master cut: stems sum back to the
+  master, so the loudest setting is the release as mastered. `mix.ts` is the pure part:
+  squared faders, mute over solo as on a desk, an exponential 40 Hz–20 kHz cutoff, and the
+  code `<track>.<base64url(version, count, level and flags per stem, cutoff)>`, refused when
+  the count doesn't match the track's. A hidden tab pauses it, as it stops `acid`. The
+  mixer's chunk, like `FooterEvent`'s, is kept out of the service worker's precache, since
+  neither is fetched while its list is empty.
+- **Save file** (`lib/save-file.ts`, `components/SaveFile.vue` on `/privacy`) — the visitor's
+  chosen groups (settings, progress, scores, shell; never secrets) as one code:
+  `base64url(version · format · payload)`, the payload a JSON object of key to value,
+  deflated with `CompressionStream` where there is one. It travels as `/privacy#save=<code>`,
+  with a QR of the link up to version 20 (the tool's own encoder, loaded on demand). The
+  fragment never reaches the server, and `lib/save-link.ts`, the first module `main.ts`
+  imports, takes it out of the address as it loads, since the router captures the address
+  when its module is evaluated and the analytics tracker reads `location.href`; a link
+  pasted into `/privacy`'s own address bar is caught by a watch on the route instead.
+  Reading a code trusts nothing: only keys `entryFor()` lists in `localStorage`, not
+  secret and not marked `stays` (the refusal of visit counting, which belongs to its browser:
+  a link must not be able to withdraw it), only strings, 64 kB a value and 256 kB unpacked, the second enforced while
+  inflating. Making one holds to the same limits (`fitSave()`), leaving out and naming a
+  value too big rather than offering a link that restores less than it says. A link being
+  made while the choice or the storage changes is thrown away. The page shows each key
+  against what is already stored and writes the changed ones only on restore, through
+  `writeItems()` in `storage-keys.ts` (the one module allowed to touch storage for keys it
+  doesn't own), then reloads, as a clear does; if a full or blocked storage refuses some,
+  it says how many and stays, so the preview shows what's left. The aliases in a save are
+  listed in full there, since they are the one value that later runs commands.
+  A code is someone else's input, so every reader of a key it can carry treats what it finds
+  as untrusted, and no stored value can break a page or leave something out of reach: the
+  daily wordle record must be one the game could have written, and `resumeDaily` drops a
+  guess the board refuses; unknown achievement ids are dropped, a set missing only
+  `completionist` gets it, and `explorer` is checked on every visit; a stage's real CTF flag
+  replaces a stored one that isn't; a forged scheme whose body or muted text misses its floor
+  is refused (`forge.spec.ts` holds every forge across the seed cube to those two floors);
+  alias names are one word, definitions and history lines at most 4 kB, the history base a
+  safe integer; an alias never shadows the first word of a two-word command; and
+  `parse.ts` finds where quotes close in one pass, where it used to rescan the rest of the
+  line for each one, which made a long line of unclosed quotes freeze the tab.
+- **Disclosure policy** (`content/security.ts`, `views/SecurityView.vue`) — `/security`, outside
+  the prism like `/privacy`, and `security.txt` (RFC 9116), which `vite-plugins/security.ts`
+  builds from the same module: `Contact`, an `Expires` `EXPIRES_DAYS` (180) after the build,
+  `Policy`, `Acknowledgments` and both `Canonical` addresses. The file is at the root and
+  `.htaccess` answers `/.well-known/security.txt` from it, because the frontend deploy's rsync
+  excludes `.well-known/` whole to protect AutoSSL's challenges; `security.spec.ts` holds the
+  rewrite ahead of the SPA fallback and checks the exclude it works around.
 - **What the site keeps** (`lib/storage-keys.ts`, `views/PrivacyView.vue`) — every key the site
   writes, with its storage, group, owner, purpose and whether it is a secret, in one list that
   `du`, `rm` and `/privacy` all read. `storage-keys.spec.ts` reads the source for every `couvbat:`
@@ -1439,7 +1522,7 @@ this section only fixes the rules the code cites.
   The leaving face is `inert` from the `<Transition>`'s `leave` to its removal, so in every frame
   exactly one `<main>` can be reached; and `settled`, a counter bumped when a swing ends or the
   pages swap, is what `usePageFocus` waits on (§9).
-- **Pages outside the prism.** `/now`, `/privacy`, `/legal` and `/work/<id>` are routes but not views: they are reached
+- **Pages outside the prism.** `/now`, `/privacy`, `/legal`, `/security` and `/work/<id>` are routes but not views: they are reached
   from links, not the navbar, so the prism keeps its four faces, and `viewIndex()` puts them after
   the faces so a swing to one still has a direction. `cd` doesn't reach them, because
   `resolvePath` is shared by four callers. Each names itself in `tabTitle()`.

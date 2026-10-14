@@ -22,6 +22,14 @@ export const privacyCopy = {
     en: 'The service worker keeps copies of the site’s own files, so it loads fast and opens offline. Nothing in them is about you, so they are listed here, not cleared.',
     fr: 'Le service worker garde des copies des fichiers du site, pour qu’il se charge vite et s’ouvre hors ligne. Rien là-dedans ne vous concerne : ils sont listés ici, pas effacés.',
   },
+  saveIntro: {
+    en: 'Your progress, scores, settings and aliases can move to another browser without an account. The link holds the values themselves, after the `#`, which a browser never sends: it goes nowhere but where you paste it. Whoever has it can restore it, so send it to yourself. The secrets never go in.',
+    fr: 'Votre progression, vos scores, vos réglages et vos alias peuvent passer dans un autre navigateur sans compte. Le lien contient les valeurs elles-mêmes, après le `#`, qu’un navigateur n’envoie jamais : il ne va nulle part ailleurs que là où vous le collez. Quiconque l’a peut le restaurer, alors envoyez-le à vous-même. Les secrets n’y entrent jamais.',
+  },
+  restoreIntro: {
+    en: 'Paste a link or a code, or open a save link. Either way nothing is written until you press restore, and only keys listed above are taken. What it holds replaces what is here, and anything else stays.',
+    fr: 'Collez un lien ou un code, ou ouvrez un lien de sauvegarde. Dans les deux cas, rien n’est écrit avant que vous appuyiez sur restaurer, et seules les clés listées plus haut sont prises. Ce qu’il contient remplace ce qui est ici, et le reste ne bouge pas.',
+  },
   presence: {
     en: 'Presence is one integer, pushed to the pages listening for it: how many people are here, with no visitor id anywhere behind it. `wall`’s wave carries nothing at all.',
     fr: 'La présence est un seul entier, poussé aux pages qui l’écoutent : combien de personnes sont là, sans aucun identifiant de visiteur derrière. Le signe de `wall` ne transporte rien du tout.',
@@ -63,8 +71,8 @@ export const privacyCopy = {
     fr: 'Météo, cours, Steam et GitHub sont interrogés par le serveur, avec ses propres clés et mes coordonnées : rien sur vous ne leur parvient.',
   },
   strace: {
-    en: 'None of this needs taking on trust. `strace <command>` runs a command and lists every request it made, with the keys of what was sent and never the values.',
-    fr: 'Rien de tout cela n’est à croire sur parole. `strace <commande>` lance une commande et liste chaque requête qu’elle a faite, avec les clés de ce qui est parti et jamais les valeurs.',
+    en: 'None of this needs taking on trust. `strace <command>` runs a command and lists every request it made, with the keys of what was sent and never the values. If a claim here doesn’t hold, /security says how to tell me.',
+    fr: 'Rien de tout cela n’est à croire sur parole. `strace <commande>` lance une commande et liste chaque requête qu’elle a faite, avec les clés de ce qui est parti et jamais les valeurs. Si une affirmation ne tient pas, /security dit comment me le signaler.',
   },
   analyticsOn: {
     en: 'Visits from this browser are counted. Refusing stops the tracker at once, in every open tab, and keeps it from loading at all after that.',
@@ -124,4 +132,51 @@ export const privacyLabels = {
   },
   who: { en: 'Who answers for it', fr: 'Qui en répond' },
   rights: { en: 'Your rights', fr: 'Vos droits' },
+} satisfies Record<string, Localised>
+
+/** The save file's (`components/SaveFile.vue`), on the same terms. `{n}` is a count of keys, `{size}` bytes. */
+export const saveFileLabels = {
+  tooBig: {
+    en: 'Left out, too large to carry: {keys}.',
+    fr: 'Écartées, trop grandes pour être emportées : {keys}.',
+  },
+  writeFailed: {
+    en: '{n} of {total} couldn’t be written: this browser’s storage is full or blocked.',
+    fr: '{n} sur {total} n’ont pas pu être écrites : le stockage de ce navigateur est plein ou bloqué.',
+  },
+  heading: { en: 'Carry it to another browser', fr: 'L’emporter dans un autre navigateur' },
+  groups: { en: 'What to carry', fr: 'Quoi emporter' },
+  make: { en: 'make a save link ({n} · {size})', fr: 'créer un lien de sauvegarde ({n} · {size})' },
+  nothing: { en: 'Nothing is stored in these groups yet.', fr: 'Rien n’est encore stocké dans ces groupes.' },
+  link: { en: 'Save link', fr: 'Lien de sauvegarde' },
+  copy: { en: 'copy', fr: 'copier' },
+  copied: { en: 'copied', fr: 'copié' },
+  qrAlt: { en: 'QR code of the save link', fr: 'QR code du lien de sauvegarde' },
+  noQr: {
+    en: 'Too long for a QR code a phone reads reliably: copy the link instead, or leave the shell out.',
+    fr: 'Trop long pour un QR code qu’un téléphone lit sans peine : copiez plutôt le lien, ou laissez le shell de côté.',
+  },
+  restoreHeading: { en: 'Restore one here', fr: 'En restaurer une ici' },
+  paste: { en: 'a save link or code', fr: 'un lien ou un code de sauvegarde' },
+  read: { en: 'read it', fr: 'le lire' },
+  restore: { en: 'restore {n} and reload', fr: 'restaurer {n} et recharger' },
+  restoring: { en: 'Restored. Reloading…', fr: 'Restauré. Rechargement…' },
+  fresh: { en: 'new here', fr: 'nouvelle ici' },
+  replaces: { en: 'replaces what is here', fr: 'remplace l’actuelle' },
+  same: { en: 'already the same', fr: 'déjà identique' },
+  dropped: {
+    en: '{n} more in it were left out: secrets, or keys this site doesn’t keep.',
+    fr: '{n} autres y ont été écartées : des secrets, ou des clés que ce site ne garde pas.',
+  },
+  empty: { en: 'It holds nothing this site keeps.', fr: 'Il ne contient rien que ce site garde.' },
+  malformed: { en: 'That isn’t a save code, or it was cut short.', fr: 'Ce n’est pas un code de sauvegarde, ou il a été tronqué.' },
+  version: {
+    en: 'That code comes from a newer version of the site. Reload and try again.',
+    fr: 'Ce code vient d’une version plus récente du site. Rechargez et réessayez.',
+  },
+  unsupported: { en: 'This browser can’t unpack that code. A newer one can.', fr: 'Ce navigateur ne sait pas décompresser ce code. Un plus récent le peut.' },
+  tooLarge: {
+    en: 'That code unpacks to more than any save holds, so it wasn’t read.',
+    fr: 'Ce code se décompresse en plus qu’aucune sauvegarde n’en contient : il n’a pas été lu.',
+  },
 } satisfies Record<string, Localised>

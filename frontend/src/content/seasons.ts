@@ -2,7 +2,8 @@ import { profile } from './profile'
 import type { Localised } from './types'
 
 /**
- * Four days a year the site notices the date (roadmap §I, *Seasons*). On one of them the
+ * Six days a year the site notices the date (roadmap §I, *Seasons*, and §J for the last
+ * two). On one of them the
  * wireframes take the day's palette (`components/palette.ts`), `fortune` draws from the
  * day's pool (`fortunes.ts`), and `neofetch` and the boot log each gain a line. Nothing
  * else changes, and nothing is earned: an achievement for a season would leave
@@ -14,7 +15,7 @@ import type { Localised } from './types'
  * `dates.ts`, nothing here reads the clock unless the caller leaves `at` out, so the specs
  * pin it with `vi.setSystemTime`.
  */
-export type SeasonId = 'halloween' | 'solstice' | 'new-year' | 'birthday'
+export type SeasonId = 'halloween' | 'solstice' | 'new-year' | 'birthday' | 'music-day' | 'april-fools'
 
 export interface Season {
   id: SeasonId
@@ -65,6 +66,25 @@ export const seasons: readonly Season[] = [
     },
     boot: `init: first commit ${profile.since}, happy birthday couvsh`,
   },
+  {
+    // The Fête de la Musique: the one French holiday that is about the site's other half.
+    // The summer solstice too, north of the equator, but the music is what France keeps.
+    id: 'music-day',
+    day: '06-21',
+    neofetch: {
+      en: 'Fête de la Musique — every output unmuted',
+      fr: 'Fête de la Musique — toutes les sorties sont ouvertes',
+    },
+    boot: 'snd: fête de la musique, unmuting every channel',
+  },
+  {
+    // The field turns the other way for the day (`components/palette.ts`), which is the
+    // whole joke: nothing a visitor reads is made false, since the CV is on this page too.
+    id: 'april-fools',
+    day: '04-01',
+    neofetch: { en: 'April Fools’ Day — the wireframes turn backwards', fr: '1er avril — les formes tournent à l’envers' },
+    boot: 'sched: april 1st, reversing the rotation of every wireframe',
+  },
 ]
 
 const pad = (n: number) => String(n).padStart(2, '0')
@@ -75,7 +95,7 @@ export function seasonOnDay(month: number, day: number): Season | undefined {
   return seasons.find((season) => season.day === key)
 }
 
-/** The season `at` falls on, on the visitor's local calendar, if it is one of the four. */
+/** The season `at` falls on, on the visitor's local calendar, if it is one of the six. */
 export function seasonOn(at: Date = new Date()): Season | undefined {
   return seasonOnDay(at.getMonth() + 1, at.getDate())
 }

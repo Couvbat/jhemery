@@ -1,5 +1,10 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { pick } from '@/content/types'
+import { privacyCopy, privacyLabels, saveFileLabels } from '@/content/privacy'
+import { legalCopy, legalHeadings } from '@/content/legal'
+import { securityCopy, securityLabels } from '@/content/security'
+import { upcomingLabels } from '@/content/upcoming'
+import { stemsLabels } from '@/components/stems/labels'
 import { messages } from '../messages'
 import { currentLocale, setLocale, useLocale } from '../index'
 
@@ -22,7 +27,22 @@ function flatten(node: Node, path: string[] = []): Array<[string, { en: unknown;
   return Object.entries(node).flatMap(([key, child]) => flatten(child as Node, [...path, key]))
 }
 
-const leaves = flatten(messages as unknown as Node)
+/**
+ * The message tree, and the tables of interface words kept out of it so that only the
+ * lazy page that reads them loads them (the home page is at its byte budget). Same rules.
+ */
+const leaves = flatten({
+  messages,
+  privacyLabels,
+  saveFileLabels,
+  privacyCopy,
+  securityLabels,
+  securityCopy,
+  legalHeadings,
+  legalCopy,
+  upcomingLabels,
+  stemsLabels,
+} as unknown as Node)
 
 describe('messages', () => {
   it('finds a non-trivial message tree', () => {
@@ -40,6 +60,13 @@ describe('messages', () => {
     // A string in one locale and an array in the other blows up at the call site,
     // which is usually far from the message that caused it.
     expect(Array.isArray(value.fr), `messages.${path} shape differs`).toBe(Array.isArray(value.en))
+  })
+
+  // `{n}` and friends are replaced by the caller, whichever locale is on: one missing from
+  // a translation drops the number, and one renamed is printed as it is.
+  it.each(leaves)('%s keeps the same placeholders in both locales', (path, value) => {
+    const holes = (text: unknown) => [...String(text).matchAll(/\{[a-z]+\}/g)].map((m) => m[0]).sort()
+    expect(holes(value.fr), `messages.${path}`).toEqual(holes(value.en))
   })
 })
 

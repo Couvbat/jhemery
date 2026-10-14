@@ -6,12 +6,15 @@ import { fortunePool, fortunes, seasonalFortunes } from '../fortunes'
 // time zone they run: the season is the visitor's local day, never UTC's.
 
 describe('seasons', () => {
-  it('falls on its four days and no others', () => {
+  it('falls on its six days and no others', () => {
     expect(seasonOnDay(10, 31)?.id).toBe('halloween')
     expect(seasonOnDay(12, 21)?.id).toBe('solstice')
     expect(seasonOnDay(1, 1)?.id).toBe('new-year')
     expect(seasonOnDay(6, 16)?.id).toBe('birthday')
-    for (const [month, day] of [[10, 30], [11, 1], [12, 20], [12, 22], [12, 31], [1, 2], [6, 15], [6, 17]] as const) {
+    expect(seasonOnDay(6, 21)?.id).toBe('music-day')
+    expect(seasonOnDay(4, 1)?.id).toBe('april-fools')
+    const around = [[10, 30], [11, 1], [12, 20], [12, 22], [12, 31], [1, 2], [6, 15], [6, 17], [6, 20], [6, 22], [3, 31], [4, 2]] as const
+    for (const [month, day] of around) {
       expect(seasonOnDay(month, day), `${month}/${day}`).toBeUndefined()
     }
   })

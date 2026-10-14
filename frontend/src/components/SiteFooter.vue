@@ -1,7 +1,7 @@
 <script setup lang="ts">
-import { onMounted } from 'vue'
+import { defineAsyncComponent, onMounted } from 'vue'
 import { RouterLink } from 'vue-router'
-import { profile } from '@/content'
+import { events, profile } from '@/content'
 import { useLocale } from '@/i18n'
 import { useStatus } from '@/composables/useStatus'
 import { startPresence, usePresence } from '@/composables/usePresence'
@@ -22,6 +22,9 @@ const builtLabel = new Date(builtAt).toLocaleDateString(undefined, {
 // Days since the first commit, and how long ago this build went out — the same
 // numbers `neofetch` and `top` report inside the terminal, kept visible.
 const { uptime, lastDeploy } = useStatus(builtAt)
+
+// An event a week away or on, which `/now` has in full. Fetched only while there is one.
+const FooterEvent = defineAsyncComponent(() => import('./FooterEvent.vue'))
 
 // The status line is the only surface that shows the count, so it is also the
 // one that opens the stream. Stays null — and the segment stays out of the DOM
@@ -57,6 +60,8 @@ onMounted(startPresence)
 
       <RouterLink to="/legal" class="hover:text-primary transition-colors">/legal</RouterLink>
 
+      <RouterLink to="/security" class="hover:text-primary transition-colors">/security</RouterLink>
+
       <a
         :href="repo"
         target="_blank"
@@ -84,6 +89,7 @@ onMounted(startPresence)
         {{ profile.availability.open ? '●' : '○' }} {{ t(profile.availability.note) }}
       </span>
       <span class="text-muted-foreground/40" aria-hidden="true">·</span>
+      <FooterEvent v-if="events.length" />
       <template v-if="online !== null">
         <span>{{ t(online === 1 ? m.footer.onlineOne : m.footer.online).replace('{n}', String(online)) }}</span>
         <span class="text-muted-foreground/40" aria-hidden="true">·</span>

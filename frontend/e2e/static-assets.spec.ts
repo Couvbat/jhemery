@@ -25,6 +25,9 @@ const FILES = [
   { path: '/THIRD-PARTY.txt', type: /text\/plain/ },
   { path: '/sitemap.xml', type: /xml/ },
   { path: '/manifest.webmanifest', type: /(manifest|json)/ },
+  // The calendar feeds (vite-plugins/calendar.ts), which an app subscribes to.
+  { path: '/events.ics', type: /text\/calendar/ },
+  { path: '/events.fr.ics', type: /text\/calendar/ },
 ] as const
 
 test.describe('static files', () => {

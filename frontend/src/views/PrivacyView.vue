@@ -5,6 +5,7 @@ import { profile } from '@/content'
 import { privacyCopy, privacyLabels } from '@/content/privacy'
 import type { Localised } from '@/content/types'
 import CodeText from '@/components/CodeText.vue'
+import SaveFile from '@/components/SaveFile.vue'
 import { useStoredItems } from '@/composables/useStoredItems'
 import { useLocale } from '@/i18n'
 import { analyticsConfigured, analyticsRefused, refuseAnalytics } from '@/lib/analytics'
@@ -213,6 +214,8 @@ async function switchCounting() {
         </section>
       </section>
 
+      <SaveFile />
+
       <section class="space-y-3" aria-labelledby="privacy-caches">
         <h2 id="privacy-caches" class="text-primary font-mono text-sm">## {{ t(privacyLabels.caches) }}</h2>
         <p class="text-sm text-foreground leading-relaxed">{{ t(privacyCopy.cachesIntro) }}</p>
@@ -280,6 +283,7 @@ async function switchCounting() {
       <p class="text-xs text-muted-foreground">
         <RouterLink to="/legal" class="text-primary hover:underline">/legal</RouterLink>
         · <RouterLink to="/now" class="text-primary hover:underline">/now</RouterLink>
+        · <RouterLink to="/security" class="text-primary hover:underline">/security</RouterLink>
         · <RouterLink to="/" class="text-primary hover:underline">~</RouterLink>
       </p>
     </div>

@@ -16,6 +16,8 @@
  * | 21–26 | the six knobs, a byte each |
  */
 
+import { fromBase64Url, toBase64Url } from '@/lib/base64url'
+
 export const VERSION = 1
 export const STEPS = 16
 export const BYTES = 27
@@ -83,24 +85,6 @@ export const DEFAULT_PATTERN: Pattern = {
 
 export function clonePattern(pattern: Pattern): Pattern {
   return { ...pattern, steps: pattern.steps.map((s) => ({ ...s })), knobs: { ...pattern.knobs } }
-}
-
-// base64url, unpadded. Hand-rolled over btoa/atob rather than borrowed from the encode
-// tool, which is about UTF-8 text and would turn these bytes into characters first.
-function toBase64Url(bytes: Uint8Array): string {
-  let binary = ''
-  for (const byte of bytes) binary += String.fromCharCode(byte)
-  return btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '')
-}
-
-function fromBase64Url(text: string): Uint8Array | null {
-  if (text.length % 4 === 1) return null
-  const padded = text.replace(/-/g, '+').replace(/_/g, '/') + '='.repeat((4 - (text.length % 4)) % 4)
-  try {
-    return Uint8Array.from(atob(padded), (char) => char.charCodeAt(0))
-  } catch {
-    return null
-  }
 }
 
 export function encode(pattern: Pattern): string {

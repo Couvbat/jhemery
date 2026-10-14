@@ -2,10 +2,10 @@
 
 Status tracker for the feature brainstorm: first three categories (three.js background, terminal
 commands, live information), then games vol. 2 (§E), views and tools (§F), the September 2026
-batch (§G), the late-September brainstorm (§H) and the October brainstorm (§I). Built feature by
-feature, across sessions.
+batch (§G), the late-September brainstorm (§H), the October brainstorm (§I) and the mid-October
+one (§J). Built feature by feature, across sessions.
 
-**Current state: §A–§H are shipped, and so is §I.** Anything else still open is
+**Current state: §A–§I are shipped, and so is §J.** Anything else still open is
 under [Open](#open) and [Known issues](#known-issues).
 
 **How to use:** tick a box when the feature ships, and append the PR number. Design detail for
@@ -907,6 +907,91 @@ Recorded as each row ships.
     starts counter-rotated as `rehome()` does; a ticker that gives up after three failed polls
     empties the field, since a deletion could no longer reach it; the label nudge covers the top
     edge; and the e2e for a closed guestbook couldn't fail.
+
+## J. Mid-October 2026 brainstorm
+
+Brainstormed on 2026-10-14, after §I shipped, with one rule: nothing that reinforces what is
+already there, so no new command, game, tool, scheme, achievement or background effect for its
+own sake. Ten ideas, each opening something the site didn't have (the calendar, the open web,
+the physical world, real security, carrying a visitor's own data, Jules's own music). The owner
+picked four. Two overlapped §I on inspection, *Seasons* and the *Storage inspector*, so those
+rows are the parts §I left out. The rest were left for now: a changelog shown to returning
+visitors, the site's history as a screenshot per release, an ActivityPub actor, webmentions and a
+webring, a receipt printer for guestbook entries, and questions answered by hand. All four
+shipped in #152, one commit each.
+
+### Time
+
+| ✔ | Feature | Approach | Files | Effort |
+|---|---|---|---|---|
+| [x] | Two more seasons | Shipped in #152. The Fête de la Musique (21 June) and April Fools' Day join `content/seasons.ts`, each with a palette, a mood, a fortune pool, a `neofetch` row and a boot line. April Fools' mood has a speed of −1: the speed only multiplies each shape's spin, so the field turns backwards for the day and nothing else changes. | `content/seasons.ts`, `content/fortunes.ts`, `components/palette.ts` | S |
+| [x] | Events and a calendar feed | Shipped in #152. `content/events.ts` lists what Jules hosts at a fixed time, as instants with their offset, a length, a title and a `goTo` path or URL; the `id` is the feed's `UID`. While one is ahead, `/now` lists it in the visitor's zone, the footer names it from a week before, and `calendar` prints it. `vite-plugins/calendar.ts` writes `/events.ics` and `/events.fr.ics` from RFC 5545 by hand. The list ships empty and the page shows nothing while it is. | `content/events.ts` (new), `vite-plugins/calendar.ts` (new), `views/NowView.vue`, `components/SiteFooter.vue`, `composables/useStatus.ts`, `terminal/commands/content.ts`, `public/.htaccess` | M |
+
+### Trust and portability
+
+| ✔ | Feature | Approach | Files | Effort |
+|---|---|---|---|---|
+| [x] | Disclosure policy | Shipped in #152. `/security`: what counts (the API, anything a visitor writes reaching the page, any claim on `/privacy` that doesn't hold), what doesn't (the CTF, denial of service, third parties), how to report, what happens next, a good-faith testing clause and a thanks list. `security.txt` (RFC 9116) is built from the same module, with `Expires` half a year after the build. | `content/security.ts` (new), `vite-plugins/security.ts` (new), `views/SecurityView.vue` (new), `router/index.ts`, `public/.htaccess`, `public/sitemap.xml`, `public/llms.txt` | S–M |
+| [x] | Save file | Shipped in #152. The part of *carry your data* the storage inspector didn't cover: `/privacy` packs the chosen groups (never secrets) into a code, offered as `/privacy#save=<code>` and a QR of it. Opening the link shows each key against what is stored and writes the changed ones only on restore. Reading a code trusts nothing in it. | `lib/save-file.ts` (new), `lib/save-link.ts` (new), `lib/base64url.ts` (new), `components/SaveFile.vue` (new), `lib/storage-keys.ts`, `main.ts` | M |
+
+### Music
+
+| ✔ | Feature | Approach | Files | Effort |
+|---|---|---|---|---|
+| [x] | Stems | Shipped in #152. One of Jules's tracks as stems on faders in the music section: mute, solo, level, a low-pass over the mix, and the mix as a link. Every stem decoded and started at one instant, so they stay sample-locked. The list ships empty, and the mixer isn't drawn or fetched until it has a track. | `content/stems.ts` (new), `components/stems/` (new), `components/sections/MusicSection.vue` | M |
+
+### Departures from the approach column
+
+The approach column above was written after the build, so these are departures from the
+brainstorm's pitch rather than from the rows.
+
+- **Events:**
+  - `calendar` is listed in `help` even while the list is empty, and says nothing is
+    scheduled. A linkable command can't be hidden (`registry.spec.ts`), and it is where the
+    feed's address is printed, which is worth having before the first event.
+  - RFC 5545's grammar wants at least one component, so the feed always carries a
+    `VTIMEZONE` for Europe/Paris that no event refers to, rather than a placeholder event in
+    every subscriber's calendar.
+  - Folding keeps an escape (`\,`) on one line, which the standard doesn't ask for, since a
+    reader that unescapes line by line would see a lone backslash.
+  - `calendar` is kept off the curl pages, which are snapshots and can't know what is ahead.
+- **Disclosure policy:** the file is built at the root, and `.htaccess` answers
+  `/.well-known/security.txt` from it. The frontend deploy's rsync excludes `.well-known/` whole
+  so `--delete` never touches AutoSSL's challenges, which also means nothing built there would
+  upload. `security.spec.ts` checks both the rewrite and the exclude it works around.
+- **Save file:**
+  - The code rides in the fragment, which no request carries, but the router captures the
+    address when its module is evaluated and would write it back, and an analytics tracker
+    reading `location.href` would send it on. So `lib/save-link.ts`, the first module `main.ts`
+    imports, takes it out of the address as it loads. A link pasted into `/privacy`'s own
+    address bar changes only the fragment and loads nothing, so a watch on the route does the
+    same there.
+  - The QR is drawn only up to version 20: past that, the modules on a phone-sized drawing
+    are too small to scan reliably. The shell group, most of a save's size, starts unticked.
+  - Writes go through a new `writeItems()` in `storage-keys.ts`, since the storage spec lets no
+    other unlisted module touch storage.
+  - `acid`'s base64url helpers moved to `lib/base64url.ts`, now shared by three codes.
+- **Stems:**
+  - In the music section rather than on `/tools`: it is Jules's own music, not a utility.
+  - An excerpt rather than a whole track: every stem is held decoded, 384 kB a second each,
+    so a spec caps a track at what a phone tab can spare.
+  - No master cut, unlike `acid`: stems sum back to the master, so the loudest setting is the
+    release as mastered, and the limiter only catches the filter's peaks.
+- **Seasons:** the spec that kept each mood a nudge now bounds the speed's magnitude, and a
+  second spec holds April Fools' as the only reversed one.
+- **After review (#152):**
+  - The PR first went 2.3 kB over the home page's byte budget. Words only lazy pages read
+    moved out of `i18n/messages.ts` into tables beside them (`/privacy`'s own, existing ones
+    included), the footer's event line became a chunk fetched only while there is an event,
+    and `events.ts` and `stems.ts` were cut down to data, with what their readers compute in
+    `upcoming.ts` and the mixer's chunk. The page ends about 0.5 kB heavier than before.
+  - A save link makes every key it can carry someone else's input. A sweep of their readers
+    found states that broke a page or left something out of reach (a daily wordle record,
+    achievements, CTF flags, a forged scheme, aliases, history), and one that froze the tab:
+    `parse.ts` rescanned the rest of the line for each opening quote. Each reader now checks
+    what it finds, the parser is linear, and the preview lists restored aliases in full.
+  - Making a save holds to the limits a restore applies, a link made while the choice
+    changed is thrown away, and a restore the storage refuses says so instead of reloading.
 
 ## Build order
 

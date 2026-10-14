@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { useTerminal } from '@/composables/useTerminal'
 import { clearAliases, expandAliases, parseDefinition, removeAlias, setAlias } from '../aliases'
 import { coreCommands } from '../commands/core'
@@ -114,6 +114,15 @@ describe('an alias a later command shadows', () => {
     expect(buffer.value.map((l) => l.text).join('\n')).not.toContain('hijacked')
   })
 
+  // `alias` refuses this name, but a save link can restore one stored by someone else.
+  it('does not run a stored alias on the first word of a two-word command typed alone', async () => {
+    const { buffer, clearBuffer, run } = useTerminal()
+    clearBuffer()
+    setAlias('git', 'echo hijacked')
+    await run('git')
+    expect(buffer.value.map((l) => l.text).join('\n')).not.toContain('hijacked')
+  })
+
   it('refuses to define an alias on the first word of a two-word command', async () => {
     const alias = coreCommands.find((c) => c.name === 'alias')!
     const { lines } = await runCommand(alias, ["git='echo", "x'"])
@@ -137,5 +146,19 @@ describe('an alias a later command shadows', () => {
     const listed = lines.map((l) => l.text)
     expect(listed.find((t) => t.startsWith('whoami'))).toContain('(shadowed by a command)')
     expect(listed.find((t) => t.startsWith('gl'))).not.toContain('shadowed')
+  })
+})
+
+describe('the stored aliases', () => {
+  // Read at import, and from a key a save link can fill with someone else's aliases.
+  it('keep only one-word names and definitions of a sane length', async () => {
+    window.localStorage.setItem(
+      'couvbat:aliases',
+      JSON.stringify({ gl: 'git log', 'two words': 'ls', '': 'ls', big: 'x'.repeat(5000), n: 42 }),
+    )
+    vi.resetModules()
+    const { aliases } = await import('../aliases')
+    expect(aliases.value).toEqual({ gl: 'git log' })
+    window.localStorage.removeItem('couvbat:aliases')
   })
 })
