@@ -26,6 +26,7 @@ describe('analytics', () => {
     vi.unstubAllEnvs()
     document.head.querySelectorAll('script').forEach((el) => el.remove())
     delete window.umami
+    localStorage.clear()
   })
 
   it('injects nothing when unconfigured', async () => {
@@ -124,5 +125,99 @@ describe('analytics', () => {
     tracker()?.dispatchEvent(new Event('load'))
 
     expect(umamiTrack).not.toHaveBeenCalled()
+  })
+
+  it('injects nothing and drops every event once the visitor has refused', async () => {
+    const { analyticsRefused, initAnalytics, refuseAnalytics, track } = await load({
+      VITE_UMAMI_SRC: SRC,
+      VITE_UMAMI_WEBSITE_ID: ID,
+    })
+    const umamiTrack = vi.fn()
+    window.umami = { track: umamiTrack }
+
+    refuseAnalytics(true)
+    initAnalytics()
+    track('terminal-opened')
+
+    expect(analyticsRefused()).toBe(true)
+    expect(tracker()).toBeNull()
+    expect(umamiTrack).not.toHaveBeenCalled()
+  })
+
+  it('counts again once the refusal is withdrawn', async () => {
+    const { analyticsRefused, initAnalytics, refuseAnalytics } = await load({
+      VITE_UMAMI_SRC: SRC,
+      VITE_UMAMI_WEBSITE_ID: ID,
+    })
+
+    refuseAnalytics(true)
+    refuseAnalytics(false)
+    initAnalytics()
+
+    expect(analyticsRefused()).toBe(false)
+    expect(localStorage.getItem('couvbat:analytics')).toBeNull()
+    expect(localStorage.getItem('umami.disabled')).toBeNull()
+    expect(tracker()).not.toBeNull()
+  })
+
+  // Found in review: an event queued while the script downloaded still went out on `load`.
+  it('drops the events waiting for the script when the visitor refuses before it arrives', async () => {
+    const { initAnalytics, refuseAnalytics, track } = await load({ VITE_UMAMI_SRC: SRC, VITE_UMAMI_WEBSITE_ID: ID })
+    const umamiTrack = vi.fn()
+
+    initAnalytics()
+    track('terminal-opened')
+    expect(refuseAnalytics(true)).toBe(true)
+    window.umami = { track: umamiTrack }
+    tracker()?.dispatchEvent(new Event('load'))
+
+    expect(umamiTrack).not.toHaveBeenCalled()
+  })
+
+  // Found in review: refusing in one tab left a tracker running in another.
+  it('silences a tracker already running, in this tab and any other', async () => {
+    const { initAnalytics, refuseAnalytics, track } = await load({ VITE_UMAMI_SRC: SRC, VITE_UMAMI_WEBSITE_ID: ID })
+    const umamiTrack = vi.fn()
+    initAnalytics()
+    window.umami = { track: umamiTrack }
+    tracker()?.dispatchEvent(new Event('load'))
+
+    // What a second tab's module would write: the same shared storage.
+    refuseAnalytics(true)
+
+    // Umami's own switch, which its tracker reads before every send, page views included.
+    expect(localStorage.getItem('umami.disabled')).not.toBeNull()
+    track('terminal-opened')
+    expect(umamiTrack).not.toHaveBeenCalled()
+  })
+
+  it('says so, and changes nothing, when the browser won’t keep the refusal', async () => {
+    const { analyticsRefused, refuseAnalytics } = await load({ VITE_UMAMI_SRC: SRC, VITE_UMAMI_WEBSITE_ID: ID })
+    const setItem = Storage.prototype.setItem
+    const full = vi.spyOn(Storage.prototype, 'setItem').mockImplementation(function (this: Storage, key: string, value: string) {
+      // The switch fits and the record doesn't: the half-written state the rollback undoes.
+      if (key === 'couvbat:analytics') throw new DOMException('full', 'QuotaExceededError')
+      setItem.call(this, key, value)
+    })
+
+    expect(refuseAnalytics(true)).toBe(false)
+    full.mockRestore()
+
+    expect(analyticsRefused()).toBe(false)
+    expect(localStorage.getItem('umami.disabled')).toBeNull()
+  })
+
+  it('takes back a switch it set once the record is gone, and leaves the owner’s alone', async () => {
+    const { initAnalytics } = await load({ VITE_UMAMI_SRC: SRC, VITE_UMAMI_WEBSITE_ID: ID })
+
+    // `rm settings` cleared the record and left the switch.
+    localStorage.setItem('umami.disabled', 'couvbat:analytics')
+    initAnalytics()
+    expect(localStorage.getItem('umami.disabled')).toBeNull()
+
+    document.head.querySelectorAll('script').forEach((el) => el.remove())
+    localStorage.setItem('umami.disabled', '1')
+    initAnalytics()
+    expect(localStorage.getItem('umami.disabled')).toBe('1')
   })
 })

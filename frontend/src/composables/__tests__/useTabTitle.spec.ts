@@ -45,6 +45,13 @@ describe('tabTitle', () => {
     expect(tabTitle('/privacy')).toBe(`Ce que ce site garde — ${profile.name}`)
   })
 
+  it('names /legal, in both languages', () => {
+    expect(tabTitle('/legal')).toBe(`Legal notice — ${profile.name}`)
+    expect(pageLabel('/legal')).toBe(`Legal notice — ${profile.name}`)
+    setLocale('fr')
+    expect(tabTitle('/legal')).toBe(`Mentions légales — ${profile.name}`)
+  })
+
   it('follows the locale', () => {
     setLocale('fr')
     expect(tabTitle('/tools')).toBe(`Outils & utilitaires — ${profile.name}`)

@@ -111,6 +111,11 @@
     <priority>0.3</priority>
   </url>
   <url>
+    <loc>https://jhemery.xyz/legal</loc>
+    <changefreq>yearly</changefreq>
+    <priority>0.2</priority>
+  </url>
+  <url>
     <loc>https://jhemery.xyz/security</loc>
     <changefreq>yearly</changefreq>
     <priority>0.3</priority>

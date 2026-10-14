@@ -52,6 +52,13 @@ const router = createRouter({
       component: () => import('../views/PrivacyView.vue'),
     },
     {
+      // The mentions légales and the credits, beside /privacy in the footer and outside
+      // the prism for the same reason.
+      path: '/legal',
+      name: 'legal',
+      component: () => import('../views/LegalView.vue'),
+    },
+    {
       // The disclosure policy (content/security.ts), outside the prism like /privacy.
       path: '/security',
       name: 'security',

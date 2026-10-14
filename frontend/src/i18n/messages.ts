@@ -68,6 +68,12 @@ export const messages = {
     genres: { en: 'Genres', fr: 'Genres' },
     tools: { en: 'Tools', fr: 'Outils' },
     listen: { en: 'Listen on SoundCloud', fr: 'Écouter sur SoundCloud' },
+    // In place of the player until it is asked for: what loading it hands SoundCloud.
+    consent: {
+      en: 'The player comes from SoundCloud, which sets its own cookies and sees your IP address. It loads only when you ask.',
+      fr: 'Le lecteur vient de SoundCloud, qui dépose ses propres cookies et voit votre adresse IP. Il ne se charge que si vous le demandez.',
+    },
+    load: { en: '▶ load the player', fr: '▶ charger le lecteur' },
   },
   gaming: {
     favouriteGenres: { en: 'Favourite genres', fr: 'Genres préférés' },
@@ -106,6 +112,11 @@ export const messages = {
     directLine: { en: 'Prefer a direct line? Find me here:', fr: 'Vous préférez le contact direct ?' },
     resume: { en: 'Résumé', fr: 'CV' },
     resumeNote: { en: 'printable, or save as PDF', fr: 'à imprimer, ou en PDF' },
+    // Under the form: what sending it hands over, where the law wants it said.
+    notice: {
+      en: 'Your name, address and message reach my inbox and serve only to answer you.',
+      fr: 'Votre nom, votre adresse et votre message arrivent dans ma boîte et ne servent qu’à vous répondre.',
+    },
   },
   terminal: {
     open: { en: 'Open terminal', fr: 'Ouvrir le terminal' },
@@ -926,23 +937,27 @@ export const messages = {
     times: { en: '{n} on screen', fr: '{n} à l’écran' },
     shapes: { en: '{n} shapes', fr: '{n} formes' },
   },
-  // /privacy (views/PrivacyView.vue). The keys and their purposes are lib/storage-keys.ts's,
-  // shared with `du`; this is the page around them. Every claim below is one the code
-  // keeps, and `strace` is how a visitor checks it rather than taking the page's word.
   // `/security`'s heading, which the tab title names too. The rest of the page's words are
   // in `content/security.ts`, which only the page loads.
   security: {
     heading: { en: 'Reporting a security problem', fr: 'Signaler un problème de sécurité' },
   },
-  // `/privacy`'s heading, which the tab title names too, and the one line that names a
-  // browser API, which `content/` may not (`purity.spec.ts`). The rest of the page's words
-  // are in `content/privacy.ts`, which only the page loads.
+  // /privacy (views/PrivacyView.vue). The heading, which the tab title needs from the main
+  // bundle, and one line that can't move; the page's other words are content/privacy.ts's,
+  // loaded with the page.
   privacy: {
     heading: { en: 'What this site keeps', fr: 'Ce que ce site garde' },
+    // Here rather than with the page's other labels: it names `navigator.`, which the
+    // content layer's purity check reads as a reach for the browser.
     estimate: {
       en: 'Your browser counts {size} in use by this site (`navigator.storage.estimate()`).',
       fr: 'Votre navigateur compte {size} utilisés par ce site (`navigator.storage.estimate()`).',
     },
+  },
+  // /legal (views/LegalView.vue). Only the heading, which the tab title needs from the main
+  // bundle; the rest of the page's words are content/legal.ts's, loaded with the page.
+  legal: {
+    heading: { en: 'Legal notice', fr: 'Mentions légales' },
   },
   footer: {
     built: { en: 'built', fr: 'build' },
