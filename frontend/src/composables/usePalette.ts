@@ -5,3 +5,11 @@ import { ref } from 'vue'
  * so `usePageFocus` can leave focus alone while it is, without importing a component.
  */
 export const paletteOpen = ref(false)
+
+/**
+ * Opens it from a button: the navbar menu's *search*, since a phone has no Ctrl+K. The
+ * palette watches `paletteOpen`, so it focuses its input however it was opened.
+ */
+export function openPalette(): void {
+  paletteOpen.value = true
+}

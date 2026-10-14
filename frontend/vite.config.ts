@@ -8,6 +8,7 @@ import { VitePWA } from 'vite-plugin-pwa'
 import { commitSha } from './vite-plugins/git'
 import { notesPlugin } from './vite-plugins/notes'
 import { resumePlugin } from './vite-plugins/resume'
+import { searchPlugin } from './vite-plugins/search'
 import { thirdPartyPlugin } from './vite-plugins/third-party'
 import { profile } from './src/content/profile'
 
@@ -19,6 +20,7 @@ export default defineConfig({
     tailwindcss(),
     resumePlugin(),
     notesPlugin(),
+    searchPlugin(),
     thirdPartyPlugin(),
     VitePWA({
       registerType: 'autoUpdate',
@@ -112,6 +114,9 @@ export default defineConfig({
           // The design notes (`vite-plugins/notes.ts`): static documents, like the résumés.
           /^\/notes(\/.*)?$/,
           /^\/notes\.css$/,
+          // The palette's search index (`vite-plugins/search.ts`). The palette fetches it,
+          // which the fallback never answers; this is for a browser opening it by hand.
+          /^\/search\.json$/,
         ],
         cleanupOutdatedCaches: true,
         clientsClaim: true,

@@ -196,9 +196,26 @@ export const messages = {
   },
   palette: {
     placeholder: { en: 'Type a command or search…', fr: 'Tapez une commande ou cherchez…' },
-    empty: { en: 'No matching command', fr: 'Aucune commande correspondante' },
+    empty: { en: 'Nothing matches', fr: 'Aucun résultat' },
     hint: { en: '↑↓ navigate · ↵ run · esc close', fr: '↑↓ naviguer · ↵ lancer · échap fermer' },
     open: { en: 'Command palette', fr: 'Palette de commandes' },
+  },
+  // The palette's content search (`lib/search.ts`): the kinds it groups `/search.json`'s
+  // results under, and the navbar menu's way in on a phone, which has no Ctrl+K.
+  search: {
+    open: { en: 'search', fr: 'rechercher' },
+    loading: { en: 'Searching…', fr: 'Recherche…' },
+    failed: {
+      en: 'The search index didn’t load. Commands still work.',
+      fr: 'L’index de recherche n’a pas pu être chargé. Les commandes fonctionnent toujours.',
+    },
+    work: { en: 'Case studies', fr: 'Études de cas' },
+    why: { en: 'Decisions', fr: 'Décisions' },
+    note: { en: 'Design notes', fr: 'Notes de conception' },
+    now: { en: 'Now', fr: 'En ce moment' },
+    // Read after a note in the other language: the notes aren't translated.
+    inEnglish: { en: 'in English', fr: 'en anglais' },
+    inFrench: { en: 'in French', fr: 'en français' },
   },
   notFound: {
     // What the page is announced as, and called in `pageLabel()`: the tab keeps the

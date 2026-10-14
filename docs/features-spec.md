@@ -579,7 +579,8 @@ Full design in [the first games spec](superpowers/specs/2026-08-04-terminal-game
 
 ## 4. Command palette
 
-**Where:** `frontend/src/components/CommandPalette.vue`
+**Where:** `frontend/src/components/CommandPalette.vue`, `frontend/src/lib/search.ts`,
+`frontend/vite-plugins/search.ts`
 
 `Ctrl+K` / `Cmd+K` opens a filtered list of the views, the sections and every command flagged
 `palette: true` — `help`, the content and live-data commands, `tools`, `games`, `achievements`,
@@ -589,6 +590,22 @@ opens the terminal with that command already run.
 
 This exists so the ~90% of visitors who will never type into a terminal still get the fast path.
 It shares the registry, so it needs no separate maintenance.
+
+**Content search** (roadmap §I). Matching is `lib/search.ts`: the query is split into words,
+folded as the word games fold, and every word has to start a word of the entry; a match in a
+title outranks one in a note's heading, which outranks one in body text. From three characters
+the palette also fetches `/search.json`, which `vite-plugins/search.ts` writes at build time: one
+entry per case study, per `why` topic, per heading of every design note (with the id the notes
+plugin gave it) and for `/now`, each cut to about two hundred characters, in both languages where
+the source has them and notes in their own, marked. Fetched, not bundled, so the eager chunk
+pays only for the matcher; like the notes, it is out of the precache, off the SPA fallback and
+`no-cache`. Results sit under the palette's own entries, grouped by kind, six at most per kind.
+A case study routes, a note heading is a plain navigation to its anchor, and a `why` result runs
+`why <topic>` through the `?run=` path (so `isLinkable` checks it); below `md` it opens the
+decision's design instead. Phones have no Ctrl+K, so the navbar menu has a *search* entry that
+opens the palette; there it lists no registry commands, since each would open the terminal §9
+keeps off phones. `content/__tests__/search.spec.ts` holds every case study, decision and note
+heading to an entry.
 
 ---
 
@@ -1216,7 +1233,9 @@ Retrofitting these is painful, so they are part of the definition of done:
   `games`): while a command holds the keyboard the region drops to `aria-live="off"`, because a
   grid redrawn eight times a second through a polite live region is actively hostile. These are
   visual games and a screen reader cannot play them; announcing the redraws would not change that.
-- Command palette: `role="listbox"`, arrow-key navigation, `aria-activedescendant`.
+- Command palette: `role="listbox"`, arrow-key navigation, `aria-activedescendant`. Content
+  results are `role="group"`s labelled by their kind, as in the APG's grouped listbox, and a note
+  in the other language carries `lang` and says which.
 - Achievements modal: same hand-rolled pattern as the terminal overlay — `role="dialog"`,
   `aria-modal="true"`, `Tab`/`Shift+Tab` cycled inside the panel, focus moved to the close button
   on open and restored to the nav button on close.
@@ -1261,7 +1280,8 @@ Retrofitting these is painful, so they are part of the definition of done:
 - The launcher is `hidden` below `md`. Mobile virtual keyboards fight fixed-position input panels
   badly enough that a bad terminal is worse than none; mobile users get the full rendered page,
   which carries the same information. `Ctrl+K` remains available for anyone on a tablet with a
-  keyboard.
+  keyboard. Phones reach the palette from the navbar menu's *search* (§4), without its commands;
+  its input is 16px there, since iOS zooms the page into any smaller one on focus.
 
 ## 10. Explicitly out of scope
 
