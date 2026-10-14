@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { describe, expect, it } from 'vitest'
-import { FFMPEG_CORE_VERSION, cdn, credits, host, legalCopy } from '../legal'
+import { FFMPEG_CORE_VERSION, cdn, credits, host, legalCopy, legalHeadings } from '../legal'
 
 /**
  * `/legal`'s copy, held as `privacy.spec.ts` holds `/privacy`'s: both languages, and out of
@@ -9,7 +9,7 @@ import { FFMPEG_CORE_VERSION, cdn, credits, host, legalCopy } from '../legal'
  * exact `@ffmpeg/core` the ffmpeg tool serves, so a dependency bump that forgets it fails.
  */
 describe('legalCopy', () => {
-  it.each(Object.entries(legalCopy))('%s is written in both languages', (_, text) => {
+  it.each(Object.entries({ ...legalCopy, ...legalHeadings }))('%s is written in both languages', (_, text) => {
     expect(text.en.trim()).not.toBe('')
     expect(text.fr.trim()).not.toBe('')
     expect(text.fr).not.toBe(text.en)

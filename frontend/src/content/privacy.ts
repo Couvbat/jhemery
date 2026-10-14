@@ -7,7 +7,7 @@ import type { Localised } from './types'
  * is imported as `@/content/privacy`, never through the barrel: only the lazy privacy page
  * reads it, and through the barrel it would load with every first paint, against the home
  * page's byte budget (`fortunes.ts` stays out of the barrel for the same reason). The page's
- * buttons and status lines stay in `i18n/messages.ts` beside the rest of the interface.
+ * headings, buttons and status lines are `privacyLabels`, below, for the same reason.
  */
 export const privacyCopy = {
   intro: {
@@ -86,4 +86,42 @@ export const privacyCopy = {
     en: `You can ask to see, correct or delete what I hold about you, or object to its use, by writing to ${profile.email}. I answer within a month. If you think I got it wrong, you can complain to the CNIL.`,
     fr: `Vous pouvez demander à voir, corriger ou effacer ce que je détiens sur vous, ou vous opposer à son usage, en écrivant à ${profile.email}. Je réponds sous un mois. Si vous estimez que j’ai mal fait, vous pouvez saisir la CNIL.`,
   },
+} satisfies Record<string, Localised>
+
+/**
+ * The page's headings, buttons and status lines. Interface rather than copy, and they lived
+ * in `i18n/messages.ts` with the rest of the interface until the GDPR sections added theirs
+ * and the home page's byte budget failed (Lighthouse, on #153): every string there loads with
+ * every first paint, and these show only here. The keys and their purposes are
+ * lib/storage-keys.ts's, shared with `du`; this is the page around them.
+ */
+export const privacyLabels = {
+  browser: { en: 'In this browser', fr: 'Dans ce navigateur' },
+  notSet: { en: 'not set', fr: 'absente' },
+  secret: { en: 'secret: only its length is shown', fr: 'secret : seule sa longueur est affichée' },
+  // `{n}` keys, `{size}` bytes: a group's total, beside its clear button.
+  stored: { en: 'stored: {n} · {size}', fr: 'stockées : {n} · {size}' },
+  clear: { en: 'clear', fr: 'effacer' },
+  // The first press arms; the second, on a different button, clears. The armed button
+  // turns into Cancel in place, so a double-click lands on Cancel.
+  cancel: { en: 'cancel', fr: 'annuler' },
+  confirm: { en: 'yes, clear {n} and reload', fr: 'oui, effacer {n} et recharger' },
+  cleared: { en: 'Cleared. Reloading…', fr: 'Effacé. Rechargement…' },
+  caches: { en: 'Caches', fr: 'Caches' },
+  files: { en: '{n} files', fr: '{n} fichiers' },
+  noCaches: {
+    en: 'Nothing cached here: the service worker hasn’t stored anything yet, or isn’t running.',
+    fr: 'Rien en cache ici : le service worker n’a encore rien stocké, ou ne tourne pas.',
+  },
+  sends: { en: 'What leaves your browser', fr: 'Ce qui quitte votre navigateur' },
+  // Shown only in a build that counts visits: the CNIL's exemption needs a way to refuse.
+  counting: { en: 'Visit counting', fr: 'Mesure d’audience' },
+  refuse: { en: 'refuse and reload', fr: 'refuser et recharger' },
+  allow: { en: 'count me again and reload', fr: 'me compter à nouveau et recharger' },
+  unsaved: {
+    en: 'Your browser wouldn’t keep the choice, so nothing changed. A content blocker refuses the tracker just as well.',
+    fr: 'Votre navigateur n’a pas voulu garder ce choix : rien n’a changé. Un bloqueur de contenu refuse le traceur tout aussi bien.',
+  },
+  who: { en: 'Who answers for it', fr: 'Qui en répond' },
+  rights: { en: 'Your rights', fr: 'Vos droits' },
 } satisfies Record<string, Localised>

@@ -937,53 +937,22 @@ export const messages = {
     times: { en: '{n} on screen', fr: '{n} à l’écran' },
     shapes: { en: '{n} shapes', fr: '{n} formes' },
   },
-  // /privacy (views/PrivacyView.vue). The keys and their purposes are lib/storage-keys.ts's,
-  // shared with `du`; this is the page around them. Every claim below is one the code
-  // keeps, and `strace` is how a visitor checks it rather than taking the page's word.
+  // /privacy (views/PrivacyView.vue). The heading, which the tab title needs from the main
+  // bundle, and one line that can't move; the page's other words are content/privacy.ts's,
+  // loaded with the page.
   privacy: {
     heading: { en: 'What this site keeps', fr: 'Ce que ce site garde' },
-    browser: { en: 'In this browser', fr: 'Dans ce navigateur' },
-    notSet: { en: 'not set', fr: 'absente' },
-    secret: { en: 'secret: only its length is shown', fr: 'secret : seule sa longueur est affichée' },
-    // `{n}` keys, `{size}` bytes: a group's total, beside its clear button.
-    stored: { en: 'stored: {n} · {size}', fr: 'stockées : {n} · {size}' },
-    clear: { en: 'clear', fr: 'effacer' },
-    // The first press arms; the second, on a different button, clears. The armed button
-    // turns into Cancel in place, so a double-click lands on Cancel.
-    cancel: { en: 'cancel', fr: 'annuler' },
-    confirm: { en: 'yes, clear {n} and reload', fr: 'oui, effacer {n} et recharger' },
-    cleared: { en: 'Cleared. Reloading…', fr: 'Effacé. Rechargement…' },
-    caches: { en: 'Caches', fr: 'Caches' },
-    files: { en: '{n} files', fr: '{n} fichiers' },
-    noCaches: {
-      en: 'Nothing cached here: the service worker hasn’t stored anything yet, or isn’t running.',
-      fr: 'Rien en cache ici : le service worker n’a encore rien stocké, ou ne tourne pas.',
-    },
+    // Here rather than with the page's other labels: it names `navigator.`, which the
+    // content layer's purity check reads as a reach for the browser.
     estimate: {
       en: 'Your browser counts {size} in use by this site (`navigator.storage.estimate()`).',
       fr: 'Votre navigateur compte {size} utilisés par ce site (`navigator.storage.estimate()`).',
     },
-    sends: { en: 'What leaves your browser', fr: 'Ce qui quitte votre navigateur' },
-    // Shown only in a build that counts visits: the CNIL's exemption needs a way to refuse.
-    counting: { en: 'Visit counting', fr: 'Mesure d’audience' },
-    refuse: { en: 'refuse and reload', fr: 'refuser et recharger' },
-    allow: { en: 'count me again and reload', fr: 'me compter à nouveau et recharger' },
-    unsaved: {
-      en: 'Your browser wouldn’t keep the choice, so nothing changed. A content blocker refuses the tracker just as well.',
-      fr: 'Votre navigateur n’a pas voulu garder ce choix : rien n’a changé. Un bloqueur de contenu refuse le traceur tout aussi bien.',
-    },
-    who: { en: 'Who answers for it', fr: 'Qui en répond' },
-    rights: { en: 'Your rights', fr: 'Vos droits' },
   },
-  // /legal (views/LegalView.vue); its paragraphs and the credits are content/legal.ts's.
+  // /legal (views/LegalView.vue). Only the heading, which the tab title needs from the main
+  // bundle; the rest of the page's words are content/legal.ts's, loaded with the page.
   legal: {
     heading: { en: 'Legal notice', fr: 'Mentions légales' },
-    publisher: { en: 'Publisher', fr: 'Éditeur' },
-    host: { en: 'Hosting', fr: 'Hébergement' },
-    guestbook: { en: 'Visitors’ messages', fr: 'Messages des visiteurs' },
-    property: { en: 'Code and trademarks', fr: 'Code et marques' },
-    credits: { en: 'Credits', fr: 'Crédits' },
-    phone: { en: 'phone', fr: 'tél.' },
   },
   footer: {
     built: { en: 'built', fr: 'build' },

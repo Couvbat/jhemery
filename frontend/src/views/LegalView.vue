@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { RouterLink } from 'vue-router'
 import { profile } from '@/content'
-import { cdn, credits, host, legalCopy, type Company } from '@/content/legal'
+import { cdn, credits, host, legalCopy, legalHeadings, type Company } from '@/content/legal'
 import CodeText from '@/components/CodeText.vue'
 import { useLocale } from '@/i18n'
 
@@ -18,7 +18,7 @@ function companyLines(company: Company): string[] {
   return [
     company.name,
     company.address,
-    ...(company.phone ? [`${t(m.legal.phone)} ${company.phone}`] : []),
+    ...(company.phone ? [`${t(legalHeadings.phone)} ${company.phone}`] : []),
     ...(company.siren ? [`SIREN ${company.siren}`] : []),
   ]
 }
@@ -39,13 +39,13 @@ function companyLines(company: Company): string[] {
       </header>
 
       <section class="space-y-3" aria-labelledby="legal-publisher">
-        <h2 id="legal-publisher" class="text-primary font-mono text-sm">## {{ t(m.legal.publisher) }}</h2>
+        <h2 id="legal-publisher" class="text-primary font-mono text-sm">## {{ t(legalHeadings.publisher) }}</h2>
         <p class="text-sm text-foreground leading-relaxed">{{ t(legalCopy.publisher) }}</p>
         <p class="text-sm text-foreground leading-relaxed"><CodeText :text="t(legalCopy.contact)" /></p>
       </section>
 
       <section class="space-y-3" aria-labelledby="legal-host">
-        <h2 id="legal-host" class="text-primary font-mono text-sm">## {{ t(m.legal.host) }}</h2>
+        <h2 id="legal-host" class="text-primary font-mono text-sm">## {{ t(legalHeadings.host) }}</h2>
         <template v-for="{ intro, company } in operators" :key="company.name">
           <p class="text-sm text-foreground leading-relaxed">{{ t(intro) }}</p>
           <address class="not-italic font-mono text-xs text-muted-foreground border-l-2 border-primary/40 pl-4 space-y-0.5">
@@ -56,13 +56,13 @@ function companyLines(company: Company): string[] {
       </section>
 
       <section id="guestbook" class="space-y-3" aria-labelledby="legal-guestbook">
-        <h2 id="legal-guestbook" class="text-primary font-mono text-sm">## {{ t(m.legal.guestbook) }}</h2>
+        <h2 id="legal-guestbook" class="text-primary font-mono text-sm">## {{ t(legalHeadings.guestbook) }}</h2>
         <p class="text-sm text-foreground leading-relaxed">{{ t(legalCopy.guestbook) }}</p>
         <p class="text-sm text-foreground leading-relaxed">{{ t(legalCopy.report) }}</p>
       </section>
 
       <section class="space-y-3" aria-labelledby="legal-property">
-        <h2 id="legal-property" class="text-primary font-mono text-sm">## {{ t(m.legal.property) }}</h2>
+        <h2 id="legal-property" class="text-primary font-mono text-sm">## {{ t(legalHeadings.property) }}</h2>
         <p class="text-sm text-foreground leading-relaxed">
           {{ t(legalCopy.code) }}
           <a :href="`${repo}/blob/master/LICENSE`" target="_blank" rel="noopener noreferrer" class="text-primary hover:underline">LICENSE ↗</a>
@@ -71,7 +71,7 @@ function companyLines(company: Company): string[] {
       </section>
 
       <section class="space-y-3" aria-labelledby="legal-credits">
-        <h2 id="legal-credits" class="text-primary font-mono text-sm">## {{ t(m.legal.credits) }}</h2>
+        <h2 id="legal-credits" class="text-primary font-mono text-sm">## {{ t(legalHeadings.credits) }}</h2>
         <p class="text-sm text-foreground leading-relaxed">{{ t(legalCopy.credits) }}</p>
         <ul class="space-y-2 font-mono text-xs" data-testid="legal-credits">
           <li

@@ -2,7 +2,7 @@
 import { computed, onMounted, ref, shallowRef } from 'vue'
 import { RouterLink } from 'vue-router'
 import { profile } from '@/content'
-import { privacyCopy } from '@/content/privacy'
+import { privacyCopy, privacyLabels } from '@/content/privacy'
 import type { Localised } from '@/content/types'
 import CodeText from '@/components/CodeText.vue'
 import { useStoredItems } from '@/composables/useStoredItems'
@@ -155,7 +155,7 @@ async function switchCounting() {
       </header>
 
       <section class="space-y-6" aria-labelledby="privacy-browser">
-        <h2 id="privacy-browser" class="text-primary font-mono text-sm">## {{ t(m.privacy.browser) }}</h2>
+        <h2 id="privacy-browser" class="text-primary font-mono text-sm">## {{ t(privacyLabels.browser) }}</h2>
 
         <section
           v-for="group in groups"
@@ -167,7 +167,7 @@ async function switchCounting() {
           <div class="flex flex-wrap items-center gap-x-3 gap-y-2 font-mono text-sm">
             <h3 :id="`privacy-group-${group.id}`" class="text-accent">### {{ t(group.label) }}</h3>
             <span class="text-xs text-muted-foreground">
-              {{ t(m.privacy.stored).replace('{n}', String(group.stored.length)).replace('{size}', formatBytes(group.bytes)) }}
+              {{ t(privacyLabels.stored).replace('{n}', String(group.stored.length)).replace('{size}', formatBytes(group.bytes)) }}
             </span>
             <div class="ml-auto flex flex-wrap gap-2" @keydown.esc="disarm">
               <button
@@ -177,7 +177,7 @@ async function switchCounting() {
                 :aria-expanded="armed === group.id"
                 @click="toggle(group.id)"
               >
-                {{ armed === group.id ? t(m.privacy.cancel) : `${t(m.privacy.clear)} ${t(group.label)}` }}
+                {{ armed === group.id ? t(privacyLabels.cancel) : `${t(privacyLabels.clear)} ${t(group.label)}` }}
               </button>
               <button
                 v-if="armed === group.id"
@@ -186,7 +186,7 @@ async function switchCounting() {
                 :disabled="clearing"
                 @click="clear(group.id)"
               >
-                {{ clearing ? t(m.privacy.cleared) : t(m.privacy.confirm).replace('{n}', String(group.stored.length)) }}
+                {{ clearing ? t(privacyLabels.cleared) : t(privacyLabels.confirm).replace('{n}', String(group.stored.length)) }}
               </button>
             </div>
           </div>
@@ -203,10 +203,10 @@ async function switchCounting() {
             >
               <span class="text-foreground break-all">{{ row.key }}</span>
               <span class="text-muted-foreground">
-                <CodeText :text="t(row.purpose)" /> · {{ row.area }}<template v-if="row.secret"> · {{ t(m.privacy.secret) }}</template>
+                <CodeText :text="t(row.purpose)" /> · {{ row.area }}<template v-if="row.secret"> · {{ t(privacyLabels.secret) }}</template>
               </span>
               <span :class="row.item ? 'text-primary' : 'text-muted-foreground'">
-                {{ row.item ? formatBytes(row.item.bytes) : t(m.privacy.notSet) }}
+                {{ row.item ? formatBytes(row.item.bytes) : t(privacyLabels.notSet) }}
               </span>
             </li>
           </ul>
@@ -214,7 +214,7 @@ async function switchCounting() {
       </section>
 
       <section class="space-y-3" aria-labelledby="privacy-caches">
-        <h2 id="privacy-caches" class="text-primary font-mono text-sm">## {{ t(m.privacy.caches) }}</h2>
+        <h2 id="privacy-caches" class="text-primary font-mono text-sm">## {{ t(privacyLabels.caches) }}</h2>
         <p class="text-sm text-foreground leading-relaxed">{{ t(privacyCopy.cachesIntro) }}</p>
         <template v-if="report">
           <ul v-if="report.caches?.length" class="space-y-2 font-mono text-xs" data-testid="privacy-caches">
@@ -225,12 +225,12 @@ async function switchCounting() {
             >
               <span class="text-foreground break-all">{{ store.name }}</span>
               <span class="text-muted-foreground">
-                <template v-if="cachePurpose(store.name)">{{ t(cachePurpose(store.name)!) }} · </template>{{ t(m.privacy.files).replace('{n}', String(store.files)) }}
+                <template v-if="cachePurpose(store.name)">{{ t(cachePurpose(store.name)!) }} · </template>{{ t(privacyLabels.files).replace('{n}', String(store.files)) }}
               </span>
               <span class="text-primary">{{ formatBytes(store.bytes) }}</span>
             </li>
           </ul>
-          <p v-else class="text-sm text-muted-foreground">{{ t(m.privacy.noCaches) }}</p>
+          <p v-else class="text-sm text-muted-foreground">{{ t(privacyLabels.noCaches) }}</p>
           <p v-if="report.caches?.length" class="text-sm text-muted-foreground">{{ t(WORKBOX_NOTE) }}</p>
           <p v-if="report.usage !== null" data-testid="storage-estimate" class="text-sm text-muted-foreground">
             <CodeText :text="t(m.privacy.estimate).replace('{size}', formatBytes(report.usage))" />
@@ -241,12 +241,12 @@ async function switchCounting() {
       </section>
 
       <section class="space-y-3" aria-labelledby="privacy-sends">
-        <h2 id="privacy-sends" class="text-primary font-mono text-sm">## {{ t(m.privacy.sends) }}</h2>
+        <h2 id="privacy-sends" class="text-primary font-mono text-sm">## {{ t(privacyLabels.sends) }}</h2>
         <ul class="space-y-3 text-sm text-foreground leading-relaxed">
           <li v-for="(claim, i) in claims" :key="i" class="border-l-2 border-primary/40 pl-4"><CodeText :text="t(claim)" /></li>
         </ul>
         <div v-if="counting" data-testid="privacy-counting" class="space-y-2">
-          <h3 class="text-accent font-mono text-sm">### {{ t(m.privacy.counting) }}</h3>
+          <h3 class="text-accent font-mono text-sm">### {{ t(privacyLabels.counting) }}</h3>
           <div class="flex flex-wrap items-center gap-x-3 gap-y-2">
             <p class="text-sm text-foreground">{{ t(refused ? privacyCopy.analyticsOff : privacyCopy.analyticsOn) }}</p>
             <button
@@ -255,22 +255,22 @@ async function switchCounting() {
               :disabled="switching"
               @click="switchCounting"
             >
-              {{ switching ? t(m.privacy.cleared) : t(refused ? m.privacy.allow : m.privacy.refuse) }}
+              {{ switching ? t(privacyLabels.cleared) : t(refused ? privacyLabels.allow : privacyLabels.refuse) }}
             </button>
           </div>
-          <p v-if="unsaved" class="text-xs text-warning" role="alert">{{ t(m.privacy.unsaved) }}</p>
+          <p v-if="unsaved" class="text-xs text-warning" role="alert">{{ t(privacyLabels.unsaved) }}</p>
         </div>
         <p class="text-sm text-foreground leading-relaxed"><CodeText :text="t(privacyCopy.strace)" /></p>
       </section>
 
       <section class="space-y-3" aria-labelledby="privacy-who">
-        <h2 id="privacy-who" class="text-primary font-mono text-sm">## {{ t(m.privacy.who) }}</h2>
+        <h2 id="privacy-who" class="text-primary font-mono text-sm">## {{ t(privacyLabels.who) }}</h2>
         <p class="text-sm text-foreground leading-relaxed">{{ t(privacyCopy.controller) }}</p>
         <p class="text-sm text-foreground leading-relaxed">{{ t(privacyCopy.bases) }}</p>
       </section>
 
       <section class="space-y-3" aria-labelledby="privacy-rights">
-        <h2 id="privacy-rights" class="text-primary font-mono text-sm">## {{ t(m.privacy.rights) }}</h2>
+        <h2 id="privacy-rights" class="text-primary font-mono text-sm">## {{ t(privacyLabels.rights) }}</h2>
         <p class="text-sm text-foreground leading-relaxed">
           {{ t(privacyCopy.rights) }}
           <a href="https://www.cnil.fr/fr/plaintes" target="_blank" rel="noopener noreferrer" class="text-primary hover:underline">cnil.fr ↗</a>

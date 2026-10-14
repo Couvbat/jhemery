@@ -92,6 +92,16 @@ export const credits: Credit[] = [
   { what: { en: 'The API', fr: 'L’API' }, who: 'NestJS', href: 'https://nestjs.com/', licence: MIT },
 ]
 
+/** The page's headings, here rather than in `i18n/messages.ts` so they load with the page. */
+export const legalHeadings = {
+  publisher: { en: 'Publisher', fr: 'Éditeur' },
+  host: { en: 'Hosting', fr: 'Hébergement' },
+  guestbook: { en: 'Visitors’ messages', fr: 'Messages des visiteurs' },
+  property: { en: 'Code and trademarks', fr: 'Code et marques' },
+  credits: { en: 'Credits', fr: 'Crédits' },
+  phone: { en: 'phone', fr: 'tél.' },
+} satisfies Record<string, Localised>
+
 export const legalCopy = {
   publisher: {
     en: `${profile.domain} is a personal, non-commercial site. Publisher and director of publication: ${profile.name}, as a private individual.`,
