@@ -917,27 +917,27 @@ picked four. Two overlapped §I on inspection, *Seasons* and the *Storage inspec
 rows are the parts §I left out. The rest were left for now: a changelog shown to returning
 visitors, the site's history as a screenshot per release, an ActivityPub actor, webmentions and a
 webring, a receipt printer for guestbook entries, and questions answered by hand. All four
-shipped together, one commit each.
+shipped in #152, one commit each.
 
 ### Time
 
 | ✔ | Feature | Approach | Files | Effort |
 |---|---|---|---|---|
-| [x] | Two more seasons | The Fête de la Musique (21 June) and April Fools' Day join `content/seasons.ts`, each with a palette, a mood, a fortune pool, a `neofetch` row and a boot line. April Fools' mood has a speed of −1: the speed only multiplies each shape's spin, so the field turns backwards for the day and nothing else changes. | `content/seasons.ts`, `content/fortunes.ts`, `components/palette.ts` | S |
-| [x] | Events and a calendar feed | `content/events.ts` lists what Jules hosts at a fixed time, as instants with their offset, a length, a title and a `goTo` path or URL; the `id` is the feed's `UID`. While one is ahead, `/now` lists it in the visitor's zone, the footer names it from a week before, and `calendar` prints it. `vite-plugins/calendar.ts` writes `/events.ics` and `/events.fr.ics` from RFC 5545 by hand. The list ships empty and the page shows nothing while it is. | `content/events.ts` (new), `vite-plugins/calendar.ts` (new), `views/NowView.vue`, `components/SiteFooter.vue`, `composables/useStatus.ts`, `terminal/commands/content.ts`, `public/.htaccess` | M |
+| [x] | Two more seasons | Shipped in #152. The Fête de la Musique (21 June) and April Fools' Day join `content/seasons.ts`, each with a palette, a mood, a fortune pool, a `neofetch` row and a boot line. April Fools' mood has a speed of −1: the speed only multiplies each shape's spin, so the field turns backwards for the day and nothing else changes. | `content/seasons.ts`, `content/fortunes.ts`, `components/palette.ts` | S |
+| [x] | Events and a calendar feed | Shipped in #152. `content/events.ts` lists what Jules hosts at a fixed time, as instants with their offset, a length, a title and a `goTo` path or URL; the `id` is the feed's `UID`. While one is ahead, `/now` lists it in the visitor's zone, the footer names it from a week before, and `calendar` prints it. `vite-plugins/calendar.ts` writes `/events.ics` and `/events.fr.ics` from RFC 5545 by hand. The list ships empty and the page shows nothing while it is. | `content/events.ts` (new), `vite-plugins/calendar.ts` (new), `views/NowView.vue`, `components/SiteFooter.vue`, `composables/useStatus.ts`, `terminal/commands/content.ts`, `public/.htaccess` | M |
 
 ### Trust and portability
 
 | ✔ | Feature | Approach | Files | Effort |
 |---|---|---|---|---|
-| [x] | Disclosure policy | `/security`: what counts (the API, anything a visitor writes reaching the page, any claim on `/privacy` that doesn't hold), what doesn't (the CTF, denial of service, third parties), how to report, what happens next, a good-faith testing clause and a thanks list. `security.txt` (RFC 9116) is built from the same module, with `Expires` half a year after the build. | `content/security.ts` (new), `vite-plugins/security.ts` (new), `views/SecurityView.vue` (new), `router/index.ts`, `public/.htaccess`, `public/sitemap.xml`, `public/llms.txt` | S–M |
-| [x] | Save file | The part of *carry your data* the storage inspector didn't cover: `/privacy` packs the chosen groups (never secrets) into a code, offered as `/privacy#save=<code>` and a QR of it. Opening the link shows each key against what is stored and writes the changed ones only on restore. Reading a code trusts nothing in it. | `lib/save-file.ts` (new), `lib/save-link.ts` (new), `lib/base64url.ts` (new), `components/SaveFile.vue` (new), `lib/storage-keys.ts`, `main.ts` | M |
+| [x] | Disclosure policy | Shipped in #152. `/security`: what counts (the API, anything a visitor writes reaching the page, any claim on `/privacy` that doesn't hold), what doesn't (the CTF, denial of service, third parties), how to report, what happens next, a good-faith testing clause and a thanks list. `security.txt` (RFC 9116) is built from the same module, with `Expires` half a year after the build. | `content/security.ts` (new), `vite-plugins/security.ts` (new), `views/SecurityView.vue` (new), `router/index.ts`, `public/.htaccess`, `public/sitemap.xml`, `public/llms.txt` | S–M |
+| [x] | Save file | Shipped in #152. The part of *carry your data* the storage inspector didn't cover: `/privacy` packs the chosen groups (never secrets) into a code, offered as `/privacy#save=<code>` and a QR of it. Opening the link shows each key against what is stored and writes the changed ones only on restore. Reading a code trusts nothing in it. | `lib/save-file.ts` (new), `lib/save-link.ts` (new), `lib/base64url.ts` (new), `components/SaveFile.vue` (new), `lib/storage-keys.ts`, `main.ts` | M |
 
 ### Music
 
 | ✔ | Feature | Approach | Files | Effort |
 |---|---|---|---|---|
-| [x] | Stems | One of Jules's tracks as stems on faders in the music section: mute, solo, level, a low-pass over the mix, and the mix as a link. Every stem decoded and started at one instant, so they stay sample-locked. The list ships empty, and the mixer isn't drawn or fetched until it has a track. | `content/stems.ts` (new), `components/stems/` (new), `components/sections/MusicSection.vue` | M |
+| [x] | Stems | Shipped in #152. One of Jules's tracks as stems on faders in the music section: mute, solo, level, a low-pass over the mix, and the mix as a link. Every stem decoded and started at one instant, so they stay sample-locked. The list ships empty, and the mixer isn't drawn or fetched until it has a track. | `content/stems.ts` (new), `components/stems/` (new), `components/sections/MusicSection.vue` | M |
 
 ### Departures from the approach column
 
