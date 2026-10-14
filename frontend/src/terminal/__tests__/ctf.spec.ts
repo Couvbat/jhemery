@@ -69,7 +69,9 @@ async function flagsFromSurfaces(): Promise<string[]> {
   const { systemCommands } = await import('../commands/system')
   take((await runCommand(systemCommands.find((c) => c.name === 'top')!)).text, 'top')
 
-  take(readFileSync(join(process.cwd(), 'public/llms.txt'), 'utf8'), 'llms.txt')
+  // The prose of llms.txt, stage 7 included, is its template (vite-plugins/discovery.ts);
+  // discovery.spec.ts holds the built file to carrying it.
+  take(readFileSync(join(process.cwd(), 'vite-plugins/llms.template.md'), 'utf8'), 'llms.txt')
   return found
 }
 

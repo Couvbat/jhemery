@@ -13,8 +13,9 @@ import { UnitHealth } from '../common/health';
  * already exists for exactly this audience. It is the same origin the MCP endpoint
  * reads `content.json` from, so a local or staging install answers from its own
  * copy rather than production's. Fetched over HTTP rather than imported, so the two
- * apps deploy independently. The file is hand-written in `frontend/public/` today,
- * not generated (see roadmap §H, *generated llms.txt*).
+ * apps deploy independently. The frontend build generates it from the content
+ * (`frontend/vite-plugins/discovery.ts`), so its lists follow the tools, the case
+ * studies and the notes.
  */
 const CORPUS_TTL_MS = 60 * 60 * 1000;
 const CORPUS_TIMEOUT_MS = 5_000;

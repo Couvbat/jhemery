@@ -126,6 +126,36 @@ describe('with site data blocked', () => {
   })
 })
 
+// A page's French URL is the same path with `?lang=fr` (content/pages.ts): it is what a
+// French search result links to, so it wins over whatever the visitor had stored.
+describe('a language in the address', () => {
+  beforeEach(() => {
+    window.localStorage.clear()
+    vi.resetModules()
+  })
+
+  afterEach(() => {
+    window.history.replaceState(null, '', '/')
+    vi.restoreAllMocks()
+  })
+
+  it('wins over the stored choice, and becomes it', async () => {
+    window.localStorage.setItem('couvbat:locale', 'en')
+    window.history.replaceState(null, '', '/now?lang=fr')
+    const { currentLocale: fresh } = await import('../index')
+    expect(fresh()).toBe('fr')
+    expect(window.localStorage.getItem('couvbat:locale')).toBe('fr')
+  })
+
+  it('is ignored when it is not a language the site has', async () => {
+    vi.spyOn(navigator, 'language', 'get').mockReturnValue('en-GB')
+    window.history.replaceState(null, '', '/now?lang=de')
+    const { currentLocale: fresh } = await import('../index')
+    expect(fresh()).toBe('en')
+    expect(window.localStorage.getItem('couvbat:locale')).toBeNull()
+  })
+})
+
 describe('toggleLocale', () => {
   it('flips between the two locales', () => {
     const { toggleLocale } = useLocale()

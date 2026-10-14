@@ -5,8 +5,10 @@ import vue from '@vitejs/plugin-vue'
 import vueDevTools from 'vite-plugin-vue-devtools'
 import tailwindcss from '@tailwindcss/vite'
 import { VitePWA } from 'vite-plugin-pwa'
+import { discoveryPlugin } from './vite-plugins/discovery'
 import { commitSha } from './vite-plugins/git'
 import { notesPlugin } from './vite-plugins/notes'
+import { pagesPlugin } from './vite-plugins/pages'
 import { resumePlugin } from './vite-plugins/resume'
 import { searchPlugin } from './vite-plugins/search'
 import { thirdPartyPlugin } from './vite-plugins/third-party'
@@ -23,6 +25,8 @@ export default defineConfig({
     tailwindcss(),
     resumePlugin(),
     notesPlugin(),
+    pagesPlugin(),
+    discoveryPlugin(),
     searchPlugin(),
     thirdPartyPlugin(),
     xrayPlugin(),
@@ -90,6 +94,10 @@ export default defineConfig({
           'resume*.html',
           'notes/**',
           'notes.css',
+          // Each public page's copy of index.html, with its own head (vite-plugins/pages.ts).
+          // They are for crawlers, which run no service worker; the worker answers every
+          // navigation with index.html, and `usePageMeta` sets the same head in the app.
+          'pages/**',
         ],
         navigateFallback: '/index.html',
         navigateFallbackDenylist: [
