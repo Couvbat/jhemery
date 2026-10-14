@@ -503,18 +503,26 @@ root and under the same name would replace the inner file's. The shadcn primitiv
 `components/ui/` aren't stamped. **Words:** `virtual:xray-map` parses each component's imports
 and resolves every name taken from the `@/content` barrel against what the modules in
 `src/content/` export. `types.ts` is left out (shapes and two helpers), and `i18n/messages.ts`
-is added when the component takes `m` from `useLocale()`. The map is a chunk of the layer's own,
-so first paint pays for the attributes alone. **Page side** (`lib/xray.ts`, pure but for the
-DOM it is handed): an element is outlined when it is on screen, at least 4 px once its
-ancestors' overflow has cut it, visible and not `inert`. A fixed element covering the screen
-(the canvas) is tagged in the bottom corner, not outlined, and reads `ThreeBackground.vue ·
-N shapes` from `useSceneControl`. Repeats of one file share a tag with a count. Tags start at
-their box's top-left corner and stack in document order, so a page's tag sits above its
-sections'. The layer measures again on scroll, resize, transition end and any mutation outside
-itself, at most once a frame. It skips all of this while the terminal or the palette is open
-or the page is swinging. CSS alone (`attr(data-src)` in a `::before`) was rejected and still
-is: it would collide with components' own pseudo-elements, and a pseudo-element can't carry a
-link.
+is added when the component takes `m` from `useLocale()` or imports `messages` itself (the
+toasts do). The map is a chunk of the layer's own, so first paint pays for the attributes
+alone. **Page side** (`lib/xray.ts`, pure but for the DOM it is handed): an element is outlined
+when it is on screen, at least 4 px once its ancestors' overflow has cut it, visible and not
+`inert`. A fixed element covering the screen (the canvas) is tagged in the bottom corner, not
+outlined, and reads `ThreeBackground.vue · N shapes`, N being the spawned and visitor pools from
+`useSceneControl` plus the guestbook's newest entries (`newestSignatures()` over the ticker's
+poll). Repeats of one file share a tag with a count. Tags start at their box's top-left corner
+and stack in document order, so a page's tag sits above its sections'. A tag that has focus
+stays where it was when its component scrolls off, until focus leaves it, rather than taking
+focus down to `<body>` with it. The status chip sits in the bottom-left corner; below `md` it
+stands above the launcher's row with a 44px *exit* button (§9), and the strip beneath it is kept
+free of tags, so the canvas's tag goes above it rather than over the launcher. Turning on is said
+once, in a live region of the layer's own, since the terminal that ran `xray` has closed by
+then. The layer measures again on scroll, resize, transition end and any mutation outside
+itself, at most once a frame. It skips all of this, and leaves `Esc` alone, while something is
+over the page: the terminal or the palette, the matrix rain or the `reboot` replay (each ends on
+any key and claims none), or the swing. CSS alone (`attr(data-src)` in a `::before`) was
+rejected and still is: it would collide with components' own pseudo-elements, and a
+pseudo-element can't carry a link.
 
 ### live
 | Command | Endpoint | Fallback |

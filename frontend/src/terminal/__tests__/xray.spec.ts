@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, it } from 'vitest'
+import { touchLayout } from '@/composables/useTerminalShell'
 import { setXray, useXray } from '@/composables/useXray'
 import { isLinkable, paletteCommands, resolve, writesOf } from '../registry'
 import { recordingContext } from './context'
@@ -19,6 +20,7 @@ async function run(locale: 'en' | 'fr' = 'en') {
 
 afterEach(() => {
   setXray(false)
+  touchLayout.value = false
 })
 
 describe('xray', () => {
@@ -28,6 +30,16 @@ describe('xray', () => {
     // The page is what it shows; the terminal over it would hide most of it.
     expect(closed).toBe(true)
     expect(text).toContain(locale === 'en' ? 'Esc' : 'Échap')
+    expect(text).toContain(locale === 'en' ? 'the exit button' : 'le bouton quitter')
+  })
+
+  // A phone has no Esc: the touch layout names the button in its place, as `tour` does.
+  it.each(['en', 'fr'] as const)('names the exit button and no key in the touch layout, in %s', async (locale) => {
+    touchLayout.value = true
+    const { text } = await run(locale)
+    expect(xrayOn.value).toBe(true)
+    expect(text).not.toMatch(/Esc|Échap/)
+    expect(text).toContain(locale === 'en' ? 'The exit button' : 'Le bouton quitter')
   })
 
   it('turns it off the second time, and leaves the terminal open', async () => {

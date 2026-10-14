@@ -2,10 +2,12 @@
 import { computed, onBeforeUnmount, onMounted, ref, shallowRef, watch } from 'vue'
 import map from 'virtual:xray-map'
 import { useLocale } from '@/i18n'
+import { useBoot } from '@/composables/useBoot'
+import { useMatrix } from '@/composables/useMatrix'
 import { paletteOpen } from '@/composables/usePalette'
 import { useGuestbookTicker } from '@/composables/useGuestbookTicker'
 import { useSceneControl } from '@/composables/useSceneControl'
-import { terminalOpen } from '@/composables/useTerminalShell'
+import { terminalOpen, touchViewport } from '@/composables/useTerminalShell'
 import { useViewSwing } from '@/composables/useViewSwing'
 import { setXray } from '@/composables/useXray'
 import { sourceUrl } from '@/lib/source'
@@ -32,17 +34,22 @@ import {
  * attached: the boxes and tags are drawn over the page from each element's rect, and
  * nothing is added inside a component, where it would shift its layout or meet its own
  * pseudo-elements. It measures again when the page scrolls, resizes or changes, at most
- * once a frame, and not at all while the terminal or the palette is open (each is a
- * dialog over the page) or the page is mid-swing.
+ * once a frame, and not at all while something is over the page: the terminal or the
+ * palette (each a dialog), the matrix rain or the boot replay (each covering the screen
+ * and ended by any key), or the page mid-swing.
  *
  * **Keyboard.** The tags are ordinary links in a `<nav>`, and come after the page in the
  * DOM, so the page's own tab order is untouched and Tab reaches them last. Nothing is
- * focused when x-ray turns on and nothing traps focus. Esc or the *exit* button turn it
- * off, and focus that was on a tag goes back to where it came from.
+ * focused when x-ray turns on and nothing traps focus; turning on is said once in a live
+ * region of the layer's own instead. A focused tag stays where it was when its component
+ * scrolls away, until focus leaves it. Esc or the *exit* button turn it off, and focus
+ * that was on a tag goes back to where it came from.
  */
 
 const { t, m, locale } = useLocale()
 const { swinging } = useViewSwing()
+const { matrixActive } = useMatrix()
+const { bootActive } = useBoot()
 const { shapeCount, visitorShapes } = useSceneControl()
 // The field's third pool, the guestbook's newest entries, counted the way the field picks them.
 const { entries: guestbookEntries } = useGuestbookTicker()
@@ -57,6 +64,8 @@ interface ShownTag {
   extra: string
   x: number
   y: number
+  w: number
+  h: number
 }
 
 const layerEl = ref<HTMLElement | null>(null)
@@ -67,7 +76,11 @@ const boxes = shallowRef<Rect[]>([])
 const tags = shallowRef<ShownTag[]>([])
 const files = ref(0)
 
-const hidden = computed(() => terminalOpen.value || paletteOpen.value || swinging.value)
+// The rain and the boot replay end on any key and claim none, and their listeners come after
+// this layer's: under them, an Esc is theirs alone.
+const hidden = computed(
+  () => terminalOpen.value || paletteOpen.value || swinging.value || matrixActive.value || bootActive.value,
+)
 
 const status = computed(() =>
   files.value === 1 ? t(m.xray.statusOne) : t(m.xray.status).replace('{n}', String(files.value)),
@@ -93,6 +106,19 @@ function measureProbe() {
   metrics = { ch: inner.width / PROBE.length, chrome: outer.width - inner.width, height: outer.height }
 }
 
+/**
+ * The tag holding focus, when its component is no longer on screen: Space, End and
+ * PageDown all scroll the page from a focused link. It stays where it was until focus
+ * leaves it, since dropping it would take the focused link out of the page and focus
+ * with it, to `<body>`.
+ */
+function strandedTag(layer: HTMLElement, keys: string[]): ShownTag | undefined {
+  const active = document.activeElement
+  if (!active || !layer.contains(active)) return undefined
+  const key = active.closest<HTMLElement>('[data-xray-tag]')?.dataset.xrayTag
+  return key && !keys.includes(key) ? tags.value.find((tag) => tag.key === key) : undefined
+}
+
 function measure() {
   const layer = layerEl.value
   if (!layer || hidden.value) return
@@ -106,17 +132,48 @@ function measure() {
     const chars = tagText(parts, `${tag.count > 1 ? ` ×${tag.count}` : ''}${extra}`).length
     return { tag, parts, extra, size: { w: Math.ceil(chars * metrics.ch + metrics.chrome), h: metrics.height } }
   })
+  const stranded = strandedTag(layer, grouped.tags.map((tag) => tag.key))
   const chip = chipEl.value?.getBoundingClientRect()
-  const reserved = chip ? [{ x: chip.left, y: chip.top, w: chip.width, h: chip.height }] : []
+  // The chip and the strip under it, down to the edge: on a phone the launcher's row is
+  // there, and the canvas's tag, which starts in that corner, goes above the chip instead.
+  const reserved: Rect[] = chip ? [{ x: chip.left, y: chip.top, w: chip.width, h: viewport.h - chip.top }] : []
+  if (stranded) reserved.push(stranded)
   const places = placeTags(
     sized.map(({ tag, size }) => ({ anchor: tag.anchor, backdrop: tag.backdrop, size })),
     viewport,
     reserved,
   )
+  const shown = sized.map(({ tag, parts, extra, size }, i) => ({ key: tag.key, parts, count: tag.count, extra, ...places[i]!, ...size }))
+  if (stranded) {
+    // Back among the others in its old order: a node Vue moves loses focus too.
+    const before = tags.value.map((tag) => tag.key)
+    const next = shown.findIndex((tag) => before.indexOf(tag.key) > before.indexOf(stranded.key))
+    shown.splice(next === -1 ? shown.length : next, 0, stranded)
+  }
   boxes.value = grouped.boxes
-  tags.value = sized.map(({ tag, parts, extra }, i) => ({ key: tag.key, parts, count: tag.count, extra, ...places[i]! }))
+  tags.value = shown
   files.value = new Set(grouped.tags.flatMap((tag) => tag.files)).size
+  // After the first pass, so the region has been in the page a frame before it speaks.
+  spoken.value ||= `${t(ON)} ${t(touchViewport() ? OUT.touch : OUT.keys)}`
 }
+
+/**
+ * Said once, the first time the layer shows: the terminal that ran `xray` has closed by
+ * then, and its output with it. The chip can't be the live region, since its count
+ * changes on every scroll. Not `App.vue`'s page announcement either: importing it brings
+ * the page-title module's graph into this chunk's, and the build answers by splitting a
+ * content module out of the entry into one more request on first paint. Written here
+ * rather than in `messages.ts`, so only this chunk carries it.
+ */
+const ON = {
+  en: 'X-ray on: the components on screen are outlined, and their tags, after the page, link to their files.',
+  fr: 'Rayons X allumés : les composants à l’écran sont entourés, et leurs étiquettes, après la page, mènent à leurs fichiers.',
+}
+const OUT = {
+  keys: { en: 'Esc or the exit button ends it.', fr: 'Échap ou le bouton quitter pour en sortir.' },
+  touch: { en: 'The exit button ends it.', fr: 'Le bouton quitter pour en sortir.' },
+}
+const spoken = ref('')
 
 let frame = 0
 function schedule() {
@@ -182,6 +239,7 @@ const TAG_CLASS = 'whitespace-nowrap rounded-sm border border-accent/70 bg-backg
     class="fixed inset-0 z-[55] overflow-hidden pointer-events-none font-mono"
     data-testid="xray-layer"
     @focusin="onFocusin"
+    @focusout="schedule"
   >
     <div aria-hidden="true">
       <div
@@ -200,7 +258,7 @@ const TAG_CLASS = 'whitespace-nowrap rounded-sm border border-accent/70 bg-backg
           :key="tag.key"
           :class="['absolute pointer-events-auto text-accent', TAG_CLASS]"
           :style="{ left: `${tag.x}px`, top: `${tag.y}px` }"
-          data-xray-tag
+          :data-xray-tag="tag.key"
         >
           <template v-for="(part, i) in tag.parts" :key="part.file">
             <template v-if="i > 0">
@@ -238,22 +296,26 @@ const TAG_CLASS = 'whitespace-nowrap rounded-sm border border-accent/70 bg-backg
       </ul>
     </nav>
 
-    <!-- Where the launcher sits on the other side; a phone has no Esc, so the button says how out. -->
+    <!-- Where the launcher sits on the other side; a phone has no Esc, so the button says how
+         out. Below `md` the launcher is a 44px target 16px from the corner, and the chip
+         stands above its row, with a 44px button of its own (features-spec §9). -->
     <div
       ref="chipEl"
-      class="absolute bottom-6 left-6 pointer-events-auto flex items-center gap-2 rounded border border-accent/60 bg-background/90 backdrop-blur px-3 py-1.5 text-xs text-accent"
+      class="absolute bottom-[calc(max(1rem,env(safe-area-inset-bottom))_+_3.25rem)] left-4 md:bottom-6 md:left-6 pointer-events-auto flex items-center gap-2 rounded border border-accent/60 bg-background/90 backdrop-blur px-3 py-1 md:py-1.5 text-xs text-accent"
     >
       <span>{{ status }}</span>
       <span class="hidden md:inline text-muted-foreground">· {{ t(m.xray.hint) }}</span>
       <button
         type="button"
         :aria-label="t(m.xray.exitLabel)"
-        class="rounded border border-border px-1.5 text-foreground hover:border-accent hover:text-accent transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+        class="min-h-11 min-w-11 md:min-h-0 md:min-w-0 rounded border border-border px-1.5 text-foreground hover:border-accent hover:text-accent transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
         @click="setXray(false)"
       >
         {{ t(m.xray.exit) }}
       </button>
     </div>
+
+    <p class="sr-only" role="status">{{ spoken }}</p>
 
     <span ref="probeEl" aria-hidden="true" :class="['invisible absolute left-0 top-0', TAG_CLASS]"
       ><span ref="probeTextEl">{{ PROBE }}</span></span

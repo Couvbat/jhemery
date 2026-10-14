@@ -253,15 +253,15 @@ export const workCommands: Command[] = [
       if (!setXray()) return [line(t({ en: 'x-ray off.', fr: 'Rayons X éteints.' }), 'muted')]
       // The page is what it shows, so the terminal gets out of the way, as `cd` does.
       close()
-      return [
-        line(
-          t({
-            en: 'x-ray on: each component is outlined and tagged with its file and where its words come from. Esc, or `xray` again, ends it.',
-            fr: 'Rayons X allumés : chaque composant est entouré et étiqueté avec son fichier et l’origine de ses textes. Échap, ou `xray` à nouveau, pour en sortir.',
-          }),
-          'primary',
-        ),
-      ]
+      // Esc is a keyboard's: the touch layout names the button in its place, as `tour` does.
+      const out = touchLayout.value
+        ? { en: 'The exit button, or `xray` again, ends it.', fr: 'Le bouton quitter, ou `xray` à nouveau, pour en sortir.' }
+        : { en: 'Esc, the exit button or `xray` again ends it.', fr: 'Échap, le bouton quitter ou `xray` à nouveau pour en sortir.' }
+      const on = {
+        en: 'x-ray on: each component is outlined and tagged with its file and where its words come from.',
+        fr: 'Rayons X allumés : chaque composant est entouré et étiqueté avec son fichier et l’origine de ses textes.',
+      }
+      return [line(`${t(on)} ${t(out)}`, 'primary')]
     },
   },
 ]

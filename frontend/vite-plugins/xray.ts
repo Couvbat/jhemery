@@ -145,15 +145,18 @@ function barrelOf(root: string): Map<string, string> {
   return barrel
 }
 
-/** `@/content`, `@/content/work`, `../content`: `'barrel'`, a module's repo path, or nothing of ours. */
-function contentTarget(source: string, from: string): string | undefined {
+/** An import's repo path, without its `.ts` or `/index`; nothing for a package. */
+function importPath(source: string, from: string): string | undefined {
   const path = source.startsWith('@/')
     ? `${SRC}${source.slice(2)}`
     : source.startsWith('.')
       ? posix.join(posix.dirname(from), source)
       : undefined
-  if (!path) return undefined
-  const bare = path.replace(/\.ts$/, '').replace(/\/index$/, '')
+  return path?.replace(/\.ts$/, '').replace(/\/index$/, '')
+}
+
+/** `@/content`, `@/content/work`, `../content`: `'barrel'`, a module's repo path, or nothing of ours. */
+function contentTarget(bare: string): string | undefined {
   if (bare === CONTENT.slice(0, -1)) return 'barrel'
   return bare.startsWith(CONTENT) ? `${bare}.ts` : undefined
 }
@@ -161,7 +164,8 @@ function contentTarget(source: string, from: string): string | undefined {
 /**
  * The files a component's words come from: each content module it imports a value from,
  * resolved through the barrel, and `i18n/messages.ts` when it takes `m` from
- * `useLocale()`, since the chrome strings are words too.
+ * `useLocale()` or imports `messages` itself (the toasts do), since the chrome strings
+ * are words too.
  */
 function wordsOf(sfc: string, path: string, barrel: Map<string, string>): string[] {
   const { descriptor } = parseSfc(sfc, { filename: path })
@@ -171,10 +175,13 @@ function wordsOf(sfc: string, path: string, barrel: Map<string, string>): string
     if (!block) continue
     for (const statement of program(block.content).body) {
       if (statement.type === 'ImportDeclaration' && statement.importKind !== 'type') {
-        const target = contentTarget(statement.source.value, path)
+        const bare = importPath(statement.source.value, path)
+        if (!bare) continue
+        const values = statement.specifiers.filter((specifier) => specifier.type !== 'ImportSpecifier' || specifier.importKind !== 'type')
+        if (`${bare}.ts` === MESSAGES) messages ||= values.length > 0
+        const target = contentTarget(bare)
         if (!target) continue
-        for (const specifier of statement.specifiers) {
-          if (specifier.type === 'ImportSpecifier' && specifier.importKind === 'type') continue
+        for (const specifier of values) {
           if (target !== 'barrel') {
             found.add(target)
             continue

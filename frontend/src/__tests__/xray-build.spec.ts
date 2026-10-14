@@ -154,8 +154,12 @@ describe('the words map', () => {
     }
   })
 
-  it('names the chrome strings when a component reads `m`, and only then', () => {
+  it('names the chrome strings when a component reads `m` or imports `messages`, and only then', () => {
     expect(map['frontend/src/components/SiteFooter.vue']).toContain('frontend/src/i18n/messages.ts')
+    // The toasts and the achievements modal take `messages` itself and only `t` from `useLocale()`.
+    for (const toast of ['AchievementToast', 'AchievementsModal', 'GuestbookTicker']) {
+      expect(map[`frontend/src/components/${toast}.vue`], toast).toEqual(['frontend/src/i18n/messages.ts'])
+    }
     // `SectionHeader` takes only `t`: its words are the section's.
     expect(map['frontend/src/components/SectionHeader.vue']).toEqual([
       'frontend/src/content/profile.ts',

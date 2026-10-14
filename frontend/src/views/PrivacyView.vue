@@ -86,9 +86,11 @@ function toggle(group: Group) {
 /**
  * Escape disarms from either button. The confirm goes with it, so focus moves to the
  * group's own button first, rather than falling to `<body>` with the button it was on.
+ * The key is claimed, as a dialog claims it, so the same press doesn't also end x-ray.
  */
 function disarm(event: KeyboardEvent) {
   if (!armed.value) return
+  event.preventDefault()
   const own = (event.currentTarget as HTMLElement).querySelector('button')
   own?.focus()
   armed.value = null
