@@ -7,10 +7,26 @@ import { computed, ref } from 'vue'
  */
 const nonce = ref(0)
 
+/**
+ * Whether the visitor asked for the player. SoundCloud's frame sets its own cookies, so it
+ * waits behind a button until then (see `MusicSection`); `play` is asking too. Module-level,
+ * so a visit asks once, not once per mount of the section.
+ */
+const requested = ref(false)
+
 export function requestPlayback() {
   nonce.value += 1
 }
 
+export function loadPlayer() {
+  requested.value = true
+}
+
 export function useMusicPlayer() {
-  return { autoplayNonce: computed(() => nonce.value), requestPlayback }
+  return {
+    autoplayNonce: computed(() => nonce.value),
+    playerLoaded: computed(() => requested.value || nonce.value > 0),
+    requestPlayback,
+    loadPlayer,
+  }
 }

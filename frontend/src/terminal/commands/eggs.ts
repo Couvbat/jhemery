@@ -14,7 +14,7 @@ import { api, ApiError } from '@/lib/api'
 import { announce, unlock } from '../achievements'
 import { COW, TRAIN } from '../ascii'
 import { bannerLines, BANNER_MAX_CHARS } from '../ascii-banner'
-import { art, blank, line, pre } from '../format'
+import { art, blank, line, link, pre } from '../format'
 import { sleep } from '../timing'
 import type { Command, CommandContext, OutputLine } from '../types'
 import { forgetGuestbookFile, resolveGuestbookFile } from './guestbook-fs'
@@ -294,7 +294,7 @@ export const eggCommands: Command[] = [
     writes: 'none',
     hidden: true,
     complete: ({ index }) => (index === 0 ? [profile.domain, profile.handle] : []),
-    run({ args }) {
+    run({ args, t }) {
       const query = (args[0] ?? profile.domain).toLowerCase().replace(/^https?:\/\//, '')
       const known = [profile.domain, profile.handle, profile.alias.toLowerCase(), 'localhost']
 
@@ -311,6 +311,7 @@ export const eggCommands: Command[] = [
         ...WHOIS_RECORD.map(([key, value]) => pre(`${`${key}:`.padEnd(width + 2)}${value}`, 'primary')),
         blank,
         line('>>> Last update of whois database: just now, by hand, in a .ts file.', 'muted'),
+        link(t({ en: '>>> the real record, publisher and host: /legal', fr: '>>> la vraie fiche, éditeur et hébergeur : /legal' }), '/legal'),
       ]
     },
   },

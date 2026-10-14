@@ -68,6 +68,12 @@ export const messages = {
     genres: { en: 'Genres', fr: 'Genres' },
     tools: { en: 'Tools', fr: 'Outils' },
     listen: { en: 'Listen on SoundCloud', fr: 'Écouter sur SoundCloud' },
+    // In place of the player until it is asked for: what loading it hands SoundCloud.
+    consent: {
+      en: 'The player comes from SoundCloud, which sets its own cookies and sees your IP address. It loads only when you ask.',
+      fr: 'Le lecteur vient de SoundCloud, qui dépose ses propres cookies et voit votre adresse IP. Il ne se charge que si vous le demandez.',
+    },
+    load: { en: '▶ load the player', fr: '▶ charger le lecteur' },
   },
   gaming: {
     favouriteGenres: { en: 'Favourite genres', fr: 'Genres préférés' },
@@ -106,6 +112,11 @@ export const messages = {
     directLine: { en: 'Prefer a direct line? Find me here:', fr: 'Vous préférez le contact direct ?' },
     resume: { en: 'Résumé', fr: 'CV' },
     resumeNote: { en: 'printable, or save as PDF', fr: 'à imprimer, ou en PDF' },
+    // Under the form: what sending it hands over, where the law wants it said.
+    notice: {
+      en: 'Your name, address and message reach my inbox and serve only to answer you.',
+      fr: 'Votre nom, votre adresse et votre message arrivent dans ma boîte et ne servent qu’à vous répondre.',
+    },
   },
   terminal: {
     open: { en: 'Open terminal', fr: 'Ouvrir le terminal' },
@@ -926,33 +937,22 @@ export const messages = {
     times: { en: '{n} on screen', fr: '{n} à l’écran' },
     shapes: { en: '{n} shapes', fr: '{n} formes' },
   },
-  // /privacy (views/PrivacyView.vue). The keys and their purposes are lib/storage-keys.ts's,
-  // shared with `du`; this is the page around them. Every claim below is one the code
-  // keeps, and `strace` is how a visitor checks it rather than taking the page's word.
+  // /privacy (views/PrivacyView.vue). The heading, which the tab title needs from the main
+  // bundle, and one line that can't move; the page's other words are content/privacy.ts's,
+  // loaded with the page.
   privacy: {
     heading: { en: 'What this site keeps', fr: 'Ce que ce site garde' },
-    browser: { en: 'In this browser', fr: 'Dans ce navigateur' },
-    notSet: { en: 'not set', fr: 'absente' },
-    secret: { en: 'secret: only its length is shown', fr: 'secret : seule sa longueur est affichée' },
-    // `{n}` keys, `{size}` bytes: a group's total, beside its clear button.
-    stored: { en: 'stored: {n} · {size}', fr: 'stockées : {n} · {size}' },
-    clear: { en: 'clear', fr: 'effacer' },
-    // The first press arms; the second, on a different button, clears. The armed button
-    // turns into Cancel in place, so a double-click lands on Cancel.
-    cancel: { en: 'cancel', fr: 'annuler' },
-    confirm: { en: 'yes, clear {n} and reload', fr: 'oui, effacer {n} et recharger' },
-    cleared: { en: 'Cleared. Reloading…', fr: 'Effacé. Rechargement…' },
-    caches: { en: 'Caches', fr: 'Caches' },
-    files: { en: '{n} files', fr: '{n} fichiers' },
-    noCaches: {
-      en: 'Nothing cached here: the service worker hasn’t stored anything yet, or isn’t running.',
-      fr: 'Rien en cache ici : le service worker n’a encore rien stocké, ou ne tourne pas.',
-    },
+    // Here rather than with the page's other labels: it names `navigator.`, which the
+    // content layer's purity check reads as a reach for the browser.
     estimate: {
       en: 'Your browser counts {size} in use by this site (`navigator.storage.estimate()`).',
       fr: 'Votre navigateur compte {size} utilisés par ce site (`navigator.storage.estimate()`).',
     },
-    sends: { en: 'What leaves your browser', fr: 'Ce qui quitte votre navigateur' },
+  },
+  // /legal (views/LegalView.vue). Only the heading, which the tab title needs from the main
+  // bundle; the rest of the page's words are content/legal.ts's, loaded with the page.
+  legal: {
+    heading: { en: 'Legal notice', fr: 'Mentions légales' },
   },
   footer: {
     built: { en: 'built', fr: 'build' },

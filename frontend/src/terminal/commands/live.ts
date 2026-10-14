@@ -3,6 +3,7 @@ import type { Localised } from '@/content/types'
 import { fetchSteam, formatPlaytime, useSteam } from '@/composables/useSteam'
 import { fetchCommits, relativeTime, shortRepo, useGithub } from '@/composables/useGithub'
 import { fetchWeather, useWeather } from '@/composables/useWeather'
+import { messages as m } from '@/i18n/messages'
 import {
   api,
   ApiError,
@@ -11,7 +12,7 @@ import {
   type WeatherReport,
 } from '@/lib/api'
 import { announce } from '../achievements'
-import { blank, fail, heading, line, pre } from '../format'
+import { blank, fail, heading, line, link, pre } from '../format'
 import { formatChange, formatPrice, sparkline } from '../sparkline'
 import type { Command, OutputLine } from '../types'
 import { ART_WIDTH, compass, weatherArt, windArrow } from '../weather-art'
@@ -189,7 +190,14 @@ export const liveCommands: Command[] = [
         ]
       }
 
-      return [...heading(data.location ?? 'weather'), blank, ...weatherReport(data, t)]
+      // Open-Meteo's data is CC BY 4.0: the credit goes where the data is shown.
+      return [
+        ...heading(data.location ?? 'weather'),
+        blank,
+        ...weatherReport(data, t),
+        blank,
+        link('weather data by Open-Meteo.com', 'https://open-meteo.com/'),
+      ]
     },
   },
   {
@@ -222,6 +230,8 @@ export const liveCommands: Command[] = [
 
       const out: OutputLine[] = [...heading('markets'), blank]
       for (const quote of data.quotes) out.push(...quoteLines(quote))
+      // CoinGecko's free API asks for this credit wherever its prices appear.
+      out.push(link('data provided by CoinGecko', 'https://www.coingecko.com/en/api'))
       out.push(
         line(
           t({
@@ -284,6 +294,16 @@ export const liveCommands: Command[] = [
       const message = args.join(' ').trim().replace(/^(["'])([\s\S]*)\1$/, '$2').trim()
       if (!message) return [fail('sign: usage — sign <message>')]
 
+      // Said before anything is asked: what signing publishes, and where the rules are.
+      print(
+        link(
+          t({
+            en: 'signing is public: every visitor sees your name and message. the rules: /legal#guestbook',
+            fr: 'signer est public : tout visiteur voit votre nom et votre message. les règles : /legal#guestbook',
+          }),
+          '/legal#guestbook',
+        ),
+      )
       const name = (await prompt('your name:')).trim()
       if (!name) return [fail('sign: a name is required')]
 
@@ -307,6 +327,7 @@ export const liveCommands: Command[] = [
     async run({ prompt, print, t }) {
       print([
         line(`composing a message to ${profile.email}`, 'muted'),
+        line(t(m.contact.notice), 'muted'),
         line('ctrl+c at any point to abort', 'muted'),
         blank,
       ])
