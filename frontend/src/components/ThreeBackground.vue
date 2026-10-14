@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, onUnmounted, ref, shallowRef, watch } from 'vue'
+import { computed, nextTick, onMounted, onUnmounted, ref, shallowRef, watch } from 'vue'
 import * as THREE from 'three'
 import { seasonOn, untilTomorrow } from '@/content'
 import { useCrt } from '@/composables/useCrt'
@@ -7,6 +7,7 @@ import { useMotion } from '@/composables/useMotion'
 import { usePresence } from '@/composables/usePresence'
 import { RIPPLE_SECONDS, rippleOffset } from './ripple'
 import { fieldMood, pickPalette, type Hue, type Palette } from './palette'
+import { newestSignatures, seededRandom, shapeLayout, signatureLabel, type Axes } from './signatures'
 import { activeSection } from '@/composables/useActiveSection'
 import { terminalOpen } from '@/composables/useTerminalShell'
 import { BASE_SHAPE_COUNT, MAX_SHAPE_COUNT, useSceneControl } from '@/composables/useSceneControl'
@@ -14,7 +15,9 @@ import { fetchWeather, weatherMood } from '@/composables/useWeather'
 import { useTheme } from '@/composables/useTheme'
 import { useViewSwing } from '@/composables/useViewSwing'
 import { startScreensaver, useScreensaver } from '@/composables/useIdle'
+import { useGuestbookTicker } from '@/composables/useGuestbookTicker'
 import { useLocale } from '@/i18n'
+import type { GuestbookEntry } from '@/lib/api'
 import { unlock, unlocked } from '@/terminal/achievements'
 
 // CRT overdrive spins the wireframes up; reading the ref inside the loop keeps the
@@ -23,7 +26,7 @@ import { unlock, unlocked } from '@/terminal/achievements'
 const { speedMultiplier, glitching } = useCrt()
 const { shapeCount, gravityOn, constellationOn, visitorShapes } = useSceneControl()
 const { screensaver } = useScreensaver()
-const { t, m } = useLocale()
+const { t, m, locale } = useLocale()
 // The prism swing between views (features-spec §11). The router drives one eased
 // clock; the DOM turns the pages by it and this component turns the field by it.
 const { swing, swingDirection, swinging, activeView } = useViewSwing()
@@ -42,10 +45,15 @@ let midnightTimer: ReturnType<typeof setTimeout> | undefined
 /** The weather's speed and opacity with the season's multiplied in. Everything below reads
  *  this rather than the weather alone; it is recomputed when either changes, never per frame. */
 const mood = computed(() => fieldMood(weatherMood.value, season.value?.id))
+/** The guestbook's newest entries, one wireframe each (`signatures.ts`). Read from the
+ *  ticker's own poll, so the field adds no request; empty while the guestbook is off. */
+const { entries: guestbookEntries } = useGuestbookTicker()
+const signatureEntries = computed(() => newestSignatures(guestbookEntries.value))
 
 const canvasRef = ref<HTMLCanvasElement | null>(null)
 /** What `click-to-inspect` is currently showing, if anything. */
 const inspected = ref<{ text: string; x: number; y: number } | null>(null)
+const labelRef = ref<HTMLElement | null>(null)
 let inspectTimer: ReturnType<typeof setTimeout> | undefined
 
 let renderer: THREE.WebGLRenderer | null = null
@@ -83,8 +91,10 @@ interface AnimatedShape {
   /** Opacity before the weather mood scales it, so the nudge stays reversible. */
   baseOpacity: number
   kind: ShapeKind
-  /** Only on a visitor's shape: how far it has faded in, and whether it is going. */
+  /** Only on a visitor's or a signature's shape: how far it has faded in, and whether it is going. */
   presence?: { level: number; leaving: boolean }
+  /** Only on a signature's shape: whose it is, and the place its id gave it. Never the message. */
+  signature?: { id: string; name: string; date: string; place: Axes }
 }
 
 const shapes: AnimatedShape[] = []
@@ -98,11 +108,19 @@ const meshes: THREE.Mesh[] = []
 const visitors: AnimatedShape[] = []
 /** How much of the way to its target a visitor's fade moves each frame. */
 const VISITOR_FADE = 0.025
+/**
+ * One shape per guestbook entry among the newest twelve (`signatureEntries`), a third pool
+ * that `spawn`, `scene reset` and the accent count never see either. Each shape's kind,
+ * place and spin come from its entry's id, and it fades in and out as the visitors' do: out
+ * when the entry leaves the page, which is how the owner's `sudo rm` reaches every open tab.
+ */
+const signatures: AnimatedShape[] = []
 
-/** Both pools, without allocating — the swing and the render loop visit every shape. */
+/** Every pool, without allocating — the swing and the render loop visit every shape. */
 function forEachShape(fn: (shape: AnimatedShape) => void) {
   for (const shape of shapes) fn(shape)
   for (const shape of visitors) fn(shape)
+  for (const shape of signatures) fn(shape)
 }
 
 const accentSeeds = 3
@@ -255,6 +273,7 @@ function applyColours() {
     ;(mesh.material as THREE.MeshBasicMaterial).color.copy(neon[accent ? palette.accent : palette.base])
   }
   for (const shape of visitors) (shape.mesh.material as THREE.MeshBasicMaterial).color.copy(neon[palette.base])
+  for (const shape of signatures) (shape.mesh.material as THREE.MeshBasicMaterial).color.copy(neon[palette.base])
   if (links) (links.material as THREE.LineBasicMaterial).color.copy(neon[palette.base])
 }
 
@@ -271,6 +290,7 @@ function applyPalette() {
     ;(mesh.material as THREE.MeshBasicMaterial).opacity = Math.min(baseOpacity * opacity, 0.6)
   }
   for (const shape of visitors) (shape.mesh.material as THREE.MeshBasicMaterial).opacity = visitorOpacity(shape)
+  for (const shape of signatures) (shape.mesh.material as THREE.MeshBasicMaterial).opacity = visitorOpacity(shape)
 
   // Nothing is redrawing on its own while motion is paused.
   if (animationFrameId === null && renderer && scene && camera) renderer.render(scene, camera)
@@ -288,20 +308,30 @@ function easeColours(dt: number) {
   applyColours()
 }
 
+/** A place in the spawn volume, in the field's own axes, each from -0.5 to 0.5 across it.
+ *  Its width follows the screen's, so a signature keeps its place on any screen. */
+function placeHome({ x, y, z }: Axes, out: THREE.Vector3): THREE.Vector3 {
+  const spread = camera ? halfExtents(camera.aspect).x * 2 : 20
+  return out.set(x * spread, y * 14, z * 12)
+}
+
 /** A fresh position from the spawn distribution, in the field's own axes — the same
  *  distribution `addShape` uses and the swing re-homes to, so the scene never drifts
  *  toward a composition the opening one could not have produced. */
 function sampleHome(out: THREE.Vector3): THREE.Vector3 {
-  const spread = camera ? halfExtents(camera.aspect).x * 2 : 20
-  return out.set((Math.random() - 0.5) * spread, (Math.random() - 0.5) * 14, (Math.random() - 0.5) * 12)
+  return placeHome({ x: Math.random() - 0.5, y: Math.random() - 0.5, z: Math.random() - 0.5 }, out)
 }
 
-function addShape(accent: boolean, pool: AnimatedShape[] = shapes) {
+/** `entry` makes it a signature's: its layout is drawn from the entry's id instead. */
+function addShape(accent: boolean, pool: AnimatedShape[] = shapes, entry?: GuestbookEntry) {
   if (!field || !camera) return
 
-  const kind = KINDS[Math.floor(Math.random() * KINDS.length)]!
+  const { kind: index, baseOpacity, place, rotation, speed } = shapeLayout(
+    entry ? seededRandom(entry.id) : Math.random,
+    KINDS.length,
+  )
+  const kind = KINDS[index]!
   const palette = currentPalette()
-  const baseOpacity = 0.15 + Math.random() * 0.25
   const material = new THREE.MeshBasicMaterial({
     color: neon[accent ? palette.accent : palette.base],
     wireframe: true,
@@ -310,24 +340,13 @@ function addShape(accent: boolean, pool: AnimatedShape[] = shapes) {
   })
   const mesh = new THREE.Mesh(kind.make(), material)
 
-  const home = sampleHome(new THREE.Vector3())
+  const home = placeHome(place, new THREE.Vector3())
   mesh.position.copy(home)
-  mesh.rotation.set(Math.random() * Math.PI, Math.random() * Math.PI, Math.random() * Math.PI)
+  mesh.rotation.set(rotation.x, rotation.y, rotation.z)
 
   field.add(mesh)
-  const shape: AnimatedShape = {
-    mesh,
-    home,
-    offset: new THREE.Vector3(),
-    accent,
-    baseOpacity,
-    kind,
-    speed: {
-      x: (Math.random() - 0.5) * 0.006,
-      y: (Math.random() - 0.5) * 0.006,
-      z: (Math.random() - 0.5) * 0.004,
-    },
-  }
+  const shape: AnimatedShape = { mesh, home, offset: new THREE.Vector3(), accent, baseOpacity, kind, speed }
+  if (entry) shape.signature = { id: entry.id, name: entry.name, date: entry.date, place }
   pool.push(shape)
   if (pool === shapes) meshes.push(mesh)
   else {
@@ -344,7 +363,8 @@ function disposeShape(shape: AnimatedShape) {
   ;(shape.mesh.material as THREE.Material).dispose()
 }
 
-/** A visitor's opacity: what any shape would have under this weather and day, times its fade. */
+/** A visitor's or a signature's opacity: what any shape would have under this weather and
+ *  day, times its fade. */
 function visitorOpacity(shape: AnimatedShape): number {
   return Math.min(shape.baseOpacity * mood.value.opacity, 0.6) * (shape.presence?.level ?? 1)
 }
@@ -373,14 +393,43 @@ function syncVisitors() {
   }
 }
 
-/** One frame of the visitors' fades, `k` of the way; removes whoever has finished leaving. */
-function fadeVisitors(k: number) {
-  for (let i = visitors.length - 1; i >= 0; i--) {
-    const shape = visitors[i]!
+/**
+ * Brings the signature pool to `signatureEntries`, as `syncVisitors` does by count but by
+ * id: a new entry's shape is added at zero opacity, one whose entry has left the page
+ * (deleted, or pushed off by a newer one) is marked to fade out, and one whose entry is
+ * back while it still fades is taken back.
+ */
+function syncSignatures() {
+  const wanted = signatureEntries.value
+  for (const shape of signatures) {
+    shape.presence!.leaving = !wanted.some((entry) => entry.id === shape.signature!.id)
+  }
+  for (const entry of wanted) {
+    if (!signatures.some((shape) => shape.signature!.id === entry.id)) addShape(false, signatures, entry)
+  }
+
+  // With no loop running there is no fade: settle the pool now.
+  if (animationFrameId === null) {
+    for (let i = signatures.length - 1; i >= 0; i--) {
+      if (signatures[i]!.presence!.leaving) disposeShape(signatures.splice(i, 1)[0]!)
+    }
+    if (renderer && scene && camera) renderer.render(scene, camera)
+  }
+
+  // The e2e suite's one window into the field (`e2e/guestbook-field.spec.ts`): how many
+  // signatures are staying, which no pixel says reliably. A count, never a name.
+  const staying = signatures.filter((shape) => !shape.presence!.leaving).length
+  canvasRef.value?.setAttribute('data-signatures', String(staying))
+}
+
+/** One frame of a pool's fades, `k` of the way; removes whoever has finished leaving. */
+function fadePool(pool: AnimatedShape[], k: number) {
+  for (let i = pool.length - 1; i >= 0; i--) {
+    const shape = pool[i]!
     const presence = shape.presence!
     presence.level += ((presence.leaving ? 0 : 1) - presence.level) * k
     if (presence.leaving && presence.level < 0.01) {
-      disposeShape(visitors.splice(i, 1)[0]!)
+      disposeShape(pool.splice(i, 1)[0]!)
       continue
     }
     ;(shape.mesh.material as THREE.MeshBasicMaterial).opacity = visitorOpacity(shape)
@@ -504,24 +553,32 @@ function handleClick(event: MouseEvent) {
   )
   raycaster.setFromCamera(pointerNdc, camera)
 
-  const hit = raycaster.intersectObjects([...meshes, ...visitors.map((v) => v.mesh)], false)[0]
+  // A signature on its way out has left the guestbook, so its name is no longer shown.
+  const present = signatures.filter((s) => !s.presence!.leaving).map((s) => s.mesh)
+  const hit = raycaster.intersectObjects([...meshes, ...visitors.map((v) => v.mesh), ...present], false)[0]
   if (!hit) return
 
-  const shape = shapes.find((s) => s.mesh === hit.object) ?? visitors.find((v) => v.mesh === hit.object)
+  const shape =
+    shapes.find((s) => s.mesh === hit.object) ??
+    visitors.find((v) => v.mesh === hit.object) ??
+    signatures.find((s) => s.mesh === hit.object)
   if (!shape) return
 
   focused = shape
   focusUntil = performance.now() + FOCUS_MS
 
   inspected.value = {
-    text: shape.presence
-      ? `${shape.kind.label} · ${t(m.scene.visitor)}`
-      : shape.accent
-        ? `${shape.kind.label} · accent`
-        : shape.kind.label,
+    text: shape.signature
+      ? signatureLabel(shape.kind.label, shape.signature, locale.value)
+      : shape.presence
+        ? `${shape.kind.label} · ${t(m.scene.visitor)}`
+        : shape.accent
+          ? `${shape.kind.label} · accent`
+          : shape.kind.label,
     x: event.clientX,
     y: event.clientY,
   }
+  void nextTick(keepLabelOnScreen)
   clearTimeout(inspectTimer)
   inspectTimer = setTimeout(() => {
     inspected.value = null
@@ -530,6 +587,21 @@ function handleClick(event: MouseEvent) {
   // Three of eighteen are a different colour. Noticing that, and then acting on
   // it, is the whole achievement.
   if (shape.accent) unlock('cyanSpotter')
+}
+
+/**
+ * Nudges the label back inside the screen once it has a width. It is centred on the click,
+ * so a shape near the edge put half of it off-screen, and a signature's label, which carries
+ * a name of up to forty characters, can be wider than a phone: that one wraps as well.
+ */
+function keepLabelOnScreen() {
+  const label = labelRef.value
+  if (!label || !inspected.value) return
+  const margin = 8
+  const { left, right } = label.getBoundingClientRect()
+  const over = right - (window.innerWidth - margin)
+  const nudge = left < margin ? margin - left : over > 0 ? -over : 0
+  if (nudge) inspected.value = { ...inspected.value, x: inspected.value.x + nudge }
 }
 
 function handleResize() {
@@ -555,7 +627,10 @@ function handleResize() {
 function rehome() {
   const finalYaw = -swingDirection.value * FIELD_YAW
   forEachShape((shape) => {
-    sampleHome(worldPosition).applyAxisAngle(Y_AXIS, -finalYaw)
+    // A signature draws its own place again, so the swing ends with it where it started.
+    if (shape.signature) placeHome(shape.signature.place, worldPosition)
+    else sampleHome(worldPosition)
+    worldPosition.applyAxisAngle(Y_AXIS, -finalYaw)
     shape.offset.add(shape.home).sub(worldPosition)
     shape.home.copy(worldPosition)
   })
@@ -615,7 +690,9 @@ function animate(now: number) {
     pointerWorld.set(mouseX * half.x, -mouseY * half.y, 0)
   }
 
-  fadeVisitors(ease(VISITOR_FADE, f))
+  const fade = ease(VISITOR_FADE, f)
+  fadePool(visitors, fade)
+  fadePool(signatures, fade)
   if (recolour < 1) easeColours(f * REFERENCE_MS)
   // Snap during a glitch, drift the rest of the time.
   const drift = ease(shaking ? 0.65 : 0.045, f)
@@ -720,13 +797,16 @@ function pauseLoop() {
   // Nor will a scheme's ease: the still frame is in the new colours.
   if (recolour < 1) easeColours(RECOLOUR_MS)
   // No fade will finish now: whoever is arriving is here, and whoever is leaving goes
-  // (`syncVisitors` disposes them when nothing loops, and draws the frame).
-  for (const shape of visitors) {
-    if (shape.presence!.leaving) continue
-    shape.presence!.level = 1
-    ;(shape.mesh.material as THREE.MeshBasicMaterial).opacity = visitorOpacity(shape)
+  // (the syncs dispose them when nothing loops, and draw the frame).
+  for (const pool of [visitors, signatures]) {
+    for (const shape of pool) {
+      if (shape.presence!.leaving) continue
+      shape.presence!.level = 1
+      ;(shape.mesh.material as THREE.MeshBasicMaterial).opacity = visitorOpacity(shape)
+    }
   }
   syncVisitors()
+  syncSignatures()
 }
 
 watch(motion, (level) => (level === 'paused' ? pauseLoop() : startLoop()))
@@ -761,6 +841,7 @@ watch(theme, () => {
 })
 watch(shapeCount, syncShapeCount)
 watch(visitorShapes, syncVisitors)
+watch(signatureEntries, syncSignatures)
 watch(constellationOn, (on) => (on ? ensureLinks() : disposeLinks()))
 
 onMounted(() => {
@@ -781,6 +862,7 @@ onMounted(() => {
     createInitialShapes()
     if (constellationOn.value) ensureLinks()
     syncVisitors()
+    syncSignatures()
   } catch (error) {
     console.warn('ThreeBackground: WebGL unavailable, skipping animated background.', error)
     return
@@ -830,6 +912,7 @@ onUnmounted(() => {
   disposeLinks()
   while (shapes.length) removeShape()
   while (visitors.length) disposeShape(visitors.pop()!)
+  while (signatures.length) disposeShape(signatures.pop()!)
 
   renderer?.forceContextLoss()
   renderer?.dispose()
@@ -854,7 +937,8 @@ onUnmounted(() => {
   >
     <div
       v-if="inspected"
-      class="fixed z-[60] -translate-x-1/2 -translate-y-full pointer-events-none rounded border border-primary/40 bg-background/90 backdrop-blur px-2 py-1 font-mono text-[11px] text-primary whitespace-nowrap"
+      ref="labelRef"
+      class="fixed z-[60] -translate-x-1/2 -translate-y-full pointer-events-none rounded border border-primary/40 bg-background/90 backdrop-blur px-2 py-1 font-mono text-[11px] text-primary w-max max-w-[calc(100vw-1rem)] break-words"
       :style="{ left: `${inspected.x}px`, top: `${inspected.y - 8}px` }"
       aria-hidden="true"
     >

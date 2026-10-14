@@ -895,6 +895,9 @@ export const messages = {
   scene: {
     visitor: { en: 'someone else, here now', fr: 'quelqu’un d’autre, ici en ce moment' },
     wake: { en: 'move the mouse or press a key', fr: 'bougez la souris ou appuyez sur une touche' },
+    // A guestbook entry's wireframe, after its kind: `components/signatures.ts` fills in the
+    // name and the day. Never the message.
+    signature: { en: 'signed by {name}, {date}', fr: 'signé par {name}, le {date}' },
   },
   now: {
     heading: { en: 'What I’m doing now', fr: 'Ce que je fais en ce moment' },

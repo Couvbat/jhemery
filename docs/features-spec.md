@@ -837,6 +837,25 @@ mounted, so coming back to *full* or *calm* picks the scene up where it stood.
   (`content/fortunes.ts`, `Localised` like the everyday lines) and adds one line to `neofetch`
   and one to the boot log. No achievement: `completionist` would then wait up to a year on the
   calendar, when every other achievement waits on the visitor.
+- **Guestbook entries** — the newest twelve entries are wireframes, in a third pool beside the
+  visitors' that `spawn`, `scene reset`, the accent count and the constellation never see. They
+  come from the ticker's own poll (§8, live guestbook ticker), so the field makes no request,
+  and with the guestbook off there are none. `components/signatures.ts` holds the pure part:
+  `newestSignatures()` picks the twelve by date, and `shapeLayout()` is the one distribution
+  every shape in the field is drawn from, given `Math.random` for the others and
+  `seededRandom(id)` (FNV-1a, then mulberry32) for an entry. So an entry is the same kind in
+  the same place with the same spin on every visit, and its place scales with the screen's
+  width as any shape's does. A view swing re-homes it to that place rather than to a fresh one.
+  An entry that leaves the page, deleted with `sudo rm` or pushed off by a newer one, fades out
+  as a departing visitor does, within one poll; while it fades it can't be clicked. A shape
+  carries no text: clicking one reads `<kind> · signed by <name>, <day>`, the day on the
+  visitor's calendar in their language, through the same text interpolation as every label, and
+  never the message. The canvas carries `data-signatures`, the count of entries staying, as the
+  e2e suite's one window into the scene. **Open question:** the backend rejects links but filters
+  nothing else, and the owner's delete is the only moderation. A name chosen to offend is
+  still shown only to whoever clicks its shape, and the ticker's toast already shows every new
+  name to everyone on the page, but it now stays one click away for as long as it is among the
+  twelve newest.
 
 **Terminal control** (`composables/useSceneControl.ts`) adds three more knobs, in the same
 flag-and-watch shape as `useMatrix`/`useBoot` — the commands only ever set, the component is the
@@ -857,7 +876,9 @@ label, and holds the camera's gaze on it for 2.2s before easing back to the orig
 stays `pointer-events-none` — a full-screen canvas that eats clicks is a worse bug than a missing
 easter egg — so the listener is on `window` and ignores anything that belongs to the page: links,
 controls, an open terminal, or a click that ended a text selection. Three of the eighteen opening
-shapes are the accent colour; clicking one of those is the `cyanSpotter` achievement.
+shapes are the accent colour; clicking one of those is the `cyanSpotter` achievement. The label
+is centred on the click and then nudged back inside the screen if it overhangs an edge, and it
+wraps rather than run wider than the screen, which a guestbook name can make it on a phone.
 
 ---
 
@@ -1158,6 +1179,10 @@ up entirely after three consecutive failures, or the first response saying the g
 `GuestbookTicker.vue` drains the queue one at a time, the same way `AchievementToast` does; two
 floating notices fighting for the same corner reads as a bug. Clicking it opens the terminal with
 `guestbook` already running.
+
+The same poll keeps the page it fetched, which the field draws as wireframes (§5.3, guestbook
+entries). Each poll replaces it, so a deleted entry drops out on the next one; the guestbook
+saying it is off empties it; a failed poll leaves it as it was, since a blip is not a deletion.
 
 ### Guestbook
 
