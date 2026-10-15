@@ -2,6 +2,7 @@ import { Injectable, Logger, Optional } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { AskDto } from './ask.dto';
 import { UnitHealth } from '../common/health';
+import { LlmService, readEventStream, stripThinking } from '../common/llm';
 import { LabService } from '../lab/lab.service';
 import { McpContentService } from '../mcp/mcp.content';
 import { AskCorpusService } from './ask.corpus';
@@ -60,18 +61,6 @@ Full-Stack Developer at In-Leed, France. Builds web apps, produces hard electron
 
 The site's own terminal has a \`mail\` command that reaches him directly.`;
 
-interface CompletionChunk {
-  choices?: Array<{ delta?: { content?: string | null } }>;
-  /** Sent on the last chunk when the request asked for `stream_options.include_usage`. */
-  usage?: { completion_tokens?: number } | null;
-}
-
-/** What one `data:` event carried: some of the answer, the runtime's token count, or both. */
-interface StreamEvent {
-  delta?: string;
-  outputTokens?: number;
-}
-
 /**
  * Which model wrote the answer, how fast, and from which of the site's pages
  * (`docs/superpowers/specs/2026-10-15-ask-my-lab-design.md` §3). Sent as one event after
@@ -122,18 +111,6 @@ export class AskService {
   /** At most one corpus refresh in flight, so questions cannot pile up dials. */
   private corpusRefresh: Promise<void> | null = null;
   /**
-   * Self-hosted inference serialises anyway, so a queue would only let callers
-   * pile up work on someone's GPU. The cap lives here rather than in
-   * `RateLimitGuard` because that guard is per-IP by construction.
-   */
-  private inFlight = false;
-  /**
-   * A detached request that is still bringing the model up. While one exists,
-   * further questions are answered "asleep" straight away rather than dialling
-   * again — a cold model would otherwise get a fresh load request per visitor.
-   */
-  private warming: Promise<unknown> | null = null;
-  /**
    * The last real question's outcome and the counts since the process started, which
    * `/health` reports. A busy refusal isn't recorded: the question holding the slot
    * will be, and that is the one that says how the model is.
@@ -147,12 +124,23 @@ export class AskService {
    * hand, never awaited. Optional, so a service built without them answers from
    * `llms.txt` alone, as it did before either existed.
    */
+  /**
+   * The model and its one slot, shared with the guestbook's moderator (`common/llm.ts`).
+   * The cap lives there rather than in `RateLimitGuard` because that guard is per-IP by
+   * construction. A service built without one gets its own, as it did before the slot
+   * was shared.
+   */
+  private readonly llm: LlmService;
+
   constructor(
     private readonly config: ConfigService,
     @Optional() private readonly content?: McpContentService,
     @Optional() private readonly passages?: AskCorpusService,
     @Optional() private readonly lab?: LabService,
-  ) {}
+    @Optional() llm?: LlmService,
+  ) {
+    this.llm = llm ?? new LlmService(config);
+  }
 
   /**
    * The lab as it is now, for the prompt's `LAB NOW` block. The same process holds the
@@ -173,9 +161,7 @@ export class AskService {
    */
   get enabled(): boolean {
     return (
-      this.config.get<string>('ASK_ENABLED') === 'true' &&
-      Boolean(this.config.get<string>('LLM_BASE_URL')) &&
-      Boolean(this.config.get<string>('LLM_MODEL'))
+      this.config.get<string>('ASK_ENABLED') === 'true' && this.llm.configured
     );
   }
 
@@ -194,10 +180,12 @@ export class AskService {
   ): Promise<AskAnswer> {
     // Claimed synchronously, before the first `await`, so two overlapping
     // requests cannot both see a free slot.
-    if (this.inFlight) {
+    const release = this.llm.tryAcquire();
+    if (!release) {
       throw askFailure(classify({ kind: 'busy' }), 'One question at a time');
     }
     if (!this.enabled) {
+      release();
       // The same status as an unreachable model, so an older frontend still has one
       // degraded path; the reason tells a newer one which.
       throw askFailure(
@@ -205,7 +193,8 @@ export class AskService {
         'The model is unavailable',
       );
     }
-    if (this.warming) {
+    if (this.llm.warming) {
+      release();
       // Still loading from an earlier question. Say so immediately instead of
       // queueing a second load behind the first.
       const failure = askFailure(
@@ -215,7 +204,6 @@ export class AskService {
       this.failed(failure, 0);
       throw failure;
     }
-    this.inFlight = true;
 
     const startedAt = Date.now();
     try {
@@ -242,7 +230,7 @@ export class AskService {
       this.failed(err, Date.now() - startedAt);
       throw err;
     } finally {
-      this.inFlight = false;
+      release();
     }
   }
 
@@ -304,9 +292,7 @@ export class AskService {
     signal?: AbortSignal,
   ): Promise<Streamed> {
     const startedAt = Date.now();
-    const baseUrl = this.config.get<string>('LLM_BASE_URL')!;
-    const model = this.config.get<string>('LLM_MODEL')!;
-    const apiKey = this.config.get<string>('LLM_API_KEY');
+    const model = this.llm.model;
     const corpus = this.corpusNow();
     const labNow = await this.labNow();
     // Once, so the passages the model was given are exactly the sources it is credited with.
@@ -333,11 +319,6 @@ export class AskService {
     };
     signal?.addEventListener('abort', onClientGone, { once: true });
 
-    const headers: Record<string, string> = {
-      'Content-Type': 'application/json',
-    };
-    if (apiKey) headers.Authorization = `Bearer ${apiKey}`;
-
     const visible = stripThinking();
     const emit = (text: string) => {
       if (!text) return;
@@ -356,39 +337,33 @@ export class AskService {
     };
 
     const work = (async () => {
-      const res = await fetch(
-        `${baseUrl.replace(/\/+$/, '')}/chat/completions`,
+      const res = await this.llm.post(
         {
-          method: 'POST',
-          headers,
-          signal: controller.signal,
-          body: JSON.stringify({
-            model,
-            stream: true,
-            max_tokens: MAX_OUTPUT_TOKENS,
-            // A reasoning model spends the whole token budget deliberating and
-            // then gets cut off mid-answer: `gemma4:e4b` burns ~250 of 300 on
-            // chain-of-thought and finishes `length`, not `stop`. Runtimes that
-            // do not know the field ignore it.
-            reasoning_effort: 'none',
-            // The runtime's own token count, on the last chunk. A runtime that ignores
-            // the option is counted by its deltas instead, and the meta says so.
-            stream_options: { include_usage: true },
-            messages: [
-              {
-                role: 'system',
-                content: systemPrompt({
-                  corpus,
-                  content: this.content?.current() ?? null,
-                  passages,
-                  labNow,
-                  locale: dto.locale,
-                }),
-              },
-              { role: 'user', content: dto.question },
-            ],
-          }),
+          stream: true,
+          max_tokens: MAX_OUTPUT_TOKENS,
+          // A reasoning model spends the whole token budget deliberating and
+          // then gets cut off mid-answer: `gemma4:e4b` burns ~250 of 300 on
+          // chain-of-thought and finishes `length`, not `stop`. Runtimes that
+          // do not know the field ignore it.
+          reasoning_effort: 'none',
+          // The runtime's own token count, on the last chunk. A runtime that ignores
+          // the option is counted by its deltas instead, and the meta says so.
+          stream_options: { include_usage: true },
+          messages: [
+            {
+              role: 'system',
+              content: systemPrompt({
+                corpus,
+                content: this.content?.current() ?? null,
+                passages,
+                labNow,
+                locale: dto.locale,
+              }),
+            },
+            { role: 'user', content: dto.question },
+          ],
         },
+        controller.signal,
       );
 
       if (!res.ok || !res.body) {
@@ -444,13 +419,12 @@ export class AskService {
         // Detach. Deliberately no `controller.abort()` — that is the line that
         // used to cancel the load.
         detached = true;
-        this.warming = work
-          .catch(() => undefined)
-          .finally(() => {
-            this.warming = null;
+        this.llm.warmingUntil(
+          work.finally(() => {
             if (idle) clearTimeout(idle);
             clearTimeout(ceiling);
-          });
+          }),
+        );
         this.logger.log(
           'ask: model still loading, detaching so the load can finish',
         );
@@ -602,117 +576,5 @@ export class AskService {
   /** How many passages the corpus holds: 0 until it has been fetched. */
   private passageCount(): number {
     return this.passages?.size ?? 0;
-  }
-}
-
-/**
- * Reads an OpenAI-compatible `stream: true` body. Written by hand rather than
- * with `EventSource` because this is a POST, and because every runtime that
- * matters sends exactly one `data:` field per event.
- */
-async function readEventStream(
-  body: ReadableStream<Uint8Array>,
-  onEvent: (event: StreamEvent) => void,
-): Promise<void> {
-  const reader = body.getReader();
-  const decoder = new TextDecoder();
-  let buffer = '';
-
-  for (;;) {
-    const { done, value } = await reader.read();
-    if (done) return;
-
-    buffer += decoder.decode(value, { stream: true });
-    let newline: number;
-    // Line by line, so an event split across two network chunks still parses.
-    while ((newline = buffer.indexOf('\n')) !== -1) {
-      const raw = buffer.slice(0, newline).trim();
-      buffer = buffer.slice(newline + 1);
-      if (!raw.startsWith('data:')) continue;
-
-      const payload = raw.slice('data:'.length).trim();
-      if (payload === '[DONE]') return;
-
-      const event = parseEvent(payload);
-      if (event) onEvent(event);
-    }
-  }
-}
-
-const THINK_OPEN = '<think>';
-const THINK_CLOSE = '</think>';
-
-/**
- * Drops `<think>…</think>` from the visible answer.
- *
- * Reasoning models leak deliberation two ways. Ollama puts it in a separate
- * `reasoning` field, which this service simply never reads; llama.cpp and
- * friends inline it in `content`. `reasoning_effort: 'none'` turns both off
- * where it is honoured, and this covers the runtimes that ignore it — nobody
- * wants a thousand characters of the model talking itself through the answer
- * streamed into a terminal that asked for two sentences.
- *
- * Stateful because a tag can be split across two chunks, so the tail of each
- * chunk is held back until it is known not to be the start of one. `flush()`
- * releases whatever survived once the stream ends.
- */
-function stripThinking(): { push(chunk: string): string; flush(): string } {
-  let buffer = '';
-  let inside = false;
-
-  return {
-    push(chunk: string): string {
-      buffer += chunk;
-      let out = '';
-
-      for (;;) {
-        if (inside) {
-          const end = buffer.indexOf(THINK_CLOSE);
-          if (end === -1) {
-            // Keep only enough to recognise a closing tag split across chunks.
-            buffer = buffer.slice(
-              Math.max(0, buffer.length - THINK_CLOSE.length + 1),
-            );
-            return out;
-          }
-          buffer = buffer.slice(end + THINK_CLOSE.length);
-          inside = false;
-          continue;
-        }
-
-        const start = buffer.indexOf(THINK_OPEN);
-        if (start === -1) {
-          const safe = Math.max(0, buffer.length - THINK_OPEN.length + 1);
-          out += buffer.slice(0, safe);
-          buffer = buffer.slice(safe);
-          return out;
-        }
-        out += buffer.slice(0, start);
-        buffer = buffer.slice(start + THINK_OPEN.length);
-        inside = true;
-      }
-    },
-    /** An unterminated `<think>` means everything after it was deliberation. */
-    flush(): string {
-      if (inside) return '';
-      const rest = buffer;
-      buffer = '';
-      return rest;
-    },
-  };
-}
-
-/** A malformed chunk is not worth failing a whole answer over. */
-function parseEvent(payload: string): StreamEvent | undefined {
-  try {
-    const chunk = JSON.parse(payload) as CompletionChunk;
-    const delta = chunk.choices?.[0]?.delta?.content ?? undefined;
-    const tokens = chunk.usage?.completion_tokens;
-    return {
-      ...(delta ? { delta } : {}),
-      ...(typeof tokens === 'number' ? { outputTokens: tokens } : {}),
-    };
-  } catch {
-    return undefined;
   }
 }
