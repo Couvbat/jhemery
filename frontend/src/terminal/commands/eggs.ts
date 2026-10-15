@@ -6,6 +6,7 @@ import {
   resetScene,
   setConstellation,
   setGravity,
+  setMusicReaction,
   spawnShapes,
   useSceneControl,
 } from '@/composables/useSceneControl'
@@ -703,17 +704,23 @@ export const eggCommands: Command[] = [
   },
   {
     name: 'scene',
-    usage: 'scene [reset]',
+    usage: 'scene [reset|music on|music off]',
     description: { en: 'Inspect or reset the background', fr: 'Inspecter ou réinitialiser le fond' },
     group: 'fun',
     writes: (args) => (args[0]?.toLowerCase() === 'reset' ? 'local' : 'none'),
     hidden: true,
-    complete: ({ index }) => (index === 0 ? ['reset'] : []),
+    complete: ({ index, args }) => (index === 0 ? ['reset', 'music'] : index === 1 && args[0] === 'music' ? ['on', 'off'] : []),
     run({ args }) {
       const control = useSceneControl()
       if (args[0] === 'reset') {
         resetScene()
         return [line('scene reset.', 'success')]
+      }
+      // Whether the field reacts to the music playing here: for the session, unsaved, as
+      // the other flags are.
+      if (args[0] === 'music' && (args[1] === 'on' || args[1] === 'off' || args.length === 1)) {
+        const on = setMusicReaction(args[1] === undefined ? undefined : args[1] === 'on')
+        return [line(on ? 'the field listens to the music.' : 'the field ignores the music.', 'success')]
       }
       if (args.length) return [line(`scene: unknown argument \`${args[0]}\``, 'error')]
 
@@ -721,6 +728,7 @@ export const eggCommands: Command[] = [
         pre(`shapes         ${control.shapeCount.value}`, 'primary'),
         pre(`gravity        ${control.gravityOn.value ? 'on' : 'off'}`, 'primary'),
         pre(`constellation  ${control.constellationOn.value ? 'on' : 'off'}`, 'primary'),
+        pre(`music          ${control.musicOn.value ? 'on' : 'off'}`, 'primary'),
         blank,
         line('try `spawn 10`, `gravity off`, `constellation on`, `scene reset`.', 'muted'),
         line('clicking a shape tells you what it is.', 'muted'),

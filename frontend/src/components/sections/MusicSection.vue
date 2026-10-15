@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { defineAsyncComponent, nextTick, ref } from 'vue'
+import { defineAsyncComponent, nextTick, onBeforeUnmount, ref, watch } from 'vue'
 import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import SectionHeader from '@/components/SectionHeader.vue'
@@ -7,7 +7,7 @@ import WindowDots from '@/components/WindowDots.vue'
 import { music } from '@/content'
 import { stemTracks } from '@/content/stems'
 import { useLocale } from '@/i18n'
-import { useMusicEmbed, useMusicPlayer } from '@/composables/useMusicPlayer'
+import { setPlayerPlaying, useMusicEmbed, useMusicPlayer } from '@/composables/useMusicPlayer'
 
 const { t, m } = useLocale()
 const { autoplayNonce, playerLoaded } = useMusicPlayer()
@@ -26,6 +26,20 @@ async function load() {
   await nextTick()
   frameEl.value?.focus()
 }
+
+// The frame's play state, for the field to follow (`components/music/soundcloud-bridge.ts`):
+// its own chunk, fetched once there is a frame and never before, as the frame itself is.
+// A `play` remounts the frame, and the bridge follows it to the new one.
+let bridge: { dispose: () => void } | null = null
+watch(frameEl, async (frame) => {
+  bridge?.dispose()
+  bridge = null
+  if (!frame) return
+  const { createSoundCloudBridge } = await import('@/components/music/soundcloud-bridge')
+  if (frameEl.value !== frame) return
+  bridge = createSoundCloudBridge(frame, { onPlaying: setPlayerPlaying })
+})
+onBeforeUnmount(() => bridge?.dispose())
 </script>
 
 <template>

@@ -127,6 +127,8 @@ async function load() {
     if (controller.signal.aborted) return
     engine = createStemsEngine(audio, buffers, mix.value, {
       seconds: track.value.seconds,
+      bpm: track.value.bpm,
+      beatsPerBar: track.value.beatsPerBar,
       onStop(reason) {
         playing.value = false
         stopClock()

@@ -542,6 +542,22 @@ any key and claims none), or the swing. CSS alone (`attr(data-src)` in a `::befo
 rejected and still is: it would collide with components' own pseudo-elements, and a
 pseudo-element can't carry a link.
 
+**The field listens** ([spec](superpowers/specs/2026-10-15-music-reactive-field-design.md)).
+`lib/music-signal.ts` is a registry the sound sources attach to while they sound (`attachMusic`,
+the last started followed, detaching falling back) and `ThreeBackground` reads at draw time
+(`currentMusic()`), not reactive and imported only by lazy chunks. `acid`'s engine puts an
+`AnalyserNode` (256-point) in series before the destination and counts beats from a monotone step
+index at each step's own tempo (`beatsAt`); the stems engine puts one after its limiter and counts
+`position × bpm / 60`. `components/music/soundcloud-bridge.ts`, fetched by `MusicSection` only
+once the frame exists, speaks the widget's `postMessage` protocol as `api.js` does (JSON
+`{ method, value }`, `addEventListener` per event, `getCurrentSound` for the permalink), accepts
+only `https://w.soundcloud.com` from that frame, re-anchors its beat on every `playProgress`, and
+takes tempos from `content/music.ts`. `components/music-react.ts` turns a source into speed,
+scale, opacity and a ripple flag with time-based envelopes (250 ms attack, 600 ms release), so
+30 and 60 fps move alike; its spec holds opacity to 0.1 within any 333 ms under a 200 BPM beat
+and a square-wave level, and beats never reach it. `scene music off` is a session flag in
+`useSceneControl`.
+
 **Stems, vol. 2** ([spec](superpowers/specs/2026-10-15-stems-vol2-design.md)). `scripts/stems.mjs`
 (`npm run stems -- <folder>`) turns DAW exports and a `track.json` into a track: it probes every
 stem (one rate, one length, at most `MAX_STEMS`), warns when the excerpt isn't a whole number of

@@ -11,6 +11,21 @@ export const music = {
   } satisfies Localised,
 } as const
 
+/** A track's tempo, for the background to beat with while SoundCloud plays it. */
+export interface Tempo {
+  bpm: number
+  /** Where the first downbeat falls, in milliseconds from the track's start. */
+  firstBeatMs: number
+}
+
+/**
+ * Tempos entered by hand, keyed by a track's path on soundcloud.com (`/couvbat/track`):
+ * SoundCloud's frame can't be heard, only followed, so a beat has to be known rather than
+ * detected (`components/music/soundcloud-bridge.ts`). A track with no entry still lifts the
+ * field while it plays; it just has no beat.
+ */
+export const tempos: Readonly<Record<string, Tempo>> = {}
+
 /** The site's own green, which the widget falls back to. */
 export const EMBED_FALLBACK_COLOUR = '#00ff41'
 

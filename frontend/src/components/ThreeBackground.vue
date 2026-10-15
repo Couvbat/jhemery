@@ -6,6 +6,8 @@ import { useCrt } from '@/composables/useCrt'
 import { useMotion } from '@/composables/useMotion'
 import { usePresence } from '@/composables/usePresence'
 import { RIPPLE_SECONDS, rippleOffset } from './ripple'
+import { createMusicReact, levelOf, lowOf, reactToMusic, RIPPLE_SHARE, type MusicInput } from './music-react'
+import { currentMusic } from '@/lib/music-signal'
 import { followSeason } from './season'
 import { fieldMood, pickPalette, type Hue, type Palette } from './palette'
 import { newestSignatures, seededRandom, shapeLayout, signatureLabel, type Axes } from './signatures'
@@ -25,7 +27,7 @@ import { unlock, unlocked } from '@/terminal/achievements'
 // animation frame allocation-free. `glitching` is the same ref that drives the CSS
 // screen-tear on `sudo rm -rf /`, so the shapes shake for exactly that window.
 const { speedMultiplier, glitching } = useCrt()
-const { shapeCount, gravityOn, constellationOn, visitorShapes } = useSceneControl()
+const { shapeCount, gravityOn, constellationOn, visitorShapes, musicOn } = useSceneControl()
 const { screensaver } = useScreensaver()
 const { t, m, locale } = useLocale()
 // The prism swing between views (features-spec §11). The router drives one eased
@@ -182,6 +184,20 @@ const CALM_SPEED = 0.35
 let lastFrame = 0
 /** When the current ripple began, on the loop's clock, or null when there is none. */
 let rippleAt: number | null = null
+/** How hard the current ripple pushes: all of it for `wall`'s, a third for a downbeat's. */
+let rippleShare = 1
+
+/**
+ * The music the field follows (`music-react.ts`, `lib/music-signal.ts`): its envelopes,
+ * the buffer a source's spectrum is read into, and what was last applied, all allocated
+ * once. Read at draw time, as the colours are, so nothing re-renders.
+ */
+const musicReact = createMusicReact()
+const musicBins = new Uint8Array(128)
+const musicInput: MusicInput = { level: null, low: null, beats: null, beatsPerBar: 4 }
+let appliedScale = 1
+/** The level's hold on the shapes' opacity, which `applyPalette` multiplies in too. */
+let musicGlow = 1
 /**
  * When the governor next lets a frame through. Kept on a grid rather than counted from
  * the last frame, so a frame that arrives a little late doesn't push every later one
@@ -289,7 +305,7 @@ function applyPalette() {
   for (const { mesh, baseOpacity } of shapes) {
     // Scaled from `baseOpacity` rather than from the current value, so a run of
     // weather changes can't ratchet every shape down to invisible.
-    ;(mesh.material as THREE.MeshBasicMaterial).opacity = Math.min(baseOpacity * opacity, 0.6)
+    ;(mesh.material as THREE.MeshBasicMaterial).opacity = Math.min(baseOpacity * opacity * musicGlow, 0.6)
   }
   for (const shape of visitors) (shape.mesh.material as THREE.MeshBasicMaterial).opacity = visitorOpacity(shape)
   for (const shape of signatures) (shape.mesh.material as THREE.MeshBasicMaterial).opacity = visitorOpacity(shape)
@@ -676,7 +692,37 @@ function animate(now: number) {
   const f = lastFrame ? Math.min(MAX_STEP, (now - lastFrame) / REFERENCE_MS) : 1
   lastFrame = now
 
-  const boost = speedMultiplier.value * sectionSpeed * mood.value.speed * (calm ? CALM_SPEED : 1) * f
+  // The music, if any is playing and the visitor hasn't turned it off (`scene music off`).
+  const source = musicOn.value ? currentMusic() : null
+  if (source) {
+    if (source.spectrum) {
+      source.spectrum(musicBins)
+      musicInput.level = levelOf(musicBins)
+      musicInput.low = lowOf(musicBins)
+    } else {
+      musicInput.level = musicInput.low = null
+    }
+    musicInput.beats = source.beats()
+    musicInput.beatsPerBar = source.beatsPerBar ?? 4
+  }
+  const music = reactToMusic(musicReact, source ? musicInput : null, now, f, motion.value)
+  // A downbeat ripples at a third of `wall`'s strength, never over one already running.
+  if (music.ripple && rippleAt === null && motion.value === 'full') {
+    rippleAt = now
+    rippleShare = RIPPLE_SHARE
+  }
+  // Light follows the level only, slowly: see `music-react.ts` on why never the beat.
+  if (Math.abs(music.opacity - musicGlow) > 0.002) {
+    musicGlow = music.opacity
+    const { opacity } = mood.value
+    for (const { mesh, baseOpacity } of shapes) {
+      ;(mesh.material as THREE.MeshBasicMaterial).opacity = Math.min(baseOpacity * opacity * musicGlow, 0.6)
+    }
+  }
+  const rescale = Math.abs(music.scale - appliedScale) > 1e-4
+  if (rescale) appliedScale = music.scale
+
+  const boost = speedMultiplier.value * sectionSpeed * mood.value.speed * (calm ? CALM_SPEED : 1) * music.speed * f
   const shaking = glitching.value
   const turning = swinging.value
   // The well's z=0-plane maths is wrong in a rotated frame; off for the 650 ms. `calm`
@@ -711,6 +757,7 @@ function animate(now: number) {
   if (rippleAt !== null && (now - rippleAt) / 1000 >= RIPPLE_SECONDS) rippleAt = null
   const rippling = rippleAt === null ? -1 : (now - rippleAt) / 1000
   forEachShape(({ mesh, speed, home, offset }) => {
+    if (rescale) mesh.scale.setScalar(appliedScale)
     mesh.rotation.x += speed.x * boost
     mesh.rotation.y += speed.y * boost
     mesh.rotation.z += speed.z * boost
@@ -734,7 +781,7 @@ function animate(now: number) {
     // term in the target like the well's, so the drift carries the shape out and back.
     if (rippling >= 0) {
       const radius = home.length()
-      const push = rippleOffset(radius, rippling)
+      const push = rippleOffset(radius, rippling) * rippleShare
       if (push && radius > 0.001) {
         target.x += (home.x / radius) * push
         target.y += (home.y / radius) * push
@@ -828,6 +875,7 @@ watch(motion, (level) => (level === 'paused' ? pauseLoop() : startLoop()))
 watch(wave, () => {
   if (motion.value !== 'full' || animationFrameId === null) return
   rippleAt = performance.now()
+  rippleShare = 1
 })
 
 // Both the section and the completionist unlock change how the scene looks; one

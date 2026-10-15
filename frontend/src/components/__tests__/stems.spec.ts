@@ -1,7 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { StemTrack } from '@/content/stems'
 import { toBase64Url } from '@/lib/base64url'
-import { createStemsEngine } from '../stems/engine'
+import { currentMusic } from '@/lib/music-signal'
+import { createStemsEngine, stemsBeats } from '../stems/engine'
 import { cutoffHz, decodeMix, DEFAULT_LEVEL, defaultMix, encodeMix, gains, MIX_VERSION, type Mix } from '../stems/mix'
 
 const stem = (id: string) => ({ id, name: { en: id, fr: id }, file: `night/${id}.m4a`, bytes: 1000 })
@@ -133,6 +134,9 @@ class FakeContext {
   createDynamicsCompressor() {
     return this.make('compressor', { threshold: param(-24), knee: param(30), ratio: param(12), attack: param(0.003), release: param(0.25) })
   }
+  createAnalyser() {
+    return this.make('analyser', { fftSize: 2048, getByteFrequencyData: vi.fn((into: Uint8Array) => into.fill(9)) })
+  }
   createBufferSource() {
     return this.make('source', { buffer: null, loop: false, loopStart: 0, loopEnd: 0, start: vi.fn(), stop: vi.fn() })
   }
@@ -245,6 +249,27 @@ describe('the engine', () => {
     expect(engine.position()).toBeLessThan(30)
     engine.seek(-4)
     expect(engine.position()).toBe(0)
+  })
+
+  // The field listens (`docs/superpowers/specs/2026-10-15-music-reactive-field-design.md`).
+  it('lets the field follow the mix while it plays, by position and tempo', () => {
+    const engine = createStemsEngine(context as unknown as AudioContext, buffers, defaultMix(3), { bpm: 120 })
+    engine.play()
+    const source = currentMusic()!
+    expect(source).toMatchObject({ id: 'stems', bpm: 120, beatsPerBar: 4 })
+    context.currentTime = 10.05 + 3
+    expect(source.beats()).toBeCloseTo(6)
+    const bins = new Uint8Array(2)
+    source.spectrum!(bins)
+    expect([...bins]).toEqual([9, 9])
+    engine.pause()
+    // The signal is the module's: other tests' engines may still be attached, never this one.
+    expect(currentMusic()).not.toBe(source)
+  })
+
+  it('counts beats from position and tempo, and none without a tempo', () => {
+    expect(stemsBeats(8, 165)).toBeCloseTo(22)
+    expect(stemsBeats(8, undefined)).toBeNull()
   })
 
   it('suspends the context once stopped, and lets go of every node on dispose', () => {

@@ -15,7 +15,9 @@ import { api, apiUrl, fetchSite, type HealthReport, type LabReport } from '@/lib
 import { sourceUrl } from '@/lib/source'
 import { dataLine, newestByRoute, newestOf, STREAM_ROUTE, type TimingEntry } from '@/lib/xray-data'
 import { parseTrace, pathHops, type Trace } from '@/lib/xray-path'
+import { listeningTo } from './music-react'
 import { newestSignatures } from './signatures'
+import { currentMusic } from '@/lib/music-signal'
 import {
   baseName,
   CANVAS_FILE,
@@ -54,7 +56,7 @@ const { t, m, locale } = useLocale()
 const { swinging } = useViewSwing()
 const { matrixActive } = useMatrix()
 const { bootPlaying } = useBoot()
-const { shapeCount, visitorShapes } = useSceneControl()
+const { shapeCount, visitorShapes, musicOn } = useSceneControl()
 // The field's third pool, the guestbook's newest entries, counted the way the field picks them.
 const { entries: guestbookEntries } = useGuestbookTicker()
 const signatureShapes = computed(() => newestSignatures(guestbookEntries.value).length)
@@ -95,7 +97,9 @@ const status = computed(() =>
 
 function extraFor(names: string[]): string {
   if (!names.includes(CANVAS_FILE)) return ''
-  return ` · ${t(m.xray.shapes).replace('{n}', String(fieldShapes.value))}`
+  // And what the field is following, when music is playing and it is listening.
+  const listening = musicOn.value ? listeningTo(currentMusic(), locale.value) : ''
+  return ` · ${t(m.xray.shapes).replace('{n}', String(fieldShapes.value))}${listening ? ` · ${listening}` : ''}`
 }
 
 /**

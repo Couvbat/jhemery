@@ -1,3 +1,4 @@
+import { attachMusic } from '@/lib/music-signal'
 import { cutoffHz, gains, type Mix } from './mix'
 
 /**
@@ -19,6 +20,15 @@ import { cutoffHz, gains, type Mix } from './mix'
 const RAMP_TC = 0.015
 /** Sources start this far ahead, so all of them are booked before the first one sounds. */
 const START_AHEAD_S = 0.05
+
+/**
+ * Beats into the excerpt, for the field to follow: the loop's position at the track's
+ * tempo. The prep script's whole-bar check puts the excerpt's start on a downbeat, so beat
+ * 0 is one. Null without a tempo, when the field follows the level alone.
+ */
+export function stemsBeats(position: number, bpm: number | null | undefined): number | null {
+  return bpm ? (position * bpm) / 60 : null
+}
 
 export type StopReason = 'user' | 'hidden'
 
@@ -44,7 +54,7 @@ export function createStemsEngine(
   context: AudioContext,
   buffers: readonly AudioBuffer[],
   initial: Mix,
-  options: { onStop?: (reason: StopReason) => void; seconds?: number } = {},
+  options: { onStop?: (reason: StopReason) => void; seconds?: number; bpm?: number; beatsPerBar?: number } = {},
 ): StemsEngine {
   // Exactly the excerpt's length when the track gives it: AAC encoders pad, and browsers
   // trim the padding differently, so looping over the buffers' own ends would put a gap
@@ -65,8 +75,12 @@ export function createStemsEngine(
   limiter.ratio.value = 20
   limiter.attack.value = 0.002
   limiter.release.value = 0.1
+  // After the limiter, so the field hears the mix as the visitor set it: solo the kick and
+  // it follows the kick. In series, so every browser pulls it.
+  const analyser = context.createAnalyser()
+  analyser.fftSize = 256
   faders.forEach((fader) => fader.connect(filter))
-  filter.connect(transport).connect(limiter).connect(context.destination)
+  filter.connect(transport).connect(limiter).connect(analyser).connect(context.destination)
 
   let sources: AudioBufferSourceNode[] = []
   /** The audio-clock time the loop's start sounded, or would have. */
@@ -76,6 +90,7 @@ export function createStemsEngine(
   let playing = false
   let disposed = false
   let suspendTimer: number | undefined
+  let detachMusic: (() => void) | null = null
 
   function apply(mix: Mix, at = context.currentTime) {
     gains(mix).forEach((gain, i) => faders[i]?.gain.setTargetAtTime(gain, at, RAMP_TC))
@@ -124,6 +139,8 @@ export function createStemsEngine(
     if (!playing) return
     offset = position()
     playing = false
+    detachMusic?.()
+    detachMusic = null
     document.removeEventListener('visibilitychange', onVisibility)
     const now = context.currentTime
     transport.gain.cancelScheduledValues(now)
@@ -155,6 +172,13 @@ export function createStemsEngine(
       transport.gain.setValueAtTime(0, when)
       transport.gain.setTargetAtTime(1, when, RAMP_TC)
       playing = true
+      detachMusic = attachMusic({
+        id: 'stems',
+        beats: () => stemsBeats(position(), options.bpm),
+        bpm: options.bpm ?? null,
+        beatsPerBar: options.beatsPerBar ?? 4,
+        spectrum: (into) => analyser.getByteFrequencyData(into),
+      })
       document.addEventListener('visibilitychange', onVisibility)
     },
     pause: () => halt('user'),
@@ -170,7 +194,7 @@ export function createStemsEngine(
       halt('user', false)
       disposed = true
       window.clearTimeout(suspendTimer)
-      for (const node of [...faders, filter, transport, limiter]) node.disconnect()
+      for (const node of [...faders, filter, transport, limiter, analyser]) node.disconnect()
     },
   }
 }
