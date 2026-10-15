@@ -76,14 +76,24 @@ export function useMusicEmbed(frame?: Ref<HTMLIFrameElement | null>) {
   // start it again. Until the frame says otherwise, an autoplaying one is taken at its word.
   const autoplay = ref(autoplayNonce.value > 0)
   let playing = autoplay.value
-  /** A scheme picked while the player played, to paint once it stops. */
-  let waiting = false
+  /**
+   * From a stop until its grace is over, whether or not a repaint waits on it: a `finish`
+   * may be the gap before the next track, and a scheme picked in it must not cut that off.
+   */
+  let settling = false
+  /**
+   * The colour a scheme picked while the player played (or settled) is to be painted in.
+   * Read when it was picked, while that scheme is what is painted: by the time the player
+   * stops, a preview may be showing, and the frame would keep the preview's colour.
+   */
+  let pending: string | null = null
   let grace: ReturnType<typeof setTimeout> | undefined
 
-  const repaint = (autoplaying: boolean) => {
-    waiting = false
+  const repaint = (autoplaying: boolean, next = embedColour()) => {
+    pending = null
+    settling = false
     clearTimeout(grace)
-    colour.value = embedColour()
+    colour.value = next
     autoplay.value = autoplaying
     playing = autoplaying
   }
@@ -91,9 +101,12 @@ export function useMusicEmbed(frame?: Ref<HTMLIFrameElement | null>) {
   watch(autoplayNonce, () => repaint(true))
 
   watch(chosen, () => {
-    if (embedColour() === colour.value) return
-    if (playing) waiting = true
-    else repaint(false)
+    const next = embedColour()
+    // Back to the frame's own colour: nothing to repaint any more, and a reload now would
+    // only cost the visitor their place.
+    if (next === colour.value) pending = null
+    else if (playing || settling) pending = next
+    else repaint(false, next)
   })
 
   const post = (method: string, value?: unknown) =>
@@ -153,15 +166,20 @@ export function useMusicEmbed(frame?: Ref<HTMLIFrameElement | null>) {
 
   function started() {
     playing = true
+    settling = false
     clearTimeout(grace)
   }
 
   function stopped() {
+    // Only a player that was playing has a next track that may be about to start (and the
+    // widget's events can arrive twice: the grace runs from the first).
+    if (!playing) return
     playing = false
-    if (!waiting) return
+    settling = true
     clearTimeout(grace)
     grace = setTimeout(() => {
-      if (!playing && waiting) repaint(false)
+      settling = false
+      if (pending) repaint(false, pending)
     }, STOP_GRACE_MS)
   }
 

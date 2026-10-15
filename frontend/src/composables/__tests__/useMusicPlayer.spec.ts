@@ -140,6 +140,104 @@ describe('useMusicEmbed', () => {
     expect(embed.src.value).toBe(before)
   })
 
+  // Review of #159: a queued repaint outlived a return to the frame's own colour, and the
+  // next pause reloaded an unchanged frame, losing the place and `auto_play`.
+  it('forgets a queued repaint when the scheme goes back to the frame’s colour', async () => {
+    vi.useFakeTimers()
+    const { embed, requestPlayback, setTheme, STOP_GRACE_MS } = await load()
+    requestPlayback()
+    await nextTick()
+    const before = embed.src.value
+
+    setTheme('nord')
+    await nextTick()
+    setTheme('cyberpunk')
+    await nextTick()
+    widget('pause')
+    await vi.advanceTimersByTimeAsync(STOP_GRACE_MS * 2)
+
+    expect(embed.src.value).toBe(before)
+    expect(autoplayOf(embed.src.value)).toBe('true')
+  })
+
+  // Review of #159: the delayed repaint read whatever was painted when it fired, a preview's
+  // colour included, and the frame kept it after the preview ended.
+  it('paints the scheme picked, not a preview showing when the player stops', async () => {
+    vi.useFakeTimers()
+    const { embed, setTheme, previewTheme, STOP_GRACE_MS } = await load()
+    embed.load()
+    widget('play')
+    setTheme('nord')
+    await nextTick()
+    const nord = root.style.getPropertyValue('--neon-green')
+
+    const restore = previewTheme('dracula')!
+    expect(root.style.getPropertyValue('--neon-green')).not.toBe(nord)
+    widget('pause')
+    await vi.advanceTimersByTimeAsync(STOP_GRACE_MS)
+    restore()
+
+    expect(colourOf(embed.src.value)).toBe(nord)
+  })
+
+  // Review of #159: a scheme picked just after `finish` reloaded at once, cutting off the
+  // next track the grace is there to wait for.
+  describe('a scheme picked in the grace after a stop', () => {
+    it('waits out the grace, and is dropped for good if the next track starts', async () => {
+      vi.useFakeTimers()
+      const { embed, setTheme, STOP_GRACE_MS } = await load()
+      embed.load()
+      const before = embed.src.value
+      widget('play')
+      widget('finish')
+      await vi.advanceTimersByTimeAsync(200)
+
+      setTheme('nord')
+      await nextTick()
+      expect(embed.src.value).toBe(before)
+
+      widget('play')
+      await vi.advanceTimersByTimeAsync(STOP_GRACE_MS * 2)
+      expect(embed.src.value).toBe(before)
+    })
+
+    it('is painted when the grace from the stop runs out, not from the pick', async () => {
+      vi.useFakeTimers()
+      const { embed, setTheme, STOP_GRACE_MS } = await load()
+      embed.load()
+      widget('play')
+      widget('finish')
+      await vi.advanceTimersByTimeAsync(STOP_GRACE_MS - 500)
+
+      setTheme('nord')
+      await nextTick()
+      const nord = root.style.getPropertyValue('--neon-green')
+      expect(colourOf(embed.src.value)).not.toBe(nord)
+
+      await vi.advanceTimersByTimeAsync(500)
+      expect(colourOf(embed.src.value)).toBe(nord)
+    })
+
+    it('takes the latest of two picks, one before the stop and one during its grace', async () => {
+      vi.useFakeTimers()
+      const { embed, setTheme, STOP_GRACE_MS } = await load()
+      embed.load()
+      widget('play')
+      setTheme('nord')
+      await nextTick()
+      widget('pause')
+      await vi.advanceTimersByTimeAsync(500)
+
+      setTheme('dracula')
+      await nextTick()
+      const dracula = root.style.getPropertyValue('--neon-green')
+      expect(colourOf(embed.src.value)).not.toBe(dracula)
+
+      await vi.advanceTimersByTimeAsync(STOP_GRACE_MS - 500)
+      expect(colourOf(embed.src.value)).toBe(dracula)
+    })
+  })
+
   it('takes the scheme again when `play` remounts the frame', async () => {
     const { embed, requestPlayback, setTheme } = await load()
     embed.load()
