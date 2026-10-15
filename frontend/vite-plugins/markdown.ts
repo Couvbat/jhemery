@@ -5,7 +5,7 @@ import { githubSlug } from '../src/content/docs'
  * `docs/superpowers/specs` actually use: headings, paragraphs, lists (nested, ordered or
  * not, with wrapped lines), blockquotes, GFM tables, fenced code, a rule, and inline
  * code, links, emphasis and bare URLs. Hand-written rather than a dependency, like `qr`:
- * thirteen known files, and the two things that matter here, escaping and GitHub's
+ * twenty known files, and the two things that matter here, escaping and GitHub's
  * heading ids, are easier to own than to configure.
  *
  * Every text run is escaped, so nothing in a spec becomes markup. Anything outside the
