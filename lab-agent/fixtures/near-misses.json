@@ -1,0 +1,4 @@
+{
+  "refused": ["192.168.1.10", "tank-10.0.0.1", "fe80::1", "2001:db8:0:0:0:0:0:1", "http://ollama", "npm.lan:81", "host:8080", "nas.local", "media.home.arpa", "poseidon.tail1234.ts.net", "mistral:7"],
+  "accepted": ["tank", "data", "boot-pool", "gemma4:e4b", "qwen2.5:7b", "deepseek-r1:1.5b", "library/qwen3:8b", "nomic-embed-text:latest", "llama3.1:70b-instruct-q4_K_M"]
+}

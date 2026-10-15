@@ -1,0 +1,5 @@
+[
+  { "id": 1, "name": "tank", "guid": "1234567890", "path": "/mnt/tank", "status": "ONLINE", "healthy": true, "size": 960000000000, "allocated": 585600000000, "free": 374400000000 },
+  { "id": 2, "name": "scratch", "path": "/mnt/scratch", "status": "REMOVED", "healthy": false, "size": 1000000000000, "allocated": 0 },
+  { "id": 3, "name": "npm.lan:81", "status": "ONLINE", "size": 10, "allocated": 1 }
+]

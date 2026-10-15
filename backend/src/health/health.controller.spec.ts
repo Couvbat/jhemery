@@ -45,6 +45,7 @@ describe('GET /health', () => {
       'ask',
       'contact',
       'mcp',
+      'lab',
     ]);
     expect(typeof report.uptime).toBe('number');
     expect(fetchSpy).not.toHaveBeenCalled();
@@ -71,6 +72,11 @@ describe('GET /health', () => {
     });
     expect(units.ask).toMatchObject({ state: 'inactive', reason: 'disabled' });
     expect(units.mcp).toMatchObject({ state: 'inactive', reason: 'disabled' });
+    expect(units.lab).toEqual({
+      unit: 'lab',
+      state: 'inactive',
+      reason: 'unconfigured',
+    });
     expect(units.presence).toEqual({
       unit: 'presence',
       state: 'active',

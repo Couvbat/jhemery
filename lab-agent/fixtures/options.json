@@ -1,0 +1,4 @@
+{
+  "monitors": { "Umami": "umami", "n8n": "n8n", "Odysseus": "odysseus", "Gnome \"bot\"": "gnome", "Dashy": "dashy" },
+  "vram": { "poseidon": 10240 }
+}
