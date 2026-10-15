@@ -8,6 +8,7 @@ import { AskService } from './ask.service';
 import { AskDto } from './ask.dto';
 import { AskCorpusService } from './ask.corpus';
 import { McpContentService } from '../mcp/mcp.content';
+import { LabService } from '../lab/lab.service';
 
 /**
  * `ask` is the only endpoint that spends someone's electricity and points at a
@@ -583,6 +584,49 @@ describe('AskService', () => {
       );
       expect(instance.health().detail).toMatchObject({ passages: 1 });
     });
+
+    it.each([
+      [true, { configured: false }],
+      [false, null],
+    ])(
+      'carries LAB NOW only when the lab is configured (%s)',
+      async (configuredLab) => {
+        respond(() => completion('data: [DONE]\n\n'));
+        const report = configuredLab
+          ? {
+              configured: true,
+              receivedAt: '2026-10-15T19:42:02.000Z',
+              ageMs: 40_000,
+              stale: false,
+              history: {},
+              snapshot: {
+                takenAt: '2026-10-15T19:42:01.000Z',
+                machines: [{ id: 'poseidon', up: true, cpu: 8 }],
+                services: [],
+              },
+            }
+          : { configured: false };
+        const instance = new AskService(
+          {
+            get: (key: string) => (configured as Record<string, string>)[key],
+          } as unknown as ConfigService,
+          undefined,
+          undefined,
+          { report: () => Promise.resolve(report) } as unknown as LabService,
+        );
+        const { onDelta } = collect();
+
+        await instance.answer(dto, onDelta);
+
+        if (configuredLab) {
+          expect(promptAt(1)).toContain(
+            'LAB NOW (snapshot 40 s old):\nposeidon: up, CPU 8 %',
+          );
+        } else {
+          expect(promptAt(1)).not.toContain('LAB NOW');
+        }
+      },
+    );
 
     it('does not make the answer wait on llms.txt', async () => {
       // The production bug: awaiting this fetch put a loopback HTTP call to the

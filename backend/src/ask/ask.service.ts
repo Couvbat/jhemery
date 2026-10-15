@@ -2,8 +2,10 @@ import { Injectable, Logger, Optional } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { AskDto } from './ask.dto';
 import { UnitHealth } from '../common/health';
+import { LabService } from '../lab/lab.service';
 import { McpContentService } from '../mcp/mcp.content';
 import { AskCorpusService } from './ask.corpus';
+import { labBrief } from './lab-brief';
 import { systemPrompt } from './prompt';
 import { askFailure, classify, reasonOf, type AskReason } from './ask.failure';
 
@@ -109,7 +111,21 @@ export class AskService {
     private readonly config: ConfigService,
     @Optional() private readonly content?: McpContentService,
     @Optional() private readonly passages?: AskCorpusService,
+    @Optional() private readonly lab?: LabService,
   ) {}
+
+  /**
+   * The lab as it is now, for the prompt's `LAB NOW` block. The same process holds the
+   * snapshot, so this is a function call: no HTTP and no loopback. Nothing with the lab
+   * off or nothing pushed yet, and nothing rather than a failure if reading it throws.
+   */
+  private async labNow(): Promise<string | null> {
+    try {
+      return labBrief(await this.lab?.report());
+    } catch {
+      return null;
+    }
+  }
 
   /**
    * Off by default: this is a public endpoint that spends a private machine's
@@ -251,6 +267,7 @@ export class AskService {
     const model = this.config.get<string>('LLM_MODEL')!;
     const apiKey = this.config.get<string>('LLM_API_KEY');
     const corpus = this.corpusNow();
+    const labNow = await this.labNow();
 
     const controller = new AbortController();
     const ceiling = setTimeout(() => controller.abort(), WARMUP_CEILING_MS);
@@ -318,6 +335,7 @@ export class AskService {
                     dto.question,
                     dto.locale,
                   ),
+                  labNow,
                   locale: dto.locale,
                 }),
               },
