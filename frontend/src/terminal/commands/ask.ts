@@ -1,6 +1,7 @@
 import { decorativeMotion } from '@/composables/useMotion'
 import { messages as m } from '@/i18n/messages'
-import { api, ApiError } from '@/lib/api'
+import { api } from '@/lib/api'
+import { COLD, degradedCopy, modelIsCold } from '@/lib/ask-session'
 import type { Localised } from '@/content/types'
 import { announce } from '../achievements'
 import { blank, fail, line, wrap } from '../format'
@@ -26,17 +27,11 @@ function answerLines(answer: string, streaming: boolean): OutputLine[] {
 }
 
 /**
- * Unconfigured, asleep and unreachable all render the same thing — one degraded
- * path rather than three, and it is the line most visitors will ever see.
- * The busy case gets its own, because "come back in a minute" is different advice.
+ * The line for whatever went wrong, by the reason the API names: one wording per piece
+ * of advice, shared with the `/lab` panel through `lib/ask-session.ts`.
  */
 function degraded(error: unknown, t: T): OutputLine[] {
-  // 503 is the backend's "someone else is asking right now"; everything else
-  // (502, a network failure, an unset ASK_ENABLED) means the model is not there.
-  if (error instanceof ApiError && error.status === 503) {
-    return [line(t(m.ask.busy), 'muted')]
-  }
-  return [line(t(m.ask.asleep), 'muted'), line(t(m.ask.asleepHint), 'muted')]
+  return degradedCopy(error).map((words) => line(t(words), 'muted'))
 }
 
 export const askCommands: Command[] = [
@@ -65,6 +60,8 @@ export const askCommands: Command[] = [
       }
 
       print([line(t(m.ask.disclaimer), 'muted'), blank])
+      // A cold model is the one failure worth warning of before it happens.
+      if (await modelIsCold()) print(line(t(COLD), 'warning'))
 
       const draw = frame()
       draw([line(t(m.ask.thinking), 'muted')])

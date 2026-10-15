@@ -1,5 +1,6 @@
 import type { Localised } from '@/content/types'
 import { api, type HealthReport, type UnitHealth } from '@/lib/api'
+import { REASON_WORDS, type AskReason } from '@/lib/ask-session'
 import { blank, fail, line, segmented } from '../format'
 import type { Command, CommandContext, OutputLine, Tone } from '../types'
 
@@ -39,6 +40,22 @@ const DETAILS: Record<string, Localised> = {
   jobs: { en: '{n} jobs known', fr: '{n} tâches connues' },
   sessions: { en: '{n} sessions', fr: '{n} sessions' },
   nodes: { en: '{n} nodes mapped', fr: '{n} nœuds sur la carte' },
+  ok: { en: '{n} answered', fr: '{n} réponses' },
+  failed: { en: '{n} failed', fr: '{n} échecs' },
+  passages: { en: '{n} passages', fr: '{n} passages' },
+}
+
+/**
+ * What the last real use found, for a unit whose `active` only means configured: `ask`'s
+ * *last answer 4 min ago*, or *last failure 2 min ago: the model host's edge refused the
+ * API*. An API from before `last` prints nothing here.
+ */
+function lastUse(h: UnitHealth, t: CommandContext['t']): string | undefined {
+  if (!h.last) return undefined
+  const ago = span(h.last.agoMs)
+  if (h.last.outcome === 'ok') return t({ en: 'last answer {ago} ago', fr: 'dernière réponse il y a {ago}' }).replace('{ago}', ago)
+  const words = Object.hasOwn(REASON_WORDS, h.last.outcome) ? t(REASON_WORDS[h.last.outcome as AskReason]) : h.last.outcome
+  return `${t({ en: 'last failure {ago} ago', fr: 'dernier échec il y a {ago}' }).replace('{ago}', ago)}: ${words}`
 }
 
 /** `42s`, `3 min`, `2h 05`: a cache age or an uptime, at a glance. */
@@ -131,6 +148,7 @@ function detail(row: Row, t: CommandContext['t']): OutputLine[] {
   const description = UNITS.find((u) => u.unit === row.unit)?.description
   const enabled = row.health ? (row.health.state === 'active' ? 'enabled' : 'disabled') : 'unknown'
   const why = note(row, t)
+  const last = row.health ? lastUse(row.health, t) : undefined
   return [
     segmented([
       { text: `${dot} `, tone },
@@ -143,6 +161,14 @@ function detail(row: Row, t: CommandContext['t']): OutputLine[] {
       { text: state, tone },
       { text: why ? ` — ${why}` : '', tone: 'muted' },
     ]),
+    ...(last
+      ? [
+          segmented([
+            { text: '       Last: ', tone: 'muted' },
+            { text: last, tone: row.health?.last?.outcome === 'ok' ? 'success' : 'warning' },
+          ]),
+        ]
+      : []),
   ]
 }
 

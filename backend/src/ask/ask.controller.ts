@@ -86,16 +86,20 @@ export class AskController {
       this.logger.warn(
         `ask produced nothing in ${SILENCE_CEILING_MS}ms — answering degraded rather than letting a proxy time the request out`,
       );
-      send({ error: 'asleep' });
+      this.ask.recordSilent(SILENCE_CEILING_MS);
+      send({ error: 'asleep', reason: 'silent' });
       finish();
     }, SILENCE_CEILING_MS);
 
     try {
-      await this.ask.answer(
+      const answer = await this.ask.answer(
         dto,
         (delta) => send({ delta }),
         abortOnDisconnect(res),
       );
+      // No word came, and the 200 is already promised: say why in the stream, in the
+      // shape an older frontend already reads as asleep.
+      if (answer?.empty) send({ error: 'asleep', reason: 'empty' });
     } catch (err) {
       // Nothing has been written yet, so the exception filter can still send a
       // real status code and the client can degrade before it renders anything.

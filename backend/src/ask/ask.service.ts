@@ -1,12 +1,8 @@
-import {
-  BadGatewayException,
-  Injectable,
-  Logger,
-  ServiceUnavailableException,
-} from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { AskDto } from './ask.dto';
 import { UnitHealth } from '../common/health';
+import { askFailure, classify, reasonOf, type AskReason } from './ask.failure';
 
 /**
  * The corpus is the site's published summary, `${FRONTEND_URL}/llms.txt`, which
@@ -63,6 +59,17 @@ interface CompletionChunk {
   choices?: Array<{ delta?: { content?: string | null } }>;
 }
 
+/**
+ * How a question ended, for the controller: an answer, or a stream that closed without
+ * one, which keeps its 200 (the status was sent before anyone knew) and says so in-stream.
+ */
+export interface AskAnswer {
+  empty: boolean;
+}
+
+/** What `/health` reports of the last real question: its outcome and when. */
+export type AskOutcome = 'ok' | AskReason;
+
 @Injectable()
 export class AskService {
   private readonly logger = new Logger(AskService.name);
@@ -81,6 +88,13 @@ export class AskService {
    * again — a cold model would otherwise get a fresh load request per visitor.
    */
   private warming: Promise<unknown> | null = null;
+  /**
+   * The last real question's outcome and the counts since the process started, which
+   * `/health` reports. A busy refusal isn't recorded: the question holding the slot
+   * will be, and that is the one that says how the model is.
+   */
+  private last: { outcome: AskOutcome; at: number } | null = null;
+  private outcomes = { ok: 0, failed: 0 };
 
   constructor(private readonly config: ConfigService) {}
 
@@ -108,41 +122,88 @@ export class AskService {
     dto: AskDto,
     onDelta: (delta: string) => void,
     signal?: AbortSignal,
-  ): Promise<void> {
+  ): Promise<AskAnswer> {
     // Claimed synchronously, before the first `await`, so two overlapping
     // requests cannot both see a free slot.
     if (this.inFlight) {
-      throw new ServiceUnavailableException('One question at a time');
+      throw askFailure(classify({ kind: 'busy' }), 'One question at a time');
     }
     if (!this.enabled) {
-      // Deliberately the same shape as an unreachable model: the frontend gets
-      // one degraded path rather than two.
-      throw new BadGatewayException('The model is unavailable');
+      // The same status as an unreachable model, so an older frontend still has one
+      // degraded path; the reason tells a newer one which.
+      throw askFailure(
+        classify({ kind: 'disabled' }),
+        'The model is unavailable',
+      );
     }
     if (this.warming) {
       // Still loading from an earlier question. Say so immediately instead of
       // queueing a second load behind the first.
-      throw new BadGatewayException('The model is still waking up');
+      const failure = askFailure(
+        classify({ kind: 'warming' }),
+        'The model is still waking up',
+      );
+      this.failed(failure, 0);
+      throw failure;
     }
     this.inFlight = true;
 
     const startedAt = Date.now();
     try {
       const delivered = await this.stream(dto, onDelta, signal);
+      if (delivered === 0) {
+        this.failed(
+          askFailure(
+            classify({ kind: 'empty' }),
+            'The stream ended without an answer',
+          ),
+          Date.now() - startedAt,
+        );
+        return { empty: true };
+      }
       // Latency and outcome only — never the question, the answer or the IP.
       // There is no value in a transcript of what strangers asked, and keeping
       // one turns a toy into a privacy obligation.
       this.logger.log(
         `ask ok in ${Date.now() - startedAt}ms (${delivered} chunks)`,
       );
+      this.record('ok');
+      return { empty: false };
     } catch (err) {
-      this.logger.warn(
-        `ask failed after ${Date.now() - startedAt}ms: ${err instanceof Error ? err.message : String(err)}`,
-      );
+      this.failed(err, Date.now() - startedAt);
       throw err;
     } finally {
       this.inFlight = false;
     }
+  }
+
+  /**
+   * The controller's silence ceiling answered for this service: nothing else will say
+   * so, since the service may still be waiting on whatever wedged.
+   */
+  recordSilent(afterMs: number): void {
+    this.failed(
+      askFailure(classify({ kind: 'ceiling' }), 'Nothing came in time'),
+      afterMs,
+    );
+  }
+
+  /**
+   * The log line leads with the reason, then the upstream's own words:
+   * `ask failed after 812ms: refused (The model answered 403)`. Still no question,
+   * answer or address.
+   */
+  private failed(err: unknown, afterMs: number): void {
+    const reason = reasonOf(err) ?? classify({ kind: 'thrown', error: err });
+    const detail = err instanceof Error ? err.message : String(err);
+    this.logger.warn(`ask failed after ${afterMs}ms: ${reason} (${detail})`);
+    this.record(reason);
+  }
+
+  private record(outcome: AskOutcome): void {
+    this.last = { outcome, at: Date.now() };
+    if (outcome === 'ok') this.outcomes.ok += 1;
+    else this.outcomes.failed += 1;
   }
 
   /**
@@ -243,7 +304,10 @@ export class AskService {
       );
 
       if (!res.ok || !res.body) {
-        throw new BadGatewayException(`The model answered ${res.status}`);
+        throw askFailure(
+          classify({ kind: 'status', status: res.status }),
+          `The model answered ${res.status}`,
+        );
       }
 
       await readEventStream(res.body, (delta) => emit(visible.push(delta)));
@@ -276,7 +340,10 @@ export class AskService {
         this.logger.log(
           'ask: model still loading, detaching so the load can finish',
         );
-        throw new BadGatewayException('The model is still waking up');
+        throw askFailure(
+          classify({ kind: 'deadline' }),
+          'The model is still waking up',
+        );
       }
 
       await work;
@@ -290,8 +357,9 @@ export class AskService {
         emit(visible.flush());
         return delivered;
       }
-      if (err instanceof BadGatewayException) throw err;
-      throw new BadGatewayException(
+      if (reasonOf(err)) throw err;
+      throw askFailure(
+        classify({ kind: 'thrown', error: err }),
         `The model is unreachable: ${err instanceof Error ? err.message : String(err)}`,
       );
     } finally {
@@ -396,10 +464,30 @@ export class AskService {
    * Whether `ask` is switched on — not whether the model is awake, which would take a
    * request to a machine in a flat. The terminal words "off" as the model being asleep.
    */
-  health(): UnitHealth {
-    return this.enabled
-      ? { unit: 'ask', state: 'active' }
-      : { unit: 'ask', state: 'inactive', reason: 'disabled' };
+  health(now = Date.now()): UnitHealth {
+    if (!this.enabled) {
+      return { unit: 'ask', state: 'inactive', reason: 'disabled' };
+    }
+    // What the last real question found, never a probe of its own: `active` alone
+    // only ever meant configured, which is how an outage once hid behind it.
+    return {
+      unit: 'ask',
+      state: 'active',
+      ...(this.last
+        ? {
+            last: {
+              outcome: this.last.outcome,
+              agoMs: Math.max(0, now - this.last.at),
+            },
+          }
+        : {}),
+      detail: { ...this.outcomes, passages: this.passageCount() },
+    };
+  }
+
+  /** How many passages the corpus holds: 0 until it has been fetched. */
+  private passageCount(): number {
+    return 0;
   }
 }
 

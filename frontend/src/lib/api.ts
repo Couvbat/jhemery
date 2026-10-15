@@ -193,6 +193,8 @@ export interface UnitHealth {
   /** Milliseconds since the unit last fetched its upstream; null if it has not yet. */
   cacheAge?: number | null
   detail?: Record<string, number>
+  /** What the last real use found, and when: `ask`'s last answer or the reason it failed. */
+  last?: { outcome: string; agoMs: number }
 }
 
 export interface HealthReport {
@@ -357,6 +359,10 @@ export class ApiError extends Error {
   constructor(
     message: string,
     readonly status?: number,
+    /** Why, when the API names it: `ask`'s closed set (`lib/ask-session.ts`). */
+    readonly reason?: string,
+    /** Seconds until a rate limit's window frees, from `Retry-After`. */
+    readonly retryAfter?: number,
   ) {
     super(message)
     this.name = 'ApiError'
@@ -365,15 +371,18 @@ export class ApiError extends Error {
 
 async function errorFrom(res: Response): Promise<ApiError> {
   let detail = `${res.status}`
+  let reason: string | undefined
   try {
-    const body = (await res.json()) as { message?: string | string[] }
+    const body = (await res.json()) as { message?: string | string[]; reason?: unknown }
     if (body?.message) {
       detail = Array.isArray(body.message) ? body.message.join(', ') : body.message
     }
+    if (typeof body?.reason === 'string') reason = body.reason
   } catch {
     // Non-JSON error body — the status code is all we have.
   }
-  return new ApiError(detail, res.status)
+  const retry = Number(res.headers?.get('retry-after'))
+  return new ApiError(detail, res.status, reason, Number.isFinite(retry) && retry > 0 ? retry : undefined)
 }
 
 // ---------------------------------------------------------------------------
@@ -603,9 +612,9 @@ export async function* askStream(
         const payload = raw.slice('data:'.length).trim()
         if (payload === '[DONE]') return
 
-        let event: { delta?: string; error?: string }
+        let event: { delta?: string; error?: string; reason?: string }
         try {
-          event = JSON.parse(payload) as { delta?: string; error?: string }
+          event = JSON.parse(payload) as { delta?: string; error?: string; reason?: string }
         } catch {
           // A malformed chunk is not worth throwing away the answer for.
           continue
@@ -615,7 +624,7 @@ export async function* askStream(
         // so it could not be a status code. Raised as one anyway: `ask` decides
         // what to draw from the error alone, and this keeps that one decision
         // in one place.
-        if (event.error) throw new ApiError(event.error, event.error === 'busy' ? 503 : 502)
+        if (event.error) throw new ApiError(event.error, event.error === 'busy' ? 503 : 502, event.reason)
         if (event.delta) yield event.delta
       }
     }

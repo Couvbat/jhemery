@@ -322,7 +322,7 @@ panel can't disagree. `ps` and `top` are still jokes.
 | `sign` | | `sign <message>` leaves a message. It says first that signing is public, and links the rules on `/legal` |
 | `mail` | `sendmail`, `write` | Send me a message without leaving the terminal |
 | `ask` | | `ask <question>` streams an answer from a self-hosted LLM |
-| `systemctl` | | `systemctl status [unit]`: what the API is running, one unit per module, from `GET /health`. With the API down every unit reads `unknown` |
+| `systemctl` | | `systemctl status [unit]`: what the API is running, one unit per module, from `GET /health`. `systemctl status ask` adds how the last real question ended (`last failure 2 min ago: the model host's edge refused the API`). With the API down every unit reads `unknown` |
 | `lab` | | The homelab behind the site, live: each machine and service with its status and one figure, the snapshot's age, and a link to the map at `/lab`. `lab --json` prints the snapshot itself, for `jq` (`lab --json \| jq .machines`). With the feed off or the API down it says so in one line and points at `hardware nas` |
 | `who` | | Everyone on the site right now, as anonymous ttys: `you pts/0`, then `somebody pts/N` for each other visitor, twelve at most and then "… and N more" |
 | `wall` | | Wave at everyone else on the site. It carries no message (any you type are dropped, and it says so), never runs from a link, and says so when the server has broadcasts switched off |
@@ -505,7 +505,7 @@ uses the front of `X-Forwarded-For`, which any client can write.
 
 | Route | Purpose |
 |---|---|
-| `POST /ask` | Proxies an OpenAI-compatible runtime (Ollama, llama.cpp, vLLM, LM Studio). 5 questions/hour per IP, one request in flight globally, ~300 output tokens, 20 s timeout. Questions and answers are never logged. **Off by default.** |
+| `POST /ask` | Proxies an OpenAI-compatible runtime (Ollama, llama.cpp, vLLM, LM Studio). 5 questions/hour per IP, one request in flight globally, ~300 output tokens, 20 s timeout. A failure keeps its status (503 busy, 502 otherwise) and names its `reason` in the body or the stream: `unconfigured`, `busy`, `warming`, `unreachable`, `refused`, `upstream`, `timeout`, `empty` or `silent`. Questions and answers are never logged. **Off by default.** |
 | `POST /contact` | Sends the `mail` command's message over SMTP (only logged, in dev). |
 | `GET /steam/activity` | Currently playing and recently played, from the Steam Web API. |
 | `GET /github/activity` | Recent public commits. |
@@ -518,7 +518,7 @@ uses the front of `X-Forwarded-For`, which any client can write.
 | `POST /presence/wall` | `wall`'s wave to every connection, coalesced to one every 15 s across the site. Takes `application/json` only (415 otherwise), so other sites can't send it unseen. Always a bare 204 when enabled, so it says nothing about anyone else; `{ configured: false }` when not. 2 per 10 min per IP. **Off by default** (`WALL_ENABLED`). |
 | `GET /stats` · `POST /stats/session` | A single running total of terminal sessions. Counted once when you open the shell, never per command, so the server never learns which commands anyone runs. 5/hour per IP. |
 | `GET /stats/wordle` · `POST /stats/wordle` | The daily wordle's distribution: seven counts per day and language (solved in 1–6, or not), today and yesterday (UTC) only, two weeks kept. A report is `{ day, locale, guesses }` and nothing else. 5/hour per IP. |
-| `GET /health` | One line per module for `systemctl status`: active or inactive and why, how old its cache is, a count it already keeps. Each module reads only what it already holds, so this never calls Steam, GitHub or the model on anyone's behalf. |
+| `GET /health` | One line per module for `systemctl status`: active or inactive and why, how old its cache is, a count it already keeps, and for `ask` the last real question's outcome (`last: { outcome, agoMs }`) with its answered and failed counts. Each module reads only what it already holds, so this never calls Steam, GitHub or the model on anyone's behalf. |
 | *every route* | `Timing-Allow-Origin` names the origins CORS admits (`FRONTEND_URL` and the dev server) and no other, so the site's own pages can read sizes and `Server-Timing` in Resource Timing, for `xray`. The caching routes (`/steam/activity`, the four `/github/*`, `/weather`, `/markets`) say which copy they served, `Server-Timing: cache;desc="hit", age;dur=180000` (milliseconds since the upstream fetch) or `cache;desc="miss", upstream;dur=812`, read from the cache age `/health` already reports; `/lab` gives its push's age the same way. Cache ages and durations only, nothing about the visitor. |
 | `POST /mcp` | A read-only [Model Context Protocol](https://modelcontextprotocol.io) endpoint (stateless Streamable HTTP, hand-written): five tools and six resources about the résumé, projects, skills and `/now`, in English or French. It reads `content.json` from `FRONTEND_URL`, caches it for 10 min, logs nothing and writes nothing. 60/min per IP. **Off by default** (`MCP_ENABLED`). |
 | `GET /lab` | The lab map's data: the last snapshot the lab pushed, its age, whether it's stale (five minutes without a push), and 30 days of uptime per node, a missing day being `null`, never down. Never calls the lab. Kept in memory and in `DATA_DIR/lab.json`, so a deploy doesn't blank the map. 60/min per IP, `Cache-Control: public, max-age=15`. `{ configured: false }` when off. **Off by default** (`LAB_ENABLED`). |
@@ -537,7 +537,7 @@ uses the front of `X-Forwarded-For`, which any client can write.
 - No Steam key hides live activity.
 - No GitHub token drops the heatmap and pinned repos, and no `GITHUB_REPO` drops the build-status
   card.
-- An unreachable model makes the terminal say it's asleep and suggest `mail`.
+- A model that can't answer makes the terminal say why in plain words, from the reason the API gives (the machine isn't answering, the model is waking up, or no model is wired up), and suggest `mail`. A sixth question in an hour is told the limit and when it resets, not that the model is asleep. Every 429 carries `Retry-After`.
 - With rooms off, the watch and radio pages say so.
 - With the downloader off, its panel says so once unlocked.
 - With MCP off, `/mcp` is a 404.

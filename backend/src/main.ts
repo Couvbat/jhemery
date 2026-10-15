@@ -48,6 +48,9 @@ async function bootstrap() {
     // DELETE /guestbook/:id fails in the browser if it is not listed here.
     // x-room-token is the same story for the rooms' host routes.
     allowedHeaders: ['Content-Type', 'x-admin-password', 'x-room-token'],
+    // Not CORS-safelisted, so a page can read it only when it is named: the rate
+    // limit's seconds until the window frees.
+    exposedHeaders: ['Retry-After'],
   });
   // One hop, not two, although Cloudflare and Apache both append to
   // X-Forwarded-For. Passenger forwards the header it was given, then adds its

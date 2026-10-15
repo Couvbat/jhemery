@@ -402,7 +402,9 @@ describe('AskService', () => {
       const { onDelta } = collect();
 
       await instance.answer(dto, onDelta);
-      await expect(instance.answer(dto, onDelta)).resolves.toBeUndefined();
+      await expect(instance.answer(dto, onDelta)).resolves.toMatchObject({
+        empty: false,
+      });
     });
 
     it('frees the slot after a failure too', async () => {
@@ -416,7 +418,9 @@ describe('AskService', () => {
       );
 
       respond(() => completion(delta('hi'), 'data: [DONE]\n\n'));
-      await expect(instance.answer(dto, onDelta)).resolves.toBeUndefined();
+      await expect(instance.answer(dto, onDelta)).resolves.toMatchObject({
+        empty: false,
+      });
     });
   });
 
@@ -520,9 +524,9 @@ describe('AskService', () => {
 
       respond(() => completion(delta('Yes, he does.'), 'data: [DONE]\n\n'));
       const second = collect();
-      await expect(
-        instance.answer(dto, second.onDelta),
-      ).resolves.toBeUndefined();
+      await expect(instance.answer(dto, second.onDelta)).resolves.toMatchObject(
+        { empty: false },
+      );
       expect(second.deltas.join('')).toBe('Yes, he does.');
     });
 
@@ -537,7 +541,7 @@ describe('AskService', () => {
       // Silence past the idle timeout, having already said something.
       await jest.advanceTimersByTimeAsync(15_000);
 
-      await expect(answered).resolves.toBeUndefined();
+      await expect(answered).resolves.toMatchObject({ empty: false });
       expect(deltas.join('')).toContain('starting');
       expect(model.upstream()?.aborted).toBe(true);
     });
@@ -564,7 +568,9 @@ describe('AskService', () => {
       );
       const { deltas, onDelta } = collect();
 
-      await expect(service().answer(dto, onDelta)).resolves.toBeUndefined();
+      await expect(service().answer(dto, onDelta)).resolves.toMatchObject({
+        empty: false,
+      });
 
       expect(dialled).toBe(true);
       expect(deltas.join('')).toBe('Yes.');
@@ -674,6 +680,141 @@ describe('AskService', () => {
       expect(lines).toMatch(/\d+ms/);
       expect(lines).not.toContain(dto.question);
       expect(lines).not.toContain('a private answer');
+    });
+
+    it('leads a failure with its reason, then the upstream’s own words', async () => {
+      const warned = jest.spyOn(Logger.prototype, 'warn');
+      respond(() => ({ ok: false, status: 403 }) as unknown as Response);
+      const { onDelta } = collect();
+
+      await expect(service().answer(dto, onDelta)).rejects.toMatchObject({
+        reason: 'refused',
+      });
+
+      const lines = warned.mock.calls.map((call) => String(call[0]));
+      expect(lines).toContainEqual(
+        expect.stringMatching(
+          /^ask failed after \d+ms: refused \(The model answered 403\)$/,
+        ),
+      );
+      expect(lines.join('\n')).not.toContain(dto.question);
+    });
+  });
+
+  describe('why it failed', () => {
+    it.each([
+      [500, 'upstream'],
+      [524, 'upstream'],
+      [403, 'refused'],
+    ])('names a %s from the model host %s', async (status, reason) => {
+      respond(() => ({ ok: false, status }) as unknown as Response);
+      const { onDelta } = collect();
+
+      await expect(service().answer(dto, onDelta)).rejects.toMatchObject({
+        reason,
+        status: 502,
+      });
+    });
+
+    it('names a connection that never answered unreachable', async () => {
+      fetchMock.mockImplementation((url: string | URL) =>
+        String(url).includes('llms.txt')
+          ? Promise.resolve(corpus as unknown as Response)
+          : Promise.reject(new Error('ECONNREFUSED')),
+      );
+      const { onDelta } = collect();
+
+      await expect(service().answer(dto, onDelta)).rejects.toMatchObject({
+        reason: 'unreachable',
+      });
+    });
+
+    it('names the unconfigured install, still with the 502 it always had', async () => {
+      const { onDelta } = collect();
+      await expect(service({}).answer(dto, onDelta)).rejects.toMatchObject({
+        reason: 'unconfigured',
+        status: 502,
+      });
+    });
+
+    it('says an answer that was only thinking ended empty, and records it', async () => {
+      respond(() =>
+        completion(delta('<think>hmm</think>'), 'data: [DONE]\n\n'),
+      );
+      const instance = service();
+      const { onDelta } = collect();
+
+      await expect(instance.answer(dto, onDelta)).resolves.toEqual({
+        empty: true,
+      });
+      expect(instance.health().last).toMatchObject({ outcome: 'empty' });
+    });
+
+    it('names the deadline timeout and a second question while it loads warming', async () => {
+      jest.useFakeTimers();
+      const held = pending();
+      fetchMock.mockImplementation((url: string | URL) =>
+        String(url).includes('llms.txt')
+          ? Promise.resolve(corpus as unknown as Response)
+          : Promise.resolve(held.res),
+      );
+      const instance = service();
+      const { onDelta } = collect();
+
+      const first = expect(instance.answer(dto, onDelta)).rejects.toMatchObject(
+        { reason: 'timeout' },
+      );
+      await jest.advanceTimersByTimeAsync(20_000);
+      await first;
+      await expect(instance.answer(dto, onDelta)).rejects.toMatchObject({
+        reason: 'warming',
+      });
+
+      held.push(delta('awake'));
+      held.close();
+      await jest.advanceTimersByTimeAsync(0);
+      jest.useRealTimers();
+    });
+  });
+
+  describe('health', () => {
+    it('reports the last real outcome and the counts, and probes nothing', async () => {
+      const instance = service();
+      expect(instance.health()).toEqual({
+        unit: 'ask',
+        state: 'active',
+        detail: { ok: 0, failed: 0, passages: 0 },
+      });
+
+      respond(() => completion(delta('hi'), 'data: [DONE]\n\n'));
+      const { onDelta } = collect();
+      await instance.answer(dto, onDelta);
+      respond(() => ({ ok: false, status: 403 }) as unknown as Response);
+      await expect(instance.answer(dto, onDelta)).rejects.toThrow();
+
+      const dials = fetchMock.mock.calls.length;
+      const health = instance.health(Date.now() + 120_000);
+      expect(health.last).toEqual({
+        outcome: 'refused',
+        agoMs: expect.any(Number) as number,
+      });
+      expect(health.last!.agoMs).toBeGreaterThanOrEqual(120_000);
+      expect(health.detail).toMatchObject({ ok: 1, failed: 1 });
+      expect(fetchMock.mock.calls).toHaveLength(dials);
+    });
+
+    it('records the controller’s silence ceiling as silent', () => {
+      const instance = service();
+      instance.recordSilent(45_000);
+      expect(instance.health().last).toMatchObject({ outcome: 'silent' });
+    });
+
+    it('stays inactive and says nothing more when off', () => {
+      expect(service({}).health()).toEqual({
+        unit: 'ask',
+        state: 'inactive',
+        reason: 'disabled',
+      });
     });
   });
 });
