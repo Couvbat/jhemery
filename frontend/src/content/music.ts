@@ -41,9 +41,9 @@ export function embedColour(colour: string): string {
 
 /**
  * The playlist's widget. Pure, so the colour is the caller's to read: changing `src`
- * reloads the cross-origin player and stops it, so `useMusicEmbed` reads the colour each
- * time it builds a frame and never while one is up. `auto_play` is written once, either
- * way — appending `&auto_play=true` after a `false` used to send the widget both.
+ * reloads the cross-origin player and stops it, so `useMusicEmbed` repaints it only while
+ * it isn't playing. `auto_play` is written once, either way — appending `&auto_play=true`
+ * after a `false` used to send the widget both.
  */
 export function soundcloudEmbedSrc(colour: string, autoplay = false): string {
   const params = new URLSearchParams({

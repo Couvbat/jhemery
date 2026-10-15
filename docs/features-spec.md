@@ -423,9 +423,13 @@ OKLCH lightness away from the background. base16 follows its documented slot rol
 The last things that ignored the scheme follow it now: the matrix rain draws in `--neon-green`
 over `--background` (and says "press any key" in both languages), the CRT overdrive's fringe is a
 `color-mix()` of the pink and cyan slots, and the SoundCloud widgets (the music section's and the
-radio rooms') take `--neon-green`, read each time a frame is built and never while one is up,
-since a new `src` reloads the cross-origin player and stops it. The music section's frame waits
-behind its load button, so that is when its colour is read, not when the section was set up.
+radio rooms') take `--neon-green`. A new `src` is the only way to recolour one, and it reloads the
+cross-origin player and stops it, so a repaint never interrupts sound. The rooms' players read the
+colour when a frame is built. The music section's follows the chosen scheme (not a preview) while
+it isn't playing; while it plays, the change waits until it has stopped for 1.5 s, which lets the
+playlist's `finish`-then-`play` between tracks go by. It knows by asking the widget over
+`postMessage`, as the rooms do: `play`, `pause`, `finish` and `isPaused`, subscribed to from
+each load and again on the widget's own `ready`, which otherwise ends the retries first.
 `content/music.ts`'s `soundcloudEmbedSrc(colour, autoplay)` is pure and lets only a `#rrggbb`
 into the URL. The window dots of every title bar are one
 `WindowDots.vue` in `destructive`, `warning` and `primary`, instead of Tailwind's red, yellow and
