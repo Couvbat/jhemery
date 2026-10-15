@@ -30,6 +30,8 @@ const REQUEST_TIMEOUT_MS = 5_000;
 export class McpContentService {
   private readonly logger = new Logger(McpContentService.name);
   private cache: { data: SiteContent; expiresAt: number } | null = null;
+  /** One background refresh at a time, for `current()`. */
+  private refreshing: Promise<unknown> | null = null;
 
   constructor(private readonly config: ConfigService) {}
 
@@ -40,6 +42,25 @@ export class McpContentService {
 
   get age(): number | null {
     return cacheAge(this.cache, CONTENT_TTL_MS);
+  }
+
+  /**
+   * What is in hand, refreshing in the background when it has expired: for `ask`, whose
+   * question must never wait on a fetch from the backend to its own frontend (the corpus
+   * correction in the `ask` spec). Null until a first fetch has landed.
+   */
+  current(): SiteContent | null {
+    if (
+      !this.refreshing &&
+      (!this.cache || this.cache.expiresAt <= Date.now())
+    ) {
+      this.refreshing = this.content()
+        .catch(() => undefined)
+        .finally(() => {
+          this.refreshing = null;
+        });
+    }
+    return this.cache?.data ?? null;
   }
 
   async content(): Promise<SiteContent> {

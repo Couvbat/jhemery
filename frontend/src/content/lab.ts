@@ -220,7 +220,7 @@ export const labNodes: LabNode[] = [
       en: 'A local model on the GPU in a flat, not a datacentre: `ask` reaches it through the API, Cloudflare’s rule, the tunnel and the proxy, in that order.',
       fr: 'Un modèle local sur le GPU d’un appartement, pas d’un datacentre : `ask` l’atteint par l’API, la règle de Cloudflare, le tunnel et le proxy, dans cet ordre.',
     },
-    decision: 'ask-no-rag',
+    decision: 'ask-retrieval',
     on: 'poseidon',
     tier: 4,
   },

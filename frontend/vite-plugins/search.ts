@@ -45,7 +45,7 @@ function both(value: Localised, limit?: number): Localised {
  * An inline tag goes without a trace, so `(<code>x</code>)` reads `(x)`; any other
  * leaves a space, so two table cells don't run together.
  */
-function textOf(html: string): string {
+export function textOf(html: string): string {
   return html
     .replace(/<pre>[\s\S]*?<\/pre>/g, ' ')
     .replace(/<\/?(code|a|strong|em)\b[^>]*>/g, '')
@@ -59,7 +59,7 @@ function textOf(html: string): string {
     .trim()
 }
 
-const HEADING = /<h([1-6]) id="([^"]+)">([\s\S]*?)<\/h\1>/g
+export const HEADING = /<h([1-6]) id="([^"]+)">([\s\S]*?)<\/h\1>/g
 
 /**
  * A note's sections, read off the page the notes plugin renders rather than off the

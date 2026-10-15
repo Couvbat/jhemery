@@ -542,6 +542,18 @@ any key and claims none), or the swing. CSS alone (`attr(data-src)` in a `::befo
 rejected and still is: it would collide with components' own pseudo-elements, and a
 pseudo-element can't carry a link.
 
+**`ask` and the site's words** ([spec](superpowers/specs/2026-10-15-ask-my-lab-design.md) §2,
+decision `ask-retrieval`). `vite-plugins/corpus.ts` writes `/corpus.json` beside `search.json`
+from the same sources, whole: one passage per case-study section, per `why` topic (chosen,
+rejected and why, hindsight), per design-note section (code dropped, split at paragraph
+boundaries past 1 500 characters; a heading with no prose gets its own words), `/now`, each
+machine, the music, gaming and tools sections and each lab node. Its shape is
+`content/corpus.ts`, mirrored in `backend/src/ask/corpus.types.ts`, version-checked like
+`content.json`. The API scores passages with BM25 over accent-folded, stop-worded words cut to
+five letters, a title word counting three times, and keeps at most four over a floor.
+`content/__tests__/corpus.spec.ts` holds it to every case study, decision and note heading,
+and every target to something that resolves.
+
 **The data layer** ([spec](superpowers/specs/2026-10-15-xray-data-layer-design.md)). A component
 that renders API data names its routes on its root, `data-api="/steam/activity"`: a literal
 attribute, not a stamp, since the component knows which `api.*` call feeds it and the compiler

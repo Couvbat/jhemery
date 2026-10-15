@@ -80,7 +80,8 @@ tools, watch-party and radio rooms, and 39 hidden achievements. English and Fren
 - 📄 **One source for the CV.** `curl jhemery.xyz` returns an ANSI-coloured résumé (and
   `curl jhemery.xyz/help` the shell's other pages), and
   `/resume.html` a printable one in either language, both generated at build time from the same
-  content the page renders. So is `content.json`, which a read-only MCP endpoint serves to agents.
+  content the page renders. So is `content.json`, which a read-only MCP endpoint serves to agents,
+  and `corpus.json`, the site's own words whole, one passage per section, that `ask` retrieves from.
   Experience and education are dated, never typed as durations: every résumé works out "3 years"
   from the months, counted the way LinkedIn counts them.
 
@@ -321,7 +322,7 @@ panel can't disagree. `ps` and `top` are still jokes.
 | `guestbook` | `gb` | Read what visitors left. Entries are listed as files you can `cat` |
 | `sign` | | `sign <message>` leaves a message. It says first that signing is public, and links the rules on `/legal` |
 | `mail` | `sendmail`, `write` | Send me a message without leaving the terminal |
-| `ask` | | `ask <question>` streams an answer from a self-hosted LLM |
+| `ask` | | `ask <question>` streams an answer from a self-hosted LLM, which answers only from what the site already says: `llms.txt` and the CV always, and the few passages of the site most relevant to the question, which the API finds in `corpus.json` with a lexical search (`why ask-retrieval`) |
 | `systemctl` | | `systemctl status [unit]`: what the API is running, one unit per module, from `GET /health`. `systemctl status ask` adds how the last real question ended (`last failure 2 min ago: the model host's edge refused the API`). With the API down every unit reads `unknown` |
 | `lab` | | The homelab behind the site, live: each machine and service with its status and one figure, the snapshot's age, and a link to the map at `/lab`. `lab --json` prints the snapshot itself, for `jq` (`lab --json \| jq .machines`). With the feed off or the API down it says so in one line and points at `hardware nas` |
 | `who` | | Everyone on the site right now, as anonymous ttys: `you pts/0`, then `somebody pts/N` for each other visitor, twelve at most and then "… and N more" |
@@ -505,7 +506,7 @@ uses the front of `X-Forwarded-For`, which any client can write.
 
 | Route | Purpose |
 |---|---|
-| `POST /ask` | Proxies an OpenAI-compatible runtime (Ollama, llama.cpp, vLLM, LM Studio). 5 questions/hour per IP, one request in flight globally, ~300 output tokens, 20 s timeout. A failure keeps its status (503 busy, 502 otherwise) and names its `reason` in the body or the stream: `unconfigured`, `busy`, `warming`, `unreachable`, `refused`, `upstream`, `timeout`, `empty` or `silent`. Questions and answers are never logged. **Off by default.** |
+| `POST /ask` | Proxies an OpenAI-compatible runtime (Ollama, llama.cpp, vLLM, LM Studio). 5 questions/hour per IP, one request in flight globally, ~300 output tokens, 20 s timeout. The prompt holds `llms.txt`, `content.json`'s profile, experience, skills, projects and `/now`, and up to four passages (5 000 characters) that BM25 finds for the question in `${FRONTEND_URL}/corpus.json`, fetched in the background and cached for an hour, never on a question's path; the whole prompt stays under 24 000 characters, passages dropped first. Raise the model's context to at least 8 192 tokens on its host (see `docs/deploy.md`). A failure keeps its status (503 busy, 502 otherwise) and names its `reason` in the body or the stream: `unconfigured`, `busy`, `warming`, `unreachable`, `refused`, `upstream`, `timeout`, `empty` or `silent`. Questions and answers are never logged. **Off by default.** |
 | `POST /contact` | Sends the `mail` command's message over SMTP (only logged, in dev). |
 | `GET /steam/activity` | Currently playing and recently played, from the Steam Web API. |
 | `GET /github/activity` | Recent public commits. |

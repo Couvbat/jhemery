@@ -6,6 +6,8 @@ import {
 import { ConfigService } from '@nestjs/config';
 import { AskService } from './ask.service';
 import { AskDto } from './ask.dto';
+import { AskCorpusService } from './ask.corpus';
+import { McpContentService } from '../mcp/mcp.content';
 
 /**
  * `ask` is the only endpoint that spends someone's electricity and points at a
@@ -548,6 +550,40 @@ describe('AskService', () => {
   });
 
   describe('corpus', () => {
+    it('puts the passages retrieval found in the prompt, and counts them for /health', async () => {
+      respond(() => completion('data: [DONE]\n\n'));
+      const passagesFor = jest.fn(() => [
+        {
+          passage: {
+            id: 'why-polling',
+            kind: 'why',
+            title: 'Why the ticker polls',
+            text: 'Every twenty seconds.',
+            target: 'why polling',
+          },
+          score: 3,
+          title: 'Why the ticker polls',
+          text: 'Every twenty seconds.',
+        },
+      ]);
+      const instance = new AskService(
+        {
+          get: (key: string) => (configured as Record<string, string>)[key],
+        } as unknown as ConfigService,
+        { current: () => null } as unknown as McpContentService,
+        { passagesFor, size: 1 } as unknown as AskCorpusService,
+      );
+      const { onDelta } = collect();
+
+      await instance.answer({ ...dto, locale: 'fr' }, onDelta);
+
+      expect(passagesFor).toHaveBeenCalledWith(dto.question, 'fr');
+      expect(promptAt(1)).toContain(
+        'PASSAGES:\n## Why the ticker polls (why polling)\nEvery twenty seconds.',
+      );
+      expect(instance.health().detail).toMatchObject({ passages: 1 });
+    });
+
     it('does not make the answer wait on llms.txt', async () => {
       // The production bug: awaiting this fetch put a loopback HTTP call to the
       // frontend host on the request path, and when it hung the endpoint hung
