@@ -1,6 +1,6 @@
 # Design spec — ask my lab: `ask` that knows the site and the lab, shows its work, and says what broke
 
-Status: proposed, not built. Extends [`ask`](2026-08-04-ask-command-design.md), whose limits all
+Status: implemented with roadmap §K, in the order 4, 2, 1, 3, 5. Departures: a stream that ends with no words now says so in-stream as `{ error: 'asleep', reason: 'empty' }`, the shape an older frontend already reads as asleep, rather than a bare 200; a heading with no prose under it gets a passage of its own words, so every note heading has one; and the panel, which the unit suite can't mount (it compiles no `.vue`), is tested in Playwright. Extends [`ask`](2026-08-04-ask-command-design.md), whose limits all
 stand unless a section here says otherwise: 5 questions an hour per IP, one in flight, ~300 tokens
 out, the 20 s first-token deadline and its detach, the 45 s response ceiling, nothing logged but
 latency and outcome. Part 1 reads the snapshot that [the lab map](2026-10-15-lab-map-design.md)

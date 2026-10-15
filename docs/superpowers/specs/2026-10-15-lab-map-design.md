@@ -1,6 +1,6 @@
 # Design spec — the lab map, a live diagram of the homelab
 
-Status: proposed, not built. The first of six specs from the 15 October 2026 brainstorm
+Status: implemented with roadmap §K. Two departures: a pool's health is optional in the snapshot, since without TrueNAS configured Glances reports only how full a pool is; and which machine runs which service in `content/lab.ts` is a draft for the owner to confirm, Ollama on poseidon being the one settled. The first of six specs from the 15 October 2026 brainstorm
 ([roadmap §K](../../roadmap.md#k-the-lab-october-2026-brainstorm)), and the foundation of three
 of them: it introduces the `lab` backend module and the snapshot that
 [the lab shell](2026-10-15-lab-shell-design.md), [ask my lab](2026-10-15-ask-my-lab-design.md)

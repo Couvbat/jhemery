@@ -1,6 +1,6 @@
 # Design spec — the guestbook's first reader: a local model
 
-Status: proposed, not built. Settles the question §I's *Guestbook entries as wireframes* left
+Status: implemented with roadmap §K. Departures: a model that doesn't answer at all backs the worker off for five minutes rather than counting as a garbled verdict; and `sign` sends its `locale` whatever the API, which stores it only with moderation on. Settles the question §I's *Guestbook entries as wireframes* left
 with the owner: the backend filters nothing but links. Shares the model with `ask`, so it comes
 after [ask my lab](2026-10-15-ask-my-lab-design.md), and its first step extracts the model slot
 the two will share.

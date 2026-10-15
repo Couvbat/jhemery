@@ -77,7 +77,7 @@ describe('strace', () => {
     await done
     const traced = texts().slice(texts().findIndex((l) => l.startsWith('POST /guestbook')))
     expect(traced[0]).toMatch(/^POST \/guestbook = 200 · /)
-    expect(traced[1]).toBe('  → { name, message }')
+    expect(traced[1]).toBe('  → { name, message, locale }')
     expect(traced.join('\n')).not.toContain('great site')
     expect(traced.join('\n')).not.toContain('Jules')
   })

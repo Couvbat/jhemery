@@ -1,6 +1,6 @@
 # Design spec — the field listens: wireframes that react to the music
 
-Status: proposed, not built. Revisits *beat-synced wireframes* from the roadmap's *Dropped* list,
+Status: implemented with roadmap §K. Departures: the level's hold on opacity reaches the base shapes, not the visitors' and signatures' wireframes, which keep their own fades; and x-ray's canvas tag picks up what the field follows on the layer's next measure, not the instant the music starts. Revisits *beat-synced wireframes* from the roadmap's *Dropped* list,
 which turned them down for want of a "music is playing" signal. Each of the site's three sound
 sources can give one, so the reason no longer holds. No backend; independent of the lab specs.
 Reads the stems mixer of [stems vol. 2](2026-10-15-stems-vol2-design.md) when it has a track, and

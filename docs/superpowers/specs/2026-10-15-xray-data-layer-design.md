@@ -1,6 +1,6 @@
 # Design spec — x-ray, the data layer: where every live number came from
 
-Status: proposed, not built. Extends §I's *X-ray mode* (#151), which tags each component with
+Status: implemented with roadmap §K. One departure: `/health` carries no `Server-Timing`, since it caches nothing and has no copy whose age to give; `/lab` gives its push's age. Extends §I's *X-ray mode* (#151), which tags each component with
 the file that drew it and the content modules its words come from. This adds what that layer
 can't see: the live data. Independent of the other lab specs, except that the request path's last
 two hops read [the lab map](2026-10-15-lab-map-design.md)'s snapshot and are left out until it

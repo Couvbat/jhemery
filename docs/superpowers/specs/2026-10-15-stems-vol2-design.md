@@ -1,6 +1,6 @@
 # Design spec — stems, vol. 2: see the track, read its notes, and get one in
 
-Status: proposed, not built. Extends §J's *Stems* (#152). Its engine, mix codes, limits and
+Status: implemented with roadmap §K; the list still ships empty. One addition: `StemTrack` takes an optional `beatsPerBar`, which the script's bar check and the transport's step both read. Extends §J's *Stems* (#152). Its engine, mix codes, limits and
 placement in the music section all stay; this adds what the first version left for later.
 
 ## Context

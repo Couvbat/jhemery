@@ -109,6 +109,9 @@ for (const locale of ['en', 'fr'] as const) {
     const layer = page.getByTestId('xray-layer')
     // Waited for: the canvas loads on idle, and its tag, the widest, starts in the chip's corner.
     await expect(tagOf(layer, 'ThreeBackground.vue')).toContainText(/ · \d+ (?:shapes|formes)\b/, { timeout: 15_000 })
+    // And the terminal that ran the link gone, not fading: the canvas can be tagged inside
+    // its 150ms leave, and its tap bar is over the launcher until then.
+    await expect(page.getByRole('dialog')).toBeHidden()
 
     const exit = layer.getByRole('button', { name: messages.xray.exitLabel[locale] })
     const target = (await exit.boundingBox())!

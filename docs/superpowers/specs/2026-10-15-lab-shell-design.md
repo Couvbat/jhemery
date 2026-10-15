@@ -1,6 +1,6 @@
 # Design spec — the lab shell: `ssh poseidon`
 
-Status: proposed, not built. A hidden command's new branch: it extends the `ssh` egg in
+Status: implemented with roadmap §K. One addition: `ctx.prompt()` gained an `inline` option, so the machine's prompt and the line typed at it read as one line, as a shell's do. A hidden command's new branch: it extends the `ssh` egg in
 `terminal/commands/eggs.ts`, reads [the lab map](2026-10-15-lab-map-design.md)'s `GET /lab`, and
 works without it. Build it after the lab map.
 
