@@ -64,7 +64,7 @@ describe('quoting, as it was before pipes', () => {
 
   it('unquotes the question it hands ask', async () => {
     mocks.askStream.mockImplementation(async function* () {
-      yield 'ok'
+      yield { delta: 'ok' }
     })
     await run('ask "where does he work?"')
     expect(mocks.askStream.mock.calls[0]![0]).toBe('where does he work?')

@@ -585,10 +585,7 @@ describe('AskService', () => {
       expect(instance.health().detail).toMatchObject({ passages: 1 });
     });
 
-    it.each([
-      [true, { configured: false }],
-      [false, null],
-    ])(
+    it.each([true, false])(
       'carries LAB NOW only when the lab is configured (%s)',
       async (configuredLab) => {
         respond(() => completion('data: [DONE]\n\n'));
@@ -778,6 +775,82 @@ describe('AskService', () => {
         ),
       );
       expect(lines.join('\n')).not.toContain(dto.question);
+    });
+  });
+
+  describe('the work it shows', () => {
+    const passage = (n: number) => ({
+      passage: {
+        id: `p${n}`,
+        kind: 'why',
+        title: `Passage ${n}`,
+        text: 'x',
+        target: `why topic-${n}`,
+      },
+      score: 10 - n,
+      title: `Passage ${n}`,
+      text: 'x',
+    });
+
+    function withPassages(env: Record<string, string> = configured) {
+      return new AskService(
+        { get: (key: string) => env[key] } as unknown as ConfigService,
+        undefined,
+        {
+          passagesFor: () => [1, 2, 3, 4].map(passage),
+          size: 4,
+        } as unknown as AskCorpusService,
+      );
+    }
+
+    it('asks the runtime for its token count, and reports it with the sources it was given', async () => {
+      respond(() =>
+        completion(
+          delta('Yes, '),
+          delta('he does.'),
+          `data: ${JSON.stringify({ choices: [], usage: { completion_tokens: 58 } })}\n\n`,
+          'data: [DONE]\n\n',
+        ),
+      );
+      const instance = withPassages({
+        ...configured,
+        LLM_HOST_LABEL: 'poseidon · RTX 3080',
+      });
+      const { onDelta } = collect();
+
+      const answer = await instance.answer(dto, onDelta);
+
+      const [, init] = fetchMock.mock.calls[1] as [string, RequestInit];
+      expect(JSON.parse(init.body as string)).toMatchObject({
+        stream_options: { include_usage: true },
+      });
+      expect(answer.meta).toMatchObject({
+        model: 'a-model',
+        label: 'poseidon · RTX 3080',
+        outputTokens: 58,
+        sources: [
+          { title: 'Passage 1', target: 'why topic-1' },
+          { title: 'Passage 2', target: 'why topic-2' },
+          { title: 'Passage 3', target: 'why topic-3' },
+        ],
+      });
+      expect(answer.meta!.approx).toBeUndefined();
+      expect(answer.meta!.firstTokenMs).toBeGreaterThanOrEqual(0);
+      expect(answer.meta!.totalMs).toBeGreaterThanOrEqual(
+        answer.meta!.firstTokenMs,
+      );
+    });
+
+    it('counts deltas, and says so, when the runtime sends no usage', async () => {
+      respond(() =>
+        completion(delta('Yes, '), delta('he does.'), 'data: [DONE]\n\n'),
+      );
+      const { onDelta } = collect();
+
+      const answer = await withPassages().answer(dto, onDelta);
+
+      expect(answer.meta).toMatchObject({ outputTokens: 2, approx: true });
+      expect(answer.meta!.label).toBeUndefined();
     });
   });
 

@@ -62,14 +62,54 @@ The site's own terminal has a \`mail\` command that reaches him directly.`;
 
 interface CompletionChunk {
   choices?: Array<{ delta?: { content?: string | null } }>;
+  /** Sent on the last chunk when the request asked for `stream_options.include_usage`. */
+  usage?: { completion_tokens?: number } | null;
+}
+
+/** What one `data:` event carried: some of the answer, the runtime's token count, or both. */
+interface StreamEvent {
+  delta?: string;
+  outputTokens?: number;
 }
 
 /**
- * How a question ended, for the controller: an answer, or a stream that closed without
- * one, which keeps its 200 (the status was sent before anyone knew) and says so in-stream.
+ * Which model wrote the answer, how fast, and from which of the site's pages
+ * (`docs/superpowers/specs/2026-10-15-ask-my-lab-design.md` §3). Sent as one event after
+ * the last delta and before `[DONE]`.
+ */
+export interface AskMeta {
+  /** `LLM_MODEL`. */
+  model: string;
+  /** `LLM_HOST_LABEL`: public text the owner writes, never derived from `LLM_BASE_URL`. */
+  label?: string;
+  outputTokens: number;
+  /** The runtime sent no usage, so `outputTokens` counts deltas instead. */
+  approx?: true;
+  firstTokenMs: number;
+  totalMs: number;
+  /** Output tokens over the time after the first token, so a cold load doesn't make a fast model look slow. */
+  tokensPerSecond: number | null;
+  /** The passages the API gave the model, best first, at most three: from retrieval, never from the model's text. */
+  sources: Array<{ title: string; target: string }>;
+}
+
+/** At most this many sources go out with an answer. */
+const MAX_SOURCES = 3;
+
+/**
+ * How a question ended, for the controller: an answer and its meta, or a stream that
+ * closed without one, which keeps its 200 (the status was sent before anyone knew) and
+ * says so in-stream.
  */
 export interface AskAnswer {
   empty: boolean;
+  meta?: AskMeta;
+}
+
+/** What `stream()` hands back: how many deltas went out, and the meta for them. */
+interface Streamed {
+  delivered: number;
+  meta: AskMeta;
 }
 
 /** What `/health` reports of the last real question: its outcome and when. */
@@ -179,7 +219,7 @@ export class AskService {
 
     const startedAt = Date.now();
     try {
-      const delivered = await this.stream(dto, onDelta, signal);
+      const { delivered, meta } = await this.stream(dto, onDelta, signal);
       if (delivered === 0) {
         this.failed(
           askFailure(
@@ -197,7 +237,7 @@ export class AskService {
         `ask ok in ${Date.now() - startedAt}ms (${delivered} chunks)`,
       );
       this.record('ok');
-      return { empty: false };
+      return { empty: false, meta };
     } catch (err) {
       this.failed(err, Date.now() - startedAt);
       throw err;
@@ -236,7 +276,7 @@ export class AskService {
   }
 
   /**
-   * Returns how many deltas made it out.
+   * Returns how many deltas made it out, and the meta that goes with them.
    *
    * **Giving up waiting is not the same as cancelling.** Ollama aborts a model
    * load the moment its client disconnects:
@@ -262,12 +302,17 @@ export class AskService {
     dto: AskDto,
     onDelta: (delta: string) => void,
     signal?: AbortSignal,
-  ): Promise<number> {
+  ): Promise<Streamed> {
+    const startedAt = Date.now();
     const baseUrl = this.config.get<string>('LLM_BASE_URL')!;
     const model = this.config.get<string>('LLM_MODEL')!;
     const apiKey = this.config.get<string>('LLM_API_KEY');
     const corpus = this.corpusNow();
     const labNow = await this.labNow();
+    // Once, so the passages the model was given are exactly the sources it is credited with.
+    const passages = this.passages?.passagesFor(dto.question, dto.locale) ?? [];
+    let firstAt: number | null = null;
+    let usage: number | undefined;
 
     const controller = new AbortController();
     const ceiling = setTimeout(() => controller.abort(), WARMUP_CEILING_MS);
@@ -303,6 +348,7 @@ export class AskService {
       idle = setTimeout(() => controller.abort(), IDLE_TIMEOUT_MS);
 
       delivered += 1;
+      firstAt ??= Date.now();
       onFirstToken();
       // A detached run is only here to finish warming the model; the visitor
       // it started for has already been answered.
@@ -325,16 +371,16 @@ export class AskService {
             // chain-of-thought and finishes `length`, not `stop`. Runtimes that
             // do not know the field ignore it.
             reasoning_effort: 'none',
+            // The runtime's own token count, on the last chunk. A runtime that ignores
+            // the option is counted by its deltas instead, and the meta says so.
+            stream_options: { include_usage: true },
             messages: [
               {
                 role: 'system',
                 content: systemPrompt({
                   corpus,
                   content: this.content?.current() ?? null,
-                  passages: this.passages?.passagesFor(
-                    dto.question,
-                    dto.locale,
-                  ),
+                  passages,
                   labNow,
                   locale: dto.locale,
                 }),
@@ -352,9 +398,35 @@ export class AskService {
         );
       }
 
-      await readEventStream(res.body, (delta) => emit(visible.push(delta)));
+      await readEventStream(res.body, (event) => {
+        if (event.delta) emit(visible.push(event.delta));
+        if (event.outputTokens !== undefined) usage = event.outputTokens;
+      });
       emit(visible.flush());
     })();
+
+    const meta = (): AskMeta => {
+      const end = Date.now();
+      const outputTokens = usage ?? delivered;
+      const generating = firstAt === null ? 0 : (end - firstAt) / 1000;
+      const label = this.config.get<string>('LLM_HOST_LABEL')?.trim();
+      return {
+        model,
+        ...(label ? { label } : {}),
+        outputTokens,
+        ...(usage === undefined ? { approx: true as const } : {}),
+        firstTokenMs: (firstAt ?? end) - startedAt,
+        totalMs: end - startedAt,
+        tokensPerSecond:
+          generating > 0
+            ? Math.round((outputTokens / generating) * 10) / 10
+            : null,
+        sources: passages.slice(0, MAX_SOURCES).map((passage) => ({
+          title: passage.title,
+          target: passage.passage.target,
+        })),
+      };
+    };
 
     const gaveUp = Symbol('deadline');
     let deadline: ReturnType<typeof setTimeout> | null = null;
@@ -389,7 +461,7 @@ export class AskService {
       }
 
       await work;
-      return delivered;
+      return { delivered, meta: meta() };
     } catch (err) {
       if (detached) throw err;
       // A fault mid-answer is not worth throwing away what the visitor already
@@ -397,7 +469,7 @@ export class AskService {
       // sitting on, which would otherwise be truncated off the end.
       if (delivered > 0) {
         emit(visible.flush());
-        return delivered;
+        return { delivered, meta: meta() };
       }
       if (reasonOf(err)) throw err;
       throw askFailure(
@@ -540,7 +612,7 @@ export class AskService {
  */
 async function readEventStream(
   body: ReadableStream<Uint8Array>,
-  onDelta: (delta: string) => void,
+  onEvent: (event: StreamEvent) => void,
 ): Promise<void> {
   const reader = body.getReader();
   const decoder = new TextDecoder();
@@ -561,8 +633,8 @@ async function readEventStream(
       const payload = raw.slice('data:'.length).trim();
       if (payload === '[DONE]') return;
 
-      const delta = parseDelta(payload);
-      if (delta) onDelta(delta);
+      const event = parseEvent(payload);
+      if (event) onEvent(event);
     }
   }
 }
@@ -631,10 +703,15 @@ function stripThinking(): { push(chunk: string): string; flush(): string } {
 }
 
 /** A malformed chunk is not worth failing a whole answer over. */
-function parseDelta(payload: string): string | undefined {
+function parseEvent(payload: string): StreamEvent | undefined {
   try {
     const chunk = JSON.parse(payload) as CompletionChunk;
-    return chunk.choices?.[0]?.delta?.content ?? undefined;
+    const delta = chunk.choices?.[0]?.delta?.content ?? undefined;
+    const tokens = chunk.usage?.completion_tokens;
+    return {
+      ...(delta ? { delta } : {}),
+      ...(typeof tokens === 'number' ? { outputTokens: tokens } : {}),
+    };
   } catch {
     return undefined;
   }

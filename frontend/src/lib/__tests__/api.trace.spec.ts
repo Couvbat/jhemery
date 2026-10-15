@@ -122,7 +122,7 @@ describe('askStream', () => {
     const body = 'data: {"delta":"hi"}\n\ndata: {"delta":" there"}\n\ndata: [DONE]\n\n'
     fetchMock.mockResolvedValue(new Response(body, { status: 200 }))
     const out: string[] = []
-    for await (const delta of api.askStream('who are you', 'en')) out.push(delta)
+    for await (const item of api.askStream('who are you', 'en')) if ('delta' in item) out.push(item.delta)
     expect(out.join('')).toBe('hi there')
     expect(traces).toHaveLength(1)
     expect(traces[0]).toMatchObject({ method: 'POST', url: '/ask', status: 200, sent: { question: 'who are you', locale: 'en' } })

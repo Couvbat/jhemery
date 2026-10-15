@@ -33,7 +33,7 @@ function texts(): string[] {
 
 function yields(...deltas: string[]) {
   mocks.askStream.mockImplementation(async function* () {
-    for (const delta of deltas) yield delta
+    for (const delta of deltas) yield { delta }
   })
 }
 
@@ -262,6 +262,55 @@ describe('ask degradation', () => {
 
     expect(texts().some((t) => t.includes('isn’t loaded'))).toBe(false)
     expect(texts().some((t) => t.includes('Yes.'))).toBe(true)
+  })
+})
+
+describe('the work it shows', () => {
+  beforeEach(() => {
+    reset()
+  })
+
+  it('prints which model wrote it and how fast, then the pages it drew from as links', async () => {
+    mocks.askStream.mockImplementation(async function* () {
+      yield { delta: 'It polls.' }
+      yield {
+        meta: {
+          model: 'gemma4:e4b',
+          label: 'poseidon · RTX 3080',
+          outputTokens: 58,
+          firstTokenMs: 410,
+          totalMs: 1930,
+          tokensPerSecond: 38.2,
+          sources: [
+            { title: 'Why the guestbook ticker polls', target: 'why polling' },
+            { title: 'QR codes', target: '/work/qr' },
+          ],
+        },
+      }
+    })
+
+    await run('ask why does the ticker poll')
+
+    const lines = buffer.value
+    const meta = lines.findIndex((l) => l.text === 'gemma4:e4b · 38.2 tok/s · first token 0.4 s · poseidon · RTX 3080')
+    expect(meta).toBeGreaterThan(lines.findIndex((l) => l.text.includes('It polls.')))
+    expect(lines[meta]!.tone).toBe('muted')
+    expect(lines[meta + 1]!.text).toBe('read more:')
+    expect(lines[meta + 2]).toMatchObject({ text: '  Why the guestbook ticker polls', href: '/?run=why%20polling' })
+    expect(lines[meta + 3]).toMatchObject({ text: '  QR codes', href: '/work/qr' })
+  })
+
+  it('marks an approximate rate, in French too', async () => {
+    setLocale('fr')
+    mocks.askStream.mockImplementation(async function* () {
+      yield { delta: 'Oui.' }
+      yield { meta: { model: 'm', outputTokens: 2, approx: true, firstTokenMs: 1250, totalMs: 1300, tokensPerSecond: 40, sources: [] } }
+    })
+
+    await run('ask parle-t-il rust')
+
+    expect(texts()).toContain('m · ~40 tok/s · premier jeton 1,3 s')
+    expect(texts()).not.toContain('pour aller plus loin :')
   })
 })
 

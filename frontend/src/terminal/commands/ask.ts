@@ -1,10 +1,10 @@
 import { decorativeMotion } from '@/composables/useMotion'
 import { messages as m } from '@/i18n/messages'
-import { api } from '@/lib/api'
-import { COLD, degradedCopy, modelIsCold } from '@/lib/ask-session'
-import type { Localised } from '@/content/types'
+import { COLD, degradedCopy, metaLine, modelIsCold, READ_MORE, runAsk, sourceHref } from '@/lib/ask-session'
+import type { AskMeta } from '@/lib/api'
+import type { Locale, Localised } from '@/content/types'
 import { announce } from '../achievements'
-import { blank, fail, line, wrap } from '../format'
+import { blank, fail, line, link, wrap } from '../format'
 import type { Command, OutputLine } from '../types'
 
 /** Matches the DTO's `@Length(3, 240)`, so a too-long question never leaves the tab. */
@@ -32,6 +32,22 @@ function answerLines(answer: string, streaming: boolean): OutputLine[] {
  */
 function degraded(error: unknown, t: T): OutputLine[] {
   return degradedCopy(error).map((words) => line(t(words), 'muted'))
+}
+
+/**
+ * Under the answer, muted: which model wrote it and how fast, then the pages it drew from
+ * as links, the way `why` prints its own. The sources come from retrieval, not from the
+ * model's text, so none is a page that doesn't exist.
+ */
+function work(meta: AskMeta | undefined, locale: Locale, t: T): OutputLine[] {
+  if (!meta) return []
+  return [
+    blank,
+    line(metaLine(meta, locale), 'muted'),
+    ...(meta.sources.length
+      ? [line(t(READ_MORE), 'muted'), ...meta.sources.map((source) => link(`  ${source.title}`, sourceHref(source.target)))]
+      : []),
+  ]
 }
 
 export const askCommands: Command[] = [
@@ -70,31 +86,24 @@ export const askCommands: Command[] = [
       // exception for text — with motion paused, buffer the whole thing and print it
       // once instead. `calm` keeps it: the visitor asked for this answer by name.
       const animate = decorativeMotion() !== 'paused'
-      let answer = ''
-
-      try {
-        for await (const delta of api.askStream(question, locale, signal)) {
-          answer += delta
+      const outcome = await runAsk(question, locale, {
+        signal,
+        onAnswer: (answer) => {
           if (animate) draw(answerLines(answer, true))
-        }
-      } catch (error) {
-        if ((error as Error)?.name === 'AbortError') {
-          // Ctrl+C. Keep whatever arrived; the shell prints its own ^C line.
-          draw(answerLines(answer.trim(), false))
-          return
-        }
-        draw(degraded(error, t))
+        },
+      })
+
+      if (outcome.aborted) {
+        // Ctrl+C. Keep whatever arrived; the shell prints its own ^C line.
+        draw(answerLines(outcome.answer, false))
+        return
+      }
+      if (outcome.failed) {
+        draw(degraded(outcome.error, t))
         return
       }
 
-      const text = answer.trim()
-      // A stream that ends without a word is a failure the visitor cannot see.
-      if (!text) {
-        draw(degraded(undefined, t))
-        return
-      }
-
-      draw(answerLines(text, false))
+      draw([...answerLines(outcome.answer, false), ...work(outcome.meta, locale, t)])
       // Unlocked on a completed answer rather than on invocation, so a timed-out
       // request does not award it.
       return announce('ask', t)

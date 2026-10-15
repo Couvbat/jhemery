@@ -104,7 +104,7 @@ describe('cancel()', () => {
       _locale: string,
       signal?: AbortSignal,
     ) {
-      yield 'partial'
+      yield { delta: 'partial' }
       await new Promise<void>((resolve, reject) => {
         signal?.addEventListener('abort', () => reject(new DOMException('', 'AbortError')), {
           once: true,

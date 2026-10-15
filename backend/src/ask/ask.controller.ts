@@ -98,8 +98,11 @@ export class AskController {
         abortOnDisconnect(res),
       );
       // No word came, and the 200 is already promised: say why in the stream, in the
-      // shape an older frontend already reads as asleep.
+      // shape an older frontend already reads as asleep. Otherwise, after the last delta
+      // and before `[DONE]`, which model wrote it and from which pages: an older
+      // frontend skips an event it doesn't know.
       if (answer?.empty) send({ error: 'asleep', reason: 'empty' });
+      else if (answer?.meta) send({ meta: answer.meta });
     } catch (err) {
       // Nothing has been written yet, so the exception filter can still send a
       // real status code and the client can degrade before it renders anything.

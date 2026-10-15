@@ -196,6 +196,28 @@ describe('AskController', () => {
     expect(body()).toBe('data: {"delta":"Yes"}\n\ndata: [DONE]\n\n');
   });
 
+  it('sends the meta after the last delta and before [DONE]', async () => {
+    const { res, body } = response();
+    const meta = {
+      model: 'gemma4:e4b',
+      outputTokens: 58,
+      firstTokenMs: 410,
+      totalMs: 1930,
+      tokensPerSecond: 38.2,
+      sources: [{ title: 'Why the ticker polls', target: 'why polling' }],
+    };
+    const ask = controller((_dto, onDelta) => {
+      onDelta('Yes');
+      return Promise.resolve({ empty: false, meta });
+    });
+
+    await ask.question(dto, res);
+
+    expect(body()).toBe(
+      `data: {"delta":"Yes"}\n\ndata: ${JSON.stringify({ meta })}\n\ndata: [DONE]\n\n`,
+    );
+  });
+
   it('says in the stream why an answer that ended empty has no words', async () => {
     const { res, body } = response();
     const ask = controller(() => Promise.resolve({ empty: true }));

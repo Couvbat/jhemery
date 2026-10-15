@@ -1,6 +1,6 @@
-import type { Localised } from '@/content/types'
+import type { Locale, Localised } from '@/content/types'
 import { messages as m } from '@/i18n/messages'
-import { api, ApiError } from './api'
+import { api, ApiError, type AskMeta } from './api'
 
 /**
  * What `ask` says when it can't answer, shared by the terminal's `ask` and the *Ask the
@@ -94,6 +94,77 @@ export function degradedCopy(error: unknown): Localised[] {
   }
   return [m.ask.asleep, m.ask.asleepHint]
 }
+
+/** How one question went: what arrived, its meta, and whether it failed or was cancelled. */
+export interface AskOutcome {
+  answer: string
+  meta?: AskMeta
+  /** Cancelled (Ctrl+C, or the page left): keep what arrived and say nothing more. */
+  aborted: boolean
+  /** No answer: the error, or `undefined` for a stream that ended without a word. */
+  failed: boolean
+  error?: unknown
+}
+
+/**
+ * Runs one question: streams it, accumulates the answer, keeps the meta. `onAnswer` hears
+ * the answer so far after each delta, for a caller that draws it as it comes. Shared by
+ * `ask` in the terminal and the `/lab` panel, so the two can't drift.
+ */
+export async function runAsk(
+  question: string,
+  locale: Locale,
+  { signal, onAnswer }: { signal?: AbortSignal; onAnswer?: (answer: string) => void } = {},
+): Promise<AskOutcome> {
+  let answer = ''
+  let meta: AskMeta | undefined
+  try {
+    for await (const event of api.askStream(question, locale, signal)) {
+      if ('delta' in event) {
+        answer += event.delta
+        onAnswer?.(answer)
+      } else {
+        meta = event.meta
+      }
+    }
+  } catch (error) {
+    if ((error as Error)?.name === 'AbortError') return { answer: answer.trim(), meta, aborted: true, failed: false }
+    return { answer: answer.trim(), meta, aborted: false, failed: true, error }
+  }
+  const text = answer.trim()
+  // A stream that ends without a word is a failure the visitor cannot see.
+  return text ? { answer: text, meta, aborted: false, failed: false } : { answer: '', meta, aborted: false, failed: true }
+}
+
+function seconds(ms: number, locale: Locale): string {
+  const text = String(Math.round(ms / 100) / 10)
+  return `${locale === 'fr' ? text.replace('.', ',') : text} s`
+}
+
+/**
+ * The line under an answer: `gemma4:e4b · 38 tok/s · first token 0.4 s · poseidon · RTX 3080`,
+ * with `~` before the rate when the runtime gave no count and the deltas were counted.
+ */
+export function metaLine(meta: AskMeta, locale: Locale): string {
+  const fr = locale === 'fr'
+  const rate =
+    meta.tokensPerSecond === null
+      ? []
+      : [`${meta.approx ? '~' : ''}${fr ? String(meta.tokensPerSecond).replace('.', ',') : meta.tokensPerSecond} tok/s`]
+  return [
+    meta.model,
+    ...rate,
+    `${fr ? 'premier jeton' : 'first token'} ${seconds(meta.firstTokenMs, locale)}`,
+    ...(meta.label ? [meta.label] : []),
+  ].join(' · ')
+}
+
+/** Where a source goes: a route as it is, a command line as the `?run=` link that runs it. */
+export function sourceHref(target: string): string {
+  return target.startsWith('/') ? target : `/?run=${encodeURIComponent(target)}`
+}
+
+export const READ_MORE: Localised = { en: 'read more:', fr: 'pour aller plus loin :' }
 
 export const COLD: Localised = {
   en: 'the model isn’t loaded, so the first answer may not come in time.',

@@ -559,11 +559,45 @@ export async function fetchSite(
  * before the body starts, and simply stops yielding if the connection dies
  * mid-answer — the caller keeps whatever arrived.
  */
+/** One of the site's pages an answer drew from: a route, or a command line a link runs. */
+export interface AskSource {
+  title: string
+  target: string
+}
+
+/**
+ * Which model wrote an answer, how fast, and from which pages: one event after the last
+ * delta. Its shape is `backend/src/ask/ask.service.ts`'s `AskMeta`.
+ */
+export interface AskMeta {
+  model: string
+  label?: string
+  outputTokens: number
+  /** The runtime sent no count, so `outputTokens` counts the deltas. */
+  approx?: boolean
+  firstTokenMs: number
+  totalMs: number
+  tokensPerSecond: number | null
+  sources: AskSource[]
+}
+
+export type AskEvent = { delta: string } | { meta: AskMeta }
+
+/** A meta event from a backend that sends one; anything else is skipped, as an unknown event is. */
+function readMeta(value: unknown): AskMeta | undefined {
+  const meta = value as Partial<AskMeta> | null
+  if (!meta || typeof meta.model !== 'string' || typeof meta.outputTokens !== 'number') return undefined
+  const sources = Array.isArray(meta.sources)
+    ? meta.sources.filter((s): s is AskSource => typeof s?.title === 'string' && typeof s?.target === 'string')
+    : []
+  return { ...(meta as AskMeta), sources }
+}
+
 export async function* askStream(
   question: string,
   locale: Locale,
   signal?: AbortSignal,
-): AsyncGenerator<string> {
+): AsyncGenerator<AskEvent> {
   const started = performance.now()
   const traced = observers.size > 0
   // The question's shape, never the question: strace prints keys.
@@ -612,9 +646,9 @@ export async function* askStream(
         const payload = raw.slice('data:'.length).trim()
         if (payload === '[DONE]') return
 
-        let event: { delta?: string; error?: string; reason?: string }
+        let event: { delta?: string; error?: string; reason?: string; meta?: unknown }
         try {
-          event = JSON.parse(payload) as { delta?: string; error?: string; reason?: string }
+          event = JSON.parse(payload) as { delta?: string; error?: string; reason?: string; meta?: unknown }
         } catch {
           // A malformed chunk is not worth throwing away the answer for.
           continue
@@ -625,7 +659,9 @@ export async function* askStream(
         // what to draw from the error alone, and this keeps that one decision
         // in one place.
         if (event.error) throw new ApiError(event.error, event.error === 'busy' ? 503 : 502, event.reason)
-        if (event.delta) yield event.delta
+        if (event.delta) yield { delta: event.delta }
+        const meta = readMeta(event.meta)
+        if (meta) yield { meta }
       }
     }
   } finally {
