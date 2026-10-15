@@ -554,6 +554,14 @@ five letters, a title word counting three times, and keeps at most four over a f
 `content/__tests__/corpus.spec.ts` holds it to every case study, decision and note heading,
 and every target to something that resolves.
 
+**Ask the lab** (the same spec, §5). `components/lab/AskTheLab.vue`, in `LabView`'s chunk: a
+`<form>` with a labelled input held to the DTO's 3 to 240 characters (`questionProblem`), three
+suggestions that fill it without sending, the disclaimer, and the answer in a `role="log"`
+region with the meta line and the sources as ordinary links. It runs through `lib/ask-session.ts`
+(`runAsk`, `degradedCopy`, `metaLine`, `modelIsCold`), as the terminal's `ask` does, so the two
+share the five questions an hour, the motion rule (buffered at *paused*), the copy and the `ask`
+achievement. Phones get it: §10 keeps the terminal's *prompt* off them, not a form in the page.
+
 **The data layer** ([spec](superpowers/specs/2026-10-15-xray-data-layer-design.md)). A component
 that renders API data names its routes on its root, `data-api="/steam/activity"`: a literal
 attribute, not a stamp, since the component knows which `api.*` call feeds it and the compiler

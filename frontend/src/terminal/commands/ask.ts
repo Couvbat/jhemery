@@ -1,15 +1,21 @@
 import { decorativeMotion } from '@/composables/useMotion'
 import { messages as m } from '@/i18n/messages'
-import { COLD, degradedCopy, metaLine, modelIsCold, READ_MORE, runAsk, sourceHref } from '@/lib/ask-session'
+import {
+  COLD,
+  degradedCopy,
+  metaLine,
+  modelIsCold,
+  QUESTION_MAX,
+  questionProblem,
+  READ_MORE,
+  runAsk,
+  sourceHref,
+} from '@/lib/ask-session'
 import type { AskMeta } from '@/lib/api'
 import type { Locale, Localised } from '@/content/types'
 import { announce } from '../achievements'
 import { blank, fail, line, link, wrap } from '../format'
 import type { Command, OutputLine } from '../types'
-
-/** Matches the DTO's `@Length(3, 240)`, so a too-long question never leaves the tab. */
-const MIN_LENGTH = 3
-const MAX_LENGTH = 240
 
 /** Trails the answer while it streams, dropped once the model is done. */
 const CURSOR = '▌'
@@ -68,12 +74,10 @@ export const askCommands: Command[] = [
         args.join(' ').trim() || (await prompt(t(m.ask.question))).trim(),
       )
 
-      if (question.length < MIN_LENGTH) {
-        return [fail('ask: usage — ask <question>')]
-      }
-      if (question.length > MAX_LENGTH) {
-        return [fail(`ask: keep it under ${MAX_LENGTH} characters`)]
-      }
+      // The DTO's limits, shared with the `/lab` panel so the two refuse the same things.
+      const problem = questionProblem(question)
+      if (problem === 'short') return [fail('ask: usage — ask <question>')]
+      if (problem === 'long') return [fail(`ask: keep it under ${QUESTION_MAX} characters`)]
 
       print([line(t(m.ask.disclaimer), 'muted'), blank])
       // A cold model is the one failure worth warning of before it happens.

@@ -45,6 +45,29 @@ export const labLabels = {
   legend: { en: 'What the wires are', fr: 'Ce que sont les fils' },
 } satisfies Record<string, Localised | Localised[]>
 
+/** The *Ask the lab* panel's words (`AskTheLab.vue`). */
+export const askLabels = {
+  heading: { en: 'Ask the lab', fr: 'Demander au labo' },
+  intro: {
+    en: 'The same model `ask` reaches from the terminal, on the GPU drawn above. It answers from what this site already says and from the lab as it is now, and shares the terminal’s five questions an hour.',
+    fr: 'Le même modèle que `ask` joint depuis le terminal, sur le GPU dessiné plus haut. Il répond d’après ce que ce site dit déjà et d’après le labo tel qu’il est, et partage les cinq questions par heure du terminal.',
+  },
+  label: { en: 'Your question', fr: 'Votre question' },
+  send: { en: 'Ask', fr: 'Demander' },
+  asking: { en: 'asking…', fr: 'question en cours…' },
+  suggestions: { en: 'Or start from one of these (they fill the box, nothing is sent):', fr: 'Ou partez de l’une de celles-ci (elles remplissent le champ, rien n’est envoyé) :' },
+  short: { en: 'A question needs at least 3 characters.', fr: 'Une question demande au moins 3 caractères.' },
+  long: { en: 'Keep it under 240 characters.', fr: 'Restez sous les 240 caractères.' },
+  answer: { en: 'The answer', fr: 'La réponse' },
+} satisfies Record<string, Localised>
+
+/** Three questions that fill the box without sending it: asking spends one of five. */
+export const askSuggestions: Localised[] = [
+  { en: 'What runs this site?', fr: 'Qu’est-ce qui fait tourner ce site ?' },
+  { en: 'Why does the guestbook ticker poll?', fr: 'Pourquoi le défilant du livre d’or interroge-t-il l’API ?' },
+  { en: 'Which models are loaded?', fr: 'Quels modèles sont chargés ?' },
+]
+
 /** How a link is said in a card's text, so nothing is said by a line alone. */
 export const linkWords: Record<LabLinkKind, Localised> = {
   public: { en: 'reaches {name}', fr: 'joint {name}' },

@@ -3,6 +3,7 @@ import { computed, onBeforeUnmount, onMounted, ref, shallowRef } from 'vue'
 import { RouterLink } from 'vue-router'
 import { profile } from '@/content'
 import CodeText from '@/components/CodeText.vue'
+import AskTheLab from '@/components/lab/AskTheLab.vue'
 import LabMap from '@/components/lab/LabMap.vue'
 import { labLabels as labels } from '@/components/lab/labels'
 import { useLocale } from '@/i18n'
@@ -109,6 +110,8 @@ const stripTone = computed(() =>
       </p>
 
       <LabMap :report="current" />
+
+      <AskTheLab />
 
       <p class="text-xs text-muted-foreground font-mono">
         <CodeText :text="t(labels.outside)" />

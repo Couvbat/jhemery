@@ -9,6 +9,18 @@ import { api, ApiError, type AskMeta } from './api'
  * the API now names the reason, and each reads as the advice it calls for.
  */
 
+/** The DTO's `@Length(3, 240)`, so a question the API would refuse never leaves the tab. */
+export const QUESTION_MIN = 3
+export const QUESTION_MAX = 240
+
+/** What is wrong with a question before it is sent, or null when nothing is. */
+export function questionProblem(question: string): 'short' | 'long' | null {
+  const length = question.trim().length
+  if (length < QUESTION_MIN) return 'short'
+  if (length > QUESTION_MAX) return 'long'
+  return null
+}
+
 /** The API's closed set, mirrored from `backend/src/ask/ask.failure.ts`. */
 export type AskReason =
   | 'unconfigured'
