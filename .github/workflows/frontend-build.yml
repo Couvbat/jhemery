@@ -80,9 +80,15 @@ jobs:
       # without this the SPA fallback and the curl/LLM resume rule never reach
       # the server -- and the deploy's `rsync --delete` removes the copy already
       # there. Silent: the site builds and renders, deep links just 404.
+      #
+      # A deploy that fails keeps this for "Re-run failed jobs", so "Re-run all
+      # jobs" finds it already there: `overwrite` replaces it rather than failing
+      # on the name. Leftovers, and every standalone build's, expire on their own.
       - name: Upload Build Artifact
         uses: actions/upload-artifact@v7
         with:
           name: frontend-build
           path: frontend/dist
           include-hidden-files: true
+          overwrite: true
+          retention-days: 14
