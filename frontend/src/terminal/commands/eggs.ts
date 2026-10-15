@@ -18,7 +18,7 @@ import { art, blank, line, link, pre } from '../format'
 import { labHosts, labLogin, labShell } from '../lab-shell'
 import { sleep } from '../timing'
 import type { Command, CommandContext, OutputLine } from '../types'
-import { forgetGuestbookFile, resolveGuestbookFile } from './guestbook-fs'
+import { cacheHeldEntries, filenameFor, forgetGuestbookFile, resolveGuestbookFile, resolveHeldFile } from './guestbook-fs'
 import { ENV_FILE } from './env-file'
 import { listFiles, resolveFileLines } from './files'
 
@@ -125,7 +125,8 @@ async function removeGuestbookEntry(
   ctx: CommandContext,
   target: string,
 ): Promise<OutputLine[]> {
-  const entry = resolveGuestbookFile(target)
+  // A held entry too, by the `held/<file>` name `sudo guestbook held` gave it.
+  const entry = resolveGuestbookFile(target) ?? resolveHeldFile(target)
   if (!entry) {
     return [line(`rm: cannot remove '${target}': No such file or directory`, 'error')]
   }
@@ -145,6 +146,52 @@ async function removeGuestbookEntry(
       return [line(`rm: cannot remove '${target}': No such file or directory`, 'error')]
     }
     return [line('rm: request failed', 'error')]
+  }
+}
+
+/**
+ * `sudo guestbook held`: what the model held, and what it hasn't read yet, as
+ * `held/<file>` names with the reason and the age, for the owner only: the API checks
+ * the password before it lists anything.
+ */
+async function listHeld(ctx: CommandContext): Promise<OutputLine[]> {
+  const password = await ctx.prompt('[sudo] password for visitor:', { mask: true })
+  if (!password) return [line('sudo: no password entered', 'error')]
+  let entries: Awaited<ReturnType<typeof api.heldGuestbook>>
+  try {
+    entries = await api.heldGuestbook(password)
+  } catch (error) {
+    if (error instanceof ApiError && error.status === 403) return [line('sudo: incorrect password', 'error')]
+    return [line('guestbook: request failed', 'error')]
+  }
+  cacheHeldEntries(entries)
+  if (!entries.length) return [line('nothing held, nothing waiting.', 'muted')]
+  const minutes = (ms: number) => (ms < 3_600_000 ? `${Math.max(1, Math.round(ms / 60_000))} min` : `${Math.round(ms / 3_600_000)} h`)
+  return entries.flatMap((entry) => [
+    {
+      text: `${entry.status === 'held' ? 'held   ' : 'pending'}  ${(entry.reason ?? '-').padEnd(13)}  ${minutes(entry.ageMs).padStart(6)}  held/${filenameFor(entry)}`,
+      tone: entry.status === 'held' ? ('warning' as const) : ('muted' as const),
+      pre: true,
+    },
+    // The entry's own words, as text: the guestbook is the reason output has no markup.
+    line(`  ${entry.name}: ${entry.message}`),
+  ]).concat([blank, line('`sudo approve held/<file>` publishes one; `sudo rm held/<file>` removes it.', 'muted')])
+}
+
+/** `sudo approve <file>`: up, whatever the model said. */
+async function approveHeld(ctx: CommandContext, target: string): Promise<OutputLine[]> {
+  const entry = resolveHeldFile(target)
+  if (!entry) return [line(`approve: ${target}: no such held entry — \`sudo guestbook held\` lists them`, 'error')]
+  const password = await ctx.prompt('[sudo] password for visitor:', { mask: true })
+  if (!password) return [line('sudo: no password entered', 'error')]
+  try {
+    await api.approveGuestbookEntry(entry.id, password)
+    forgetGuestbookFile(target)
+    return [line(`published held/${filenameFor(entry)}`, 'success')]
+  } catch (error) {
+    if (error instanceof ApiError && error.status === 403) return [line('sudo: incorrect password', 'error')]
+    if (error instanceof ApiError && error.status === 404) return [line(`approve: ${target}: already gone or already up`, 'error')]
+    return [line('approve: request failed', 'error')]
   }
 }
 
@@ -185,6 +232,10 @@ export const eggCommands: Command[] = [
         lockAdmin()
         return [line('sudo: credentials cleared', 'muted')]
       }
+
+      if (rest === 'guestbook held') return listHeld(ctx)
+      const approveMatch = /^approve\s+(\S+)$/.exec(rest)
+      if (approveMatch) return approveHeld(ctx, approveMatch[1]!)
 
       const rmMatch = /^rm\s+(?:-\w+\s+)?(\S+)$/.exec(rest)
       const rmTarget = rmMatch?.[1]

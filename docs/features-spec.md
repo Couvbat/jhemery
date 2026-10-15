@@ -542,6 +542,19 @@ any key and claims none), or the swing. CSS alone (`attr(data-src)` in a `::befo
 rejected and still is: it would collide with components' own pseudo-elements, and a
 pseudo-element can't carry a link.
 
+**The guestbook's first reader** ([spec](superpowers/specs/2026-10-15-guestbook-moderation-design.md)).
+With `GUESTBOOK_MODERATION=model` an entry is stored `pending` and `sign` gets a `202`; a worker
+in `GuestbookService` reads pending entries oldest first through `common/llm.ts`'s one slot as a
+background caller (`acquire({ background: true })` waits for the slot *and* any detached warm-up
+of `ask`'s), temperature 0, 60 tokens, JSON only, and accepts exactly
+`{"verdict","reason"}` (`guestbook/moderation.ts`). `hold` keeps it for the owner; anything
+unreadable is retried once and then left to the grace period, which publishes it. Entries from
+before moderation have no status and read as published. Optional replies are grounded in `ask`'s
+passages and pass the sanitiser and link filter. `backend/scripts/eval-moderation.ts` runs
+twenty labelled entries against the configured model; it is not in CI. The terminal side:
+`sign` polls `GET /guestbook/:id/status`, `cat` prints a reply as muted text with its `see`
+link, and `sudo guestbook held` / `sudo approve` are the owner's.
+
 **`ask` and the site's words** ([spec](superpowers/specs/2026-10-15-ask-my-lab-design.md) §2,
 decision `ask-retrieval`). `vite-plugins/corpus.ts` writes `/corpus.json` beside `search.json`
 from the same sources, whole: one passage per case-study section, per `why` topic (chosen,

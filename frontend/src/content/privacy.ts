@@ -51,8 +51,8 @@ export const privacyCopy = {
     fr: 'Le formulaire de contact et `mail` envoient votre nom, votre adresse et votre message dans ma boîte, par email. Ils ne servent qu’à vous répondre, et je les supprime au plus tard trois ans après notre dernier échange.',
   },
   guestbook: {
-    en: '`sign` publishes the name and message you give, with the date, for every visitor to read. An entry stays until 500 newer ones push it out, or until you ask me to remove it.',
-    fr: '`sign` publie le nom et le message que vous donnez, avec la date, à la vue de tous les visiteurs. Un message reste jusqu’à ce que 500 plus récents le poussent dehors, ou jusqu’à ce que vous me demandiez de le retirer.',
+    en: '`sign` publishes the name and message you give, with the date, for every visitor to read. Each entry is first read by a language model running on my own machine, which may hold it for me to review; nothing is sent to anyone else. It goes from the host in France to that machine, also in France. An entry stays until 500 newer ones push it out, or until you ask me to remove it.',
+    fr: '`sign` publie le nom et le message que vous donnez, avec la date, à la vue de tous les visiteurs. Chaque message est d’abord lu par un modèle de langage qui tourne sur ma propre machine, et qui peut le garder pour que je le relise ; rien n’est envoyé à qui que ce soit d’autre. Il va de l’hébergeur en France à cette machine, en France aussi. Un message reste jusqu’à ce que 500 plus récents le poussent dehors, ou jusqu’à ce que vous me demandiez de le retirer.',
   },
   addresses: {
     en: 'Your IP address reaches the server with every request. The rate limiter keeps it to stop abuse, in memory only, never on disk: it counts against you for an hour at the longest, and the entry goes at the next clean-up, which runs as later requests arrive, or when the server restarts. The host’s access logs record it too, under o2switch’s own retention.',

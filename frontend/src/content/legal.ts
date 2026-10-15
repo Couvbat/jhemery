@@ -120,8 +120,8 @@ export const legalCopy = {
     fr: 'Chaque requête passe d’abord par Cloudflare, qui protège le site et le sert plus vite :',
   },
   guestbook: {
-    en: 'The guestbook publishes what visitors write, under the name they give. I read it, and remove without notice anything unlawful, hateful or harassing, any advertising, and anything that names or exposes someone else.',
-    fr: 'Le livre d’or publie ce qu’écrivent les visiteurs, sous le nom qu’ils donnent. Je le lis, et je retire sans préavis tout ce qui est illicite, haineux ou harcelant, la publicité, et tout ce qui nomme ou expose quelqu’un d’autre.',
+    en: 'The guestbook publishes what visitors write, under the name they give. Each entry is first read by a language model running on my own machine, which may hold it for me to review; nothing is sent to anyone else. I read it too, and remove without notice anything unlawful, hateful or harassing, any advertising, and anything that names or exposes someone else.',
+    fr: 'Le livre d’or publie ce qu’écrivent les visiteurs, sous le nom qu’ils donnent. Chaque message est d’abord lu par un modèle de langage qui tourne sur ma propre machine, et qui peut le garder pour que je le relise ; rien n’est envoyé à qui que ce soit d’autre. Je le lis aussi, et je retire sans préavis tout ce qui est illicite, haineux ou harcelant, la publicité, et tout ce qui nomme ou expose quelqu’un d’autre.',
   },
   report: {
     en: `To report an entry, or to have one of yours removed, write to ${profile.email} with its name and date. I act on it as soon as I read it.`,

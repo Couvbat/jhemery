@@ -208,6 +208,27 @@ export interface GuestbookEntry {
   name: string
   message: string
   date: string
+  /** A local model's one-line reply, under an entry it published; `see` a page it drew from. */
+  reply?: { text: string; by: 'model'; see?: string }
+}
+
+/** Where a moderated entry is: what `GET /guestbook/:id/status` answers. */
+export type GuestbookStatus = 'pending' | 'held' | 'published'
+
+/** `sign` with moderation on: the entry waits for the model, and only its id comes back. */
+export interface GuestbookPending {
+  id: string
+  status: 'pending'
+}
+
+/** What the owner's list shows of an entry that isn't up. */
+export interface HeldGuestbookEntry {
+  id: string
+  name: string
+  message: string
+  status: 'pending' | 'held'
+  reason?: string
+  ageMs: number
 }
 
 export interface GuestbookList {
@@ -702,11 +723,21 @@ export const api = {
       body: '{}',
     }),
   guestbook: (options?: RequestOptions) => request<GuestbookList>('/guestbook', undefined, options),
-  sign: (name: string, message: string) =>
-    request<GuestbookEntry>('/guestbook', {
+  // `201` and the entry from an API without moderation, `202` and `{ id, status }` from
+  // one with it: the two apps deploy in no fixed order, so both are read.
+  sign: (name: string, message: string, locale?: Locale) =>
+    request<GuestbookEntry | GuestbookPending>('/guestbook', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name, message }),
+      body: JSON.stringify(locale ? { name, message, locale } : { name, message }),
+    }),
+  guestbookStatus: (id: string) => request<{ status: GuestbookStatus }>(`/guestbook/${encodeURIComponent(id)}/status`),
+  heldGuestbook: (password: string) =>
+    request<HeldGuestbookEntry[]>('/guestbook/held', { headers: adminHeaders(password) }),
+  approveGuestbookEntry: (id: string, password: string) =>
+    request<void>(`/guestbook/${encodeURIComponent(id)}/approve`, {
+      method: 'POST',
+      headers: adminHeaders(password),
     }),
   deleteGuestbookEntry: (id: string, password: string) =>
     request<void>(`/guestbook/${id}`, {

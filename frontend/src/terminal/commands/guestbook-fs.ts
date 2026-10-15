@@ -1,4 +1,4 @@
-import type { GuestbookEntry } from '@/lib/api'
+import type { GuestbookEntry, HeldGuestbookEntry } from '@/lib/api'
 
 /**
  * Maps the "filenames" shown by `guestbook` back to the entries they represent, so
@@ -19,7 +19,7 @@ function slugify(name: string): string {
   )
 }
 
-export function filenameFor(entry: GuestbookEntry): string {
+export function filenameFor(entry: Pick<GuestbookEntry, 'id' | 'name'>): string {
   return `${slugify(entry.name)}-${entry.id.slice(0, 6)}.txt`
 }
 
@@ -43,4 +43,22 @@ export function resolveGuestbookFile(name: string): GuestbookEntry | undefined {
 
 export function forgetGuestbookFile(name: string): void {
   cache.delete(name.replace(/^guestbook\//, ''))
+  held.delete(name.replace(/^(?:guestbook\/)?held\//, ''))
+}
+
+/**
+ * The owner's view of what isn't up, as `held/<file>` names: filled by
+ * `sudo guestbook held`, read by `sudo approve` and `sudo rm`. Never shown to anyone
+ * the API hasn't checked the password of.
+ */
+const held = new Map<string, HeldGuestbookEntry>()
+
+export function cacheHeldEntries(entries: HeldGuestbookEntry[]): void {
+  held.clear()
+  for (const entry of entries) held.set(filenameFor(entry), entry)
+}
+
+/** Accepts `held/<file>`, `guestbook/held/<file>`, or the bare filename. */
+export function resolveHeldFile(name: string): HeldGuestbookEntry | undefined {
+  return held.get(name.replace(/^(?:guestbook\/)?held\//, ''))
 }
