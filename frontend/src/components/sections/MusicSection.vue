@@ -11,9 +11,6 @@ import { useMusicEmbed, useMusicPlayer } from '@/composables/useMusicPlayer'
 
 const { t, m } = useLocale()
 const { autoplayNonce, playerLoaded } = useMusicPlayer()
-// `src` takes the scheme's colour each time a frame is built, never while one is up (see
-// `useMusicEmbed`).
-const { src, load: loadFrame } = useMusicEmbed()
 
 // Its own chunk, fetched only when there is a track to mix (`content/stems.ts`): with the
 // list empty the home page never asks for it.
@@ -21,6 +18,9 @@ const StemsMixer = defineAsyncComponent(() => import('@/components/stems/StemsMi
 
 // The button goes when the frame comes, and focus would fall to `<body>` with it.
 const frameEl = ref<HTMLIFrameElement | null>(null)
+// `src` follows the chosen scheme, but never while the player is playing: it listens to the
+// frame for that (see `useMusicEmbed`).
+const { src, load: loadFrame, onFrameLoad } = useMusicEmbed(frameEl)
 async function load() {
   loadFrame()
   await nextTick()
@@ -112,6 +112,7 @@ async function load() {
               frameborder="0"
               class="rounded"
               :title="t(m.music.listen)"
+              @load="onFrameLoad"
             ></iframe>
             <div
               v-else
