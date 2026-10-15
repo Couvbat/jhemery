@@ -134,7 +134,7 @@ class FakeContext {
     return this.make('compressor', { threshold: param(-24), knee: param(30), ratio: param(12), attack: param(0.003), release: param(0.25) })
   }
   createBufferSource() {
-    return this.make('source', { buffer: null, loop: false, loopEnd: 0, start: vi.fn(), stop: vi.fn() })
+    return this.make('source', { buffer: null, loop: false, loopStart: 0, loopEnd: 0, start: vi.fn(), stop: vi.fn() })
   }
 }
 
@@ -207,6 +207,44 @@ describe('the engine', () => {
     engine.play()
     expect(engine.playing).toBe(false)
     expect(onStop).toHaveBeenCalledTimes(2)
+  })
+
+  // Vol. 2: the loop is the excerpt, exactly, whatever padding an encoder added.
+  it('loops over exactly the track’s seconds when it gives them', () => {
+    const engine = createStemsEngine(context as unknown as AudioContext, buffers, defaultMix(3), { seconds: 29.5 })
+    engine.play()
+    expect(engine.length).toBe(29.5)
+    expect(nodes('source').every((s) => s.loopStart === 0 && s.loopEnd === 29.5)).toBe(true)
+  })
+
+  it('seeks playing by booking every stem at one instant, stopping the old ones at that same instant', () => {
+    const engine = engineOn()
+    engine.play()
+    const before = nodes('source')
+    context.currentTime = 20
+    engine.seek(12)
+    const after = nodes('source').slice(before.length)
+    expect(after).toHaveLength(3)
+    expect(new Set(after.map((s) => JSON.stringify((s.start as ReturnType<typeof vi.fn>).mock.calls[0]))).size).toBe(1)
+    expect((after[0]!.start as ReturnType<typeof vi.fn>).mock.calls[0]).toEqual([20.05, 12])
+    expect(before.every((s) => (s.stop as ReturnType<typeof vi.fn>).mock.calls[0]?.[0] === 20.05)).toBe(true)
+    context.currentTime = 20.05 + 3
+    expect(engine.position()).toBeCloseTo(15)
+  })
+
+  it('seeks paused by moving where play will start, booking nothing', () => {
+    const engine = engineOn()
+    engine.seek(7)
+    expect(nodes('source')).toHaveLength(0)
+    expect(engine.position()).toBe(7)
+    engine.play()
+    expect((nodes('source')[0]!.start as ReturnType<typeof vi.fn>).mock.calls[0]).toEqual([10.05, 7])
+    // Clamped inside the loop.
+    engine.pause()
+    engine.seek(99)
+    expect(engine.position()).toBeLessThan(30)
+    engine.seek(-4)
+    expect(engine.position()).toBe(0)
   })
 
   it('suspends the context once stopped, and lets go of every node on dispose', () => {

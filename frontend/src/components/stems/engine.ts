@@ -28,6 +28,12 @@ export interface StemsEngine {
   readonly playing: boolean
   /** Seconds into the loop, by the audio clock. */
   position: () => number
+  /**
+   * Jumps to `seconds` into the loop. Playing, every stem's new source is booked at one
+   * `when` and the old ones stop at that same `when`, so the stems stay sample-locked across
+   * the jump as they do across a loop; paused, it is where `play()` will start.
+   */
+  seek: (seconds: number) => void
   readonly length: number
   set: (mix: Mix) => void
   /** Stops, and lets go of every node. The context is the caller's to close. */
@@ -38,10 +44,13 @@ export function createStemsEngine(
   context: AudioContext,
   buffers: readonly AudioBuffer[],
   initial: Mix,
-  options: { onStop?: (reason: StopReason) => void } = {},
+  options: { onStop?: (reason: StopReason) => void; seconds?: number } = {},
 ): StemsEngine {
-  // The shortest, should an encoder have padded one file: the loop has to fit every stem.
-  const length = Math.min(...buffers.map((buffer) => buffer.duration))
+  // Exactly the excerpt's length when the track gives it: AAC encoders pad, and browsers
+  // trim the padding differently, so looping over the buffers' own ends would put a gap
+  // at the seam. Without it, the shortest, which every stem fits.
+  const shortest = Math.min(...buffers.map((buffer) => buffer.duration))
+  const length = options.seconds && options.seconds > 0 ? Math.min(options.seconds, shortest) : shortest
   const faders = buffers.map(() => context.createGain())
   const filter = context.createBiquadFilter()
   filter.type = 'lowpass'
@@ -80,6 +89,33 @@ export function createStemsEngine(
 
   const position = () => (playing ? (((context.currentTime - startedAt) % length) + length) % length : offset)
 
+  /** One looping source per stem, all at `when` and `from`: the one place sources start. */
+  function book(when: number, from: number): AudioBufferSourceNode[] {
+    return buffers.map((buffer, i) => {
+      const source = context.createBufferSource()
+      source.buffer = buffer
+      source.loop = true
+      source.loopStart = 0
+      source.loopEnd = length
+      source.connect(faders[i]!)
+      source.start(when, from)
+      return source
+    })
+  }
+
+  function seek(seconds: number) {
+    if (disposed) return
+    const to = Math.min(Math.max(0, seconds), Math.max(0, length - 1e-6))
+    if (!playing) {
+      offset = to
+      return
+    }
+    const when = context.currentTime + START_AHEAD_S
+    for (const source of sources) source.stop(when)
+    sources = book(when, to)
+    startedAt = when - to
+  }
+
   const onVisibility = () => {
     if (document.hidden) halt('hidden')
   }
@@ -113,15 +149,7 @@ export function createStemsEngine(
       window.clearTimeout(suspendTimer)
       void context.resume().catch(() => {})
       const when = context.currentTime + START_AHEAD_S
-      sources = buffers.map((buffer, i) => {
-        const source = context.createBufferSource()
-        source.buffer = buffer
-        source.loop = true
-        source.loopEnd = length
-        source.connect(faders[i]!)
-        source.start(when, offset)
-        return source
-      })
+      sources = book(when, offset)
       startedAt = when - offset
       transport.gain.cancelScheduledValues(when)
       transport.gain.setValueAtTime(0, when)
@@ -134,6 +162,7 @@ export function createStemsEngine(
       return playing
     },
     position,
+    seek,
     length,
     set: (mix) => apply(mix),
     dispose() {

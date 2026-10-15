@@ -542,6 +542,21 @@ any key and claims none), or the swing. CSS alone (`attr(data-src)` in a `::befo
 rejected and still is: it would collide with components' own pseudo-elements, and a
 pseudo-element can't carry a link.
 
+**Stems, vol. 2** ([spec](superpowers/specs/2026-10-15-stems-vol2-design.md)). `scripts/stems.mjs`
+(`npm run stems -- <folder>`) turns DAW exports and a `track.json` into a track: it probes every
+stem (one rate, one length, at most `MAX_STEMS`), warns when the excerpt isn't a whole number of
+bars, cuts it with `atrim` (sample-accurate, never a keyframe seek), encodes AAC-LC 192 kb/s at
+48 kHz with `+faststart`, checks the decoded cost, writes `peaks.json` (480 one-byte buckets per
+stem, normalised across the track with a square root) and prints the `StemTrack` literal; its
+pure half is `scripts/stems-lib.mjs`. The mixer fetches `peaks.json` on mount and draws a canvas
+lane per stem (`components/stems/peaks.ts`), in `--neon-green` read at draw time and redrawn on a
+scheme switch, its opacity following the stem's gain; one playhead crosses them at a rate set by
+the motion level. `engine.seek()` books every stem's new source at one `when` and stops the old
+ones at the same `when`; the loop is exactly `track.seconds` (`loopStart`/`loopEnd`), which takes
+AAC padding out of the seam. `StemTrack` gains optional `bpm`, `beatsPerBar`, `key`, `daw` and
+`released`, `Stem` a `chain`. The `stems` command lists the tracks and hands the mixer a default
+mix code for `stems <id>` (`composables/useStemsRequest.ts`), the path a `?mix=` link takes.
+
 **The guestbook's first reader** ([spec](superpowers/specs/2026-10-15-guestbook-moderation-design.md)).
 With `GUESTBOOK_MODERATION=model` an entry is stored `pending` and `sign` gets a `202`; a worker
 in `GuestbookService` reads pending entries oldest first through `common/llm.ts`'s one slot as a
