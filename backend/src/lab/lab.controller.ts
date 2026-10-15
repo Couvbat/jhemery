@@ -9,11 +9,13 @@ import {
   HttpCode,
   Injectable,
   Post,
+  Res,
   UseGuards,
   ValidationPipe,
 } from '@nestjs/common';
-import type { Request } from 'express';
+import type { Request, Response } from 'express';
 import { RateLimit, RateLimitGuard } from '../common/rate-limit.guard';
+import { serverTiming } from '../common/server-timing';
 import { LabSnapshotDto } from './lab.dto';
 import { LabService } from './lab.service';
 import type { IngestResult, LabReport, LabSnapshot } from './lab.types';
@@ -40,12 +42,22 @@ export class LabIngestGuard implements CanActivate {
 export class LabController {
   constructor(private readonly lab: LabService) {}
 
-  /** What visitors read. Never calls the lab: it serves the copy the last push left. */
+  /**
+   * What visitors read. Never calls the lab: it serves the copy the last push left, and
+   * says how old it is in `Server-Timing`, as the caching routes do.
+   */
   @Get()
   @RateLimit({ limit: 60, windowMs: 60_000 })
   @Header('Cache-Control', 'public, max-age=15')
-  report(): Promise<LabReport> {
-    return this.lab.report();
+  async report(@Res({ passthrough: true }) res: Response): Promise<LabReport> {
+    const report = await this.lab.report();
+    serverTiming(
+      res,
+      report.configured && report.ageMs !== null
+        ? { cache: 'hit', ageMs: report.ageMs }
+        : null,
+    );
+    return report;
   }
 
   /**

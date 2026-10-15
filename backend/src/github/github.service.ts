@@ -270,9 +270,7 @@ export class GithubService {
     };
     if (token) headers.Authorization = `Bearer ${token}`;
 
-    const url = new URL(
-      `https://api.github.com/repos/${repo}/actions/runs`,
-    );
+    const url = new URL(`https://api.github.com/repos/${repo}/actions/runs`);
     url.searchParams.set('per_page', String(MAX_WORKFLOW_RUNS));
 
     const res = await fetch(url, { headers });
@@ -407,6 +405,25 @@ export class GithubService {
         url: item.html_url,
         date: item.commit.committer.date,
       }));
+  }
+
+  /** How old each route's cache is, for that route's `Server-Timing`; null before its first fetch. */
+  cacheAges(
+    now = Date.now(),
+  ): Record<
+    'activity' | 'contributions' | 'pinnedRepos' | 'workflowStatus',
+    number | null
+  > {
+    return {
+      activity: cacheAge(this.cache, CACHE_TTL_MS, now),
+      contributions: cacheAge(
+        this.contributionsCache,
+        CONTRIBUTIONS_TTL_MS,
+        now,
+      ),
+      pinnedRepos: cacheAge(this.pinnedReposCache, PINNED_REPOS_TTL_MS, now),
+      workflowStatus: cacheAge(this.workflowCache, WORKFLOW_TTL_MS, now),
+    };
   }
 
   /** Configured or not, and how old the recent-commits cache is — nothing is fetched. */

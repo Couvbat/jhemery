@@ -3,6 +3,7 @@ import { ValidationPipe } from '@nestjs/common';
 import { NestExpressApplication } from '@nestjs/platform-express';
 import helmet from 'helmet';
 import { AppModule } from './app.module';
+import { allowedOrigins, timingAllowOrigin } from './common/server-timing';
 
 async function bootstrap() {
   const app = await NestFactory.create<NestExpressApplication>(AppModule);
@@ -34,12 +35,13 @@ async function bootstrap() {
       },
     }),
   );
-  const allowedOrigins = [
-    'http://localhost:5173',
-    process.env.FRONTEND_URL,
-  ].filter(Boolean) as string[];
+  const origins = allowedOrigins();
+  // Resource Timing hides a cross-origin response's sizes and Server-Timing unless it
+  // names the page's origin. The same origins CORS admits, and only those: x-ray reads
+  // its own requests, and no other site learns this API's cache ages.
+  app.use(timingAllowOrigin(origins));
   app.enableCors({
-    origin: allowedOrigins,
+    origin: origins,
     // DELETE is used by the guestbook moderation endpoint.
     methods: ['GET', 'POST', 'DELETE'],
     // x-admin-password is what GuestbookController reads; the preflight for

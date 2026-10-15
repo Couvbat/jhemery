@@ -55,6 +55,7 @@ describe('LabController (HTTP)', () => {
     const res = await request(app.getHttpServer()).get('/lab').expect(200);
     expect(res.body).toEqual({ configured: false });
     expect(res.headers['cache-control']).toBe('public, max-age=15');
+    expect(res.headers['server-timing']).toBeUndefined();
   });
 
   it('takes a push with the token, and serves it back', async () => {
@@ -70,6 +71,10 @@ describe('LabController (HTTP)', () => {
       stale: false,
       snapshot: { machines: [{ id: 'poseidon', up: true, cpu: 8 }] },
     });
+    // The copy's age, as the caching routes give theirs.
+    expect(res.headers['server-timing']).toMatch(
+      /^cache;desc="hit", age;dur=\d+$/,
+    );
   });
 
   it.each([
