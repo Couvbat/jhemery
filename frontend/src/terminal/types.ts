@@ -112,8 +112,13 @@ export interface CommandContext {
    * accepts — and closes the overlay on success. Returns false for an unknown target.
    */
   navigate: (target: string) => boolean
-  /** Ask the user for a line of input. Rejects if they hit Ctrl+C, and throws when `tty` is false. */
-  prompt: (question: string, options?: { mask?: boolean }) => Promise<string>
+  /**
+   * Ask the user for a line of input. Rejects if they hit Ctrl+C, and throws when `tty` is false.
+   * `inline` echoes the question and the answer as one line, the way a shell's prompt and the
+   * command typed at it read (the lab shell's `jules@poseidon:~$ uptime`), rather than the
+   * question on a line of its own.
+   */
+  prompt: (question: string, options?: { mask?: boolean; inline?: boolean }) => Promise<string>
   /**
    * Routes raw keys to `handler` while the command runs — the primitive the games
    * need to hold the keyboard for longer than one line. Returns a release

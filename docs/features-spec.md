@@ -697,6 +697,7 @@ heading to an entry.
 | `ls -a` → `cat .env` | A production-looking env file whose every value is a joke. `env` (aliases `printenv`, `export`) prints the same variables from the same module, so the file and the listing cannot drift; `export FOO=bar` answers that the environment is read-only |
 | `reboot` (alias `restart`) | Replays the first-visit boot sequence (§6) via a `useBoot` flag, the same shape `matrix` uses |
 | `ssh [user@]host` | Wrong host → `Could not resolve hostname`; wrong user → `Permission denied (publickey)`; `contact@` opens the contact section, because that is what the section's own prompt claims to do; the real handle gets a paced OpenSSH handshake that ends by triggering `reboot` |
+| `ssh poseidon`, `ssh optimus` | The lab shell ([spec](superpowers/specs/2026-10-15-lab-shell-design.md)): a pretend shell on a lab machine, `jules@poseidon:~$`, a loop over `ctx.prompt()` whose small table (`terminal/lab-shell/`) answers from `GET /lab` and the spec sheet. Its banner says it is simulated; `root@` is refused; it opens with the feed off; it unlocks *Lab Rat* |
 | `whois [domain]` | An invented registration record for this domain; anything else gets `No match for …` |
 | `banner <text>` | Block letters from a 5×7 font table in `terminal/ascii-banner.ts` — no dependency, no fetch. Wraps into stacked blocks past 12 characters, breaking on a space where it can; unknown characters render as `?` rather than vanishing |
 | `spawn`, `gravity`, `constellation`, `scene` | Terminal control over the background — see §5.3 |

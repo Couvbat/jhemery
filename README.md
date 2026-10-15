@@ -6,7 +6,7 @@
 
 The personal portfolio of **Jules Hémery** (*Couvbat*): a terminal-flavoured site over a wireframe
 three.js background. It has a real shell you can type into, eight games, a page of in-browser
-tools, watch-party and radio rooms, and 38 hidden achievements. English and French throughout.
+tools, watch-party and radio rooms, and 39 hidden achievements. English and French throughout.
 
 [![Frontend checks](https://github.com/Couvbat/jhemery/actions/workflows/frontend-pr-check.yml/badge.svg?branch=dev)](https://github.com/Couvbat/jhemery/actions/workflows/frontend-pr-check.yml)
 [![Backend checks](https://github.com/Couvbat/jhemery/actions/workflows/backend-pr-check.yml/badge.svg?branch=dev)](https://github.com/Couvbat/jhemery/actions/workflows/backend-pr-check.yml)
@@ -62,7 +62,7 @@ tools, watch-party and radio rooms, and 38 hidden achievements. English and Fren
   never uploaded.
 - 📺 **Watch party and radio rooms.** A YouTube video, or a radio queue that mixes SoundCloud
   tracks and YouTube videos, stays in sync across everyone in a five-character room, over SSE.
-- 🏆 **38 achievements** for finding the hidden layer, each announced with a burst of monospace
+- 🏆 **39 achievements** for finding the hidden layer, each announced with a burst of monospace
   confetti — and a capture-the-flag chain, eight stages deep, for whoever keeps pulling threads.
 - 🌐 **Live data** from Steam, GitHub, CI runs, the weather and crypto prices, plus live presence,
   a guestbook and a self-hosted LLM behind `ask`. Every integration degrades gracefully when it's
@@ -362,6 +362,13 @@ the name of one you saved, the command wins and `alias` marks yours as shadowed.
 Two files never appear in a plain `ls`: `.secret`, and a `.env` full of credentials that are as
 fake as they look. `ls -a` lists both, and `cat` and `vim` can read them.
 
+`ssh poseidon` and `ssh optimus` open a pretend shell on the lab's machines, `jules@poseidon:~$`,
+in which every number is real: `uptime`, `free -h`, `zpool status`/`list`, `nvidia-smi`,
+`ollama ps`/`list`, `docker ps`, `neofetch` and a live `glances` (`q` to quit, `r` to refresh)
+read the same snapshot `/lab` draws. Its banner says it is simulated, `ssh optimus` inside it
+hops, and `exit` or <kbd>Ctrl</kbd>+<kbd>C</kbd> leaves. With the lab's feed off it still opens,
+answering from the spec sheet.
+
 `sudo -i` asks for the admin password and unlocks the owner-only [downloader](#tools).
 
 </details>
@@ -431,15 +438,15 @@ Rooms are off unless the API sets `ROOMS_ENABLED`.
 
 ## Achievements
 
-There are 38 achievements, tracked in `localStorage` (`couvbat:achievements`, plus
+There are 39 achievements, tracked in `localStorage` (`couvbat:achievements`, plus
 `couvbat:achievements:sections` for the exploration one and `couvbat:achievements:themes` for the
 colour-scheme one). Unlocking one shows a floating toast with a burst of monospace-glyph confetti
 (only at full motion) and prints a line in the terminal. The trophy button in
-the navbar opens a modal listing all 38: locked ones show `???` and a vague hint, and unlocked
+the navbar opens a modal listing all 39: locked ones show `???` and a vague hint, and unlocked
 ones show their title and how you got them. `achievements` (`trophies`) prints the same progress
 in the terminal.
 
-The last one unlocks itself once you have the other thirty-seven. When it does, the three.js
+The last one unlocks itself once you have the other thirty-eight. When it does, the three.js
 background changes palette.
 
 <details>
@@ -475,6 +482,7 @@ background changes palette.
 | Configuration Leak | `cat .env` (or open it in `vim`) |
 | Deja Vu | Replay the boot sequence with `reboot` |
 | Knock Knock | `ssh couvbat@jhemery.xyz` |
+| Lab Rat | `ssh poseidon` (or `optimus`): a shell on one of the lab's machines |
 | Spot the Difference | `diff` two files |
 | Make It Yours | Define an `alias` |
 | Big Text Energy | `banner <text>` |

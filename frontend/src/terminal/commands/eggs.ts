@@ -15,6 +15,7 @@ import { announce, unlock } from '../achievements'
 import { COW, TRAIN } from '../ascii'
 import { bannerLines, BANNER_MAX_CHARS } from '../ascii-banner'
 import { art, blank, line, link, pre } from '../format'
+import { labHosts, labLogin, labShell } from '../lab-shell'
 import { sleep } from '../timing'
 import type { Command, CommandContext, OutputLine } from '../types'
 import { forgetGuestbookFile, resolveGuestbookFile } from './guestbook-fs'
@@ -240,13 +241,17 @@ export const eggCommands: Command[] = [
     hidden: true,
     complete: ({ index }) =>
       index === 0
-        ? [`${profile.handle}@${profile.domain}`, `contact@${profile.domain}`]
+        ? [`${profile.handle}@${profile.domain}`, `contact@${profile.domain}`, ...labHosts]
         : [],
     async run(ctx) {
       const target = ctx.args[0]
       if (!target) {
         return [line('usage: ssh [user@]hostname', 'error')]
       }
+
+      // The lab's machines answer to their own names, with a shell of their own.
+      const lab = labLogin(target)
+      if (lab) return 'refused' in lab ? lab.refused : labShell(ctx, lab.host)
 
       const [user, host] = target.includes('@') ? target.split('@') : [profile.handle, target]
       if (host !== profile.domain && host !== 'localhost') {
