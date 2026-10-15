@@ -22,6 +22,7 @@ export const UNITS: Array<{ unit: string; description: Localised }> = [
   { unit: 'ask', description: { en: 'The local model behind `ask`', fr: 'Le modèle local derrière `ask`' } },
   { unit: 'contact', description: { en: 'Mail from the contact form', fr: 'Le courrier du formulaire' } },
   { unit: 'mcp', description: { en: 'The read-only MCP endpoint', fr: 'Le point MCP en lecture seule' } },
+  { unit: 'lab', description: { en: 'The lab’s snapshot, behind /lab', fr: 'L’instantané du labo, derrière /lab' } },
 ]
 
 const REASONS: Record<NonNullable<UnitHealth['reason']>, Localised> = {
@@ -37,6 +38,7 @@ const DETAILS: Record<string, Localised> = {
   rooms: { en: '{n} rooms open', fr: '{n} salles ouvertes' },
   jobs: { en: '{n} jobs known', fr: '{n} tâches connues' },
   sessions: { en: '{n} sessions', fr: '{n} sessions' },
+  nodes: { en: '{n} nodes mapped', fr: '{n} nœuds sur la carte' },
 }
 
 /** `42s`, `3 min`, `2h 05`: a cache age or an uptime, at a glance. */

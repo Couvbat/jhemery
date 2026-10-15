@@ -296,6 +296,58 @@ export interface JobsInfo {
   jobs: DownloadJob[]
 }
 
+/** A pool's health word, as ZFS says it; absent when only its fill is known. */
+export type PoolHealth = 'ONLINE' | 'DEGRADED' | 'FAULTED' | 'OFFLINE' | 'UNAVAIL'
+
+/**
+ * One machine in the lab's snapshot. The shape is `backend/src/lab/lab.types.ts`, and
+ * what it may hold is the lab map spec's: coarse figures, never an address or a version.
+ */
+export interface LabMachine {
+  id: string
+  up: boolean
+  uptimeSeconds?: number
+  /** Percent, 0–100. */
+  cpu?: number
+  memory?: number
+  load?: number
+  tempC?: { cpu?: number; gpu?: number }
+  pools?: { name: string; health?: PoolHealth; used: number }[]
+  gpu?: { util: number; vramUsedMb: number; vramTotalMb: number; powerW?: number }
+  containers?: number
+}
+
+export interface LabServiceSample {
+  id: string
+  status: 'up' | 'down' | 'maintenance'
+  latencyMs?: number
+}
+
+export interface LabSnapshot {
+  takenAt: string
+  machines: LabMachine[]
+  services: LabServiceSample[]
+  models?: {
+    runtime: 'up' | 'down'
+    resident: { name: string; vramMb: number }[]
+    installed: { name: string; sizeGb: number }[]
+  }
+  tunnel?: { healthy: boolean; connections: number }
+}
+
+/** `GET /lab`: the copy the API holds of the lab's last push. It never calls the lab. */
+export type LabReport =
+  | { configured: false }
+  | {
+      configured: true
+      receivedAt: string | null
+      ageMs: number | null
+      stale: boolean
+      snapshot: LabSnapshot | null
+      /** Per node, 30 UTC days oldest first: the fraction up, or null for no data. */
+      history: Record<string, (number | null)[]>
+    }
+
 /** `POST /presence/wall` on a deployment that hasn't opted in. */
 export interface WallOff {
   configured: false
@@ -592,6 +644,7 @@ export const api = {
       body: JSON.stringify({ day, locale, guesses }),
     }),
   health: () => request<HealthReport>('/health'),
+  lab: (options?: RequestOptions) => request<LabReport>('/lab', undefined, options),
   /**
    * `wall`'s wave. Enabled, a bare 204 (`undefined` here), whatever became of it. The
    * empty JSON body is the point: the server takes nothing else, so the browser's CORS

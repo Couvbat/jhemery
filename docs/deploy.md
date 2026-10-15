@@ -377,6 +377,49 @@ see this IP, which is why it is held to a global budget of 30 lookups a minute a
 with misses remembered for 10 minutes ([room-titles.ts](../backend/src/rooms/room-titles.ts)).
 If either site starts refusing the server, rooms keep working and the queue shows bare IDs.
 
+## The lab map: the agent and the API
+
+`/lab` draws the homelab from content and colours it from `GET /lab`, which serves whatever the lab
+last pushed. Push, never pull: the API never calls the lab, so nothing here opens a path into the
+home network. Two halves to turn on.
+
+**The API.** In the server's `.env`: `LAB_ENABLED=true`, `LAB_INGEST_TOKEN` (32 characters or
+more; `openssl rand -hex 32`), and `LAB_NODES`, the ids the map draws (`backend/.env.example` lists
+them). Restart the app. `systemctl status lab` in the site's terminal then reads *active* with
+*nothing cached yet* until the first push.
+
+**The agent.** `lab-agent/` is plain ES modules for Node 22 with no dependencies, so nothing is
+installed or built. On the NAS that will run it:
+
+1. Check the repo out on a dataset (`git clone`, then `git pull` to update).
+2. Create a TrueNAS custom app from `lab-agent/compose.example.yaml`: the official `node:22-alpine`
+   image with the `lab-agent` folder mounted read-only, `node /app/agent.mjs` as the command, no
+   port, a non-root user.
+3. Fill in its environment there, never in the repo, since it holds the lab's internal addresses:
+   `LAB_API_URL`, `LAB_INGEST_TOKEN` (the API's value), Glances per machine (`LAB_GLANCES`,
+   `id=url` pairs), each GPU's memory (`LAB_GPU_VRAM_MB`, since Glances reports VRAM as a
+   percentage), TrueNAS per machine (`LAB_TRUENAS` with `wss://` for the JSON-RPC API or `https://`
+   for REST, and `LAB_TRUENAS_KEYS`), Uptime Kuma's `/metrics` (`LAB_KUMA_URL`, `LAB_KUMA_KEY`)
+   and **`LAB_KUMA_MONITORS`, which decides what may be shown**: a Kuma monitor not listed there
+   is never sent, which is how a critical service Kuma watches stays off the map. Then
+   `LAB_OLLAMA_URL` and `LAB_CLOUDFLARED_URL` (cloudflared's metrics server, `--metrics
+   0.0.0.0:20241`).
+4. Start it. Its log has one line per push: `pushed: 10 accepted, 0 dropped`, a dropped id being a
+   typo in `LAB_NODES` or `LAB_KUMA_MONITORS`, or `push refused: 400 — property … should not
+   exist`, which is the API refusing something the schema doesn't list. `node agent.mjs --once`
+   pushes a single snapshot and exits, for trying a change.
+
+**The Cloudflare rule.** The token is the control; a WAF rule is the second lock, so a leaked token
+is not enough on its own. In the zone's *Security → WAF → Custom rules*: *if* the hostname is the
+API's *and* the URI path is `/lab/snapshot` *and* the IP source address is **not** the home
+network's address, *then* Block. With a dynamic home address, keep it in a Cloudflare IP list that
+something at home updates, as the model's own rule already needs.
+
+**When the map goes grey.** *Stale* after five minutes without a push: the agent's log says why
+(`push failed: …` is the API unreachable from home; a 403 is a token that differs between the two
+`.env`s; a 429 is two agents pushing). A day with no push at all is drawn grey on the 30-day bars,
+never red, since the API cannot tell a sleeping lab from a broken push.
+
 ## What the shell can run — facts for the downloader
 
 Measured on the o2switch shell (`cronos`) on 22 September 2026, for the admin-only yt-dlp

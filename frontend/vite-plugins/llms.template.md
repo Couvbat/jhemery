@@ -32,6 +32,14 @@ Parts of the site, each with what was hard, its numbers, the code and the design
 
 {{work}}
 
+## The lab
+
+The homelab behind the site and its model, drawn live at [The lab](https://jhemery.xyz/lab): the
+machines and every service that isn't critical, in the order a request meets them, coloured by a
+snapshot the lab pushes to the API once a minute. No addresses, ports or versions are published.
+
+{{lab}}
+
 ## Other
 
 - [LinkedIn](https://www.linkedin.com/in/jules-h%C3%A9mery-338134195/)

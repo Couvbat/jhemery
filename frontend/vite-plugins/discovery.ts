@@ -3,6 +3,7 @@ import { fileURLToPath, URL } from 'node:url'
 import type { Plugin } from 'vite'
 import { pages } from '../src/content/pages'
 import { pageUrl, SITE } from '../src/content/site'
+import { labNodes } from '../src/content/lab'
 import { toolInfo } from '../src/content/tools'
 import type { Locale } from '../src/content/types'
 import { work } from '../src/content/work'
@@ -14,8 +15,8 @@ import { resumeHtmlFile } from './resume'
  * `sitemap.xml` and `llms.txt`, generated from the content they list. Both were
  * hand-written in `public/`, and each new tool, case study or note had to be added to them
  * by hand, with `discovery.spec.ts` failing until it was. Now the lists come from the same
- * modules the app reads: the pages (`content/pages.ts`), the tools, the case studies and
- * the notes.
+ * modules the app reads: the pages (`content/pages.ts`), the tools, the case studies, the
+ * notes and the lab's nodes.
  *
  * `llms.txt` keeps its prose in `llms.template.md`, word for word, including stage 7 of
  * the CTF chain, and only its lists are filled in. `ask` reads the result as its corpus,
@@ -78,6 +79,8 @@ function lists(list: Note[]): Record<string, string> {
     notes: list
       .map((note) => `- [${note.name}](${SITE}/notes/${note.slug})${note.lang === 'fr' ? ' (in French)' : ''}`)
       .join('\n'),
+    // One line per node, so `ask` can answer "what runs this site" from its corpus.
+    lab: labNodes.map((node) => `- ${node.name} — ${node.role.en}`).join('\n'),
   }
 }
 

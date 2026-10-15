@@ -145,6 +145,7 @@ export class ApiStub {
     )
     this.get('/weather', configured ? payloads.weatherConfigured : payloads.unconfigured)
     this.get('/markets', configured ? payloads.marketsConfigured : payloads.unconfigured)
+    this.get('/lab', configured ? payloads.labConfigured : payloads.unconfigured)
     this.get(
       '/guestbook',
       configured ? payloads.guestbookConfigured : payloads.guestbookDisabled,

@@ -56,6 +56,8 @@ onMounted(startPresence)
 
       <RouterLink to="/now" class="ml-auto hover:text-primary transition-colors">/now</RouterLink>
 
+      <RouterLink to="/lab" class="hover:text-primary transition-colors">/lab</RouterLink>
+
       <RouterLink to="/privacy" class="hover:text-primary transition-colors">/privacy</RouterLink>
 
       <RouterLink to="/legal" class="hover:text-primary transition-colors">/legal</RouterLink>

@@ -110,7 +110,7 @@ describe('searchIndex', () => {
 
     // Level on `site`, and /now comes first in the index: the groups keep their own order.
     expect(searchIndex(index, 'site', 'en').map((group) => group.kind)).toEqual(['work', 'now'])
-    expect(searchKinds).toEqual(['work', 'why', 'note', 'now'])
+    expect(searchKinds).toEqual(['work', 'why', 'note', 'now', 'lab'])
   })
 
   it('searches the page’s language, and a note in its own', () => {

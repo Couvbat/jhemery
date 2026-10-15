@@ -1380,6 +1380,26 @@ Streamable HTTP: `initialize`, `ping`, `tools/*`, `resources/*`, 202 for notific
 minutes with a stale fallback, and a tool that cannot reach it reports `isError` rather than a
 protocol error. Nothing asked is logged.
 
+### `lab` — `GET /lab`, `POST /lab/snapshot`
+
+The lab map's backend, off unless `LAB_ENABLED` with a `LAB_INGEST_TOKEN` of 32 characters or
+more ([spec](superpowers/specs/2026-10-15-lab-map-design.md)). Rules the code cites:
+
+- **Push, never pull.** The API never calls into the home network. The lab agent (`lab-agent/`, one
+  container on a NAS) pushes a snapshot once a minute; visitors read the copy held in memory and
+  in `DATA_DIR/lab.json`.
+- **A closed schema.** The push's own pipe refuses unknown properties with a 400 that names them,
+  bounds every number, caps every array, and refuses any string that looks like an address, a
+  `host:port`, a URL or a name in `.lan`, `.local`, `.home.arpa` or `.ts.net`. The agent checks
+  its output against the same rules before sending. Ids not in `LAB_NODES` are dropped and named.
+- **The token is the control.** A bearer compared in constant time, checked by a guard before the
+  body is read; unset or short means locked. A Cloudflare rule admitting the push only from home
+  is defence in depth (`deploy.md`).
+- **History that doesn't claim an outage it didn't see.** Thirty UTC days per node of up out of
+  seen; a day with no snapshot is `null`, drawn grey. Stale after five minutes without a push.
+- `GET /lab` is 60/min per IP with `Cache-Control: public, max-age=15`; the push is 6/min.
+  `health()` reports the snapshot's age as `cacheAge` and the node count.
+
 ### `jobs` — the downloader, `/jobs`, `/jobs/:id`, `/jobs/:id/file`
 
 The admin tier of the tools page (§11). Rules the code cites:

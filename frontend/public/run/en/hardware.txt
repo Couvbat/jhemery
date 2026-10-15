@@ -42,5 +42,6 @@
 [2mRAM          →  16 GB DDR3 1866 MHz (2×8 GB)[0m
 [2mSSD          →  Crucial M500 480 GB[0m
 
+[2mlive: /lab[0m
 
 [2mcurl jhemery.xyz/help for the other pages · live in a browser: https://jhemery.xyz/?run=hardware[0m
