@@ -542,6 +542,28 @@ any key and claims none), or the swing. CSS alone (`attr(data-src)` in a `::befo
 rejected and still is: it would collide with components' own pseudo-elements, and a
 pseudo-element can't carry a link.
 
+**The data layer** ([spec](superpowers/specs/2026-10-15-xray-data-layer-design.md)). A component
+that renders API data names its routes on its root, `data-api="/steam/activity"`: a literal
+attribute, not a stamp, since the component knows which `api.*` call feeds it and the compiler
+doesn't. `src/__tests__/xray-api.spec.ts` reads the source and holds every `.vue` that imports the
+client or a fetching composable to carrying one, naming only routes the client calls. The tag gets
+one more line per route, `GET /steam/activity · 84 ms · 1.2 kB · server copy 3 min old`
+(`lib/xray-data.ts`), from Resource Timing, which the layer reads with a `PerformanceObserver`
+started `buffered`: `request()` keeps its fast path, since the requests happened before x-ray
+turned on. Across origins the browser hides sizes and `Server-Timing` unless the response says
+`Timing-Allow-Origin`, which the API sets to the origins CORS admits; the caching routes add
+`Server-Timing` from their own cache age (`common/server-timing.ts`). `main.ts` empties the
+250-entry buffer when it fills, since the ticker's poll alone fills it on a long visit and a poll
+puts its route back within one interval. The presence stream has no finished entry while open, so
+its line reads `stream · open` from `usePresence`. **The path** (`xray path`, or the chip's *path*
+button) is a labelled region in the top-right corner with an ordered list of hops
+(`lib/xray-path.ts`), fetched when it opens and not before: you → Cloudflare from
+`/cdn-cgi/trace` (same origin, through `fetchSite()` so `strace` sees it), the static host, the
+API with its newest round trip and `/health`'s uptime, the model while `ask` is active, and the
+lab's push with its age; the facts are `content/lab.ts`'s, so the panel and `/lab` can't tell two
+stories. `parseTrace()` keeps `colo`, `http` and `tls`, each only in its expected shape, and drops
+every other line, the visitor's address and country among them, before anything stores it.
+
 ### live
 | Command | Endpoint | Fallback |
 |---|---|---|

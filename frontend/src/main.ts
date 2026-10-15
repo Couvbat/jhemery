@@ -16,6 +16,13 @@ import { restoreMotion } from './composables/useMotion'
 restoreTheme()
 restoreMotion()
 
+// X-ray reads the newest request per route from Resource Timing, and the browser keeps
+// 250 entries before it starts dropping new ones: the ticker's poll alone fills that on a
+// long visit. Emptied when full, since a poll puts its route back within one interval.
+if ('addEventListener' in performance) {
+  performance.addEventListener('resourcetimingbufferfull', () => performance.clearResourceTimings())
+}
+
 const app = createApp(App)
 
 app.use(router)

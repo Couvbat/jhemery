@@ -70,6 +70,10 @@ export const privacyCopy = {
     en: 'Weather, prices, Steam and GitHub are fetched by the server, with its own keys and my coordinates: nothing about you goes to them.',
     fr: 'Météo, cours, Steam et GitHub sont interrogés par le serveur, avec ses propres clés et mes coordonnées : rien sur vous ne leur parvient.',
   },
+  xray: {
+    en: '`xray` reads how long this page’s own requests took from your browser’s timing records, and `xray path` asks Cloudflare’s `/cdn-cgi/trace` which data centre answered you. That reply carries your address and country too; both are dropped before anything is kept or shown, and nothing from either is sent anywhere.',
+    fr: '`xray` lit la durée des requêtes de cette page dans les mesures de votre navigateur, et `xray path` demande à `/cdn-cgi/trace` de Cloudflare quel centre de données vous a répondu. Cette réponse contient aussi votre adresse et votre pays ; les deux sont écartés avant que quoi que ce soit soit gardé ou affiché, et rien n’en est envoyé nulle part.',
+  },
   strace: {
     en: 'None of this needs taking on trust. `strace <command>` runs a command and lists every request it made, with the keys of what was sent and never the values. If a claim here doesn’t hold, /security says how to tell me.',
     fr: 'Rien de tout cela n’est à croire sur parole. `strace <commande>` lance une commande et liste chaque requête qu’elle a faite, avec les clés de ce qui est parti et jamais les valeurs. Si une affirmation ne tient pas, /security dit comment me le signaler.',

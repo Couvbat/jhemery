@@ -31,7 +31,7 @@ const displayGames = computed(() => {
 </script>
 
 <template>
-  <section id="gaming" class="py-20 pt-24">
+  <section id="gaming" class="py-20 pt-24" data-api="/steam/activity">
     <div class="max-w-5xl mx-auto px-4">
       <SectionHeader section="gaming" tone="purple" />
 

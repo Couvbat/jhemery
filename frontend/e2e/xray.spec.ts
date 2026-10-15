@@ -72,7 +72,8 @@ test('`?run=xray` tags the hero with its file, linked at the build’s commit', 
   await expect(layer.getByRole('status')).toHaveText(announced(onPhone()))
 
   // The canvas loads on idle, after the first measure: the layer notices it arrive.
-  await expect(tagOf(layer, 'ThreeBackground.vue')).toContainText(/ · \d+ shapes$/, { timeout: 15_000 })
+  // Its data lines follow the count, one per route it names.
+  await expect(tagOf(layer, 'ThreeBackground.vue')).toContainText(/ · \d+ shapes\b/, { timeout: 15_000 })
 
   await page.keyboard.press('Escape')
   await expect(layer).toHaveCount(0)
@@ -107,7 +108,7 @@ for (const locale of ['en', 'fr'] as const) {
     await page.goto('/?run=xray')
     const layer = page.getByTestId('xray-layer')
     // Waited for: the canvas loads on idle, and its tag, the widest, starts in the chip's corner.
-    await expect(tagOf(layer, 'ThreeBackground.vue')).toContainText(/ · \d+ \S+$/, { timeout: 15_000 })
+    await expect(tagOf(layer, 'ThreeBackground.vue')).toContainText(/ · \d+ (?:shapes|formes)\b/, { timeout: 15_000 })
 
     const exit = layer.getByRole('button', { name: messages.xray.exitLabel[locale] })
     const target = (await exit.boundingBox())!
@@ -243,4 +244,31 @@ test('a focused tag keeps focus when its component scrolls away', async ({ page 
   // Once focus moves on, the tag goes with the component it named.
   await page.locator('footer a').first().focus()
   await expect(hero).toHaveCount(0)
+})
+
+// The data layer (`docs/superpowers/specs/2026-10-15-xray-data-layer-design.md`): what
+// only a browser records. Resource Timing lists the stubbed call, and the layer reads it.
+test('a live section’s tag says which route fed it and how long that took', async ({ page }) => {
+  await page.goto('/?run=xray')
+  const layer = page.getByTestId('xray-layer')
+  await expect(tagOf(layer, 'HeroSection.vue')).toBeVisible({ timeout: 15_000 })
+  await page.locator('#gaming').scrollIntoViewIfNeeded()
+  await expect(tagOf(layer, 'GamingSection.vue').getByTestId('xray-data')).toHaveText(/^GET \/steam\/activity · \d+ ms\b/, {
+    timeout: 15_000,
+  })
+})
+
+test('`?run=xray path` opens this visit’s path, with no address anywhere in it', async ({ page, pageErrors }) => {
+  await page.goto('/?run=xray%20path')
+  const panel = page.getByTestId('xray-path')
+  // The preview server has no Cloudflare in front: the trace is the SPA's fallback page.
+  await expect(panel.locator('[data-hop="visitor"]')).toContainText('not behind Cloudflare here', { timeout: 15_000 })
+  await expect(panel.locator('[data-hop="api"]')).toContainText('up 3 days')
+  await expect(panel.locator('[data-hop="lab"]')).toContainText('last push')
+  // `ask` is off in the fixture's health, so the model's hop isn't drawn.
+  await expect(panel.locator('[data-hop="model"]')).toHaveCount(0)
+  expect(await panel.innerText()).not.toMatch(/\b\d{1,3}(?:\.\d{1,3}){3}\b|\b[0-9a-f]{1,4}(?::[0-9a-f]{0,4}){3,}\b/i)
+  // Opened, not focused, as the tags aren't.
+  await expect(panel.locator(':focus')).toHaveCount(0)
+  expect(pageErrors).toEqual([])
 })

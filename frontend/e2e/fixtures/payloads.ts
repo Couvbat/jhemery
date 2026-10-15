@@ -4,6 +4,7 @@ import type {
   GithubPinnedRepos,
   GithubWorkflowStatus,
   GuestbookList,
+  HealthReport,
   LabReport,
   MarketsReport,
   StatsReport,
@@ -209,6 +210,12 @@ export const labConfigured: LabReport = {
  * their own flags (`enabled`, and a 503) because they are off by default rather than
  * merely unconfigured.
  */
+/** `GET /health`, which answers configured or not: up three days, `ask` off. */
+export const healthReport: HealthReport = {
+  uptime: 3 * 86_400,
+  units: [{ unit: 'ask', state: 'inactive', reason: 'unconfigured' }],
+}
+
 export const unconfigured = { configured: false } as const
 
 export const guestbookDisabled: GuestbookList = { enabled: false }

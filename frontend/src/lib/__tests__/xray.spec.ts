@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it } from 'vitest'
 import {
+  API_ATTR,
   collectTargets,
   GAP,
   groupTargets,
@@ -46,6 +47,7 @@ describe('what gets outlined', () => {
     element({ class: 'unstamped' }, { x: 0, y: 0, w: 50, h: 50 }, home)
 
     const targets = collectTargets(document, VIEWPORT)
+    expect(targets.every((target) => target.apis.length === 0)).toBe(true)
     expect(targets.map((target) => target.files)).toEqual([
       [HOME],
       [HERO],
@@ -76,6 +78,11 @@ describe('what gets outlined', () => {
     expect(collectTargets(document, VIEWPORT).map((target) => target.rect)).toEqual([{ x: 120, y: 140, w: 80, h: 20 }])
   })
 
+  it('reads the routes a live component names on its root', () => {
+    element({ [SRC_ATTR]: 'frontend/src/components/sections/ProjectsSection.vue', [API_ATTR]: '/github/activity  /github/pinned-repos' }, { x: 0, y: 0, w: 1000, h: 800 })
+    expect(collectTargets(document, VIEWPORT)[0]!.apis).toEqual(['/github/activity', '/github/pinned-repos'])
+  })
+
   it('tags a fixed layer over the whole screen without outlining it', () => {
     element({ [SRC_ATTR]: 'frontend/src/components/ThreeBackground.vue' }, { x: 0, y: 0, w: 1000, h: 800 }, document.body, 'position: fixed')
     element({ [SRC_ATTR]: HERO }, { x: 0, y: 0, w: 1000, h: 800 })
@@ -90,7 +97,7 @@ describe('what gets outlined', () => {
 
 describe('one tag per file', () => {
   const at = (x: number, y: number): Rect => ({ x, y, w: 40, h: 10 })
-  const target = (files: string[], rect: Rect): Target => ({ files, rect, backdrop: false })
+  const target = (files: string[], rect: Rect, apis: string[] = []): Target => ({ files, rect, backdrop: false, apis })
 
   it('outlines every instance and tags the first, with how many there are', () => {
     const dots = 'frontend/src/components/WindowDots.vue'
@@ -100,6 +107,15 @@ describe('one tag per file', () => {
       { files: [HERO], count: 1, anchor: at(0, 0) },
       { files: [dots], count: 2, anchor: at(10, 20) },
     ])
+  })
+
+  it('gathers the routes every instance names, once each', () => {
+    const card = 'frontend/src/components/BuildStatusCard.vue'
+    const { tags } = groupTargets([
+      target([card], at(0, 0), ['/github/workflow-status']),
+      target([card], at(0, 40), ['/github/workflow-status', '/github/activity']),
+    ])
+    expect(tags[0]!.apis).toEqual(['/github/workflow-status', '/github/activity'])
   })
 
   it('reads as the layer draws it', () => {

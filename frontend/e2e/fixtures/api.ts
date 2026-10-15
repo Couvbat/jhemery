@@ -146,6 +146,8 @@ export class ApiStub {
     this.get('/weather', configured ? payloads.weatherConfigured : payloads.unconfigured)
     this.get('/markets', configured ? payloads.marketsConfigured : payloads.unconfigured)
     this.get('/lab', configured ? payloads.labConfigured : payloads.unconfigured)
+    // Not gated either: `/health` answers with or without keys, listing what is off.
+    this.get('/health', payloads.healthReport)
     this.get(
       '/guestbook',
       configured ? payloads.guestbookConfigured : payloads.guestbookDisabled,

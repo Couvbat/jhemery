@@ -930,7 +930,12 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <canvas ref="canvasRef" class="fixed inset-0 -z-10 pointer-events-none" aria-hidden="true"></canvas>
+  <canvas
+    ref="canvasRef"
+    class="fixed inset-0 -z-10 pointer-events-none"
+    aria-hidden="true"
+    data-api="/presence /weather /guestbook"
+  ></canvas>
 
   <Transition
     enter-active-class="transition duration-150 ease-out"
