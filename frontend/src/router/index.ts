@@ -48,6 +48,13 @@ const router = createRouter({
       component: () => import('../views/NowView.vue'),
     },
     {
+      // The homelab behind the site as a live map (content/lab.ts, coloured by GET /lab).
+      // Outside the prism like /now, and linked from the footer beside it.
+      path: '/lab',
+      name: 'lab',
+      component: () => import('../views/LabView.vue'),
+    },
+    {
       // What the site keeps in the visitor's browser, and what it sends. Outside the prism
       // like /now, and linked from the footer, so a phone, which has no `du`, gets it too.
       path: '/privacy',

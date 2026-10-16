@@ -1,6 +1,7 @@
-import { OUTER_ATTR, SRC_ATTR, type XrayMap } from './xray-stamp'
+import { apiRoutes } from './xray-data'
+import { API_ATTR, OUTER_ATTR, SRC_ATTR, type XrayMap } from './xray-stamp'
 
-export { OUTER_ATTR, SRC_ATTR, type XrayMap }
+export { API_ATTR, OUTER_ATTR, SRC_ATTR, type XrayMap }
 
 /**
  * X-ray mode's page side (roadmap §I, *X-ray mode*): which elements get outlined, what
@@ -29,6 +30,8 @@ export interface Target {
   rect: Rect
   /** Fixed and covering the screen, as the canvas is: tagged in a corner, not outlined. */
   backdrop: boolean
+  /** The API routes its `data-api` names, for the tag's data lines. */
+  apis: string[]
 }
 
 export interface Tag {
@@ -40,6 +43,8 @@ export interface Tag {
   /** The first of them, in document order. */
   anchor: Rect
   backdrop: boolean
+  /** Every route any of them names, once each. */
+  apis: string[]
 }
 
 /** Smaller than this is a visually hidden node (`sr-only`), not something to outline. */
@@ -127,6 +132,7 @@ export function collectTargets(root: ParentNode, viewport: Viewport, skip?: Elem
       files: filesOf(el),
       rect,
       backdrop: covers(rect, viewport) && getComputedStyle(el).position === 'fixed',
+      apis: apiRoutes(el.getAttribute(API_ATTR)),
     })
   }
   return targets
@@ -140,8 +146,12 @@ export function groupTargets(targets: Target[]): { boxes: Rect[]; tags: Tag[] } 
     if (!target.backdrop) boxes.push(target.rect)
     const key = target.files.join(' ')
     const seen = tags.get(key)
-    if (seen) seen.count++
-    else tags.set(key, { key, files: target.files, count: 1, anchor: target.rect, backdrop: target.backdrop })
+    if (seen) {
+      seen.count++
+      seen.apis = [...new Set([...seen.apis, ...target.apis])]
+    } else {
+      tags.set(key, { key, files: target.files, count: 1, anchor: target.rect, backdrop: target.backdrop, apis: target.apis })
+    }
   }
   return { boxes, tags: [...tags.values()] }
 }

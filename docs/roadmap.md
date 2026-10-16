@@ -2,10 +2,10 @@
 
 Status tracker for the feature brainstorm: first three categories (three.js background, terminal
 commands, live information), then games vol. 2 (§E), views and tools (§F), the September 2026
-batch (§G), the late-September brainstorm (§H), the October brainstorm (§I) and the mid-October
-one (§J). Built feature by feature, across sessions.
+batch (§G), the late-September brainstorm (§H), the October brainstorm (§I), the mid-October
+one (§J) and the lab batch (§K). Built feature by feature, across sessions.
 
-**Current state: §A–§I are shipped, and so is §J.** Anything else still open is
+**Current state: §A–§I are shipped, and so is §J. §K is specced and not started.** Anything else still open is
 under [Open](#open) and [Known issues](#known-issues).
 
 **How to use:** tick a box when the feature ships, and append the PR number. Design detail for
@@ -993,6 +993,40 @@ brainstorm's pitch rather than from the rows.
   - Making a save holds to the limits a restore applies, a link made while the choice
     changed is thrown away, and a restore the storage refuses says so instead of reloading.
 
+## K. The lab, October 2026 brainstorm
+
+Chosen direction: features that show work beyond the site itself — the homelab, local AI, music —
+for an audience of peers and the self-hosting crowd, with a simple surface and depth for whoever
+looks. Seven features, each with its own spec, written before any of it is built. Three of them
+read one snapshot the lab pushes to the API, so the lab map goes first.
+
+| ✔ | Feature | Approach | Files | Effort |
+|---|---|---|---|---|
+| [x] | Lab map | [Spec](superpowers/specs/2026-10-15-lab-map-design.md). A `/lab` page drawing the homelab as HTML cards in request-path tiers with an SVG of wires behind them, topology from a new `content/lab.ts`, coloured by a snapshot that a small zero-dependency agent in the repo (`lab-agent/`, one container on a NAS) pushes to a new, off-by-default `lab` module (`POST /lab/snapshot` with a bearer token, `GET /lab` for visitors). Push, never pull: no visitor request reaches home. A closed schema refuses addresses, ports and versions. Plus a visible `lab` command. | `backend/src/lab/` (new), `lab-agent/` (new), the backend PR check, `content/lab.ts` (new), `views/LabView.vue` (new), `lib/lab.ts` (new), `lib/api.ts`, `router/index.ts`, `content/pages.ts`, `vite-plugins/discovery.ts`, `llms.template.md`, `SiteFooter.vue`, `terminal/commands/`, `systemctl.ts`, `deploy.md` | L |
+| [x] | Lab shell | [Spec](superpowers/specs/2026-10-15-lab-shell-design.md). `ssh poseidon` and `ssh optimus` open a simulated shell, labelled as one, whose `uptime`, `zpool status`, `nvidia-smi`, `ollama ps` and `glances` print the real snapshot. Opens with the feed off too, from `hardware.ts`, so its achievement (`labRat`) never waits on the lab. | `terminal/commands/eggs.ts`, `terminal/lab-shell/` (new), `terminal/achievements.ts`, README | M |
+| [x] | Ask my lab | [Spec](superpowers/specs/2026-10-15-ask-my-lab-design.md). `ask` answers from everything the site already says (lexical retrieval over a new build artifact, `/corpus.json`, with the pages it drew from printed as links, revisiting the `ask-no-rag` decision), gets a `LAB NOW` block from the snapshot, a meta event (model, tokens per second, machine), a closed set of failure reasons surfaced in `systemctl status ask` and the degraded copy (429 told apart from asleep), and an *Ask the lab* form on `/lab` that phones can use. | `backend/src/ask/`, `common/health.ts`, `common/rate-limit.guard.ts`, `terminal/commands/ask.ts`, `lib/api.ts`, `lib/ask-session.ts` (new), `views/LabView.vue`, `systemctl.ts`, `deploy.md` | M |
+| [x] | Guestbook moderation | [Spec](superpowers/specs/2026-10-15-guestbook-moderation-design.md). Off by default. Entries wait as `pending` for the local model's verdict; only an explicit `hold` holds, and anything without a verdict publishes after 30 minutes, so the guestbook is never less available than today. Optional model replies, labelled. The model slot moves to `common/llm.ts`, shared with `ask`. | `backend/src/guestbook/`, `backend/src/common/llm.ts` (new), `backend/src/ask/ask.service.ts`, `backend/scripts/eval-moderation.ts` (new), `terminal/commands/live.ts`, `terminal/commands/eggs.ts`, `content/legal.ts`, `content/privacy.ts` | M |
+| [x] | Stems, vol. 2 | [Spec](superpowers/specs/2026-10-15-stems-vol2-design.md). A prep script from DAW exports to a published track (cut, encode, check bars and size, peaks, print the entry), waveform lanes from a 4 kB peaks file shown before any audio loads, seeking that keeps the stems locked, liner notes (BPM, key, plugin chains), and a `stems` command. | `scripts/stems.mjs` (new), `scripts/stems-lib.mjs` (new), `content/stems.ts`, `components/stems/`, `terminal/commands/content.ts` | M |
+| [x] | Music-reactive field | [Spec](superpowers/specs/2026-10-15-music-reactive-field-design.md). The three.js background follows whatever music the visitor plays: `acid` and the stems mixer through an analyser and their own exact beat clocks, SoundCloud through a hand-written bridge to the widget's play state and position plus tempos entered by hand in `content/music.ts`. Beats move geometry, never light (no flashing at 150–200 BPM); *calm* follows the level only; `scene music off`. Revisits *beat-synced wireframes* from *Dropped*. | `lib/music-signal.ts` (new), `components/music-react.ts` (new), `components/music/soundcloud-bridge.ts` (new), `components/ThreeBackground.vue`, `tools/acid/`, `components/stems/`, `content/music.ts`, `composables/useMusicPlayer.ts`, `useSceneControl.ts` | M |
+| [x] | X-ray data layer | [Spec](superpowers/specs/2026-10-15-xray-data-layer-design.md). Components that render API data carry `data-api`, held to it by a source scan; the layer reads Resource Timing (the API adds `Timing-Allow-Origin` and `Server-Timing` with its cache age) to tag each with its route, time and freshness; `xray path` shows this visit's hops from `/cdn-cgi/trace`, keeping only the colo, HTTP and TLS versions. | `lib/xray-stamp.ts`, `lib/xray-data.ts` (new), `components/XrayLayer.vue`, the live components, `main.ts` (both apps), `backend/src/common/`, the caching controllers | M |
+
+**Before the first branch:** the specs are build input, published at `/notes/<slug>`, and
+`content/__tests__/notes.spec.ts` counts the notes: 20 with these seven (it was 13; the counts in
+the comments of `vite-plugins/notes.ts` and `vite-plugins/markdown.ts` follow). Commit the specs,
+this section and that count together, on their own docs branch into `dev`.
+
+**Order:** the lab map; then the lab shell and the x-ray data layer, in either order; ask my lab
+(its parts 2 and 4, the site's passages and the failure reasons, don't need the map and can go
+first; part 4 is the one that would have named the 15 October outage); guestbook moderation after it, since both touch `ask.service.ts`; stems
+vol. 2 whenever a first track is ready, since it is mostly content; the music-reactive field at
+any point, since it needs no backend and `acid` and SoundCloud already exist.
+
+**Settled with the owner, 15 October:** Azazel is retired and off the map; every service that
+isn't critical is on it (the lab map spec lists which are and which aren't); the installed models
+are public. **Still open:** which machine runs each service, Nextcloud (off in the draft), and the
+stems' licence line. Stems vol. 2 waits on the owner extracting a first track's stems; its code
+can ship before them, since the mixer stays hidden while the list is empty.
+
 ## Build order
 
 **Phase 1 — quick wins, no backend (S):** ✅ shipped on `feat/phase-1` → `dev`.
@@ -1101,7 +1135,8 @@ multiplayer feature is usually played alone, and §G already called the playgrou
   `acid`'s engine.
 - **Beat-synced wireframes** and **an ambient drone** — both need a "SoundCloud is playing" signal
   the music section doesn't have (`useMusicPlayer` is only a remount nonce), plus per-track tempo
-  entered by hand.
+  entered by hand. Revisited in [§K](#k-the-lab-october-2026-brainstorm): the wireframes came back
+  as the music-reactive field, with a signal from each source; the drone stays dropped.
 - **SoundCloud's latest uploads over RSS** — uncertain the feed exists for a non-podcast account,
   and deploy.md records SoundCloud blocking the host's IP once.
 - **Owner broadcast** (`wall` from the admin) — rarely anyone to broadcast to, and another held

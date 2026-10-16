@@ -9,16 +9,16 @@ import type { Locale, Localised } from './types'
  */
 
 /** What a result is, which is also how the palette groups them, in this order. */
-export type SearchKind = 'work' | 'why' | 'note' | 'now'
+export type SearchKind = 'work' | 'why' | 'note' | 'now' | 'lab'
 
-export const searchKinds: SearchKind[] = ['work', 'why', 'note', 'now']
+export const searchKinds: SearchKind[] = ['work', 'why', 'note', 'now', 'lab']
 
 /** Both languages where the source has them; one where it doesn't, with `lang` saying which. */
 export type SearchText = string | Localised
 
 export interface SearchEntry {
   kind: SearchKind
-  /** A case study's name, a decision's topic, a note's title, `/now`. */
+  /** A case study's name, a decision's topic, a note's title, `/now`, `/lab`. */
   title: SearchText
   /** Set on a note's sections: the heading the result is, inside the note `title` names. */
   heading?: string

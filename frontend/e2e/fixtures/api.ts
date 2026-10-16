@@ -145,6 +145,9 @@ export class ApiStub {
     )
     this.get('/weather', configured ? payloads.weatherConfigured : payloads.unconfigured)
     this.get('/markets', configured ? payloads.marketsConfigured : payloads.unconfigured)
+    this.get('/lab', configured ? payloads.labConfigured : payloads.unconfigured)
+    // Not gated either: `/health` answers with or without keys, listing what is off.
+    this.get('/health', payloads.healthReport)
     this.get(
       '/guestbook',
       configured ? payloads.guestbookConfigured : payloads.guestbookDisabled,
@@ -300,11 +303,13 @@ export class ApiStub {
   /**
    * `POST /ask`, as the SSE frame sequence `askStream` parses: one `data:` line per
    * delta, terminated by `[DONE]`. Pass `{ error }` for the mid-stream failure case
-   * that cannot be a status code — the one `askStream` turns back into an ApiError.
+   * that cannot be a status code — the one `askStream` turns back into an ApiError —
+   * or `{ meta }` for the event that follows a finished answer, before `[DONE]`.
    */
-  ask(deltas: string[], trailer?: { error: string }): this {
+  ask(deltas: string[], trailer?: { error: string; reason?: string } | { meta: unknown }): this {
     const frames = deltas.map((delta) => `data: ${JSON.stringify({ delta })}\n\n`)
-    frames.push(trailer ? `data: ${JSON.stringify(trailer)}\n\n` : 'data: [DONE]\n\n')
+    if (trailer && 'meta' in trailer) frames.push(`data: ${JSON.stringify(trailer)}\n\n`, 'data: [DONE]\n\n')
+    else frames.push(trailer ? `data: ${JSON.stringify(trailer)}\n\n` : 'data: [DONE]\n\n')
     this.handlers.push({
       method: 'POST',
       pattern: toPattern('/ask'),

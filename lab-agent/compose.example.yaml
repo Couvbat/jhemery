@@ -1,0 +1,37 @@
+# The lab agent as a TrueNAS custom app (Apps → Discover → Custom App → Install via YAML).
+#
+# The simplest deployment needs no registry and no build: the official Node image, with
+# this folder mounted from a dataset, updated by pulling the repo on the NAS. Copy this
+# file, fill in the environment there, and keep it out of the repo: it holds the lab's
+# internal addresses. docs/deploy.md has the rest, including the API's side.
+services:
+  lab-agent:
+    image: node:22-alpine
+    command: node /app/agent.mjs
+    user: "1000:1000"
+    restart: unless-stopped
+    read_only: true
+    volumes:
+      # Wherever the repo is checked out on the NAS.
+      - /mnt/tank/apps/jhemery/lab-agent:/app:ro
+    environment:
+      # Where to push, and the token the API expects (at least 32 characters, the same
+      # value as the API's LAB_INGEST_TOKEN).
+      LAB_API_URL: https://api.example.com
+      LAB_INGEST_TOKEN: change-me-to-at-least-32-random-characters
+      LAB_INTERVAL_S: "60"
+      # Glances' REST API per machine, as id=url pairs. The ids are the map's.
+      LAB_GLANCES: poseidon=http://glances-poseidon:61208,optimus=http://glances-optimus:61208
+      # The GPU's memory in MB per machine: Glances reports VRAM only as a percentage.
+      LAB_GPU_VRAM_MB: poseidon=10240
+      # TrueNAS per machine: ws:// or wss:// for the JSON-RPC API, http(s):// for REST.
+      LAB_TRUENAS: poseidon=wss://truenas-poseidon,optimus=wss://truenas-optimus
+      LAB_TRUENAS_KEYS: poseidon=api-key,optimus=api-key
+      # Uptime Kuma's /metrics and its API key, and which monitors the map may show:
+      # Kuma's monitor name = the map's node id. A monitor not listed is never sent.
+      LAB_KUMA_URL: http://uptime-kuma:3001
+      LAB_KUMA_KEY: uk1_api-key
+      LAB_KUMA_MONITORS: Umami=umami,n8n=n8n,Dashy=dashy,Gnome=gnome,missigno=missigno,Odysseus=odysseus,Ollama=ollama
+      LAB_OLLAMA_URL: http://ollama:11434
+      # cloudflared's metrics server (`--metrics 0.0.0.0:20241` on the tunnel).
+      LAB_CLOUDFLARED_URL: http://cloudflared:20241

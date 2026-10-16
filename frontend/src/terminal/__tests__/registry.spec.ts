@@ -326,6 +326,7 @@ describe('links (?run=)', () => {
       ['ls', ['about']],
       ['skills', ['--why']],
       ['tools', ['qr']],
+      ['lab', ['--json']],
     ] as const) {
       expect(isLinkable(resolve(name)!, args), `${name} ${args.join(' ')}`).toBe(true)
     }

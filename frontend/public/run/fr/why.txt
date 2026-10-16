@@ -6,6 +6,7 @@
   rooms-sse             Comment les salons restent synchronisés
   ffmpeg-single-thread  Pourquoi ffmpeg tourne sur un seul thread
   ask-no-rag            Comment ask connaît le site
+  ask-retrieval         Comment ask trouve la bonne partie du site
   mcp-sdk               Pourquoi le serveur MCP est écrit à la main
   polling               Pourquoi le ticker du livre d'or fait du polling
   steam-proxy           D'où vient le journal de jeux Steam

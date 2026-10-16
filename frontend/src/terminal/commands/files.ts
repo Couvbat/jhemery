@@ -1,7 +1,8 @@
 import { findWork, now, nowCategories, profile, skillNames, socials, staleDays } from '@/content'
 import type { Localised } from '@/content/types'
+import { sourceHref } from '@/lib/ask-session'
 import { isUnlocked } from '../achievements'
-import { blank, line, pre, segmented, wrap } from '../format'
+import { blank, line, link, pre, segmented, wrap } from '../format'
 import type { OutputLine } from '../types'
 import { workLines } from '../work'
 import { SECRET_FILE, secretContents } from './secret'
@@ -144,6 +145,14 @@ export function resolveFileLines(file: string, t: TFunction): OutputLine[] | und
       return [
         line(`${entry.name} — ${new Date(entry.date).toLocaleDateString()}`, 'primary'),
         ...wrap(entry.message).map((text) => line(`  ${text}`)),
+        // Text, never markup, like the entry above it: the reason `OutputLine[]` has no HTML.
+        // Labelled as the model's, in the spirit of `ask`'s disclaimer.
+        ...(entry.reply
+          ? [
+              line(`  ↳ ${t({ en: 'a local model replied', fr: 'un modèle local a répondu' })}: ${entry.reply.text}`, 'muted'),
+              ...(entry.reply.see ? [link(`    ${entry.reply.see}`, sourceHref(entry.reply.see))] : []),
+            ]
+          : []),
       ]
     }
   }

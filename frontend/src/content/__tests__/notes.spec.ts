@@ -17,7 +17,7 @@ const prose = (html: string) => html.replace(/<pre>[\s\S]*?<\/pre>|<code>[\s\S]*
 
 describe('design notes', () => {
   it('publishes every spec, with unique slugs', () => {
-    expect(notes.length).toBe(13)
+    expect(notes.length).toBe(20)
     expect(new Set(notes.map((n) => n.slug)).size).toBe(notes.length)
   })
 

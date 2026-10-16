@@ -54,6 +54,28 @@ describe('xray', () => {
   it('runs from a link, and from the palette', () => {
     expect(writesOf(xray)).toBe('none')
     expect(isLinkable(xray)).toBe(true)
+    expect(isLinkable(xray, ['path'])).toBe(true)
     expect(paletteCommands()).toContain(xray)
+  })
+
+  it('opens the path panel with `path`, and a bare `xray` leaves it closed', async () => {
+    const { xrayPath } = useXray()
+    await run()
+    expect(xrayPath.value).toBe(false)
+    // On already: `path` keeps it on and opens the panel rather than toggling it off.
+    const recorded = recordingContext('xray', ['path'])
+    const lines = (await xray.run(recorded.ctx)) ?? []
+    expect(xrayOn.value).toBe(true)
+    expect(xrayPath.value).toBe(true)
+    expect(lines[0]!.text).toContain('this visit’s path')
+    setXray(false)
+    expect(xrayPath.value).toBe(false)
+  })
+
+  it('refuses any other argument', async () => {
+    const recorded = recordingContext('xray', ['bones'])
+    const lines = (await xray.run(recorded.ctx)) ?? []
+    expect(lines).toEqual([expect.objectContaining({ stderr: true, text: 'xray: bones: unknown argument; try `xray path`' })])
+    expect(xrayOn.value).toBe(false)
   })
 })

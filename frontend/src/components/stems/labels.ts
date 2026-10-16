@@ -17,6 +17,8 @@ export const stemsLabels = {
   solo: { en: 'Solo {name}', fr: 'Isoler {name}' },
   level: { en: 'Level of {name}', fr: 'Niveau de {name}' },
   filter: { en: 'filter', fr: 'filtre' },
+  position: { en: 'Position in the excerpt', fr: 'Position dans l’extrait' },
+  chain: { en: 'chain', fr: 'chaîne' },
   reset: { en: 'reset', fr: 'réinitialiser' },
   copy: { en: 'copy this mix as a link', fr: 'copier ce mix en lien' },
   copied: { en: 'link copied', fr: 'lien copié' },

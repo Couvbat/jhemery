@@ -8,6 +8,7 @@ import { McpService } from './mcp.service';
   imports: [ConfigModule],
   controllers: [McpController],
   providers: [McpService, McpContentService],
-  exports: [McpService],
+  // The content service too: `ask` reads the same copy of content.json.
+  exports: [McpService, McpContentService],
 })
 export class McpModule {}

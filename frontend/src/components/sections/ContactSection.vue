@@ -37,7 +37,7 @@ async function submit() {
 </script>
 
 <template>
-  <section id="contact" class="py-20 pt-24 pb-32">
+  <section id="contact" class="py-20 pt-24 pb-32" data-api="/contact">
     <div class="max-w-5xl mx-auto px-4">
       <SectionHeader section="contact" tone="green" />
 

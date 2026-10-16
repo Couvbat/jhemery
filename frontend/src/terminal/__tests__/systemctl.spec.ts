@@ -55,6 +55,29 @@ describe('systemctl status', () => {
     )
   })
 
+  // `active` only ever meant configured; the last real question says whether it works.
+  it('says how ask’s last real question ended, and why when it failed', async () => {
+    const ask = (last: { outcome: string; agoMs: number }) =>
+      api.health.mockResolvedValue({
+        ...REPORT,
+        units: [{ unit: 'ask', state: 'active', last, detail: { ok: 4, failed: 1, passages: 212 } }],
+      })
+
+    ask({ outcome: 'refused', agoMs: 120_000 })
+    const failed = await runCommand(systemctl, ['status', 'ask'])
+    expect(failed.text).toContain('Last: last failure 2 min ago: the model host’s edge refused the API')
+    expect(failed.text).toContain('4 answered · 1 failed · 212 passages')
+
+    ask({ outcome: 'ok', agoMs: 240_000 })
+    expect((await runCommand(systemctl, ['status', 'ask'], { locale: 'fr' })).text).toContain(
+      'Last: dernière réponse il y a 4 min',
+    )
+  })
+
+  it('prints no Last line for an API from before it', async () => {
+    expect((await runCommand(systemctl, ['status', 'steam'])).text).not.toContain('Last:')
+  })
+
   it('does not know units that do not exist', async () => {
     expect((await runCommand(systemctl, ['status', 'sshd'])).text).toContain('Unit sshd.service could not be found.')
   })

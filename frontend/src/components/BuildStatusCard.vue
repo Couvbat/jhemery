@@ -60,7 +60,7 @@ function duration(run: WorkflowRun): string {
 </script>
 
 <template>
-  <div class="rounded border border-border bg-card overflow-hidden">
+  <div class="rounded border border-border bg-card overflow-hidden" data-api="/github/workflow-status">
     <div class="flex items-center gap-2 px-4 py-2 bg-muted border-b border-border">
       <WindowDots />
       <span class="ml-3 text-xs text-muted-foreground">{{ t(m.build.title) }}</span>

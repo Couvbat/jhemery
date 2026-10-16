@@ -237,9 +237,44 @@ export const decisions: Decision[] = [
     pr: 23,
     source: { doc: 'docs/superpowers/specs/2026-08-04-ask-command-design.md', anchor: 'grounding--no-rag' },
     hindsight: {
-      en: 'The corpus was first fetched on the request path, and in production that loopback call to the frontend hung requests past 120 s without the model ever being contacted. It now refreshes in the background, and a question is answered from the cached copy, a stale one or a baked-in fallback, so the first question after a restart gets the fallback.',
-      fr: "Le corpus était d'abord récupéré pendant la requête, et en production cet appel en boucle locale vers le frontend bloquait les requêtes au-delà de 120 s sans que le modèle soit jamais sollicité. Il se rafraîchit désormais en arrière-plan, et chaque question est servie depuis la copie en cache, une copie périmée ou un corpus de secours intégré : la première question après un redémarrage tombe donc sur ce dernier.",
+      en: 'The corpus was first fetched on the request path, and in production that loopback call to the frontend hung requests past 120 s without the model ever being contacted. It now refreshes in the background, and a question is answered from the cached copy, a stale one or a baked-in fallback, so the first question after a restart gets the fallback. And the site outgrew a few kilobytes: ask now retrieves passages too, which `why ask-retrieval` explains.',
+      fr: "Le corpus était d'abord récupéré pendant la requête, et en production cet appel en boucle locale vers le frontend bloquait les requêtes au-delà de 120 s sans que le modèle soit jamais sollicité. Il se rafraîchit désormais en arrière-plan, et chaque question est servie depuis la copie en cache, une copie périmée ou un corpus de secours intégré : la première question après un redémarrage tombe donc sur ce dernier. Et le site a dépassé les quelques kilo-octets : ask va désormais aussi chercher des passages, ce que `why ask-retrieval` explique.",
     },
+  },
+  {
+    id: 'ask-retrieval',
+    topic: {
+      en: 'How ask finds the right part of the site',
+      fr: 'Comment ask trouve la bonne partie du site',
+    },
+    chose: {
+      en: 'Besides llms.txt and the CV, ask retrieves the few passages most relevant to each question from the site’s own words, with a lexical search in the API’s process, and answers only from what the site already says.',
+      fr: 'En plus de llms.txt et du CV, ask va chercher les quelques passages les plus pertinents pour chaque question dans les propres textes du site, par une recherche lexicale dans le processus de l’API, et ne répond que d’après ce que le site dit déjà.',
+    },
+    rejected: [
+      {
+        what: { en: 'The whole site in the prompt', fr: 'Le site entier dans le prompt' },
+        because: {
+          en: 'With the design notes it is hundreds of kilobytes, more than any home GPU’s model can read at once.',
+          fr: 'Avec les notes de conception, il pèse des centaines de kilo-octets, plus que ce que le modèle d’un GPU domestique peut lire d’un coup.',
+        },
+      },
+      {
+        what: { en: 'Embeddings and a vector store', fr: 'Des embeddings et une base vectorielle' },
+        because: {
+          en: 'A second call into the home network per question, an index to rebuild on every deploy, and a dependency, for a site small enough that words find the right passage.',
+          fr: 'Un second appel vers le réseau de la maison par question, un index à reconstruire à chaque déploiement et une dépendance, pour un site assez petit pour que les mots trouvent le bon passage.',
+        },
+      },
+      {
+        what: { en: 'The search index as it is', fr: 'L’index de recherche tel quel' },
+        because: {
+          en: 'Its texts are cut at 200 characters, too short to answer from.',
+          fr: 'Ses textes sont coupés à 200 caractères, trop courts pour y puiser une réponse.',
+        },
+      },
+    ],
+    source: { doc: 'docs/superpowers/specs/2026-10-15-ask-my-lab-design.md', anchor: 'the-decision-this-changes' },
   },
   {
     id: 'mcp-sdk',

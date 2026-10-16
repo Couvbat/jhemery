@@ -1,0 +1,109 @@
+{
+  "takenAt": "2026-10-15T19:42:01.000Z",
+  "machines": [
+    {
+      "id": "poseidon",
+      "up": true,
+      "uptimeSeconds": 1047845,
+      "cpu": 8.1,
+      "memory": 41.3,
+      "load": 0.42,
+      "tempC": {
+        "cpu": 47,
+        "gpu": 44
+      },
+      "pools": [
+        {
+          "name": "tank",
+          "health": "ONLINE",
+          "used": 0.61
+        },
+        {
+          "name": "scratch",
+          "health": "UNAVAIL",
+          "used": 0
+        }
+      ],
+      "gpu": {
+        "util": 3,
+        "vramUsedMb": 2154,
+        "vramTotalMb": 10240
+      },
+      "containers": 3
+    },
+    {
+      "id": "optimus",
+      "up": true,
+      "uptimeSeconds": 2592760,
+      "cpu": 2.4,
+      "memory": 63.9,
+      "load": 0.18,
+      "tempC": {
+        "cpu": 39
+      },
+      "pools": [
+        {
+          "name": "data",
+          "used": 0.744
+        }
+      ],
+      "containers": 5
+    },
+    {
+      "id": "hephaistos",
+      "up": false
+    }
+  ],
+  "services": [
+    {
+      "id": "umami",
+      "latencyMs": 41,
+      "status": "up"
+    },
+    {
+      "id": "n8n",
+      "latencyMs": 88,
+      "status": "down"
+    },
+    {
+      "id": "odysseus",
+      "latencyMs": 121,
+      "status": "maintenance"
+    },
+    {
+      "id": "gnome",
+      "status": "up"
+    },
+    {
+      "id": "dashy",
+      "status": "up"
+    }
+  ],
+  "models": {
+    "runtime": "up",
+    "resident": [
+      {
+        "name": "gemma4:e4b",
+        "vramMb": 2100
+      }
+    ],
+    "installed": [
+      {
+        "name": "gemma4:e4b",
+        "sizeGb": 9.6
+      },
+      {
+        "name": "qwen3:8b",
+        "sizeGb": 5.2
+      },
+      {
+        "name": "nomic-embed-text:latest",
+        "sizeGb": 0.3
+      }
+    ]
+  },
+  "tunnel": {
+    "healthy": true,
+    "connections": 4
+  }
+}

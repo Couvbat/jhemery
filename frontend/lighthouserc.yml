@@ -100,7 +100,18 @@ ci:
       # out of the first load, the same 2 kB, which counts once when both merge;
       # #154 (a head per page) adds its own. Together they measured 308.2 kB, and
       # the two KiB were raised on purpose rather than drifted into.
-      total-byte-weight: ['error', { maxNumericValue: 309248 }]
+      #
+      # 305 KiB from #160, roadmap §K's seven features, which measured 312.4 kB
+      # with dev at about 308.9. What they add to the home page's first load,
+      # gzipped: the stylesheet's rules for the new pages (+0.5 kB, Tailwind has
+      # one sheet), the background's music reaction (+0.5 kB of glue, the reaction
+      # itself fetched only when music first plays), the API client's new calls
+      # (+0.25 kB), the SoundCloud conversation and x-ray's kept timings in the
+      # entry (+0.5 kB), and the music signal, a chunk the background shares with
+      # the sound sources (+0.15 kB and a request). Two trims came first (the
+      # reaction out of the first load, `content/music.ts` back in its chunk);
+      # what is left is features, not drift, and about 0.6 kB stays spare.
+      total-byte-weight: ['error', { maxNumericValue: 312320 }]
 
       # Speed Index is deliberately unasserted. The boot sequence is an
       # animation that keeps repainting on purpose, which is exactly what Speed

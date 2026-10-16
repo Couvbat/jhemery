@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
-const mocks = vi.hoisted(() => ({ askStream: vi.fn() }))
+const mocks = vi.hoisted(() => ({ askStream: vi.fn(), lab: vi.fn() }))
 
 // The animated commands only pace themselves when motion is allowed, and it is
 // the paced ones that are interesting here — an instant command is over before
@@ -12,7 +12,7 @@ vi.mock('@/composables/useCrt', async (importOriginal) => ({
 
 vi.mock('@/lib/api', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@/lib/api')>()
-  return { ...actual, api: { ...actual.api, askStream: mocks.askStream } }
+  return { ...actual, api: { ...actual.api, askStream: mocks.askStream, lab: mocks.lab } }
 })
 
 import { messages } from '@/i18n/messages'
@@ -75,6 +75,26 @@ describe('cancel()', () => {
     expect(pendingPrompt.value).toBeNull()
   })
 
+  it('closes the lab shell with one line, after echoing its prompt inline', async () => {
+    mocks.lab.mockResolvedValue({ configured: false })
+    const done = submit('ssh poseidon')
+    await vi.advanceTimersByTimeAsync(2_000)
+    expect(pendingPrompt.value?.question).toBe('jules@poseidon:~$')
+
+    const at = buffer.value.length
+    await submit('whoami')
+    await vi.advanceTimersByTimeAsync(0)
+    // The prompt and the line typed at it are one line, as a shell's are; never the
+    // question on a line of its own.
+    expect(buffer.value.slice(at, at + 2).map((l) => l.text)).toEqual(['jules@poseidon:~$ whoami', 'jules'])
+    expect(buffer.value.some((l) => l.text === 'jules@poseidon:~$')).toBe(false)
+
+    cancel()
+    await done
+    expect(buffer.value.at(-2)?.text).toBe('Connection to poseidon closed.')
+    expect(cancelledCount()).toBe(1)
+  })
+
   it('prints one line for a command that swallows the abort itself', async () => {
     // `ask` keeps whatever the stream delivered before the Ctrl+C and returns
     // normally, so the line has to come from the shell rather than from an
@@ -84,7 +104,7 @@ describe('cancel()', () => {
       _locale: string,
       signal?: AbortSignal,
     ) {
-      yield 'partial'
+      yield { delta: 'partial' }
       await new Promise<void>((resolve, reject) => {
         signal?.addEventListener('abort', () => reject(new DOMException('', 'AbortError')), {
           once: true,

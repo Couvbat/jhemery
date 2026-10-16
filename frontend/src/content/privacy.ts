@@ -51,8 +51,8 @@ export const privacyCopy = {
     fr: 'Le formulaire de contact et `mail` envoient votre nom, votre adresse et votre message dans ma boîte, par email. Ils ne servent qu’à vous répondre, et je les supprime au plus tard trois ans après notre dernier échange.',
   },
   guestbook: {
-    en: '`sign` publishes the name and message you give, with the date, for every visitor to read. An entry stays until 500 newer ones push it out, or until you ask me to remove it.',
-    fr: '`sign` publie le nom et le message que vous donnez, avec la date, à la vue de tous les visiteurs. Un message reste jusqu’à ce que 500 plus récents le poussent dehors, ou jusqu’à ce que vous me demandiez de le retirer.',
+    en: '`sign` publishes the name and message you give, with the date, for every visitor to read. Each entry is first read by a language model running on my own machine, which may hold it for me to review; nothing is sent to anyone else. It goes from the host in France to that machine, also in France. An entry stays until 500 newer ones push it out, or until you ask me to remove it.',
+    fr: '`sign` publie le nom et le message que vous donnez, avec la date, à la vue de tous les visiteurs. Chaque message est d’abord lu par un modèle de langage qui tourne sur ma propre machine, et qui peut le garder pour que je le relise ; rien n’est envoyé à qui que ce soit d’autre. Il va de l’hébergeur en France à cette machine, en France aussi. Un message reste jusqu’à ce que 500 plus récents le poussent dehors, ou jusqu’à ce que vous me demandiez de le retirer.',
   },
   addresses: {
     en: 'Your IP address reaches the server with every request. The rate limiter keeps it to stop abuse, in memory only, never on disk: it counts against you for an hour at the longest, and the entry goes at the next clean-up, which runs as later requests arrive, or when the server restarts. The host’s access logs record it too, under o2switch’s own retention.',
@@ -63,12 +63,16 @@ export const privacyCopy = {
     fr: 'Cloudflare transporte chaque requête jusqu’au serveur : il voit votre adresse IP, la page demandée et l’user agent de votre navigateur. Il agit pour mon compte, et ses transferts vers les États-Unis reposent sur le Data Privacy Framework UE–États-Unis.',
   },
   embeds: {
-    en: 'SoundCloud’s player loads only when you press its button or type `play`, and a room’s YouTube or SoundCloud player only when you open a room. Once loaded, those services see your IP address and set their own cookies, under their own policies.',
-    fr: 'Le lecteur SoundCloud ne se charge que si vous appuyez sur son bouton ou tapez `play`, et le lecteur YouTube ou SoundCloud d’un salon que si vous ouvrez ce salon. Une fois chargés, ces services voient votre adresse IP et déposent leurs propres cookies, selon leurs propres règles.',
+    en: 'SoundCloud’s player loads only when you press its button or type `play`, and a room’s YouTube or SoundCloud player only when you open a room. Once loaded, those services see your IP address and set their own cookies, under their own policies. While the player is up, the page also fetches the waveform of the track playing from SoundCloud’s servers, the one the player draws, so the background can follow it: with no cookie, and kept nowhere.',
+    fr: 'Le lecteur SoundCloud ne se charge que si vous appuyez sur son bouton ou tapez `play`, et le lecteur YouTube ou SoundCloud d’un salon que si vous ouvrez ce salon. Une fois chargés, ces services voient votre adresse IP et déposent leurs propres cookies, selon leurs propres règles. Tant que le lecteur est là, la page récupère aussi chez SoundCloud la forme d’onde du morceau en cours, celle que le lecteur dessine, pour que le fond puisse la suivre : sans cookie, et sans rien en garder.',
   },
   upstream: {
     en: 'Weather, prices, Steam and GitHub are fetched by the server, with its own keys and my coordinates: nothing about you goes to them.',
     fr: 'Météo, cours, Steam et GitHub sont interrogés par le serveur, avec ses propres clés et mes coordonnées : rien sur vous ne leur parvient.',
+  },
+  xray: {
+    en: '`xray` reads how long this page’s own requests took from your browser’s timing records, and `xray path` asks Cloudflare’s `/cdn-cgi/trace` which data centre answered you. That reply carries your address and country too; both are dropped before anything is kept or shown, and nothing from either is sent anywhere.',
+    fr: '`xray` lit la durée des requêtes de cette page dans les mesures de votre navigateur, et `xray path` demande à `/cdn-cgi/trace` de Cloudflare quel centre de données vous a répondu. Cette réponse contient aussi votre adresse et votre pays ; les deux sont écartés avant que quoi que ce soit soit gardé ou affiché, et rien n’en est envoyé nulle part.',
   },
   strace: {
     en: 'None of this needs taking on trust. `strace <command>` runs a command and lists every request it made, with the keys of what was sent and never the values. If a claim here doesn’t hold, /security says how to tell me.',

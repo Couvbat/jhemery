@@ -58,7 +58,7 @@ function titleFor(day: ContributionDay | null): string {
 </script>
 
 <template>
-  <div class="rounded border border-border bg-card overflow-hidden">
+  <div class="rounded border border-border bg-card overflow-hidden" data-api="/github/contributions">
     <div class="flex items-center gap-2 px-4 py-2 bg-muted border-b border-border">
       <WindowDots />
       <span class="ml-3 text-xs text-muted-foreground">{{ t(m.projects.contributions) }}</span>

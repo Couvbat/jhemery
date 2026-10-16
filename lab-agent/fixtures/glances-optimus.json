@@ -1,0 +1,18 @@
+{
+  "quicklook": { "cpu": 2.4, "mem": 63.9, "swap": 0 },
+  "load": { "min1": 0.18, "min5": 0.2, "min15": 0.22, "cpucore": 8 },
+  "sensors": [{ "label": "Package id 0", "value": 39, "unit": "C", "type": "temperature_core" }],
+  "uptime": "30 days, 0:12:40",
+  "gpu": [],
+  "containers": [
+    { "name": "umami", "status": "running" },
+    { "name": "uptime-kuma", "status": "running" },
+    { "name": "n8n", "status": "running" },
+    { "name": "dashy", "status": "running" },
+    { "name": "lab-agent", "status": "running" }
+  ],
+  "fs": [
+    { "device_name": "data", "fs_type": "zfs", "mnt_point": "/mnt/data", "percent": 74.4 },
+    { "device_name": "10.0.0.5", "fs_type": "zfs", "mnt_point": "/mnt/odd", "percent": 1 }
+  ]
+}
