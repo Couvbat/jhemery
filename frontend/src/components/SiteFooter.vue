@@ -34,7 +34,7 @@ onMounted(startPresence)
 </script>
 
 <template>
-  <footer class="border-t border-border bg-background/80">
+  <footer class="border-t border-border bg-background/80" data-api="/presence">
     <div class="max-w-5xl mx-auto px-4 py-6 space-y-2">
     <div
       class="flex flex-wrap items-center gap-x-4 gap-y-2 font-mono text-xs text-muted-foreground"
@@ -55,6 +55,8 @@ onMounted(startPresence)
       <span class="text-muted-foreground/60">{{ t(m.footer.built) }} {{ builtLabel }}</span>
 
       <RouterLink to="/now" class="ml-auto hover:text-primary transition-colors">/now</RouterLink>
+
+      <RouterLink to="/lab" class="hover:text-primary transition-colors">/lab</RouterLink>
 
       <RouterLink to="/privacy" class="hover:text-primary transition-colors">/privacy</RouterLink>
 

@@ -4,6 +4,7 @@ import { ContactModule } from '../contact/contact.module';
 import { GithubModule } from '../github/github.module';
 import { GuestbookModule } from '../guestbook/guestbook.module';
 import { JobsModule } from '../jobs/jobs.module';
+import { LabModule } from '../lab/lab.module';
 import { MarketsModule } from '../markets/markets.module';
 import { McpModule } from '../mcp/mcp.module';
 import { PresenceModule } from '../presence/presence.module';
@@ -24,6 +25,7 @@ import { HealthController } from './health.controller';
     GithubModule,
     GuestbookModule,
     JobsModule,
+    LabModule,
     MarketsModule,
     McpModule,
     PresenceModule,

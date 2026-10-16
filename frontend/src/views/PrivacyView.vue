@@ -122,6 +122,7 @@ const claims = [
   privacyCopy.cloudflare,
   privacyCopy.embeds,
   privacyCopy.upstream,
+  privacyCopy.xray,
 ]
 
 // A build that counts nothing has nothing to refuse, so the switch only shows where it acts.

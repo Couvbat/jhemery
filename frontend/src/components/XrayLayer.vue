@@ -9,9 +9,16 @@ import { useGuestbookTicker } from '@/composables/useGuestbookTicker'
 import { useSceneControl } from '@/composables/useSceneControl'
 import { terminalOpen, touchViewport } from '@/composables/useTerminalShell'
 import { useViewSwing } from '@/composables/useViewSwing'
-import { setXray } from '@/composables/useXray'
+import { usePresence } from '@/composables/usePresence'
+import { setXray, setXrayPath, useXray } from '@/composables/useXray'
+import { api, apiUrl, fetchSite, type HealthReport, type LabReport } from '@/lib/api'
 import { sourceUrl } from '@/lib/source'
+import { dataLine, newestByRoute, newestOf, STREAM_ROUTE, type TimingEntry } from '@/lib/xray-data'
+import { keptTimings } from '@/lib/timing-keep'
+import { parseTrace, pathHops, type Trace } from '@/lib/xray-path'
+import { listeningTo } from './music-react'
 import { newestSignatures } from './signatures'
+import { currentMusic } from '@/lib/music-signal'
 import {
   baseName,
   CANVAS_FILE,
@@ -50,7 +57,7 @@ const { t, m, locale } = useLocale()
 const { swinging } = useViewSwing()
 const { matrixActive } = useMatrix()
 const { bootPlaying } = useBoot()
-const { shapeCount, visitorShapes } = useSceneControl()
+const { shapeCount, visitorShapes, musicOn } = useSceneControl()
 // The field's third pool, the guestbook's newest entries, counted the way the field picks them.
 const { entries: guestbookEntries } = useGuestbookTicker()
 const signatureShapes = computed(() => newestSignatures(guestbookEntries.value).length)
@@ -62,6 +69,8 @@ interface ShownTag {
   count: number
   /** The canvas's shape count; nothing for any other tag. */
   extra: string
+  /** One line per API route the component names: where its live data came from. */
+  data: string[]
   x: number
   y: number
   w: number
@@ -70,6 +79,7 @@ interface ShownTag {
 
 const layerEl = ref<HTMLElement | null>(null)
 const chipEl = ref<HTMLElement | null>(null)
+const panelEl = ref<HTMLElement | null>(null)
 const probeEl = ref<HTMLElement | null>(null)
 const probeTextEl = ref<HTMLElement | null>(null)
 const boxes = shallowRef<Rect[]>([])
@@ -88,7 +98,9 @@ const status = computed(() =>
 
 function extraFor(names: string[]): string {
   if (!names.includes(CANVAS_FILE)) return ''
-  return ` · ${t(m.xray.shapes).replace('{n}', String(fieldShapes.value))}`
+  // And what the field is following, when music is playing and it is listening.
+  const listening = musicOn.value ? listeningTo(currentMusic(), locale.value) : ''
+  return ` · ${t(m.xray.shapes).replace('{n}', String(fieldShapes.value))}${listening ? ` · ${listening}` : ''}`
 }
 
 /**
@@ -97,13 +109,39 @@ function extraFor(names: string[]): string {
  * web font can land after the first.
  */
 const PROBE = '0'.repeat(20)
-let metrics = { ch: 6, chrome: 14, height: 18 }
+let metrics = { ch: 6, chrome: 14, height: 18, line: 16 }
 
 function measureProbe() {
   const outer = probeEl.value?.getBoundingClientRect()
   const inner = probeTextEl.value?.getBoundingClientRect()
   if (!outer || !inner || !inner.width) return
-  metrics = { ch: inner.width / PROBE.length, chrome: outer.width - inner.width, height: outer.height }
+  metrics = { ch: inner.width / PROBE.length, chrome: outer.width - inner.width, height: outer.height, line: inner.height }
+}
+
+/**
+ * The newest request per API route, from what the browser has already recorded (Resource
+ * Timing), so `request()` keeps its fast path: the page's requests happened before x-ray
+ * turned on, and an observer in `request()` could not have helped. Started `buffered`, so
+ * the entries from before the layer mounted come in first.
+ */
+const timings = shallowRef<Map<string, TimingEntry>>(new Map())
+let timingObserver: PerformanceObserver | undefined
+
+function takeTimings(entries: readonly TimingEntry[]) {
+  const next = new Map(timings.value)
+  for (const [route, entry] of newestByRoute(entries, apiUrl)) {
+    const seen = next.get(route)
+    if (!seen || entry.startTime >= seen.startTime) next.set(route, entry)
+  }
+  timings.value = next
+}
+
+const { streaming } = usePresence()
+
+function dataLines(apis: string[]): string[] {
+  return apis.map((route) =>
+    dataLine(route, timings.value.get(route), locale.value, route === STREAM_ROUTE ? (streaming.value ? 'open' : 'closed') : undefined),
+  )
 }
 
 /**
@@ -129,21 +167,25 @@ function measure() {
   const sized = grouped.tags.map((tag) => {
     const parts = tagParts(tag.files, map)
     const extra = extraFor(tag.files)
-    const chars = tagText(parts, `${tag.count > 1 ? ` ×${tag.count}` : ''}${extra}`).length
-    return { tag, parts, extra, size: { w: Math.ceil(chars * metrics.ch + metrics.chrome), h: metrics.height } }
+    const data = dataLines(tag.apis)
+    const chars = Math.max(tagText(parts, `${tag.count > 1 ? ` ×${tag.count}` : ''}${extra}`).length, ...data.map((d) => d.length))
+    const size = { w: Math.ceil(chars * metrics.ch + metrics.chrome), h: metrics.height + data.length * metrics.line }
+    return { tag, parts, extra, data, size }
   })
   const stranded = strandedTag(layer, grouped.tags.map((tag) => tag.key))
   const chip = chipEl.value?.getBoundingClientRect()
   // The chip and the strip under it, down to the edge: on a phone the launcher's row is
   // there, and the canvas's tag, which starts in that corner, goes above the chip instead.
   const reserved: Rect[] = chip ? [{ x: chip.left, y: chip.top, w: chip.width, h: viewport.h - chip.top }] : []
+  const panel = panelEl.value?.getBoundingClientRect()
+  if (panel?.width) reserved.push({ x: panel.left, y: panel.top, w: panel.width, h: panel.height })
   if (stranded) reserved.push(stranded)
   const places = placeTags(
     sized.map(({ tag, size }) => ({ anchor: tag.anchor, backdrop: tag.backdrop, size })),
     viewport,
     reserved,
   )
-  const shown = sized.map(({ tag, parts, extra, size }, i) => ({ key: tag.key, parts, count: tag.count, extra, ...places[i]!, ...size }))
+  const shown = sized.map(({ tag, parts, extra, data, size }, i) => ({ key: tag.key, parts, count: tag.count, extra, data, ...places[i]!, ...size }))
   if (stranded) {
     // Back among the others in its old order: a node Vue moves loses focus too.
     const before = tags.value.map((tag) => tag.key)
@@ -175,6 +217,18 @@ const OUT = {
 }
 const spoken = ref('')
 
+/** The panel's words, here rather than in `messages.ts` for the same reason as `ON`'s. */
+const PATH = {
+  title: { en: 'this visit’s path', fr: 'le chemin de cette visite' },
+  open: { en: 'path', fr: 'chemin' },
+  openLabel: { en: 'Show this visit’s path', fr: 'Montrer le chemin de cette visite' },
+  close: { en: 'Close this visit’s path', fr: 'Fermer le chemin de cette visite' },
+  note: {
+    en: 'Read from your own browser and shown only to you; nothing is kept or sent.',
+    fr: 'Lu dans votre propre navigateur et montré à vous seul ; rien n’est gardé ni envoyé.',
+  },
+}
+
 let frame = 0
 function schedule() {
   if (frame) return
@@ -202,7 +256,46 @@ function onFocusin(event: FocusEvent) {
   if (from instanceof HTMLElement && !layerEl.value?.contains(from)) returnTo = from
 }
 
-watch([hidden, locale, fieldShapes], () => schedule())
+watch([hidden, locale, fieldShapes, timings, streaming], () => schedule())
+
+/**
+ * *This visit's path* (the data-layer spec's §3): fetched when the panel opens and only
+ * then, so a bare `xray` asks nothing of anyone. The trace keeps three keys and drops the
+ * rest, the visitor's address among them, before anything stores it (`parseTrace`).
+ */
+const { xrayPath } = useXray()
+const trace = shallowRef<Trace | null | undefined>(undefined)
+const health = shallowRef<HealthReport | null>(null)
+const lab = shallowRef<LabReport | null>(null)
+
+async function readPath() {
+  trace.value = undefined
+  const [traced, healthy, labbed] = await Promise.allSettled([
+    fetchSite('/cdn-cgi/trace', 'GET', { limit: 4096 }),
+    api.health(),
+    api.lab(),
+  ])
+  trace.value =
+    traced.status === 'fulfilled' && traced.value.status === 200 ? parseTrace(new TextDecoder().decode(traced.value.body)) : null
+  health.value = healthy.status === 'fulfilled' ? healthy.value : null
+  lab.value = labbed.status === 'fulfilled' ? labbed.value : null
+}
+
+watch(
+  xrayPath,
+  (open) => {
+    if (open) void readPath()
+    schedule()
+  },
+  { immediate: true },
+)
+
+const hops = computed(() =>
+  pathHops(
+    { trace: trace.value, apiMs: newestOf(timings.value.values())?.duration, health: health.value, lab: lab.value },
+    locale.value,
+  ),
+)
 
 onMounted(() => {
   window.addEventListener('scroll', schedule, { capture: true, passive: true })
@@ -216,6 +309,16 @@ onMounted(() => {
     attributes: true,
     attributeFilter: ['class', 'style', 'hidden', 'open', 'inert'],
   })
+  // What the buffer lost when it was last emptied, then what it holds now.
+  takeTimings(keptTimings() as unknown as TimingEntry[])
+  if (typeof PerformanceObserver !== 'undefined') {
+    try {
+      timingObserver = new PerformanceObserver((list) => takeTimings(list.getEntries() as unknown as TimingEntry[]))
+      timingObserver.observe({ type: 'resource', buffered: true })
+    } catch {
+      // A browser without the `type` form: the tags simply have no data lines.
+    }
+  }
   schedule()
 })
 
@@ -225,6 +328,7 @@ onBeforeUnmount(() => {
   window.removeEventListener('keydown', onKeydown)
   document.removeEventListener('transitionend', schedule, true)
   observer.disconnect()
+  timingObserver?.disconnect()
   cancelAnimationFrame(frame)
   if (layerEl.value?.contains(document.activeElement) && returnTo?.isConnected) returnTo.focus({ preventScroll: true })
 })
@@ -292,6 +396,11 @@ const TAG_CLASS = 'whitespace-nowrap rounded-sm border border-accent/70 bg-backg
             <span class="sr-only">{{ ` (${t(m.xray.times).replace('{n}', String(tag.count))})` }}</span>
           </template>
           <span v-if="tag.extra" class="text-muted-foreground">{{ tag.extra }}</span>
+          <!-- A line of its own on screen; read aloud, a pause, not a run-on into the count. -->
+          <template v-for="data in tag.data" :key="data">
+            <span class="sr-only">{{ '; ' }}</span>
+            <span class="block text-muted-foreground" data-testid="xray-data">{{ data }}</span>
+          </template>
         </li>
       </ul>
     </nav>
@@ -307,6 +416,15 @@ const TAG_CLASS = 'whitespace-nowrap rounded-sm border border-accent/70 bg-backg
       <span class="hidden md:inline text-muted-foreground">· {{ t(m.xray.hint) }}</span>
       <button
         type="button"
+        :aria-label="t(PATH.openLabel)"
+        :aria-pressed="xrayPath"
+        class="min-h-11 min-w-11 md:min-h-0 md:min-w-0 rounded border border-border px-1.5 text-foreground hover:border-accent hover:text-accent transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+        @click="setXrayPath(!xrayPath)"
+      >
+        {{ t(PATH.open) }}
+      </button>
+      <button
+        type="button"
         :aria-label="t(m.xray.exitLabel)"
         class="min-h-11 min-w-11 md:min-h-0 md:min-w-0 rounded border border-border px-1.5 text-foreground hover:border-accent hover:text-accent transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
         @click="setXray(false)"
@@ -314,6 +432,36 @@ const TAG_CLASS = 'whitespace-nowrap rounded-sm border border-accent/70 bg-backg
         {{ t(m.xray.exit) }}
       </button>
     </div>
+
+    <!-- In the corner opposite the chip. A labelled region that takes no focus when it opens,
+         as the tags don't; Esc still ends x-ray, and the close button only the panel. -->
+    <section
+      v-if="xrayPath"
+      ref="panelEl"
+      role="region"
+      :aria-label="t(PATH.title)"
+      class="absolute right-4 top-16 md:right-6 w-[min(24rem,calc(100vw-2rem))] pointer-events-auto rounded border border-accent/60 bg-background/95 backdrop-blur p-3 text-xs"
+      data-testid="xray-path"
+    >
+      <div class="flex items-center justify-between gap-2">
+        <h2 class="text-accent">{{ t(PATH.title) }}</h2>
+        <button
+          type="button"
+          :aria-label="t(PATH.close)"
+          class="min-h-11 min-w-11 md:min-h-0 md:min-w-0 rounded border border-border px-1.5 text-foreground hover:border-accent hover:text-accent transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          @click="setXrayPath(false)"
+        >
+          ×
+        </button>
+      </div>
+      <ol class="mt-2 space-y-1.5 list-decimal pl-5 marker:text-muted-foreground">
+        <li v-for="hop in hops" :key="hop.id" :data-hop="hop.id">
+          <span class="text-foreground">{{ hop.path }}</span>
+          <span v-if="hop.detail" class="block text-muted-foreground">{{ hop.detail }}</span>
+        </li>
+      </ol>
+      <p class="mt-2 text-muted-foreground">{{ t(PATH.note) }}</p>
+    </section>
 
     <p class="sr-only" role="status">{{ spoken }}</p>
 

@@ -65,9 +65,11 @@ describe('AskController', () => {
   }
 
   /** An `AskService` whose `answer()` this test drives by hand. */
+  const recordSilent = jest.fn();
   function service(answer: AskService['answer']): AskService {
-    return { answer } as unknown as AskService;
+    return { answer, recordSilent } as unknown as AskService;
   }
+  const answered = { empty: false };
 
   function controller(answer: AskService['answer']): AskController {
     return new AskController(service(answer));
@@ -89,7 +91,7 @@ describe('AskController', () => {
     const ask = controller((_dto, onDelta) => {
       onDelta('Yes');
       onDelta(', he does.');
-      return Promise.resolve();
+      return Promise.resolve(answered);
     });
 
     await ask.question(dto, res);
@@ -136,15 +138,19 @@ describe('AskController', () => {
    */
   it('answers degraded rather than staying silent long enough for a proxy to time out', async () => {
     const { res, body, status, ended } = response();
-    const ask = controller(() => new Promise<void>(() => {}));
+    const ask = controller(() => new Promise(() => {}));
 
     const pending = ask.question(dto, res);
     jest.advanceTimersByTime(45_000);
     await Promise.resolve();
 
     expect(status()).toBe(200);
-    expect(body()).toBe('data: {"error":"asleep"}\n\ndata: [DONE]\n\n');
+    // `silent`: the ceiling answered, and the service is told so for `/health`.
+    expect(body()).toBe(
+      'data: {"error":"asleep","reason":"silent"}\n\ndata: [DONE]\n\n',
+    );
     expect(ended()).toBe(true);
+    expect(recordSilent).toHaveBeenCalledWith(45_000);
     // The handler itself is still parked on a service that never settles, which
     // is fine — the visitor has their answer and the model keeps loading.
     void pending;
@@ -155,7 +161,7 @@ describe('AskController', () => {
     let late!: (delta: string) => void;
     const ask = controller((_dto, onDelta) => {
       late = onDelta;
-      return new Promise<void>(() => {});
+      return new Promise(() => {});
     });
 
     const pending = ask.question(dto, res);
@@ -173,8 +179,8 @@ describe('AskController', () => {
     let finish!: () => void;
     const ask = controller((_dto, onDelta) => {
       onDelta('Yes');
-      return new Promise<void>((resolve) => {
-        finish = resolve;
+      return new Promise((resolve) => {
+        finish = () => resolve(answered);
       });
     });
 
@@ -190,11 +196,44 @@ describe('AskController', () => {
     expect(body()).toBe('data: {"delta":"Yes"}\n\ndata: [DONE]\n\n');
   });
 
+  it('sends the meta after the last delta and before [DONE]', async () => {
+    const { res, body } = response();
+    const meta = {
+      model: 'gemma4:e4b',
+      outputTokens: 58,
+      firstTokenMs: 410,
+      totalMs: 1930,
+      tokensPerSecond: 38.2,
+      sources: [{ title: 'Why the ticker polls', target: 'why polling' }],
+    };
+    const ask = controller((_dto, onDelta) => {
+      onDelta('Yes');
+      return Promise.resolve({ empty: false, meta });
+    });
+
+    await ask.question(dto, res);
+
+    expect(body()).toBe(
+      `data: {"delta":"Yes"}\n\ndata: ${JSON.stringify({ meta })}\n\ndata: [DONE]\n\n`,
+    );
+  });
+
+  it('says in the stream why an answer that ended empty has no words', async () => {
+    const { res, body } = response();
+    const ask = controller(() => Promise.resolve({ empty: true }));
+
+    await ask.question(dto, res);
+
+    expect(body()).toBe(
+      'data: {"error":"asleep","reason":"empty"}\n\ndata: [DONE]\n\n',
+    );
+  });
+
   it('stops the ceiling firing once a normal answer is done', async () => {
     const { res, body } = response();
     const ask = controller((_dto, onDelta) => {
       onDelta('Yes');
-      return Promise.resolve();
+      return Promise.resolve(answered);
     });
 
     await ask.question(dto, res);

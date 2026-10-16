@@ -113,7 +113,9 @@ describe('the search index', () => {
   // Fetched on a visitor's first query, so it has to stay a small file: a body that
   // stopped being cut would show up here before it showed up on anyone's phone bill.
   it('stays small', () => {
-    expect(JSON.stringify(index).length).toBeLessThan(96 * 1024)
+    // 96 kB until the lab batch's seven notes and its decision brought it there: an
+    // uncut body would add hundreds of kilobytes, not a few, so the guard still holds.
+    expect(JSON.stringify(index).length).toBeLessThan(112 * 1024)
   })
 })
 

@@ -5,6 +5,7 @@ import { ContactService } from '../contact/contact.service';
 import { GithubService } from '../github/github.service';
 import { GuestbookService } from '../guestbook/guestbook.service';
 import { JobsService } from '../jobs/jobs.service';
+import { LabService } from '../lab/lab.service';
 import { MarketsService } from '../markets/markets.service';
 import { McpService } from '../mcp/mcp.service';
 import { PresenceService } from '../presence/presence.service';
@@ -42,6 +43,7 @@ export class HealthController {
     ask: AskService,
     contact: ContactService,
     mcp: McpService,
+    lab: LabService,
   ) {
     this.units = [
       steam,
@@ -56,6 +58,7 @@ export class HealthController {
       ask,
       contact,
       mcp,
+      lab,
     ];
   }
 

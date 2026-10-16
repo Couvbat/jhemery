@@ -291,7 +291,7 @@ describe('useMusicEmbed', () => {
     expect(embed.src.value).toBe(before)
   })
 
-  it('subscribes from each load and asks whether it is paused, until the widget answers', async () => {
+  it('subscribes from each load and asks whether it is paused and what it plays, until the widget answers', async () => {
     vi.useFakeTimers()
     const { embed } = await load()
     const posted = vi.spyOn(iframe.contentWindow!, 'postMessage')
@@ -301,14 +301,17 @@ describe('useMusicEmbed', () => {
       [{ method: 'addEventListener', value: 'play' }, 'https://w.soundcloud.com'],
       [{ method: 'addEventListener', value: 'pause' }, 'https://w.soundcloud.com'],
       [{ method: 'addEventListener', value: 'finish' }, 'https://w.soundcloud.com'],
+      // The field's: where the track is, and which track (`soundcloud-bridge.ts`).
+      [{ method: 'addEventListener', value: 'playProgress' }, 'https://w.soundcloud.com'],
       [{ method: 'isPaused', value: null }, 'https://w.soundcloud.com'],
+      [{ method: 'getCurrentSound', value: null }, 'https://w.soundcloud.com'],
     ])
 
     await vi.advanceTimersByTimeAsync(500)
-    expect(posted).toHaveBeenCalledTimes(8)
+    expect(posted).toHaveBeenCalledTimes(12)
     widget('isPaused', true)
     await vi.advanceTimersByTimeAsync(5_000)
-    expect(posted).toHaveBeenCalledTimes(8)
+    expect(posted).toHaveBeenCalledTimes(12)
   })
 
   // Found against the real widget: its own `ready` arrives first and ends the retries, so
@@ -326,10 +329,12 @@ describe('useMusicEmbed', () => {
       'addEventListener',
       'addEventListener',
       'addEventListener',
+      'addEventListener',
       'isPaused',
+      'getCurrentSound',
     ])
     await vi.advanceTimersByTimeAsync(5_000)
-    expect(posted).toHaveBeenCalledTimes(4)
+    expect(posted).toHaveBeenCalledTimes(6)
   })
 
   it('gives up on a frame that never answers', async () => {
@@ -338,6 +343,45 @@ describe('useMusicEmbed', () => {
     const posted = vi.spyOn(iframe.contentWindow!, 'postMessage')
     embed.onFrameLoad()
     await vi.advanceTimersByTimeAsync(60_000)
-    expect(posted.mock.calls.length).toBe(20 * 4)
+    expect(posted.mock.calls.length).toBe(20 * 6)
+  })
+
+  // The field's bridge used to subscribe the widget itself, a second conversation with the
+  // same frame; now it hears this one.
+  describe('listen', () => {
+    it('hands every checked message on, and nothing from another origin or frame', async () => {
+      const { embed } = await load()
+      const heard: Array<{ method: string; value: unknown }> = []
+      embed.listen((message) => heard.push(message))
+
+      widget('playProgress', { currentPosition: 1_200 })
+      widget('play', undefined, { origin: 'https://evil.example' })
+      widget('play', undefined, { source: window })
+      window.dispatchEvent(new MessageEvent('message', { data: '{not json', origin: 'https://w.soundcloud.com', source: iframe.contentWindow }))
+
+      expect(heard).toEqual([{ method: 'playProgress', value: { currentPosition: 1_200 } }])
+    })
+
+    it('asks what a late listener missed, and what plays whenever a track starts', async () => {
+      const { embed } = await load()
+      const posted = vi.spyOn(iframe.contentWindow!, 'postMessage')
+      const stop = embed.listen(() => {})
+      expect(posted.mock.calls.map(([message]) => JSON.parse(message as string).method)).toEqual(['isPaused', 'getCurrentSound'])
+
+      posted.mockClear()
+      widget('play')
+      expect(posted.mock.calls.map(([message]) => JSON.parse(message as string).method)).toEqual(['getCurrentSound'])
+      stop()
+    })
+
+    it('stops when told to', async () => {
+      const { embed } = await load()
+      const heard: string[] = []
+      const stop = embed.listen(({ method }) => heard.push(method))
+      widget('play')
+      stop()
+      widget('pause')
+      expect(heard).toEqual(['play'])
+    })
   })
 })

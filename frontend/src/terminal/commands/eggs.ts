@@ -6,6 +6,7 @@ import {
   resetScene,
   setConstellation,
   setGravity,
+  setMusicReaction,
   spawnShapes,
   useSceneControl,
 } from '@/composables/useSceneControl'
@@ -15,9 +16,10 @@ import { announce, unlock } from '../achievements'
 import { COW, TRAIN } from '../ascii'
 import { bannerLines, BANNER_MAX_CHARS } from '../ascii-banner'
 import { art, blank, line, link, pre } from '../format'
+import { labHosts, labLogin, labShell } from '../lab-shell'
 import { sleep } from '../timing'
 import type { Command, CommandContext, OutputLine } from '../types'
-import { forgetGuestbookFile, resolveGuestbookFile } from './guestbook-fs'
+import { cacheHeldEntries, filenameFor, forgetGuestbookFile, resolveGuestbookFile, resolveHeldFile } from './guestbook-fs'
 import { ENV_FILE } from './env-file'
 import { listFiles, resolveFileLines } from './files'
 
@@ -124,7 +126,8 @@ async function removeGuestbookEntry(
   ctx: CommandContext,
   target: string,
 ): Promise<OutputLine[]> {
-  const entry = resolveGuestbookFile(target)
+  // A held entry too, by the `held/<file>` name `sudo guestbook held` gave it.
+  const entry = resolveGuestbookFile(target) ?? resolveHeldFile(target)
   if (!entry) {
     return [line(`rm: cannot remove '${target}': No such file or directory`, 'error')]
   }
@@ -144,6 +147,52 @@ async function removeGuestbookEntry(
       return [line(`rm: cannot remove '${target}': No such file or directory`, 'error')]
     }
     return [line('rm: request failed', 'error')]
+  }
+}
+
+/**
+ * `sudo guestbook held`: what the model held, and what it hasn't read yet, as
+ * `held/<file>` names with the reason and the age, for the owner only: the API checks
+ * the password before it lists anything.
+ */
+async function listHeld(ctx: CommandContext): Promise<OutputLine[]> {
+  const password = await ctx.prompt('[sudo] password for visitor:', { mask: true })
+  if (!password) return [line('sudo: no password entered', 'error')]
+  let entries: Awaited<ReturnType<typeof api.heldGuestbook>>
+  try {
+    entries = await api.heldGuestbook(password)
+  } catch (error) {
+    if (error instanceof ApiError && error.status === 403) return [line('sudo: incorrect password', 'error')]
+    return [line('guestbook: request failed', 'error')]
+  }
+  cacheHeldEntries(entries)
+  if (!entries.length) return [line('nothing held, nothing waiting.', 'muted')]
+  const minutes = (ms: number) => (ms < 3_600_000 ? `${Math.max(1, Math.round(ms / 60_000))} min` : `${Math.round(ms / 3_600_000)} h`)
+  return entries.flatMap((entry) => [
+    {
+      text: `${entry.status === 'held' ? 'held   ' : 'pending'}  ${(entry.reason ?? '-').padEnd(13)}  ${minutes(entry.ageMs).padStart(6)}  held/${filenameFor(entry)}`,
+      tone: entry.status === 'held' ? ('warning' as const) : ('muted' as const),
+      pre: true,
+    },
+    // The entry's own words, as text: the guestbook is the reason output has no markup.
+    line(`  ${entry.name}: ${entry.message}`),
+  ]).concat([blank, line('`sudo approve held/<file>` publishes one; `sudo rm held/<file>` removes it.', 'muted')])
+}
+
+/** `sudo approve <file>`: up, whatever the model said. */
+async function approveHeld(ctx: CommandContext, target: string): Promise<OutputLine[]> {
+  const entry = resolveHeldFile(target)
+  if (!entry) return [line(`approve: ${target}: no such held entry — \`sudo guestbook held\` lists them`, 'error')]
+  const password = await ctx.prompt('[sudo] password for visitor:', { mask: true })
+  if (!password) return [line('sudo: no password entered', 'error')]
+  try {
+    await api.approveGuestbookEntry(entry.id, password)
+    forgetGuestbookFile(target)
+    return [line(`published held/${filenameFor(entry)}`, 'success')]
+  } catch (error) {
+    if (error instanceof ApiError && error.status === 403) return [line('sudo: incorrect password', 'error')]
+    if (error instanceof ApiError && error.status === 404) return [line(`approve: ${target}: already gone or already up`, 'error')]
+    return [line('approve: request failed', 'error')]
   }
 }
 
@@ -184,6 +233,10 @@ export const eggCommands: Command[] = [
         lockAdmin()
         return [line('sudo: credentials cleared', 'muted')]
       }
+
+      if (rest === 'guestbook held') return listHeld(ctx)
+      const approveMatch = /^approve\s+(\S+)$/.exec(rest)
+      if (approveMatch) return approveHeld(ctx, approveMatch[1]!)
 
       const rmMatch = /^rm\s+(?:-\w+\s+)?(\S+)$/.exec(rest)
       const rmTarget = rmMatch?.[1]
@@ -240,13 +293,17 @@ export const eggCommands: Command[] = [
     hidden: true,
     complete: ({ index }) =>
       index === 0
-        ? [`${profile.handle}@${profile.domain}`, `contact@${profile.domain}`]
+        ? [`${profile.handle}@${profile.domain}`, `contact@${profile.domain}`, ...labHosts]
         : [],
     async run(ctx) {
       const target = ctx.args[0]
       if (!target) {
         return [line('usage: ssh [user@]hostname', 'error')]
       }
+
+      // The lab's machines answer to their own names, with a shell of their own.
+      const lab = labLogin(target)
+      if (lab) return 'refused' in lab ? lab.refused : labShell(ctx, lab.host)
 
       const [user, host] = target.includes('@') ? target.split('@') : [profile.handle, target]
       if (host !== profile.domain && host !== 'localhost') {
@@ -647,17 +704,23 @@ export const eggCommands: Command[] = [
   },
   {
     name: 'scene',
-    usage: 'scene [reset]',
+    usage: 'scene [reset|music on|music off]',
     description: { en: 'Inspect or reset the background', fr: 'Inspecter ou réinitialiser le fond' },
     group: 'fun',
     writes: (args) => (args[0]?.toLowerCase() === 'reset' ? 'local' : 'none'),
     hidden: true,
-    complete: ({ index }) => (index === 0 ? ['reset'] : []),
+    complete: ({ index, args }) => (index === 0 ? ['reset', 'music'] : index === 1 && args[0] === 'music' ? ['on', 'off'] : []),
     run({ args }) {
       const control = useSceneControl()
       if (args[0] === 'reset') {
         resetScene()
         return [line('scene reset.', 'success')]
+      }
+      // Whether the field reacts to the music playing here: for the session, unsaved, as
+      // the other flags are.
+      if (args[0] === 'music' && (args[1] === 'on' || args[1] === 'off' || args.length === 1)) {
+        const on = setMusicReaction(args[1] === undefined ? undefined : args[1] === 'on')
+        return [line(on ? 'the field listens to the music.' : 'the field ignores the music.', 'success')]
       }
       if (args.length) return [line(`scene: unknown argument \`${args[0]}\``, 'error')]
 
@@ -665,6 +728,7 @@ export const eggCommands: Command[] = [
         pre(`shapes         ${control.shapeCount.value}`, 'primary'),
         pre(`gravity        ${control.gravityOn.value ? 'on' : 'off'}`, 'primary'),
         pre(`constellation  ${control.constellationOn.value ? 'on' : 'off'}`, 'primary'),
+        pre(`music          ${control.musicOn.value ? 'on' : 'off'}`, 'primary'),
         blank,
         line('try `spawn 10`, `gravity off`, `constellation on`, `scene reset`.', 'muted'),
         line('clicking a shape tells you what it is.', 'muted'),

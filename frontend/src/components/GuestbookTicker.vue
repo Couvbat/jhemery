@@ -62,6 +62,7 @@ onUnmounted(() => {
   >
     <button
       v-if="visible"
+      data-api="/guestbook"
       type="button"
       class="fixed bottom-20 left-4 z-[70] max-w-[min(20rem,calc(100vw-2rem))] rounded border border-accent/40 bg-background/95 backdrop-blur px-4 py-2 text-left text-xs sm:text-sm font-mono hover:border-accent transition-colors"
       @click="openGuestbook"

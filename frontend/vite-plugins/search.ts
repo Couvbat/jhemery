@@ -1,5 +1,6 @@
 import type { Plugin } from 'vite'
 import { decisions } from '../src/content/decisions'
+import { labNodes } from '../src/content/lab'
 import { now } from '../src/content/now'
 import type { SearchEntry, SearchIndex } from '../src/content/search'
 import type { Localised } from '../src/content/types'
@@ -9,9 +10,10 @@ import { noteFiles, readNote } from './notes'
 
 /**
  * `/search.json`: what the Ctrl+K palette searches besides its own commands. One entry
- * per case study, per `why` topic, per heading of every design note, and one for `/now`
- * (the shape is `content/search.ts`). Emitted like `content.json` rather than bundled,
- * because the palette is in the eager chunk and the home page sits near its byte budget:
+ * per case study, per `why` topic, per heading of every design note, and one each for
+ * `/now` and `/lab` (the shape is `content/search.ts`). Emitted like `content.json` rather
+ * than bundled, because the palette is in the eager chunk and the home page sits near its
+ * byte budget:
  * the palette fetches this on the first query long enough to search with, and a visitor
  * who never searches never pays for it. Kept out of the precache, like the notes it
  * indexes, and off the SPA fallback (`vite.config.ts`).
@@ -43,7 +45,7 @@ function both(value: Localised, limit?: number): Localised {
  * An inline tag goes without a trace, so `(<code>x</code>)` reads `(x)`; any other
  * leaves a space, so two table cells don't run together.
  */
-function textOf(html: string): string {
+export function textOf(html: string): string {
   return html
     .replace(/<pre>[\s\S]*?<\/pre>/g, ' ')
     .replace(/<\/?(code|a|strong|em)\b[^>]*>/g, '')
@@ -57,7 +59,7 @@ function textOf(html: string): string {
     .trim()
 }
 
-const HEADING = /<h([1-6]) id="([^"]+)">([\s\S]*?)<\/h\1>/g
+export const HEADING = /<h([1-6]) id="([^"]+)">([\s\S]*?)<\/h\1>/g
 
 /**
  * A note's sections, read off the page the notes plugin renders rather than off the
@@ -102,6 +104,16 @@ export function buildSearchIndex(sha = commitSha()): SearchIndex {
         fr: cut(now.entries.map((entry) => entry.text.fr).join(' ')),
       },
       target: '/now',
+    },
+    // The lab map is a diagram, so its entry is what it draws: the node names and roles.
+    {
+      kind: 'lab',
+      title: '/lab',
+      text: {
+        en: cut(labNodes.map((node) => `${node.name}: ${node.role.en}.`).join(' ')),
+        fr: cut(labNodes.map((node) => `${node.name} : ${node.role.fr}.`).join(' ')),
+      },
+      target: '/lab',
     },
   ]
   return { version: 1, entries }

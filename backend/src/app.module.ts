@@ -12,6 +12,7 @@ import { StatsModule } from './stats/stats.module';
 import { RoomsModule } from './rooms/rooms.module';
 import { JobsModule } from './jobs/jobs.module';
 import { McpModule } from './mcp/mcp.module';
+import { LabModule } from './lab/lab.module';
 import { HealthModule } from './health/health.module';
 
 @Module({
@@ -29,6 +30,7 @@ import { HealthModule } from './health/health.module';
     RoomsModule,
     JobsModule,
     McpModule,
+    LabModule,
     HealthModule,
   ],
 })

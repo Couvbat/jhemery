@@ -51,9 +51,9 @@ ci:
 
     assertions:
       # --- Category scores -----------------------------------------------
-      # Baseline 0.96 on the home page (the 404 measured 0.97). The gap to 0.90
+      # Baseline 0.95 on the home page (the 404 measured 0.97). The gap to 0.90
       # absorbs a slow runner without absorbing an actual regression: shipping an
-      # extra render-blocking bundle costs far more than six points. The home page
+      # extra render-blocking bundle costs far more than five points. The home page
       # first measured 0.79, almost all of it layout shift, below.
       categories:performance: ['error', { minScore: 0.9 }]
 
@@ -95,12 +95,12 @@ ci:
 
       # --- Metric budgets --------------------------------------------------
       # Measured medians on the desktop preset, for whoever has to re-tune these
-      # later, on the home page: FCP 539 ms, LCP 632 ms, TBT 13 ms, CLS 0.008,
-      # 303 KiB total. (The 404, which these were first set against: FCP 353 ms,
+      # later, on the home page: FCP 520 ms, LCP 659 ms, TBT 27 ms, CLS 0.008,
+      # 306 KiB total. (The 404, which these were first set against: FCP 353 ms,
       # LCP 509 ms, TBT 4 ms, CLS 0.008.)
       first-contentful-paint: ['error', { maxNumericValue: 1200 }]
       largest-contentful-paint: ['error', { maxNumericValue: 2000 }]
-      # 400 ms against a 13 ms baseline looks absurdly loose and is not: blocking
+      # 400 ms against a 27 ms baseline looks absurdly loose and is not: blocking
       # time is the one metric that still swings hard on a contended runner.
       # What it catches is a change of kind — parsing work moved onto the
       # critical path — not a change of degree.
@@ -110,7 +110,7 @@ ci:
       # its own, moved with every letter. HeroSection.vue says how both stopped.
       cumulative-layout-shift: ['error', { maxNumericValue: 0.05 }]
 
-      # 303 KiB on the home page, of which 132 KiB is the three.js chunk. Lighthouse waits
+      # 306 KiB on the home page, of which 133 KiB is the three.js chunk. Lighthouse waits
       # for network idle, so the deferred background counts here even though no
       # visitor waits on it. The ceiling exists to make "just precache three.js"
       # or "just add one more dependency" show up as a red check rather than as
@@ -123,13 +123,24 @@ ci:
       # #154 (a head per page) adds its own. Together they measured 308.2 kB, and
       # the two KiB were raised on purpose rather than drifted into.
       #
-      # 304 KiB from the day the home page replaced the 404 as what is measured:
-      # 310,364 bytes, with nothing added to the site. The home page fetches what
-      # the 404 did, less the 404's own chunk, plus eight live-data calls that
-      # answer 404 here at about 450 bytes each, since there is no backend. Chrome
-      # also fetches the manifest's 3 kB icon on some runs and not others, and the
-      # ceiling has to hold with it.
-      total-byte-weight: ['error', { maxNumericValue: 311296 }]
+      # 305 KiB from #160, roadmap §K's seven features, which measured 312.4 kB
+      # with dev at about 308.9. What they add to the home page's first load,
+      # gzipped: the stylesheet's rules for the new pages (+0.5 kB, Tailwind has
+      # one sheet), the background's music reaction (+0.5 kB of glue, the reaction
+      # itself fetched only when music first plays), the API client's new calls
+      # (+0.25 kB), the SoundCloud conversation and x-ray's kept timings in the
+      # entry (+0.5 kB), and the music signal, a chunk the background shares with
+      # the sound sources (+0.15 kB and a request). Two trims came first (the
+      # reaction out of the first load, `content/music.ts` back in its chunk);
+      # what is left is features, not drift, and about 0.6 kB stays spare.
+      #
+      # 307 KiB from #162, the day the home page replaced the 404 as what is
+      # measured: 313,399 bytes with #160 in, nothing added to the site. The home
+      # page fetches what the 404 did, less the 404's own chunk, plus eight
+      # live-data calls that answer 404 here at about 450 bytes each, since there
+      # is no backend. Chrome also fetches the manifest's 3 kB icon on some runs
+      # and not others, and the ceiling has to hold with it. About 1 kB stays spare.
+      total-byte-weight: ['error', { maxNumericValue: 314368 }]
 
       # Speed Index is deliberately unasserted. The boot sequence is an
       # animation that keeps repainting on purpose, which is exactly what Speed

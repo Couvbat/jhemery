@@ -6,6 +6,9 @@ import {
 import { ConfigService } from '@nestjs/config';
 import { AskService } from './ask.service';
 import { AskDto } from './ask.dto';
+import { AskCorpusService } from './ask.corpus';
+import { McpContentService } from '../mcp/mcp.content';
+import { LabService } from '../lab/lab.service';
 
 /**
  * `ask` is the only endpoint that spends someone's electricity and points at a
@@ -402,7 +405,9 @@ describe('AskService', () => {
       const { onDelta } = collect();
 
       await instance.answer(dto, onDelta);
-      await expect(instance.answer(dto, onDelta)).resolves.toBeUndefined();
+      await expect(instance.answer(dto, onDelta)).resolves.toMatchObject({
+        empty: false,
+      });
     });
 
     it('frees the slot after a failure too', async () => {
@@ -416,7 +421,9 @@ describe('AskService', () => {
       );
 
       respond(() => completion(delta('hi'), 'data: [DONE]\n\n'));
-      await expect(instance.answer(dto, onDelta)).resolves.toBeUndefined();
+      await expect(instance.answer(dto, onDelta)).resolves.toMatchObject({
+        empty: false,
+      });
     });
   });
 
@@ -520,9 +527,9 @@ describe('AskService', () => {
 
       respond(() => completion(delta('Yes, he does.'), 'data: [DONE]\n\n'));
       const second = collect();
-      await expect(
-        instance.answer(dto, second.onDelta),
-      ).resolves.toBeUndefined();
+      await expect(instance.answer(dto, second.onDelta)).resolves.toMatchObject(
+        { empty: false },
+      );
       expect(second.deltas.join('')).toBe('Yes, he does.');
     });
 
@@ -537,13 +544,87 @@ describe('AskService', () => {
       // Silence past the idle timeout, having already said something.
       await jest.advanceTimersByTimeAsync(15_000);
 
-      await expect(answered).resolves.toBeUndefined();
+      await expect(answered).resolves.toMatchObject({ empty: false });
       expect(deltas.join('')).toContain('starting');
       expect(model.upstream()?.aborted).toBe(true);
     });
   });
 
   describe('corpus', () => {
+    it('puts the passages retrieval found in the prompt, and counts them for /health', async () => {
+      respond(() => completion('data: [DONE]\n\n'));
+      const passagesFor = jest.fn(() => [
+        {
+          passage: {
+            id: 'why-polling',
+            kind: 'why',
+            title: 'Why the ticker polls',
+            text: 'Every twenty seconds.',
+            target: 'why polling',
+          },
+          score: 3,
+          title: 'Why the ticker polls',
+          text: 'Every twenty seconds.',
+        },
+      ]);
+      const instance = new AskService(
+        {
+          get: (key: string) => (configured as Record<string, string>)[key],
+        } as unknown as ConfigService,
+        { current: () => null } as unknown as McpContentService,
+        { passagesFor, size: 1 } as unknown as AskCorpusService,
+      );
+      const { onDelta } = collect();
+
+      await instance.answer({ ...dto, locale: 'fr' }, onDelta);
+
+      expect(passagesFor).toHaveBeenCalledWith(dto.question, 'fr');
+      expect(promptAt(1)).toContain(
+        'PASSAGES:\n## Why the ticker polls (why polling)\nEvery twenty seconds.',
+      );
+      expect(instance.health().detail).toMatchObject({ passages: 1 });
+    });
+
+    it.each([true, false])(
+      'carries LAB NOW only when the lab is configured (%s)',
+      async (configuredLab) => {
+        respond(() => completion('data: [DONE]\n\n'));
+        const report = configuredLab
+          ? {
+              configured: true,
+              receivedAt: '2026-10-15T19:42:02.000Z',
+              ageMs: 40_000,
+              stale: false,
+              history: {},
+              snapshot: {
+                takenAt: '2026-10-15T19:42:01.000Z',
+                machines: [{ id: 'poseidon', up: true, cpu: 8 }],
+                services: [],
+              },
+            }
+          : { configured: false };
+        const instance = new AskService(
+          {
+            get: (key: string) => (configured as Record<string, string>)[key],
+          } as unknown as ConfigService,
+          undefined,
+          undefined,
+          { report: () => Promise.resolve(report) } as unknown as LabService,
+        );
+        const { onDelta } = collect();
+
+        await instance.answer(dto, onDelta);
+
+        if (configuredLab) {
+          expect(promptAt(1)).toContain(
+            'LAB NOW (snapshot 40 s old):\nposeidon: up, CPU 8 %',
+          );
+        } else {
+          expect(promptAt(1)).not.toContain('LAB NOW');
+        }
+      },
+    );
+
     it('does not make the answer wait on llms.txt', async () => {
       // The production bug: awaiting this fetch put a loopback HTTP call to the
       // frontend host on the request path, and when it hung the endpoint hung
@@ -564,7 +645,9 @@ describe('AskService', () => {
       );
       const { deltas, onDelta } = collect();
 
-      await expect(service().answer(dto, onDelta)).resolves.toBeUndefined();
+      await expect(service().answer(dto, onDelta)).resolves.toMatchObject({
+        empty: false,
+      });
 
       expect(dialled).toBe(true);
       expect(deltas.join('')).toBe('Yes.');
@@ -674,6 +757,217 @@ describe('AskService', () => {
       expect(lines).toMatch(/\d+ms/);
       expect(lines).not.toContain(dto.question);
       expect(lines).not.toContain('a private answer');
+    });
+
+    it('leads a failure with its reason, then the upstream’s own words', async () => {
+      const warned = jest.spyOn(Logger.prototype, 'warn');
+      respond(() => ({ ok: false, status: 403 }) as unknown as Response);
+      const { onDelta } = collect();
+
+      await expect(service().answer(dto, onDelta)).rejects.toMatchObject({
+        reason: 'refused',
+      });
+
+      const lines = warned.mock.calls.map((call) => String(call[0]));
+      expect(lines).toContainEqual(
+        expect.stringMatching(
+          /^ask failed after \d+ms: refused \(The model answered 403\)$/,
+        ),
+      );
+      expect(lines.join('\n')).not.toContain(dto.question);
+    });
+  });
+
+  describe('the work it shows', () => {
+    const passage = (n: number) => ({
+      passage: {
+        id: `p${n}`,
+        kind: 'why',
+        title: `Passage ${n}`,
+        text: 'x',
+        target: `why topic-${n}`,
+      },
+      score: 10 - n,
+      title: `Passage ${n}`,
+      text: 'x',
+    });
+
+    function withPassages(env: Record<string, string> = configured) {
+      return new AskService(
+        { get: (key: string) => env[key] } as unknown as ConfigService,
+        undefined,
+        {
+          passagesFor: () => [1, 2, 3, 4].map(passage),
+          size: 4,
+        } as unknown as AskCorpusService,
+      );
+    }
+
+    it('asks the runtime for its token count, and reports it with the sources it was given', async () => {
+      respond(() =>
+        completion(
+          delta('Yes, '),
+          delta('he does.'),
+          `data: ${JSON.stringify({ choices: [], usage: { completion_tokens: 58 } })}\n\n`,
+          'data: [DONE]\n\n',
+        ),
+      );
+      const instance = withPassages({
+        ...configured,
+        LLM_HOST_LABEL: 'poseidon · RTX 3080',
+      });
+      const { onDelta } = collect();
+
+      const answer = await instance.answer(dto, onDelta);
+
+      const [, init] = fetchMock.mock.calls[1] as [string, RequestInit];
+      expect(JSON.parse(init.body as string)).toMatchObject({
+        stream_options: { include_usage: true },
+      });
+      expect(answer.meta).toMatchObject({
+        model: 'a-model',
+        label: 'poseidon · RTX 3080',
+        outputTokens: 58,
+        sources: [
+          { title: 'Passage 1', target: 'why topic-1' },
+          { title: 'Passage 2', target: 'why topic-2' },
+          { title: 'Passage 3', target: 'why topic-3' },
+        ],
+      });
+      expect(answer.meta!.approx).toBeUndefined();
+      expect(answer.meta!.firstTokenMs).toBeGreaterThanOrEqual(0);
+      expect(answer.meta!.totalMs).toBeGreaterThanOrEqual(
+        answer.meta!.firstTokenMs,
+      );
+    });
+
+    it('counts deltas, and says so, when the runtime sends no usage', async () => {
+      respond(() =>
+        completion(delta('Yes, '), delta('he does.'), 'data: [DONE]\n\n'),
+      );
+      const { onDelta } = collect();
+
+      const answer = await withPassages().answer(dto, onDelta);
+
+      expect(answer.meta).toMatchObject({ outputTokens: 2, approx: true });
+      expect(answer.meta!.label).toBeUndefined();
+    });
+  });
+
+  describe('why it failed', () => {
+    it.each([
+      [500, 'upstream'],
+      [524, 'upstream'],
+      [403, 'refused'],
+    ])('names a %s from the model host %s', async (status, reason) => {
+      respond(() => ({ ok: false, status }) as unknown as Response);
+      const { onDelta } = collect();
+
+      await expect(service().answer(dto, onDelta)).rejects.toMatchObject({
+        reason,
+        status: 502,
+      });
+    });
+
+    it('names a connection that never answered unreachable', async () => {
+      fetchMock.mockImplementation((url: string | URL) =>
+        String(url).includes('llms.txt')
+          ? Promise.resolve(corpus as unknown as Response)
+          : Promise.reject(new Error('ECONNREFUSED')),
+      );
+      const { onDelta } = collect();
+
+      await expect(service().answer(dto, onDelta)).rejects.toMatchObject({
+        reason: 'unreachable',
+      });
+    });
+
+    it('names the unconfigured install, still with the 502 it always had', async () => {
+      const { onDelta } = collect();
+      await expect(service({}).answer(dto, onDelta)).rejects.toMatchObject({
+        reason: 'unconfigured',
+        status: 502,
+      });
+    });
+
+    it('says an answer that was only thinking ended empty, and records it', async () => {
+      respond(() =>
+        completion(delta('<think>hmm</think>'), 'data: [DONE]\n\n'),
+      );
+      const instance = service();
+      const { onDelta } = collect();
+
+      await expect(instance.answer(dto, onDelta)).resolves.toEqual({
+        empty: true,
+      });
+      expect(instance.health().last).toMatchObject({ outcome: 'empty' });
+    });
+
+    it('names the deadline timeout and a second question while it loads warming', async () => {
+      jest.useFakeTimers();
+      const held = pending();
+      fetchMock.mockImplementation((url: string | URL) =>
+        String(url).includes('llms.txt')
+          ? Promise.resolve(corpus as unknown as Response)
+          : Promise.resolve(held.res),
+      );
+      const instance = service();
+      const { onDelta } = collect();
+
+      const first = expect(instance.answer(dto, onDelta)).rejects.toMatchObject(
+        { reason: 'timeout' },
+      );
+      await jest.advanceTimersByTimeAsync(20_000);
+      await first;
+      await expect(instance.answer(dto, onDelta)).rejects.toMatchObject({
+        reason: 'warming',
+      });
+
+      held.push(delta('awake'));
+      held.close();
+      await jest.advanceTimersByTimeAsync(0);
+      jest.useRealTimers();
+    });
+  });
+
+  describe('health', () => {
+    it('reports the last real outcome and the counts, and probes nothing', async () => {
+      const instance = service();
+      expect(instance.health()).toEqual({
+        unit: 'ask',
+        state: 'active',
+        detail: { ok: 0, failed: 0, passages: 0 },
+      });
+
+      respond(() => completion(delta('hi'), 'data: [DONE]\n\n'));
+      const { onDelta } = collect();
+      await instance.answer(dto, onDelta);
+      respond(() => ({ ok: false, status: 403 }) as unknown as Response);
+      await expect(instance.answer(dto, onDelta)).rejects.toThrow();
+
+      const dials = fetchMock.mock.calls.length;
+      const health = instance.health(Date.now() + 120_000);
+      expect(health.last).toEqual({
+        outcome: 'refused',
+        agoMs: expect.any(Number) as number,
+      });
+      expect(health.last!.agoMs).toBeGreaterThanOrEqual(120_000);
+      expect(health.detail).toMatchObject({ ok: 1, failed: 1 });
+      expect(fetchMock.mock.calls).toHaveLength(dials);
+    });
+
+    it('records the controller’s silence ceiling as silent', () => {
+      const instance = service();
+      instance.recordSilent(45_000);
+      expect(instance.health().last).toMatchObject({ outcome: 'silent' });
+    });
+
+    it('stays inactive and says nothing more when off', () => {
+      expect(service({}).health()).toEqual({
+        unit: 'ask',
+        state: 'inactive',
+        reason: 'disabled',
+      });
     });
   });
 });

@@ -1,4 +1,6 @@
-import { Controller, Get } from '@nestjs/common';
+import { Controller, Get, Res } from '@nestjs/common';
+import type { Response } from 'express';
+import { timedCopy } from '../common/server-timing';
 import { GithubService } from './github.service';
 import {
   GithubActivity,
@@ -7,27 +9,52 @@ import {
   GithubWorkflowStatus,
 } from './github.types';
 
+/** Each route says whether it served its cache or fetched, in `Server-Timing` (see `timedCopy`). */
 @Controller('github')
 export class GithubController {
   constructor(private readonly githubService: GithubService) {}
 
   @Get('activity')
-  async getActivity(): Promise<GithubActivity> {
-    return this.githubService.getActivity();
+  getActivity(
+    @Res({ passthrough: true }) res: Response,
+  ): Promise<GithubActivity> {
+    return timedCopy(
+      res,
+      () => this.githubService.cacheAges().activity,
+      () => this.githubService.getActivity(),
+    );
   }
 
   @Get('contributions')
-  async getContributions(): Promise<GithubContributions> {
-    return this.githubService.getContributions();
+  getContributions(
+    @Res({ passthrough: true }) res: Response,
+  ): Promise<GithubContributions> {
+    return timedCopy(
+      res,
+      () => this.githubService.cacheAges().contributions,
+      () => this.githubService.getContributions(),
+    );
   }
 
   @Get('pinned-repos')
-  async getPinnedRepos(): Promise<GithubPinnedRepos> {
-    return this.githubService.getPinnedRepos();
+  getPinnedRepos(
+    @Res({ passthrough: true }) res: Response,
+  ): Promise<GithubPinnedRepos> {
+    return timedCopy(
+      res,
+      () => this.githubService.cacheAges().pinnedRepos,
+      () => this.githubService.getPinnedRepos(),
+    );
   }
 
   @Get('workflow-status')
-  async getWorkflowStatus(): Promise<GithubWorkflowStatus> {
-    return this.githubService.getWorkflowStatus();
+  getWorkflowStatus(
+    @Res({ passthrough: true }) res: Response,
+  ): Promise<GithubWorkflowStatus> {
+    return timedCopy(
+      res,
+      () => this.githubService.cacheAges().workflowStatus,
+      () => this.githubService.getWorkflowStatus(),
+    );
   }
 }

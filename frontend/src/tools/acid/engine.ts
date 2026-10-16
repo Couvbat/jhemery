@@ -1,3 +1,4 @@
+import { attachMusic } from '@/lib/music-signal'
 import { midiOf, stepDuration, stepTimes, STEPS, type Knob, type Pattern, type StepTime } from './pattern'
 
 /**
@@ -90,6 +91,30 @@ export interface AcidEngine {
   dispose: () => void
 }
 
+/** A step booked: when it sounds, which of the pattern's steps it is, its place counting
+ *  from the start, and the tempo it was booked at. */
+export interface BookedStep {
+  step: number
+  time: number
+  index: number
+  bpm: number
+}
+
+/**
+ * Beats since the sequencer started, by the audio clock, for the field to follow
+ * (`docs/superpowers/specs/2026-10-15-music-reactive-field-design.md`): the step sounding
+ * now over four, since a step is a sixteenth, plus how far into it the clock is, at the
+ * tempo that step was booked at, so a tempo change mid-pattern doesn't make the beat jump.
+ * Null before the first step sounds.
+ */
+export function beatsAt(booked: readonly BookedStep[], now: number): number | null {
+  let mark: BookedStep | undefined
+  for (const each of booked) if (each.time <= now) mark = each
+  if (!mark) return null
+  const into = Math.min(1, Math.max(0, (now - mark.time) / stepDuration(mark.bpm)))
+  return (mark.index + into) / 4
+}
+
 /** At most one sequencer sounds at a time, whichever surface started it: the tool and
  *  the shell would otherwise play two patterns over each other. */
 let sounding: { halt: (reason: StopReason) => void } | null = null
@@ -119,7 +144,12 @@ export function createEngine(
   limiter.attack.value = 0.002
   limiter.release.value = 0.1
 
-  const chain: AudioNode[] = [oscillator, filter, shaper, amp, master, limiter]
+  // In series just before the destination, so every browser pulls it: an analyser hanging
+  // off a branch with no output isn't reliably processed. It reads; it changes nothing.
+  const analyser = context.createAnalyser()
+  analyser.fftSize = 256
+
+  const chain: AudioNode[] = [oscillator, filter, shaper, amp, master, limiter, analyser]
   chain.forEach((node, i) => node.connect(chain[i + 1] ?? context.destination))
   oscillator.start()
 
@@ -131,7 +161,10 @@ export function createEngine(
   /** Whether the step last booked left its gate open for the next one to slide into. */
   let tied = false
   /** The last few steps booked, oldest first: what `position()` reads the clock against. */
-  const booked: StepTime[] = []
+  const booked: BookedStep[] = []
+  /** How many steps have been booked since start, for the beat count. */
+  let count = 0
+  let detachMusic: (() => void) | null = null
   let drive = Number.NaN
 
   function book({ step, time }: StepTime, pattern: Pattern) {
@@ -143,7 +176,8 @@ export function createEngine(
     }
     oscillator.type = pattern.wave === 'square' ? 'square' : 'sawtooth'
     filter.Q.setValueAtTime(voice.resonance, time)
-    booked.push({ step, time })
+    booked.push({ step, time, index: count, bpm: pattern.bpm })
+    count += 1
     if (booked.length > 8) booked.shift()
 
     const current = pattern.steps[step]
@@ -194,6 +228,8 @@ export function createEngine(
     window.clearInterval(timer)
     document.removeEventListener('visibilitychange', onVisibility)
     if (sounding?.halt === halt) sounding = null
+    detachMusic?.()
+    detachMusic = null
 
     const now = context.currentTime
     amp.gain.cancelScheduledValues(now)
@@ -228,7 +264,17 @@ export function createEngine(
       void context.resume().catch(() => {})
       cursor = { step: 0, time: context.currentTime + 0.05 }
       tied = false
+      count = 0
       playing = true
+      // The field follows it while it sounds, from the tool and from the shell alike.
+      detachMusic = attachMusic({
+        id: 'acid',
+        beats: () => beatsAt(booked, context.currentTime),
+        get bpm() {
+          return read().bpm
+        },
+        spectrum: (into) => analyser.getByteFrequencyData(into),
+      })
       document.addEventListener('visibilitychange', onVisibility)
       tick()
       timer = window.setInterval(tick, TICK_MS)

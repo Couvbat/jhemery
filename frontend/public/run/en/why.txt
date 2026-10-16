@@ -6,6 +6,7 @@
   rooms-sse             How the rooms stay in sync
   ffmpeg-single-thread  Why ffmpeg runs on one thread
   ask-no-rag            How ask knows about the site
+  ask-retrieval         How ask finds the right part of the site
   mcp-sdk               Why the MCP server is hand-written
   polling               Why the guestbook ticker polls
   steam-proxy           Where the Steam game log comes from

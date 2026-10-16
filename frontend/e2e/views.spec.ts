@@ -171,6 +171,9 @@ test.describe('page changes, for a keyboard and a screen reader', () => {
 
   test('the skip link is the first Tab, and lands on the heading without a hash', async ({ page }) => {
     await page.goto('/tools')
+    // The page's view is a lazy chunk: pressed in the first ~150 ms after `load`, the link
+    // had no heading to go to yet, and the test failed about one run in fifteen (#160).
+    await expect(page.getByRole('heading', { level: 1, name: heading() })).toBeVisible()
 
     await page.keyboard.press('Tab')
     const skip = page.getByRole('link', { name: messages.nav.skip.en })

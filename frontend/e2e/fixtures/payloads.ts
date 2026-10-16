@@ -4,6 +4,8 @@ import type {
   GithubPinnedRepos,
   GithubWorkflowStatus,
   GuestbookList,
+  HealthReport,
+  LabReport,
   MarketsReport,
   StatsReport,
   SteamActivity,
@@ -167,12 +169,53 @@ export const guestbookConfigured: GuestbookList = {
 }
 
 /**
+ * The lab, freshly pushed: poseidon up with its pool and GPU, one service down. Its age is
+ * fixed, so the strip reads the same on every run.
+ */
+export const labConfigured: LabReport = {
+  configured: true,
+  receivedAt: '2026-10-15T19:42:02.000Z',
+  ageMs: 40_000,
+  stale: false,
+  snapshot: {
+    takenAt: '2026-10-15T19:42:01.000Z',
+    machines: [
+      {
+        id: 'poseidon',
+        up: true,
+        uptimeSeconds: 1_036_800,
+        cpu: 8,
+        memory: 41,
+        tempC: { cpu: 47, gpu: 44 },
+        pools: [{ name: 'tank', health: 'ONLINE', used: 0.61 }],
+        gpu: { util: 3, vramUsedMb: 2150, vramTotalMb: 10240 },
+        containers: 6,
+      },
+      { id: 'optimus', up: true, cpu: 2, memory: 64, pools: [{ name: 'data', health: 'ONLINE', used: 0.74 }] },
+    ],
+    services: [
+      { id: 'umami', status: 'up', latencyMs: 41 },
+      { id: 'n8n', status: 'down' },
+    ],
+    models: { runtime: 'up', resident: [{ name: 'gemma4:e4b', vramMb: 2100 }], installed: [{ name: 'gemma4:e4b', sizeGb: 9.6 }] },
+    tunnel: { healthy: true, connections: 4 },
+  },
+  history: { poseidon: [...Array<number | null>(29).fill(null), 1] },
+}
+
+/**
  * The degraded shape. Every optional integration answers this rather than erroring
  * when its key is missing, and the frontend is required to render it as an honest
  * "not available" — see the backend section of CLAUDE.md. `guestbook` and `ask` use
  * their own flags (`enabled`, and a 503) because they are off by default rather than
  * merely unconfigured.
  */
+/** `GET /health`, which answers configured or not: up three days, `ask` off. */
+export const healthReport: HealthReport = {
+  uptime: 3 * 86_400,
+  units: [{ unit: 'ask', state: 'inactive', reason: 'unconfigured' }],
+}
+
 export const unconfigured = { configured: false } as const
 
 export const guestbookDisabled: GuestbookList = { enabled: false }
