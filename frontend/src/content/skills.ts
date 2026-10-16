@@ -6,7 +6,7 @@ const REPO = 'https://github.com/Couvbat/jhemery/tree/master'
  * Technology names are proper nouns — no translation needed. `usedIn` is the evidence:
  * only what this repository can show gets a link, so each one is a claim a reader can
  * check in a click. Every `where` is a path `goTo()` accepts or a URL into the repo;
- * `skills.spec.ts` holds both kinds to that.
+ * `portfolio.spec.ts` holds both kinds to that, the URL down to the file it names.
  */
 export const skills: Skill[] = [
   { name: 'HTML' },
