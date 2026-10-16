@@ -557,7 +557,8 @@ once the frame exists, hears the widget through `useMusicEmbed`'s one conversati
 (`listen`): JSON `{ method, value }` as `api.js` speaks it, `addEventListener` per event,
 `getCurrentSound` for the sound, only `https://w.soundcloud.com` from that frame. It re-anchors the
 position on every `playProgress` (which never counts as playing: the widget sends a few after
-`pause`), takes tempos from `content/music.ts` for the beat, and reads the level off the track's
+`pause`), takes tempos from `content/tempos.ts` for the beat (its own module, so the list stays out of
+the home page's first load), and reads the level off the track's
 waveform, `waveform_url`'s JSON on `wave.sndcdn.com` (CSP `connect-src`), each height placed
 between the track's 10th and 95th percentiles. The waveform is 100 ms a point and its
 autocorrelation shows no beat, so the tempos are found offline instead: `npm run tempos`

@@ -4,7 +4,7 @@ import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import SectionHeader from '@/components/SectionHeader.vue'
 import WindowDots from '@/components/WindowDots.vue'
-import { music, tempos } from '@/content'
+import { music } from '@/content'
 import { stemTracks } from '@/content/stems'
 import { useLocale } from '@/i18n'
 import { useMusicEmbed, useMusicPlayer } from '@/composables/useMusicPlayer'
@@ -38,7 +38,7 @@ watch(frameEl, async (frame) => {
   if (!frame) return
   const { createSoundCloudBridge } = await import('@/components/music/soundcloud-bridge')
   if (frameEl.value !== frame) return
-  const bridge = createSoundCloudBridge({ tempos })
+  const bridge = createSoundCloudBridge()
   const unlisten = listen(bridge.receive)
   unfollow = () => {
     unlisten()

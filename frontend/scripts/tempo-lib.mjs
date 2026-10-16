@@ -1,5 +1,5 @@
 /**
- * A track's tempo and first beat from its audio, for `content/music.ts`'s `tempos`
+ * A track's tempo and first beat from its audio, for `content/tempos.ts`
  * (`npm run tempos`). SoundCloud's frame can't be heard from the page and its waveform is
  * 100 ms a point, too coarse for a beat, so the beat is found here, once, from the audio
  * itself, and the page follows the widget's position against it.
@@ -324,12 +324,12 @@ export function soundcloudPath(url) {
 const DECLARATION = /export const tempos: Readonly<Record<string, Tempo>> = \{[^]*?\r?\n?\}\r?\n/
 
 /**
- * `content/music.ts` with `entries` merged into its `tempos`, keyed and sorted by path,
+ * `content/tempos.ts` with `entries` merged into its `tempos`, keyed and sorted by path,
  * every other line as it was. Throws if the declaration isn't where it was left.
  */
 export function writeTempos(source, entries) {
   const found = DECLARATION.exec(source)
-  if (!found) throw new Error('content/music.ts: no `export const tempos` declaration to write into')
+  if (!found) throw new Error('content/tempos.ts: no `export const tempos` declaration to write into')
   const merged = new Map()
   for (const match of found[0].matchAll(/'([^']+)': \{ bpm: ([\d.]+), firstBeatMs: (\d+) \}/g)) {
     merged.set(match[1], { bpm: Number(match[2]), firstBeatMs: Number(match[3]) })

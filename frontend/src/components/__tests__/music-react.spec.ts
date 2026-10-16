@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it } from 'vitest'
-import { tempos } from '@/content/music'
+import { tempos } from '@/content/tempos'
 import { attachMusic, currentMusic, type MusicSource } from '@/lib/music-signal'
 import {
   CALM_MAX_SPEED,
@@ -197,7 +197,7 @@ describe('reading a spectrum, and saying what is followed', () => {
   })
 })
 
-describe('the tempos entered by hand', () => {
+describe('the tempos', () => {
   it.each(Object.entries(tempos))('%s has a positive tempo and a first beat at or after the start', (_path, tempo) => {
     expect(tempo.bpm).toBeGreaterThan(0)
     expect(tempo.firstBeatMs).toBeGreaterThanOrEqual(0)

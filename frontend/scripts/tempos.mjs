@@ -1,7 +1,7 @@
 /**
  * `npm run tempos -- <audio file | SoundCloud track or set URL>... [--write]`: each track's
- * tempo and first beat, detected from its audio (`tempo-lib.mjs`), for `content/music.ts`'s
- * `tempos`, which the background beats with while SoundCloud plays the track.
+ * tempo and first beat, detected from its audio (`tempo-lib.mjs`), for `content/tempos.ts`,
+ * which the background beats with while SoundCloud plays the track.
  *
  *   npm run tempos -- https://soundcloud.com/couvbat/sets/mon-bruit --write
  *   npm run tempos -- ~/exports/cultist.wav --path /couvbat/cultist --write
@@ -9,7 +9,7 @@
  * A dev-time script, as `npm run stems` is: it calls the system's `ffmpeg` to decode, and
  * for a SoundCloud URL `yt-dlp` to fetch the audio, into a temporary folder it removes
  * after. Meant for the site owner's own tracks. Without `--write` it only prints; with it,
- * the entries are merged into `src/content/music.ts`, keyed by each track's path on
+ * the entries are merged into `src/content/tempos.ts`, keyed by each track's path on
  * soundcloud.com, which a local file needs given with `--path`.
  *
  * `--range 110-220` is the octave the tempo is looked for in (the default): a track at 100
@@ -23,7 +23,7 @@ import { fileURLToPath, URL } from 'node:url'
 import { ANALYSIS_RATE, DEFAULT_RANGE, detectTempo, parseRange, soundcloudPath, writeTempos } from './tempo-lib.mjs'
 
 const root = resolve(fileURLToPath(new URL('..', import.meta.url)))
-const MUSIC = join(root, 'src/content/music.ts')
+const TEMPOS = join(root, 'src/content/tempos.ts')
 /** Below this the beat barely stands out from its offbeat: worth a listen before trusting. */
 const WEAK = 2
 
@@ -120,8 +120,8 @@ try {
 }
 
 if (write && Object.keys(found).length) {
-  writeFileSync(MUSIC, writeTempos(readFileSync(MUSIC, 'utf8'), found))
-  console.log(`\nwrote ${Object.keys(found).length} to src/content/music.ts`)
+  writeFileSync(TEMPOS, writeTempos(readFileSync(TEMPOS, 'utf8'), found))
+  console.log(`\nwrote ${Object.keys(found).length} to src/content/tempos.ts`)
 } else if (Object.keys(found).length) {
-  console.log(`\n${writeTempos('export const tempos: Readonly<Record<string, Tempo>> = {}\n', found)}add --write to put them in src/content/music.ts`)
+  console.log(`\n${writeTempos('export const tempos: Readonly<Record<string, Tempo>> = {}\n', found)}add --write to put them in src/content/tempos.ts`)
 }
