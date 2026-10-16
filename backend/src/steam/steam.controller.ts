@@ -19,7 +19,7 @@ export class SteamController {
   ): Promise<SteamActivity> {
     return timedCopy(
       res,
-      () => this.steamService.health().cacheAge,
+      () => this.steamService.copyAge(),
       () => this.steamService.getActivity(parseApps(apps)),
     );
   }

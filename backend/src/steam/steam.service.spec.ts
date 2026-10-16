@@ -216,6 +216,9 @@ describe('SteamService', () => {
     answers.GetOwnedGames = () => ({ body: { response: {} } });
     const steam = service();
     expect((await steam.getActivity([ISAAC])).favourites).toEqual([]);
+    expect(warn).toHaveBeenCalledWith(
+      expect.stringContaining('"Game details" public?'),
+    );
     now += 6 * 60_000;
     await steam.getActivity([ISAAC]);
     expect(calls('GetOwnedGames')).toHaveLength(2);
@@ -227,5 +230,50 @@ describe('SteamService', () => {
     expect(activity.configured).toBe(true);
     expect(activity.profile?.name).toBe('Couvbat');
     expect(activity).not.toHaveProperty('favourites');
+  });
+
+  // Found in review: a failing GetOwnedGames was asked again on every page load.
+  it('asks again five minutes after a failed read, keeping the last library meanwhile', async () => {
+    const steam = service();
+    await steam.getActivity([ISAAC]);
+    answers.GetOwnedGames = () => ({ status: 500 });
+    now += 25 * 60 * 60_000;
+    const stale = await steam.getActivity([ISAAC]);
+    expect(stale.favourites?.[0]).toMatchObject({
+      appId: ISAAC,
+      minutes: 72_240,
+    });
+    now += 60_000;
+    await steam.getActivity([ISAAC]);
+    expect(calls('GetOwnedGames')).toHaveLength(2);
+    now += 5 * 60_000;
+    await steam.getActivity([ISAAC]);
+    expect(calls('GetOwnedGames')).toHaveLength(3);
+  });
+
+  it('gives every call to Steam a deadline', async () => {
+    await service().getActivity([ISAAC, FACTORIO]);
+    for (const [, init] of fetchMock.mock.calls) {
+      expect((init as RequestInit | undefined)?.signal).toBeInstanceOf(
+        AbortSignal,
+      );
+    }
+  });
+
+  // Found in review: Server-Timing read the activity's cache alone, so a request that
+  // fetched a favourite's hours from Steam said it served a copy.
+  it('reads younger once a favourite has gone to Steam, so the request reads as a miss', async () => {
+    const steam = service();
+    await steam.getActivity();
+    now += 3 * 60_000;
+    const before = steam.copyAge(now)!;
+    expect(before).toBe(3 * 60_000);
+    await steam.getActivity([ISAAC]);
+    expect(steam.copyAge(now)!).toBeLessThan(before);
+    now += 60_000;
+    // Served from the copies now: older than before, so a hit.
+    const settled = steam.copyAge(now)!;
+    await steam.getActivity([ISAAC]);
+    expect(steam.copyAge(now)).toBe(settled);
   });
 });

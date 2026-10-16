@@ -1071,12 +1071,17 @@ with the markets module, the tour's games stop, and `stems` listed while it has 
     which was the typed list claiming to be recent.
   - `gaming` lists the favourites with their notes, so its curl page does too; `steam`'s
     unavailable line, and `gaming`'s last one, are in French as well now.
-  - Checked against the real API on 16 October: the library answered for all six, and every
-    achievements call said *Profile is not public*, a 400 like a game with no stats. Hours
-    need public game details; achievements need the profile itself public. So the counts
-    show once the owner makes it public, until then the cards show hours, and the backend
-    logs the refusal rather than reading it as a game with none. The receipts' first find:
-    Factorio's typed *150+ hours* is 146.
+  - Checked against the real API on 16 October: the library answered for all six, and the
+    achievements calls said *Profile is not public* with a 403, beside Project Zomboid's
+    *Requested app has no stats* with a 400. Hours need public game details; achievements
+    need the profile itself public. So the counts show once the owner makes it public;
+    until then the cards show hours, and the backend logs the refusal rather than reading
+    it as a game with none. The receipts' first find: Factorio's typed *150+ hours* is 146.
+  - After review: every call to Steam has an 8-second deadline, as weather's and markets'
+    have; a library that fails to load is asked for again in five minutes, the last one read
+    serving meanwhile, rather than on every page load; an empty one is logged, being most
+    likely game details that aren't public; and `Server-Timing` reads a request that fetched
+    a favourite from Steam as a miss.
 
 ## Build order
 
