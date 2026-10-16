@@ -17,7 +17,7 @@ import { escapeHtml, renderMarkdown } from './markdown'
  * deploy workflows watch their folder too.
  *
  * Each page says which language it is in, since the site is bilingual and the notes
- * are not: twelve are in English and one in French.
+ * are not: nineteen are in English and one in French.
  */
 
 const SPEC_DIR = fileURLToPath(new URL('../../docs/superpowers/specs/', import.meta.url))

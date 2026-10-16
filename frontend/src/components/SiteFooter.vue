@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { defineAsyncComponent, onMounted } from 'vue'
 import { RouterLink } from 'vue-router'
-import { events, profile } from '@/content'
+import { profile } from '@/content'
 import { useLocale } from '@/i18n'
 import { useStatus } from '@/composables/useStatus'
 import { startPresence, usePresence } from '@/composables/usePresence'
@@ -23,8 +23,9 @@ const builtLabel = new Date(builtAt).toLocaleDateString(undefined, {
 // numbers `neofetch` and `top` report inside the terminal, kept visible.
 const { uptime, lastDeploy } = useStatus(builtAt)
 
-// An event a week away or on, which `/now` has in full. Fetched only while there is one.
-const FooterEvent = defineAsyncComponent(() => import('./FooterEvent.vue'))
+// An event a week away or on, which `/now` has in full. Only in a build whose list has one
+// (`__HAS_EVENTS__`, vite.config.ts): otherwise the line and its chunk aren't built at all.
+const FooterEvent = __HAS_EVENTS__ ? defineAsyncComponent(() => import('./FooterEvent.vue')) : null
 
 // The status line is the only surface that shows the count, so it is also the
 // one that opens the stream. Stays null — and the segment stays out of the DOM
@@ -34,7 +35,7 @@ onMounted(startPresence)
 </script>
 
 <template>
-  <footer class="border-t border-border bg-background/80">
+  <footer class="border-t border-border bg-background/80" data-api="/presence">
     <div class="max-w-5xl mx-auto px-4 py-6 space-y-2">
     <div
       class="flex flex-wrap items-center gap-x-4 gap-y-2 font-mono text-xs text-muted-foreground"
@@ -55,6 +56,8 @@ onMounted(startPresence)
       <span class="text-muted-foreground/60">{{ t(m.footer.built) }} {{ builtLabel }}</span>
 
       <RouterLink to="/now" class="ml-auto hover:text-primary transition-colors">/now</RouterLink>
+
+      <RouterLink to="/lab" class="hover:text-primary transition-colors">/lab</RouterLink>
 
       <RouterLink to="/privacy" class="hover:text-primary transition-colors">/privacy</RouterLink>
 
@@ -89,7 +92,7 @@ onMounted(startPresence)
         {{ profile.availability.open ? '●' : '○' }} {{ t(profile.availability.note) }}
       </span>
       <span class="text-muted-foreground/40" aria-hidden="true">·</span>
-      <FooterEvent v-if="events.length" />
+      <FooterEvent v-if="FooterEvent" />
       <template v-if="online !== null">
         <span>{{ t(online === 1 ? m.footer.onlineOne : m.footer.online).replace('{n}', String(online)) }}</span>
         <span class="text-muted-foreground/40" aria-hidden="true">·</span>

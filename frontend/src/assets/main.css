@@ -269,7 +269,7 @@
   --popover-foreground: oklch(0.88 0.18 145);
   --primary: oklch(0.85 0.3 145);
   --primary-foreground: oklch(0.1 0.01 145);
-  --secondary: oklch(0.6 0.3 300);
+  --secondary: oklch(0.63 0.3 300);
   --secondary-foreground: oklch(0.98 0 0);
   --muted: oklch(0.18 0.01 145);
   --muted-foreground: oklch(0.58 0.1 145);
@@ -283,7 +283,7 @@
   --ring: oklch(0.85 0.3 145);
   --chart-1: oklch(0.85 0.3 145);
   --chart-2: oklch(0.85 0.2 200);
-  --chart-3: oklch(0.6 0.3 300);
+  --chart-3: oklch(0.63 0.3 300);
   --chart-4: oklch(0.8 0.25 60);
   --chart-5: oklch(0.75 0.25 350);
   --sidebar: oklch(0.13 0.01 145);

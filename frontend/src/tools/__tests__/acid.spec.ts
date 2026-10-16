@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { createEngine, MASTER_DB, MAX_RESONANCE_DB, shapeCurve, TICK_MS, voiceOf } from '../acid/engine'
+import { currentMusic } from '@/lib/music-signal'
+import { beatsAt, createEngine, MASTER_DB, MAX_RESONANCE_DB, shapeCurve, TICK_MS, voiceOf } from '../acid/engine'
 import {
   BYTES,
   DEFAULT_PATTERN,
@@ -281,6 +282,12 @@ class FakeContext {
       release: param(0.25),
     })
   }
+  createAnalyser() {
+    return this.make('analyser', {
+      fftSize: 2048,
+      getByteFrequencyData: vi.fn((into: Uint8Array) => into.fill(77)),
+    })
+  }
 }
 
 describe('the engine', () => {
@@ -305,9 +312,10 @@ describe('the engine', () => {
     vi.useRealTimers()
   })
 
-  it('wires oscillator → filter → shaper → amp → master → limiter → speakers', () => {
+  it('wires oscillator → filter → shaper → amp → master → limiter → analyser → speakers', () => {
     engineOn()
-    const order = ['oscillator', 'filter', 'shaper', 'gain', 'gain', 'compressor']
+    // The analyser in series, last: an analyser off a branch with no output isn't reliably pulled.
+    const order = ['oscillator', 'filter', 'shaper', 'gain', 'gain', 'compressor', 'analyser']
     expect(context.nodes.map((n) => n.kind)).toEqual(order)
     context.nodes.forEach((n, i) => expect(n.connections).toEqual([context.nodes[i + 1] ?? context.destination]))
     expect((node('gain', 1).gain as FakeParam).value).toBeCloseTo(10 ** (MASTER_DB / 20))
@@ -410,5 +418,44 @@ describe('the engine', () => {
     expect(node('oscillator').stop).toHaveBeenCalledWith(expect.any(Number))
     engine.start()
     expect(engine.playing).toBe(false)
+  })
+
+  // The field listens (`docs/superpowers/specs/2026-10-15-music-reactive-field-design.md`).
+  it('lets the field follow it while it sounds: beats, the pattern’s tempo, the spectrum', () => {
+    const engine = engineOn()
+    expect(currentMusic()).toBeNull()
+    engine.start()
+    const source = currentMusic()!
+    expect(source).toMatchObject({ id: 'acid', bpm: DEFAULT_PATTERN.bpm })
+    advance(1)
+    // A sixteenth is a quarter of a beat: a second in, the beat count is near bpm / 60.
+    expect(source.beats()!).toBeCloseTo(DEFAULT_PATTERN.bpm / 60 - 0.05 * (DEFAULT_PATTERN.bpm / 60), 0)
+    const bins = new Uint8Array(4)
+    source.spectrum!(bins)
+    expect([...bins]).toEqual([77, 77, 77, 77])
+    engine.stop()
+    expect(currentMusic()).toBeNull()
+  })
+})
+
+describe('beats from steps', () => {
+  const at = (index: number, time: number, bpm = 120) => ({ step: index % 16, time, index, bpm })
+
+  it('counts a step as a quarter of a beat, plus how far into it the clock is', () => {
+    // At 120 BPM a sixteenth lasts 0.125 s.
+    const booked = [at(0, 1), at(1, 1.125), at(2, 1.25)]
+    expect(beatsAt(booked, 0.5)).toBeNull()
+    expect(beatsAt(booked, 1)).toBe(0)
+    expect(beatsAt(booked, 1.0625)).toBeCloseTo(0.125)
+    expect(beatsAt(booked, 1.25)).toBeCloseTo(0.5)
+  })
+
+  it('keeps counting across the pattern’s wrap and a tempo change, without jumping', () => {
+    const booked = [at(15, 2.875, 120), at(16, 3, 120), at(17, 3.0625, 240)]
+    expect(beatsAt(booked, 3)).toBeCloseTo(4)
+    // Into a step booked at 240 BPM, a sixteenth is 0.0625 s.
+    expect(beatsAt(booked, 3.09375)).toBeCloseTo(17.5 / 4)
+    // Never past the end of the step it is in.
+    expect(beatsAt(booked, 9)).toBeCloseTo(18 / 4)
   })
 })

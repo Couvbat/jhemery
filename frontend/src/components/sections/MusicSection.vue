@@ -1,31 +1,50 @@
 <script setup lang="ts">
-import { defineAsyncComponent, nextTick, ref } from 'vue'
+import { defineAsyncComponent, nextTick, onBeforeUnmount, ref, watch } from 'vue'
 import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import SectionHeader from '@/components/SectionHeader.vue'
 import WindowDots from '@/components/WindowDots.vue'
-import { music } from '@/content'
-import { stemTracks } from '@/content/stems'
+import { music, tempos } from '@/content'
 import { useLocale } from '@/i18n'
 import { useMusicEmbed, useMusicPlayer } from '@/composables/useMusicPlayer'
 
 const { t, m } = useLocale()
 const { autoplayNonce, playerLoaded } = useMusicPlayer()
-// `src` takes the scheme's colour each time a frame is built, never while one is up (see
-// `useMusicEmbed`).
-const { src, load: loadFrame } = useMusicEmbed()
 
-// Its own chunk, fetched only when there is a track to mix (`content/stems.ts`): with the
-// list empty the home page never asks for it.
-const StemsMixer = defineAsyncComponent(() => import('@/components/stems/StemsMixer.vue'))
+// Its own chunk, and only in a build with a track to mix (`__HAS_STEMS__`, vite.config.ts):
+// with `content/stems.ts` empty, neither the mixer nor the code to fetch it is built.
+const StemsMixer = __HAS_STEMS__ ? defineAsyncComponent(() => import('@/components/stems/StemsMixer.vue')) : null
 
 // The button goes when the frame comes, and focus would fall to `<body>` with it.
 const frameEl = ref<HTMLIFrameElement | null>(null)
+// `src` follows the chosen scheme, but never while the player is playing: it listens to the
+// frame for that (see `useMusicEmbed`).
+const { src, load: loadFrame, onFrameLoad, listen } = useMusicEmbed(frameEl)
 async function load() {
   loadFrame()
   await nextTick()
   frameEl.value?.focus()
 }
+
+// What the frame plays, for the field to follow (`components/music/soundcloud-bridge.ts`):
+// its own chunk, fetched once there is a frame and never before, as the frame itself is. It
+// hears the embed's conversation with the widget rather than starting one. A `play`
+// remounts the frame, and a new bridge follows the new one from its first word.
+let unfollow: (() => void) | null = null
+watch(frameEl, async (frame) => {
+  unfollow?.()
+  unfollow = null
+  if (!frame) return
+  const { createSoundCloudBridge } = await import('@/components/music/soundcloud-bridge')
+  if (frameEl.value !== frame) return
+  const bridge = createSoundCloudBridge({ tempos })
+  const unlisten = listen(bridge.receive)
+  unfollow = () => {
+    unlisten()
+    bridge.dispose()
+  }
+})
+onBeforeUnmount(() => unfollow?.())
 </script>
 
 <template>
@@ -112,6 +131,7 @@ async function load() {
               frameborder="0"
               class="rounded"
               :title="t(m.music.listen)"
+              @load="onFrameLoad"
             ></iframe>
             <div
               v-else
@@ -133,7 +153,7 @@ async function load() {
                 :href="music.profileUrl"
                 target="_blank"
                 rel="noopener noreferrer"
-                class="text-accent hover:text-accent/80 transition-colors"
+                class="text-accent underline underline-offset-2 hover:text-accent/80 transition-colors"
                 >soundcloud.com/couvbat</a
               >
             </p>
@@ -141,7 +161,7 @@ async function load() {
         </div>
       </div>
 
-      <StemsMixer v-if="stemTracks.length" class="mt-4" />
+      <StemsMixer v-if="StemsMixer" class="mt-4" />
     </div>
   </section>
 </template>

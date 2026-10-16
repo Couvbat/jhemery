@@ -1,8 +1,8 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { RouterLink } from 'vue-router'
-import { feedFile, isExternal, now, nowCategories, profile, staleDays } from '@/content'
-import { eventEnd, eventStart, isLive, upcomingEvents, upcomingLabels as labels } from '@/content/upcoming'
+import { isExternal, now, nowCategories, profile, staleDays } from '@/content'
+import { eventEnd, eventStart, feedFile, isLive, upcomingEvents, upcomingLabels as labels } from '@/content/upcoming'
 import { goTo } from '@/composables/useViewSwing'
 import { useLocale } from '@/i18n'
 import { relative } from '@/tools/time/time'

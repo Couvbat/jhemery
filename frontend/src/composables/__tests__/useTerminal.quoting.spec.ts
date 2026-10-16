@@ -50,7 +50,7 @@ describe('quoting, as it was before pipes', () => {
     await vi.waitFor(() => expect(buffer.value.some((l) => l.text.includes('your name'))).toBe(true))
     await submit('J')
     await done
-    expect(mocks.sign).toHaveBeenCalledWith('J', 'great site; love it')
+    expect(mocks.sign).toHaveBeenCalledWith('J', 'great site; love it', 'en')
   })
 
   it("hands sign an elided French message whole: c'est top", async () => {
@@ -59,12 +59,12 @@ describe('quoting, as it was before pipes', () => {
     await vi.waitFor(() => expect(buffer.value.some((l) => l.text.includes('your name'))).toBe(true))
     await submit('J')
     await done
-    expect(mocks.sign).toHaveBeenCalledWith('J', "c'est top, j'adore")
+    expect(mocks.sign).toHaveBeenCalledWith('J', "c'est top, j'adore", 'en')
   })
 
   it('unquotes the question it hands ask', async () => {
     mocks.askStream.mockImplementation(async function* () {
-      yield 'ok'
+      yield { delta: 'ok' }
     })
     await run('ask "where does he work?"')
     expect(mocks.askStream.mock.calls[0]![0]).toBe('where does he work?')

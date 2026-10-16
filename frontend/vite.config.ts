@@ -12,10 +12,13 @@ import { notesPlugin } from './vite-plugins/notes'
 import { pagesPlugin } from './vite-plugins/pages'
 import { resumePlugin } from './vite-plugins/resume'
 import { searchPlugin } from './vite-plugins/search'
+import { corpusPlugin } from './vite-plugins/corpus'
 import { securityPlugin } from './vite-plugins/security'
 import { thirdPartyPlugin } from './vite-plugins/third-party'
 import { stampSource, xrayPlugin } from './vite-plugins/xray'
+import { events } from './src/content/events'
 import { profile } from './src/content/profile'
+import { stemTracks } from './src/content/stems'
 
 // https://vite.dev/config/
 export default defineConfig({
@@ -32,6 +35,7 @@ export default defineConfig({
     pagesPlugin(),
     discoveryPlugin(),
     searchPlugin(),
+    corpusPlugin(),
     thirdPartyPlugin(),
     xrayPlugin(),
     VitePWA({
@@ -92,9 +96,9 @@ export default defineConfig({
           // `/assets/` header in public/.htaccess, not on the service worker.
           '**/ffmpeg-core-*.js',
           '**/ffmpeg.worker-*.js',
-          // The stems mixer and the footer's event line: each is only ever fetched while
-          // its list in `src/content/` has an entry, and both ship empty. Precaching them
-          // would download on every install what no visitor can be shown.
+          // The stems mixer and the footer's event line: each is only built, and fetched,
+          // while its list in `src/content/` has an entry (`__HAS_*` below). Once one is,
+          // precaching it would still download on every install what few visitors see.
           '**/StemsMixer-*.js',
           '**/FooterEvent-*.js',
           // The printable résumés and the design notes: documents a few visitors read,
@@ -138,6 +142,8 @@ export default defineConfig({
           // The palette's search index (`vite-plugins/search.ts`). The palette fetches it,
           // which the fallback never answers; this is for a browser opening it by hand.
           /^\/search\.json$/,
+          // What `ask` retrieves from (`vite-plugins/corpus.ts`), read by the backend.
+          /^\/corpus\.json$/,
           // The calendar feeds (`vite-plugins/calendar.ts`), which a calendar app reads.
           /^\/events(\.fr)?\.ics$/,
           // RFC 9116's file, at the root and at the path `.htaccess` answers from it.
@@ -170,6 +176,12 @@ export default defineConfig({
   define: {
     __BUILD_SHA__: JSON.stringify(commitSha()),
     __BUILD_TIME__: JSON.stringify(new Date().toISOString()),
+    // Whether the footer's event line and the stems mixer have anything to show. Both lists
+    // are content, known when the build runs, and both ship empty: as constants, the code
+    // that would fetch them is dropped from the home page whole, chunk and preload entry
+    // included, rather than shipped to check an empty list on every visit.
+    __HAS_EVENTS__: JSON.stringify(events.length > 0),
+    __HAS_STEMS__: JSON.stringify(stemTracks.length > 0),
   },
   optimizeDeps: {
     // Vite's dependency optimiser only meets `@ffmpeg/ffmpeg` when the ffmpeg tool's

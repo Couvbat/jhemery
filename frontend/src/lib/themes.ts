@@ -1,4 +1,4 @@
-import { liftToFloor, TEXT_FLOOR } from './themeRules'
+import { FLOORS, liftToFloor } from './themeRules'
 
 /**
  * The colour schemes `theme` switches between: the site's own neon, plus the palettes
@@ -6,13 +6,13 @@ import { liftToFloor, TEXT_FLOOR } from './themeRules'
  * derived from them (`themeTokens`), so adding one is a single object here — nothing in
  * the stylesheet or the components needs to know it exists.
  *
- * The values are the upstream palettes. Muted and body text are then lifted by rule
- * (`readable` below, floors in `themeRules.ts`) until they reach 4.5:1 on every surface
- * text is drawn on, so a new scheme passes by construction. Three hand adjustments
- * predate the rule and stay: Dracula's comment grey (#6272a4, 3.0:1) is #8490c0, Tokyo
- * Night's muted text borrows the Moon variant's `fg_dark`, and Catppuccin Latte's yellow
- * — 2.3:1 on its own base, and not a tone the rule lifts — is a darker amber in the same
- * family.
+ * The values are the upstream palettes. Every tone drawn as text is then lifted by rule
+ * (`readable` below, floors in `themeRules.ts`) until it reaches 4.5:1 where it is drawn,
+ * so a new scheme passes by construction. Three hand adjustments predate the rule and
+ * stay: Dracula's comment grey (#6272a4, 3.0:1) is #8490c0, Tokyo Night's muted text
+ * borrows the Moon variant's `fg_dark`, and Catppuccin Latte's yellow, 2.3:1 on its own
+ * base, is a darker amber in the same family, which the rule then lifts the rest of the
+ * way.
  */
 
 export type ThemeMode = 'dark' | 'light'
@@ -69,7 +69,8 @@ const schemes: Theme[] = [
       muted: 'oklch(0.58 0.1 145)',
       primary: 'oklch(0.85 0.3 145)',
       accent: 'oklch(0.85 0.2 200)',
-      secondary: 'oklch(0.6 0.3 300)',
+      // 0.6 until the floor rose to 4.5:1: it read 4.08:1 on a card.
+      secondary: 'oklch(0.63 0.3 300)',
       highlight: '#ff0080',
       warning: 'oklch(0.852 0.199 91.936)',
       destructive: 'oklch(0.6 0.22 30)',
@@ -271,26 +272,22 @@ const schemes: Theme[] = [
 ]
 
 /**
- * Muted and body text, lifted to `TEXT_FLOOR` against background, surface and raised.
- * Done when the table is built rather than in `themeTokens()`, because the swatches, the
- * scheme menu and `theme`'s listing read `colours.muted` too, and they must show the
- * colour that is painted. The default passes untouched (`main.css` is its only
- * definition, and Lighthouse only ever measures it), which a spec holds.
+ * Every tone `FLOORS` names, lifted to its floor against the surfaces it is drawn on: body
+ * and muted text against background, surface and raised, the colourful tones against
+ * background and surface. Done when the table is built rather than in `themeTokens()`,
+ * because the swatches, the scheme menu and `theme`'s listing read `colours` too, and they
+ * must show the colour that is painted. The default passes untouched (`main.css` is its
+ * only definition, and Lighthouse only ever measures it), which a spec holds.
  *
  * Solarized sits near 4.5:1 by design, so lifting both of its text colours brings them
  * close together there. Readability is the floor; the hierarchy between the two is not.
  */
 function readable(theme: Theme): Theme {
-  const c = theme.colours
-  const on = [c.background, c.surface, c.raised]
-  return {
-    ...theme,
-    colours: {
-      ...c,
-      foreground: liftToFloor(c.foreground, on, TEXT_FLOOR, theme.mode),
-      muted: liftToFloor(c.muted, on, TEXT_FLOOR, theme.mode),
-    },
+  const colours = { ...theme.colours }
+  for (const { text, on, min } of FLOORS) {
+    colours[text] = liftToFloor(colours[text], on.map((surface) => colours[surface]), min, theme.mode)
   }
+  return { ...theme, colours }
 }
 
 export const themes: Theme[] = schemes.map(readable)

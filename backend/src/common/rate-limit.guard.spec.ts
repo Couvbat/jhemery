@@ -15,6 +15,8 @@ describe('RateLimitGuard', () => {
   let guard: RateLimitGuard;
   let reflector: Reflector;
   let options: RateLimitOptions | undefined;
+  /** The headers the guard set on the last response it refused. */
+  let sent: Record<string, string>;
 
   /**
    * `ip` stands in for what Express derives from `trust proxy`: the peer that
@@ -39,14 +41,23 @@ describe('RateLimitGuard', () => {
     if (cfConnectingIp !== undefined)
       headers['cf-connecting-ip'] = cfConnectingIp;
     const request = { ip, headers, socket: { remoteAddress: ip } };
+    const response = {
+      setHeader: (name: string, value: string) => {
+        sent[name] = value;
+      },
+    };
     return {
-      switchToHttp: () => ({ getRequest: () => request }),
+      switchToHttp: () => ({
+        getRequest: () => request,
+        getResponse: () => response,
+      }),
       getHandler: () => ({ name: handler }),
       getClass: () => ({ name: controller }),
     } as unknown as ExecutionContext;
   }
 
   beforeEach(() => {
+    sent = {};
     options = { limit: 1, windowMs: 60_000 };
     reflector = {
       getAllAndOverride: () => options,
@@ -80,14 +91,17 @@ describe('RateLimitGuard', () => {
   });
 
   it('answers 429 with a retry hint rather than a generic error', () => {
-    expect.assertions(2);
+    expect.assertions(3);
     guard.canActivate(context());
+    jest.advanceTimersByTime(15_000);
     try {
       guard.canActivate(context());
     } catch (err) {
       const error = err as HttpException;
       expect(error.getStatus()).toBe(HttpStatus.TOO_MANY_REQUESTS);
       expect(error.message).toMatch(/try again in \d+s/);
+      // The seconds until the window frees, which `ask` turns into minutes.
+      expect(sent['Retry-After']).toBe('45');
     }
   });
 

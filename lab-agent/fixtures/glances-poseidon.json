@@ -1,0 +1,22 @@
+{
+  "quicklook": { "cpu": 8.13, "mem": 41.27, "swap": 0.4, "cpu_name": "Intel(R) Core(TM) i7-10700K CPU @ 3.80GHz", "ip": "192.168.1.20" },
+  "load": { "min1": 0.42, "min5": 0.51, "min15": 0.47, "cpucore": 16 },
+  "sensors": [
+    { "label": "Package id 0", "value": 47, "unit": "C", "type": "temperature_core", "warning": 80, "critical": 100 },
+    { "label": "Core 0", "value": 45, "unit": "C", "type": "temperature_core" },
+    { "label": "acpitz 1", "value": 27.8, "unit": "C", "type": "temperature_hdd" },
+    { "label": "nas.local fan", "value": 1200, "unit": "R", "type": "fan_speed" }
+  ],
+  "uptime": "12 days, 3:04:05",
+  "gpu": [{ "key": "gpu_id", "gpu_id": "nvidia0", "name": "NVIDIA GeForce RTX 3080", "mem": 21.04, "proc": 3, "temperature": 44, "fan_speed": 30 }],
+  "containers": [
+    { "name": "ollama", "status": "running", "ports": "0.0.0.0:11434->11434/tcp" },
+    { "name": "odysseus", "status": "running", "ports": "0.0.0.0:3000->3000/tcp" },
+    { "name": "glances", "status": "running" },
+    { "name": "old-thing", "status": "exited" }
+  ],
+  "fs": [
+    { "device_name": "tank", "fs_type": "zfs", "mnt_point": "/mnt/tank", "percent": 61.2 },
+    { "device_name": "boot-pool/ROOT/25.04", "fs_type": "zfs", "mnt_point": "/", "percent": 3.1 }
+  ]
+}

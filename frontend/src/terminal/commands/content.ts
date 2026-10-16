@@ -2,7 +2,6 @@ import {
   durationLabel,
   education,
   events,
-  feedFile,
   experience,
   gaming,
   isExternal,
@@ -28,7 +27,8 @@ import { useStats } from '@/composables/useStats'
 import { useTheme } from '@/composables/useTheme'
 import { fetchSite, type SiteResponse } from '@/lib/api'
 import { REPO } from '@/lib/source'
-import { eventEnd, eventStart, isLive, upcomingEvents } from '@/content/upcoming'
+import { eventEnd, eventStart, feedFile, isLive, upcomingEvents } from '@/content/upcoming'
+import { seasonRows } from '@/content/fortunes'
 import { relative } from '@/tools/time/time'
 import { parseSgr } from '../ansi'
 import { MARK } from '../ascii'
@@ -279,6 +279,8 @@ export const contentCommands: Command[] = [
         out.push(...keyValues(machine.specs, 'muted'))
         out.push(blank)
       }
+      // The NAS are the lab, which `/lab` draws live; the specs above are what doesn't change.
+      if (requested !== 'pc') out.push(line('live: /lab', 'muted'))
       return out
     },
   },
@@ -336,7 +338,7 @@ export const contentCommands: Command[] = [
       // One line on a season's day (`content/seasons.ts`), on the visitor's calendar. The
       // curl pages run under two clocks that fall on no season, so it never reaches them.
       const season = seasonOn()
-      if (season) info.push(['Season', t(season.neofetch)])
+      if (season) info.push(['Season', t(seasonRows[season.id])])
       if (steam) {
         info.push(['Steam', steam.inGame ? `${steam.name} — ${steam.inGame}` : steam.status])
       }

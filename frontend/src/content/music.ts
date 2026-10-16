@@ -11,6 +11,22 @@ export const music = {
   } satisfies Localised,
 } as const
 
+/** A track's tempo, for the background to beat with while SoundCloud plays it. */
+export interface Tempo {
+  bpm: number
+  /** Where the first downbeat falls, in milliseconds from the track's start. */
+  firstBeatMs: number
+}
+
+/**
+ * Tempos entered by hand, keyed by a track's path on soundcloud.com (`/couvbat/track`):
+ * SoundCloud's frame can't be heard, only followed, so a beat has to be known rather than
+ * detected (`components/music/soundcloud-bridge.ts`). The bridge reads a track's level off
+ * its waveform, which is too coarse for a beat: a track with no entry still breathes with
+ * its drops and breakdowns, it just has no pulse and no downbeat ripple.
+ */
+export const tempos: Readonly<Record<string, Tempo>> = {}
+
 /** The site's own green, which the widget falls back to. */
 export const EMBED_FALLBACK_COLOUR = '#00ff41'
 
@@ -26,9 +42,9 @@ export function embedColour(colour: string): string {
 
 /**
  * The playlist's widget. Pure, so the colour is the caller's to read: changing `src`
- * reloads the cross-origin player and stops it, so `useMusicEmbed` reads the colour each
- * time it builds a frame and never while one is up. `auto_play` is written once, either
- * way — appending `&auto_play=true` after a `false` used to send the widget both.
+ * reloads the cross-origin player and stops it, so `useMusicEmbed` repaints it only while
+ * it isn't playing. `auto_play` is written once, either way — appending `&auto_play=true`
+ * after a `false` used to send the widget both.
  */
 export function soundcloudEmbedSrc(colour: string, autoplay = false): string {
   const params = new URLSearchParams({

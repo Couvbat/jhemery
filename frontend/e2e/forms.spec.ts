@@ -177,7 +177,8 @@ test.describe('through the terminal', () => {
     await terminal.input.press('Enter')
 
     await terminal.expectOutput('✓ signed')
-    expect(api.sent('POST', '/guestbook')[0]!.body).toEqual({ name: 'E2E', message: 'hello' })
+    // The terminal's language too, for the reply a moderated guestbook may write in it.
+    expect(api.sent('POST', '/guestbook')[0]!.body).toEqual({ name: 'E2E', message: 'hello', locale: 'en' })
 
     // And the refusal path — the guestbook is rate-limited and moderated, so being
     // told why is the difference between "try again" and "stop trying".

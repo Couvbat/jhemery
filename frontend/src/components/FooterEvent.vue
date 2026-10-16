@@ -6,8 +6,8 @@ import { useLocale } from '@/i18n'
 import { relative } from '@/tools/time/time'
 
 /**
- * The footer's event, once one is a week away or on (`content/upcoming.ts`). Its own chunk:
- * the footer only asks for it while `content/events.ts` lists something, so an empty list
+ * The footer's event, once one is a week away or on (`content/upcoming.ts`). Its own chunk,
+ * built only while `content/events.ts` lists something (`__HAS_EVENTS__`), so an empty list
  * costs the home page nothing. It re-reads the clock every minute, as the uptime beside it
  * does, so "in 5 minutes" turns into "live" on a tab left open.
  */

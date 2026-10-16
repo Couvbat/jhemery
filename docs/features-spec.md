@@ -66,7 +66,7 @@ src/content/
   upcoming.ts    what the readers compute from it (when, which are ahead) and their words;
                  outside the barrel, so an empty list costs the home page nothing
   stems.ts       StemTrack[], tracks split into stems for the music section's mixer;
-                 outside the barrel, and only data
+                 outside the barrel, and only data, read by the build (`__HAS_STEMS__`)
   security.ts    the disclosure policy and security.txt; outside the barrel, like privacy.ts
   docs.ts        githubSlug and headingSlugs, so a link to a doc's heading can be checked
   decisions.ts   Decision[], what the site chose and turned down; read by `why` (§3)
@@ -375,9 +375,10 @@ variant covers the few fixed palette colours that stay. The listing's swatches a
 output needs a colour that is *not* the current scheme's, so `OutputSegment` has a `colour` field.
 It is only ever set from the theme table. The floors live in `src/lib/themeRules.ts`: body and
 muted text at 4.5:1 on background, surface *and* raised (the `bg-muted` title bars are 12 px
-muted text), primary at 4.5:1, the other tones at 3:1. Muted and body text are lifted to the
-floor by rule when the table is built, stepping OKLCH lightness with hue and chroma kept, so a
-new scheme passes by construction; `themes.spec.ts` checks every scheme against the same floors.
+muted text), and the colourful tones (primary, accent, secondary, warning, destructive) at
+4.5:1 on background and surface, since they are body-size text too, in badges and prompts. Every
+tone with a floor is lifted to it by rule when the table is built, stepping OKLCH lightness with
+hue and chroma kept, so a new scheme passes by construction; `themes.spec.ts` checks every scheme against the same floors.
 The default is never lifted. It lives in `main.css` and Lighthouse measures it, so it must pass as
 shipped, and a spec holds that. Three upstream colours were also adjusted by hand before the rule
 existed, each noted in the file.
@@ -423,9 +424,13 @@ OKLCH lightness away from the background. base16 follows its documented slot rol
 The last things that ignored the scheme follow it now: the matrix rain draws in `--neon-green`
 over `--background` (and says "press any key" in both languages), the CRT overdrive's fringe is a
 `color-mix()` of the pink and cyan slots, and the SoundCloud widgets (the music section's and the
-radio rooms') take `--neon-green`, read each time a frame is built and never while one is up,
-since a new `src` reloads the cross-origin player and stops it. The music section's frame waits
-behind its load button, so that is when its colour is read, not when the section was set up.
+radio rooms') take `--neon-green`. A new `src` is the only way to recolour one, and it reloads the
+cross-origin player and stops it, so a repaint never interrupts sound. The rooms' players read the
+colour when a frame is built. The music section's follows the chosen scheme (not a preview) while
+it isn't playing; while it plays, the change waits until it has stopped for 1.5 s, which lets the
+playlist's `finish`-then-`play` between tracks go by. It knows by asking the widget over
+`postMessage`, as the rooms do: `play`, `pause`, `finish` and `isPaused`, subscribed to from
+each load and again on the widget's own `ready`, which otherwise ends the retries first.
 `content/music.ts`'s `soundcloudEmbedSrc(colour, autoplay)` is pure and lets only a `#rrggbb`
 into the URL. The window dots of every title bar are one
 `WindowDots.vue` in `destructive`, `warning` and `primary`, instead of Tailwind's red, yellow and
@@ -541,6 +546,95 @@ over the page: the terminal or the palette, the matrix rain or the `reboot` repl
 any key and claims none), or the swing. CSS alone (`attr(data-src)` in a `::before`) was
 rejected and still is: it would collide with components' own pseudo-elements, and a
 pseudo-element can't carry a link.
+
+**The field listens** ([spec](superpowers/specs/2026-10-15-music-reactive-field-design.md)).
+`lib/music-signal.ts` is a registry the sound sources attach to while they sound (`attachMusic`,
+the last started followed, detaching falling back) and `ThreeBackground` reads at draw time
+(`currentMusic()`), not reactive and imported only by lazy chunks. `acid`'s engine puts an
+`AnalyserNode` (256-point) in series before the destination and counts beats from a monotone step
+index at each step's own tempo (`beatsAt`); the stems engine puts one after its limiter and counts
+`position × bpm / 60`. `components/music/soundcloud-bridge.ts`, fetched by `MusicSection` only
+once the frame exists, hears the widget through `useMusicEmbed`'s one conversation with it
+(`listen`): JSON `{ method, value }` as `api.js` speaks it, `addEventListener` per event,
+`getCurrentSound` for the sound, only `https://w.soundcloud.com` from that frame. It re-anchors the
+position on every `playProgress` (which never counts as playing: the widget sends a few after
+`pause`), takes tempos from `content/music.ts` for the beat, and reads the level off the track's
+waveform, `waveform_url`'s JSON on `wave.sndcdn.com` (CSP `connect-src`), each height over the
+track's tallest, squared. `components/music-react.ts` turns a source into speed,
+scale, opacity and a ripple flag with time-based envelopes (250 ms attack, 600 ms release), so
+30 and 60 fps move alike; its spec holds opacity to 0.1 within any 333 ms under a 200 BPM beat
+and a square-wave level, and beats never reach it. `scene music off` is a session flag in
+`useSceneControl`.
+
+**Stems, vol. 2** ([spec](superpowers/specs/2026-10-15-stems-vol2-design.md)). `scripts/stems.mjs`
+(`npm run stems -- <folder>`) turns DAW exports and a `track.json` into a track: it probes every
+stem (one rate, one length, at most `MAX_STEMS`), warns when the excerpt isn't a whole number of
+bars, cuts it with `atrim` (sample-accurate, never a keyframe seek), encodes AAC-LC 192 kb/s at
+48 kHz with `+faststart`, checks the decoded cost, writes `peaks.json` (480 one-byte buckets per
+stem, normalised across the track with a square root) and prints the `StemTrack` literal; its
+pure half is `scripts/stems-lib.mjs`. The mixer fetches `peaks.json` on mount and draws a canvas
+lane per stem (`components/stems/peaks.ts`), in `--neon-green` read at draw time and redrawn on a
+scheme switch, its opacity following the stem's gain; one playhead crosses them at a rate set by
+the motion level. `engine.seek()` books every stem's new source at one `when` and stops the old
+ones at the same `when`; the loop is exactly `track.seconds` (`loopStart`/`loopEnd`), which takes
+AAC padding out of the seam. `StemTrack` gains optional `bpm`, `beatsPerBar`, `key`, `daw` and
+`released`, `Stem` a `chain`. The `stems` command lists the tracks and hands the mixer a default
+mix code for `stems <id>` (`composables/useStemsRequest.ts`), the path a `?mix=` link takes.
+
+**The guestbook's first reader** ([spec](superpowers/specs/2026-10-15-guestbook-moderation-design.md)).
+With `GUESTBOOK_MODERATION=model` an entry is stored `pending` and `sign` gets a `202`; a worker
+in `GuestbookService` reads pending entries oldest first through `common/llm.ts`'s one slot as a
+background caller (`acquire({ background: true })` waits for the slot *and* any detached warm-up
+of `ask`'s), temperature 0, 60 tokens, JSON only, and accepts exactly
+`{"verdict","reason"}` (`guestbook/moderation.ts`). `hold` keeps it for the owner; anything
+unreadable is retried once and then left to the grace period, which publishes it. Entries from
+before moderation have no status and read as published. Optional replies are grounded in `ask`'s
+passages and pass the sanitiser and link filter. `backend/scripts/eval-moderation.ts` runs
+twenty labelled entries against the configured model; it is not in CI. The terminal side:
+`sign` polls `GET /guestbook/:id/status`, `cat` prints a reply as muted text with its `see`
+link, and `sudo guestbook held` / `sudo approve` are the owner's.
+
+**`ask` and the site's words** ([spec](superpowers/specs/2026-10-15-ask-my-lab-design.md) §2,
+decision `ask-retrieval`). `vite-plugins/corpus.ts` writes `/corpus.json` beside `search.json`
+from the same sources, whole: one passage per case-study section, per `why` topic (chosen,
+rejected and why, hindsight), per design-note section (code dropped, split at paragraph
+boundaries past 1 500 characters; a heading with no prose gets its own words), `/now`, each
+machine, the music, gaming and tools sections and each lab node. Its shape is
+`content/corpus.ts`, mirrored in `backend/src/ask/corpus.types.ts`, version-checked like
+`content.json`. The API scores passages with BM25 over accent-folded, stop-worded words cut to
+five letters, a title word counting three times, and keeps at most four over a floor.
+`content/__tests__/corpus.spec.ts` holds it to every case study, decision and note heading,
+and every target to something that resolves.
+
+**Ask the lab** (the same spec, §5). `components/lab/AskTheLab.vue`, in `LabView`'s chunk: a
+`<form>` with a labelled input held to the DTO's 3 to 240 characters (`questionProblem`), three
+suggestions that fill it without sending, the disclaimer, and the answer in a `role="log"`
+region with the meta line and the sources as ordinary links. It runs through `lib/ask-session.ts`
+(`runAsk`, `degradedCopy`, `metaLine`, `modelIsCold`), as the terminal's `ask` does, so the two
+share the five questions an hour, the motion rule (buffered at *paused*), the copy and the `ask`
+achievement. Phones get it: §10 keeps the terminal's *prompt* off them, not a form in the page.
+
+**The data layer** ([spec](superpowers/specs/2026-10-15-xray-data-layer-design.md)). A component
+that renders API data names its routes on its root, `data-api="/steam/activity"`: a literal
+attribute, not a stamp, since the component knows which `api.*` call feeds it and the compiler
+doesn't. `src/__tests__/xray-api.spec.ts` reads the source and holds every `.vue` that imports the
+client or a fetching composable to carrying one, naming only routes the client calls. The tag gets
+one more line per route, `GET /steam/activity · 84 ms · 1.2 kB · server copy 3 min old`
+(`lib/xray-data.ts`), from Resource Timing, which the layer reads with a `PerformanceObserver`
+started `buffered`: `request()` keeps its fast path, since the requests happened before x-ray
+turned on. Across origins the browser hides sizes and `Server-Timing` unless the response says
+`Timing-Allow-Origin`, which the API sets to the origins CORS admits; the caching routes add
+`Server-Timing` from their own cache age (`common/server-timing.ts`). `main.ts` empties the
+250-entry buffer when it fills, since the ticker's poll alone fills it on a long visit and a poll
+puts its route back within one interval. The presence stream has no finished entry while open, so
+its line reads `stream · open` from `usePresence`. **The path** (`xray path`, or the chip's *path*
+button) is a labelled region in the top-right corner with an ordered list of hops
+(`lib/xray-path.ts`), fetched when it opens and not before: you → Cloudflare from
+`/cdn-cgi/trace` (same origin, through `fetchSite()` so `strace` sees it), the static host, the
+API with its newest round trip and `/health`'s uptime, the model while `ask` is active, and the
+lab's push with its age; the facts are `content/lab.ts`'s, so the panel and `/lab` can't tell two
+stories. `parseTrace()` keeps `colo`, `http` and `tls`, each only in its expected shape, and drops
+every other line, the visitor's address and country among them, before anything stores it.
 
 ### live
 | Command | Endpoint | Fallback |
@@ -697,6 +791,7 @@ heading to an entry.
 | `ls -a` → `cat .env` | A production-looking env file whose every value is a joke. `env` (aliases `printenv`, `export`) prints the same variables from the same module, so the file and the listing cannot drift; `export FOO=bar` answers that the environment is read-only |
 | `reboot` (alias `restart`) | Replays the first-visit boot sequence (§6) via a `useBoot` flag, the same shape `matrix` uses |
 | `ssh [user@]host` | Wrong host → `Could not resolve hostname`; wrong user → `Permission denied (publickey)`; `contact@` opens the contact section, because that is what the section's own prompt claims to do; the real handle gets a paced OpenSSH handshake that ends by triggering `reboot` |
+| `ssh poseidon`, `ssh optimus` | The lab shell ([spec](superpowers/specs/2026-10-15-lab-shell-design.md)): a pretend shell on a lab machine, `jules@poseidon:~$`, a loop over `ctx.prompt()` whose small table (`terminal/lab-shell/`) answers from `GET /lab` and the spec sheet. Its banner says it is simulated; `root@` is refused; it opens with the feed off; it unlocks *Lab Rat* |
 | `whois [domain]` | An invented registration record for this domain; anything else gets `No match for …` |
 | `banner <text>` | Block letters from a 5×7 font table in `terminal/ascii-banner.ts` — no dependency, no fetch. Wraps into stacked blocks past 12 characters, breaking on a space where it can; unknown characters render as `?` rather than vanishing |
 | `spawn`, `gravity`, `constellation`, `scene` | Terminal control over the background — see §5.3 |
@@ -871,7 +966,9 @@ mounted, so coming back to *full* or *calm* picks the scene up where it stood.
   weather's, so they apply whichever palette wins; the season palette's own speed is 1, so the
   speed counts once. Slots, never colours, so a season repaints inside the visitor's scheme.
   The same day gives `fortune` its own pool (`content/fortunes.ts`, `Localised` like the
-  everyday lines) and adds one line to `neofetch` and one to the boot log. No achievement:
+  everyday lines) and adds one line to `neofetch` and one to the boot log. The `neofetch` rows
+  are `seasonRows` in `fortunes.ts` too, not fields of the days: `seasons.ts` is in the
+  barrel, which the boot log's line needs, and only the terminal reads the rows. No achievement:
   `completionist` would then wait up to a year on the calendar, when every other achievement
   waits on the visitor.
 - **Guestbook entries** — the newest twelve entries are wireframes, in a third pool beside the
@@ -953,9 +1050,11 @@ wraps rather than run wider than the screen, which a guestbook name can make it 
   is the feed's `UID`, so it never changes once published. While one hasn't ended, `/now` lists
   it in the visitor's zone with a relative phrase, `calendar` prints the same, and from
   `SOON_DAYS` (7) before its start the footer's status line names it through
-  `FooterEvent.vue`, which re-reads the clock each minute. The footer only fetches that
-  component while the list has an entry, and the helpers and words all readers share are in
-  `upcoming.ts`, outside the barrel: with the list empty, the home page pays for one array. `vite-plugins/calendar.ts` writes `/events.ics` and `/events.fr.ics` from RFC 5545
+  `FooterEvent.vue`, which re-reads the clock each minute. The build reads whether the list
+  has an entry (`__HAS_EVENTS__`, defined in `vite.config.ts`), and with none the footer's
+  code for the line and the chunk itself aren't built; the helpers and words all readers
+  share are in `upcoming.ts`, outside the barrel, `feedFile` included: with the list empty,
+  the home page carries nothing of it. `vite-plugins/calendar.ts` writes `/events.ics` and `/events.fr.ics` from RFC 5545
   by hand: CRLF lines folded at 75 octets without splitting a character or an escape, TEXT
   escaped, every time in UTC. The feed always carries a `VTIMEZONE` for Europe/Paris that no
   event refers to, because the grammar requires one component and the list is often empty.
@@ -973,8 +1072,9 @@ wraps rather than run wider than the screen, which a guestbook name can make it 
   squared faders, mute over solo as on a desk, an exponential 40 Hz–20 kHz cutoff, and the
   code `<track>.<base64url(version, count, level and flags per stem, cutoff)>`, refused when
   the count doesn't match the track's. A hidden tab pauses it, as it stops `acid`. The
-  mixer's chunk, like `FooterEvent`'s, is kept out of the service worker's precache, since
-  neither is fetched while its list is empty.
+  mixer is built only while `stemTracks` has an entry (`__HAS_STEMS__`, as for the events),
+  and its chunk, like `FooterEvent`'s, is kept out of the service worker's precache once it
+  is, since few visitors ever open it.
 - **Save file** (`lib/save-file.ts`, `components/SaveFile.vue` on `/privacy`) — the visitor's
   chosen groups (settings, progress, scores, shell; never secrets) as one code:
   `base64url(version · format · payload)`, the payload a JSON object of key to value,
@@ -1379,6 +1479,26 @@ Streamable HTTP: `initialize`, `ping`, `tools/*`, `resources/*`, 202 for notific
 `GET`/`DELETE`. Its five tools and six resources render `${FRONTEND_URL}/content.json`, cached 10
 minutes with a stale fallback, and a tool that cannot reach it reports `isError` rather than a
 protocol error. Nothing asked is logged.
+
+### `lab` — `GET /lab`, `POST /lab/snapshot`
+
+The lab map's backend, off unless `LAB_ENABLED` with a `LAB_INGEST_TOKEN` of 32 characters or
+more ([spec](superpowers/specs/2026-10-15-lab-map-design.md)). Rules the code cites:
+
+- **Push, never pull.** The API never calls into the home network. The lab agent (`lab-agent/`, one
+  container on a NAS) pushes a snapshot once a minute; visitors read the copy held in memory and
+  in `DATA_DIR/lab.json`.
+- **A closed schema.** The push's own pipe refuses unknown properties with a 400 that names them,
+  bounds every number, caps every array, and refuses any string that looks like an address, a
+  `host:port`, a URL or a name in `.lan`, `.local`, `.home.arpa` or `.ts.net`. The agent checks
+  its output against the same rules before sending. Ids not in `LAB_NODES` are dropped and named.
+- **The token is the control.** A bearer compared in constant time, checked by a guard before the
+  body is read; unset or short means locked. A Cloudflare rule admitting the push only from home
+  is defence in depth (`deploy.md`).
+- **History that doesn't claim an outage it didn't see.** Thirty UTC days per node of up out of
+  seen; a day with no snapshot is `null`, drawn grey. Stale after five minutes without a push.
+- `GET /lab` is 60/min per IP with `Cache-Control: public, max-age=15`; the push is 6/min.
+  `health()` reports the snapshot's age as `cacheAge` and the node count.
 
 ### `jobs` — the downloader, `/jobs`, `/jobs/:id`, `/jobs/:id/file`
 

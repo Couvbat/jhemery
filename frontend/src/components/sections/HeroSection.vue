@@ -21,7 +21,16 @@ const bio = computed(() => {
 })
 
 const displayed = ref('')
+const typing = ref(false)
 let timer: ReturnType<typeof setInterval> | undefined
+
+/**
+ * While the line types, its cursor is its last character, solid, as a terminal's is while
+ * someone types; once it is done, the cursor is an element that blinks. An element that
+ * moved with every letter was a layout shift each time, 0.08 of the home page's CLS, and
+ * a pseudo-element counts the same. A line that only grows from where it starts does not.
+ */
+const typedLine = computed(() => (typing.value ? `${displayed.value}█` : displayed.value))
 
 function typeTagline() {
   clearInterval(timer)
@@ -30,16 +39,19 @@ function typeTagline() {
   // Typed under `calm` too; only `paused` (or reduced motion) prints it whole.
   if (decorativeMotion() === 'paused') {
     displayed.value = fullText
+    typing.value = false
     return
   }
 
   displayed.value = ''
+  typing.value = true
   let i = 0
   timer = setInterval(() => {
     if (i < fullText.length) {
       displayed.value += fullText[i++]
     } else {
       clearInterval(timer)
+      typing.value = false
     }
   }, 45)
 }
@@ -77,13 +89,20 @@ onUnmounted(() => clearInterval(timer))
           <!-- Name + typing effect -->
           <div>
             <!-- Named by the whole tagline, not by what has been typed so far: focus can land
-                 here mid-animation, and a screen reader would read "full block". -->
+                 here mid-animation, and a screen reader would read "full block".
+                 The whole line sits under the typed one, invisible, in the same grid cell, so
+                 the heading is its final height from the first frame. Typed into an empty
+                 box, it grew from one line to three and pushed the page down as it went:
+                 0.27 of the home page's 0.32 layout shift. -->
             <h1
               tabindex="-1"
               :aria-label="t(profile.tagline)"
               class="text-3xl md:text-5xl font-bold text-primary glow-green tracking-tight rounded-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-4 focus-visible:ring-offset-background"
             >
-              <span aria-hidden="true">{{ displayed }}<span class="animate-pulse">█</span></span>
+              <span aria-hidden="true" class="grid">
+                <span class="invisible col-start-1 row-start-1">{{ t(profile.tagline) }}█</span>
+                <span class="col-start-1 row-start-1">{{ typedLine }}<span v-if="!typing" class="animate-pulse">█</span></span>
+              </span>
             </h1>
           </div>
 

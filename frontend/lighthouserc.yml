@@ -11,12 +11,21 @@
 ci:
   collect:
     # LHCI serves `dist/` itself, so there is no dev server to start and no port
-    # to coordinate. It collects every HTML file it finds there: `/`, plus the two
-    # printable résumés the build emits, which are real documents rather than SPA
-    # routes, so every assertion below applies to them too. Other routes of the SPA
-    # are the same document with the same bundle and would re-measure identical
-    # numbers.
+    # to coordinate, and on that port it runs the URLs below, so every assertion
+    # applies to each of them.
     staticDistDir: ./dist
+    # Named, not discovered. Discovery collects the first five HTML files it finds
+    # in `dist/`, and the first is `/index.html`: an address the router has no route
+    # for, so until October 2026 every number here was the 404 page's. `/` is the
+    # home page, with its sections, its live cards and the three.js background. The
+    # printable résumés and the notes are real documents rather than SPA routes, and
+    # the SPA's other routes are the same document with the same bundle.
+    url:
+      - http://localhost/
+      - http://localhost/resume.html
+      - http://localhost/resume.fr.html
+      - http://localhost/notes/
+      - http://localhost/notes/ask-command.html
     # Five, not three, because of what the first CI run actually did: on the
     # GitHub runner run #1 measured 879 ms of blocking time and a 0.61
     # performance score, while runs #2 and #3 came in at 14 ms / 0.96 and
@@ -42,9 +51,10 @@ ci:
 
     assertions:
       # --- Category scores -----------------------------------------------
-      # Baseline 0.97. The gap to 0.90 absorbs a slow runner without absorbing
-      # an actual regression: shipping an extra render-blocking bundle costs far
-      # more than seven points.
+      # Baseline 0.95 on the home page (the 404 measured 0.97). The gap to 0.90
+      # absorbs a slow runner without absorbing an actual regression: shipping an
+      # extra render-blocking bundle costs far more than five points. The home page
+      # first measured 0.79, almost all of it layout shift, below.
       categories:performance: ['error', { minScore: 0.9 }]
 
       # 1.00, and held there, as SEO is. It sat at 0.95 on two audits, both fixed
@@ -58,8 +68,15 @@ ci:
       #                               aria-label of "Changer de langue". Its name now
       #                               comes from its content, so what a voice-control
       #                               user sees is what they can say.
-      # Collection also picks up the printable résumés in dist/, which score 1.00
-      # too, so a regression on any of the three pages fails the check.
+      # The home page, first measured in October 2026, read 0.93 on two more:
+      #   color-contrast              the default's purple, text in badges and in
+      #                               the hero's prompt, was 4.08:1. The colourful
+      #                               tones were held to 3:1, large text's floor,
+      #                               and are now held to 4.5:1 by the same rule.
+      #   link-in-text-block          two links in muted text, told apart by colour
+      #                               alone at 2.9:1. They are underlined.
+      # The résumés and the notes score 1.00 too, so a regression on any of the
+      # pages collected fails the check.
       categories:accessibility: ['error', { minScore: 1 }]
 
       # Baseline 0.96, and it cannot reach 1.00 in this harness:
@@ -78,17 +95,22 @@ ci:
 
       # --- Metric budgets --------------------------------------------------
       # Measured medians on the desktop preset, for whoever has to re-tune these
-      # later: FCP 353 ms, LCP 509 ms, TBT 4 ms, CLS 0.008, 227 KiB total.
+      # later, on the home page: FCP 520 ms, LCP 659 ms, TBT 27 ms, CLS 0.008,
+      # 306 KiB total. (The 404, which these were first set against: FCP 353 ms,
+      # LCP 509 ms, TBT 4 ms, CLS 0.008.)
       first-contentful-paint: ['error', { maxNumericValue: 1200 }]
       largest-contentful-paint: ['error', { maxNumericValue: 2000 }]
-      # 400 ms against a 4 ms baseline looks absurdly loose and is not: blocking
+      # 400 ms against a 27 ms baseline looks absurdly loose and is not: blocking
       # time is the one metric that still swings hard on a contended runner.
       # What it catches is a change of kind — parsing work moved onto the
       # critical path — not a change of degree.
       total-blocking-time: ['error', { maxNumericValue: 400 }]
+      # The home page first measured 0.32: the hero's tagline typed itself from
+      # one line to three and pushed the page down, and its cursor, an element of
+      # its own, moved with every letter. HeroSection.vue says how both stopped.
       cumulative-layout-shift: ['error', { maxNumericValue: 0.05 }]
 
-      # 227 KiB today, of which 130 KiB is the three.js chunk. Lighthouse waits
+      # 306 KiB on the home page, of which 133 KiB is the three.js chunk. Lighthouse waits
       # for network idle, so the deferred background counts here even though no
       # visitor waits on it. The ceiling exists to make "just precache three.js"
       # or "just add one more dependency" show up as a red check rather than as
@@ -100,11 +122,29 @@ ci:
       # out of the first load, the same 2 kB, which counts once when both merge;
       # #154 (a head per page) adds its own. Together they measured 308.2 kB, and
       # the two KiB were raised on purpose rather than drifted into.
-      total-byte-weight: ['error', { maxNumericValue: 309248 }]
+      #
+      # 305 KiB from #160, roadmap §K's seven features, which measured 312.4 kB
+      # with dev at about 308.9. What they add to the home page's first load,
+      # gzipped: the stylesheet's rules for the new pages (+0.5 kB, Tailwind has
+      # one sheet), the background's music reaction (+0.5 kB of glue, the reaction
+      # itself fetched only when music first plays), the API client's new calls
+      # (+0.25 kB), the SoundCloud conversation and x-ray's kept timings in the
+      # entry (+0.5 kB), and the music signal, a chunk the background shares with
+      # the sound sources (+0.15 kB and a request). Two trims came first (the
+      # reaction out of the first load, `content/music.ts` back in its chunk);
+      # what is left is features, not drift, and about 0.6 kB stays spare.
+      #
+      # 307 KiB from #162, the day the home page replaced the 404 as what is
+      # measured: 313,399 bytes with #160 in, nothing added to the site. The home
+      # page fetches what the 404 did, less the 404's own chunk, plus eight
+      # live-data calls that answer 404 here at about 450 bytes each, since there
+      # is no backend. Chrome also fetches the manifest's 3 kB icon on some runs
+      # and not others, and the ceiling has to hold with it. About 1 kB stays spare.
+      total-byte-weight: ['error', { maxNumericValue: 314368 }]
 
       # Speed Index is deliberately unasserted. The boot sequence is an
       # animation that keeps repainting on purpose, which is exactly what Speed
-      # Index penalises — it measures 1.7-1.8 s here while FCP is 0.35 s. The
+      # Index penalises — it measures 2.0-2.3 s here while FCP is 0.54 s. The
       # metric is meaningless for this page rather than merely inconvenient.
 
   upload:

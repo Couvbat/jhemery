@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 const mocks = vi.hoisted(() => ({
   askStream: vi.fn(),
+  lab: vi.fn(),
   reducedMotion: false,
 }))
 
@@ -14,7 +15,7 @@ vi.mock('@/composables/useCrt', async (importOriginal) => ({
 // `ApiError` stays real — the degraded path branches on `instanceof` and status.
 vi.mock('@/lib/api', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@/lib/api')>()
-  return { ...actual, api: { ...actual.api, askStream: mocks.askStream } }
+  return { ...actual, api: { ...actual.api, askStream: mocks.askStream, lab: mocks.lab } }
 })
 
 import { ApiError } from '@/lib/api'
@@ -32,7 +33,7 @@ function texts(): string[] {
 
 function yields(...deltas: string[]) {
   mocks.askStream.mockImplementation(async function* () {
-    for (const delta of deltas) yield delta
+    for (const delta of deltas) yield { delta }
   })
 }
 
@@ -49,6 +50,8 @@ function reset() {
   setLocale('en')
   unlocked.value = new Set()
   mocks.askStream.mockReset()
+  // The pre-check's read: off unless a test arranges a lab.
+  mocks.lab.mockReset().mockResolvedValue({ configured: false })
   mocks.reducedMotion = false
 }
 
@@ -191,6 +194,123 @@ describe('ask degradation', () => {
     await run('ask does he know Rust')
 
     expect(texts()).not.toContain(m.ask.thinking.en)
+  })
+
+  // One line per piece of advice, by the reason the API now names.
+  it.each([
+    ['unreachable', 'the model’s machine isn’t answering the site right now.'],
+    ['refused', 'the model’s machine isn’t answering the site right now.'],
+    ['upstream', 'the model’s machine isn’t answering the site right now.'],
+    ['warming', 'the model was asleep and is waking up — ask again in a minute.'],
+    ['timeout', 'the model was asleep and is waking up — ask again in a minute.'],
+    ['empty', 'the model was asleep and is waking up — ask again in a minute.'],
+    ['silent', 'the model was asleep and is waking up — ask again in a minute.'],
+    ['unconfigured', 'there’s no model wired up here.'],
+  ])('says what a %s failure means, and points at mail', async (reason, words) => {
+    fails(new ApiError('nope', 502, reason))
+
+    await run('ask does he know Rust')
+
+    expect(texts()).toContain(words)
+    expect(texts()).toContain(m.ask.asleepHint.en)
+    expect(texts()).not.toContain(m.ask.asleep.en)
+  })
+
+  it('tells the busy reason as it always told a 503', async () => {
+    fails(new ApiError('One question at a time', 503, 'busy'))
+    await run('ask does he know Rust')
+    expect(texts()).toContain(m.ask.busy.en)
+  })
+
+  it('tells a rate limit apart from an outage, with the minutes it waits, and no mail', async () => {
+    fails(new ApiError('Too many requests', 429, undefined, 725))
+
+    await run('ask does he know Rust')
+
+    expect(texts()).toContain('that’s five questions this hour — the limit resets in 13 min.')
+    expect(texts()).not.toContain(m.ask.asleepHint.en)
+  })
+
+  it('warns before streaming when the lab says the model isn’t loaded', async () => {
+    mocks.lab.mockResolvedValue({
+      configured: true,
+      receivedAt: '2026-10-15T19:42:02.000Z',
+      ageMs: 40_000,
+      stale: false,
+      history: {},
+      snapshot: {
+        takenAt: '2026-10-15T19:42:01.000Z',
+        machines: [],
+        services: [],
+        models: { runtime: 'up', resident: [], installed: [{ name: 'gemma4:e4b', sizeGb: 9.6 }] },
+      },
+    })
+    yields('Yes.')
+
+    await run('ask does he know Rust')
+
+    const warning = texts().indexOf('the model isn’t loaded, so the first answer may not come in time.')
+    expect(warning).toBeGreaterThan(texts().indexOf(m.ask.disclaimer.en))
+    expect(texts().findIndex((t) => t.includes('Yes.'))).toBeGreaterThan(warning)
+  })
+
+  it('skips the pre-check when the lab can’t be read', async () => {
+    mocks.lab.mockRejectedValue(new Error('offline'))
+    yields('Yes.')
+
+    await run('ask does he know Rust')
+
+    expect(texts().some((t) => t.includes('isn’t loaded'))).toBe(false)
+    expect(texts().some((t) => t.includes('Yes.'))).toBe(true)
+  })
+})
+
+describe('the work it shows', () => {
+  beforeEach(() => {
+    reset()
+  })
+
+  it('prints which model wrote it and how fast, then the pages it drew from as links', async () => {
+    mocks.askStream.mockImplementation(async function* () {
+      yield { delta: 'It polls.' }
+      yield {
+        meta: {
+          model: 'gemma4:e4b',
+          label: 'poseidon · RTX 3080',
+          outputTokens: 58,
+          firstTokenMs: 410,
+          totalMs: 1930,
+          tokensPerSecond: 38.2,
+          sources: [
+            { title: 'Why the guestbook ticker polls', target: 'why polling' },
+            { title: 'QR codes', target: '/work/qr' },
+          ],
+        },
+      }
+    })
+
+    await run('ask why does the ticker poll')
+
+    const lines = buffer.value
+    const meta = lines.findIndex((l) => l.text === 'gemma4:e4b · 38.2 tok/s · first token 0.4 s · poseidon · RTX 3080')
+    expect(meta).toBeGreaterThan(lines.findIndex((l) => l.text.includes('It polls.')))
+    expect(lines[meta]!.tone).toBe('muted')
+    expect(lines[meta + 1]!.text).toBe('read more:')
+    expect(lines[meta + 2]).toMatchObject({ text: '  Why the guestbook ticker polls', href: '/?run=why%20polling' })
+    expect(lines[meta + 3]).toMatchObject({ text: '  QR codes', href: '/work/qr' })
+  })
+
+  it('marks an approximate rate, in French too', async () => {
+    setLocale('fr')
+    mocks.askStream.mockImplementation(async function* () {
+      yield { delta: 'Oui.' }
+      yield { meta: { model: 'm', outputTokens: 2, approx: true, firstTokenMs: 1250, totalMs: 1300, tokensPerSecond: 40, sources: [] } }
+    })
+
+    await run('ask parle-t-il rust')
+
+    expect(texts()).toContain('m · ~40 tok/s · premier jeton 1,3 s')
+    expect(texts()).not.toContain('pour aller plus loin :')
   })
 })
 

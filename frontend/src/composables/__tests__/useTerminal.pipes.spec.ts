@@ -141,7 +141,7 @@ describe('; && ||', () => {
   // `ask` keeps its partial answer on Ctrl+C rather than rethrowing; the cow must not draw it.
   it('stops a pipe at Ctrl+C even when a stage keeps what it had instead of rethrowing', async () => {
     mocks.askStream.mockImplementation(async function* (_q: string, _l: string, signal: AbortSignal) {
-      yield 'partial'
+      yield { delta: 'partial' }
       if (!signal.aborted) await new Promise((resolve) => signal.addEventListener('abort', resolve))
     })
     const done = run('ask "who is he" | cowsay')

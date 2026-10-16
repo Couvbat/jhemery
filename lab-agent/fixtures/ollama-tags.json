@@ -1,0 +1,6 @@
+{ "models": [
+  { "name": "gemma4:e4b", "model": "gemma4:e4b", "size": 9608350718, "digest": "abc" },
+  { "name": "qwen3:8b", "size": 5225388164 },
+  { "name": "nomic-embed-text:latest", "size": 274302450 },
+  { "name": "http://evil:1/x", "size": 1 }
+] }

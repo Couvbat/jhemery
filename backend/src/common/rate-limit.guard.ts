@@ -7,7 +7,7 @@ import {
   SetMetadata,
 } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
-import { Request } from 'express';
+import { Request, Response } from 'express';
 import { BlockList, isIPv6 } from 'node:net';
 
 export interface RateLimitOptions {
@@ -71,6 +71,12 @@ export class RateLimitGuard implements CanActivate {
 
     if (entry.count >= options.limit) {
       const retryAfter = Math.ceil((entry.resetAt - now) / 1000);
+      // The seconds until the window frees, so a client can say when rather than
+      // only that: `ask`'s sixth question an hour is told the minutes.
+      context
+        .switchToHttp()
+        .getResponse<Response>()
+        .setHeader('Retry-After', String(retryAfter));
       throw new HttpException(
         `Too many requests — try again in ${retryAfter}s`,
         HttpStatus.TOO_MANY_REQUESTS,

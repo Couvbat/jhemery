@@ -55,9 +55,11 @@ jobs:
           server-dir: ${{ steps.remote.outputs.dir }}
           log-level: minimal
 
+      # Only on success, so "Re-run failed jobs" still finds the build (see
+      # frontend-deploy.yml).
       - name: Cleaning artifacts
         uses: geekyeggo/delete-artifact@v6
-        if: always()
+        if: success()
         with:
           name: frontend-build
           failOnError: false

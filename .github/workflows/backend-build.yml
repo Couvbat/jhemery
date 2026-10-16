@@ -42,8 +42,13 @@ jobs:
           cp package.json dist/
           cp package-lock.json dist/
 
+      # A deploy that fails keeps this for "Re-run failed jobs", so "Re-run all
+      # jobs" finds it already there: `overwrite` replaces it rather than failing
+      # on the name. Leftovers, and every standalone build's, expire on their own.
       - name: Upload Build Artifact
         uses: actions/upload-artifact@v7
         with:
           name: backend-build
           path: backend/dist
+          overwrite: true
+          retention-days: 14

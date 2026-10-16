@@ -2,14 +2,18 @@ import { contrastRatio, oklchToRgb, parseColour, rgbToOklch, toHex, type RGB } f
 import type { ThemeColours, ThemeMode } from './themes'
 
 /**
- * The contrast every scheme is held to, in one place: `themes.ts` lifts muted and body
- * text to it when the table is built, `themes.spec.ts` checks every scheme against it,
- * and the scheme forge (`forge.ts`) grows a palette until it passes.
+ * The contrast every scheme is held to, in one place: `themes.ts` lifts every tone
+ * `FLOORS` names to it when the table is built, `themes.spec.ts` checks every scheme
+ * against it, and the scheme forge (`forge.ts`) grows a palette until it passes.
  *
  * Body and muted text reach WCAG AA (4.5:1) on every surface text is drawn on, raised
  * included: the 12 px window title bars are muted text on `bg-muted`, and that pair at
- * 4.04:1 is what held the accessibility score off 1.00. The colourful tones reach
- * AA-large (3:1) on the page background, where they are used.
+ * 4.04:1 is what held the accessibility score off 1.00.
+ *
+ * The colourful tones are text too, at body size: the host in the hero's prompt, a
+ * branch name, every badge at 12 px. So they reach AA as well, on the page and on a card,
+ * where they are drawn. They were held to AA-large (3:1) until Lighthouse first measured
+ * the home page rather than the 404, and found the default's purple at 4.08:1.
  */
 
 export type Tone = keyof ThemeColours
@@ -17,6 +21,9 @@ export type Tone = keyof ThemeColours
 /** The three surfaces text is drawn on. */
 export const TEXT_ON: Tone[] = ['background', 'surface', 'raised']
 export const TEXT_FLOOR = 4.5
+
+/** Where the colourful tones are drawn as text: the page and the cards on it. */
+export const TONE_ON: Tone[] = ['background', 'surface']
 
 export interface Floor {
   text: Tone
@@ -27,8 +34,7 @@ export interface Floor {
 export const FLOORS: Floor[] = [
   { text: 'foreground', on: TEXT_ON, min: TEXT_FLOOR },
   { text: 'muted', on: TEXT_ON, min: TEXT_FLOOR },
-  { text: 'primary', on: ['background'], min: 4.5 },
-  ...(['accent', 'secondary', 'warning', 'destructive'] as const).map((text) => ({ text, on: ['background'] as Tone[], min: 3 })),
+  ...(['primary', 'accent', 'secondary', 'warning', 'destructive'] as const).map((text) => ({ text, on: TONE_ON, min: TEXT_FLOOR })),
 ]
 
 function lowestRatio(colour: RGB, against: RGB[]): number {

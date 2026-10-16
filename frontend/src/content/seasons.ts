@@ -1,11 +1,10 @@
 import { profile } from './profile'
-import type { Localised } from './types'
 
 /**
  * Six days a year the site notices the date (roadmap §I, *Seasons*, and §J for the last
- * two). On one of them the
- * wireframes take the day's palette (`components/palette.ts`), `fortune` draws from the
- * day's pool (`fortunes.ts`), and `neofetch` and the boot log each gain a line. Nothing
+ * two). On one of them the wireframes take the day's palette (`components/palette.ts`),
+ * `fortune` draws from the day's pool and `neofetch` gains a row (both `fortunes.ts`, which
+ * only the terminal loads), and the boot log gains a line. Nothing
  * else changes, and nothing is earned: an achievement for a season would leave
  * `completionist` waiting on the calendar, up to a year, when every other one waits only
  * on the visitor.
@@ -21,8 +20,6 @@ export interface Season {
   id: SeasonId
   /** `MM-DD`, on the visitor's calendar. One day each, never a range. */
   day: string
-  /** `neofetch`'s `Season` row. */
-  neofetch: Localised
   /**
    * The boot log's line, after its timestamp. English, like the rest of that kernel log,
    * which is a fixed piece of machine voice rather than copy.
@@ -34,7 +31,6 @@ export const seasons: readonly Season[] = [
   {
     id: 'halloween',
     day: '10-31',
-    neofetch: { en: 'Halloween — the wireframes are haunted', fr: 'Halloween — les formes sont hantées' },
     boot: 'loading module: halloween.ko (spooky=1)',
   },
   {
@@ -43,16 +39,11 @@ export const seasons: readonly Season[] = [
     // northern hemisphere, where the site is; south of the equator it is the longest day.
     id: 'solstice',
     day: '12-21',
-    neofetch: {
-      en: 'winter solstice — the longest night, north of the equator',
-      fr: 'solstice d’hiver — la plus longue nuit, au nord de l’équateur',
-    },
     boot: 'rtc: longest night of the year, dimming the wireframes',
   },
   {
     id: 'new-year',
     day: '01-01',
-    neofetch: { en: 'New Year’s Day — same bugs, new year', fr: 'jour de l’an — mêmes bugs, nouvelle année' },
     boot: 'rtc: year rolled over, every timestamp still sane',
   },
   {
@@ -60,10 +51,6 @@ export const seasons: readonly Season[] = [
     // the site was born.
     id: 'birthday',
     day: profile.since.slice(5),
-    neofetch: {
-      en: `the site’s birthday — first commit ${profile.since}`,
-      fr: `anniversaire du site — premier commit le ${profile.since}`,
-    },
     boot: `init: first commit ${profile.since}, happy birthday couvsh`,
   },
   {
@@ -71,10 +58,6 @@ export const seasons: readonly Season[] = [
     // The summer solstice too, north of the equator, but the music is what France keeps.
     id: 'music-day',
     day: '06-21',
-    neofetch: {
-      en: 'Fête de la Musique — every output unmuted',
-      fr: 'Fête de la Musique — toutes les sorties sont ouvertes',
-    },
     boot: 'snd: fête de la musique, unmuting every channel',
   },
   {
@@ -82,7 +65,6 @@ export const seasons: readonly Season[] = [
     // whole joke: nothing a visitor reads is made false, since the CV is on this page too.
     id: 'april-fools',
     day: '04-01',
-    neofetch: { en: 'April Fools’ Day — the wireframes turn backwards', fr: '1er avril — les formes tournent à l’envers' },
     boot: 'sched: april 1st, reversing the rotation of every wireframe',
   },
 ]

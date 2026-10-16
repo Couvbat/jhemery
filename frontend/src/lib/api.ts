@@ -193,6 +193,8 @@ export interface UnitHealth {
   /** Milliseconds since the unit last fetched its upstream; null if it has not yet. */
   cacheAge?: number | null
   detail?: Record<string, number>
+  /** What the last real use found, and when: `ask`'s last answer or the reason it failed. */
+  last?: { outcome: string; agoMs: number }
 }
 
 export interface HealthReport {
@@ -206,6 +208,27 @@ export interface GuestbookEntry {
   name: string
   message: string
   date: string
+  /** A local model's one-line reply, under an entry it published; `see` a page it drew from. */
+  reply?: { text: string; by: 'model'; see?: string }
+}
+
+/** Where a moderated entry is: what `GET /guestbook/:id/status` answers. */
+export type GuestbookStatus = 'pending' | 'held' | 'published'
+
+/** `sign` with moderation on: the entry waits for the model, and only its id comes back. */
+export interface GuestbookPending {
+  id: string
+  status: 'pending'
+}
+
+/** What the owner's list shows of an entry that isn't up. */
+export interface HeldGuestbookEntry {
+  id: string
+  name: string
+  message: string
+  status: 'pending' | 'held'
+  reason?: string
+  ageMs: number
 }
 
 export interface GuestbookList {
@@ -296,6 +319,58 @@ export interface JobsInfo {
   jobs: DownloadJob[]
 }
 
+/** A pool's health word, as ZFS says it; absent when only its fill is known. */
+export type PoolHealth = 'ONLINE' | 'DEGRADED' | 'FAULTED' | 'OFFLINE' | 'UNAVAIL'
+
+/**
+ * One machine in the lab's snapshot. The shape is `backend/src/lab/lab.types.ts`, and
+ * what it may hold is the lab map spec's: coarse figures, never an address or a version.
+ */
+export interface LabMachine {
+  id: string
+  up: boolean
+  uptimeSeconds?: number
+  /** Percent, 0–100. */
+  cpu?: number
+  memory?: number
+  load?: number
+  tempC?: { cpu?: number; gpu?: number }
+  pools?: { name: string; health?: PoolHealth; used: number }[]
+  gpu?: { util: number; vramUsedMb: number; vramTotalMb: number; powerW?: number }
+  containers?: number
+}
+
+export interface LabServiceSample {
+  id: string
+  status: 'up' | 'down' | 'maintenance'
+  latencyMs?: number
+}
+
+export interface LabSnapshot {
+  takenAt: string
+  machines: LabMachine[]
+  services: LabServiceSample[]
+  models?: {
+    runtime: 'up' | 'down'
+    resident: { name: string; vramMb: number }[]
+    installed: { name: string; sizeGb: number }[]
+  }
+  tunnel?: { healthy: boolean; connections: number }
+}
+
+/** `GET /lab`: the copy the API holds of the lab's last push. It never calls the lab. */
+export type LabReport =
+  | { configured: false }
+  | {
+      configured: true
+      receivedAt: string | null
+      ageMs: number | null
+      stale: boolean
+      snapshot: LabSnapshot | null
+      /** Per node, 30 UTC days oldest first: the fraction up, or null for no data. */
+      history: Record<string, (number | null)[]>
+    }
+
 /** `POST /presence/wall` on a deployment that hasn't opted in. */
 export interface WallOff {
   configured: false
@@ -305,6 +380,10 @@ export class ApiError extends Error {
   constructor(
     message: string,
     readonly status?: number,
+    /** Why, when the API names it: `ask`'s closed set (`lib/ask-session.ts`). */
+    readonly reason?: string,
+    /** Seconds until a rate limit's window frees, from `Retry-After`. */
+    readonly retryAfter?: number,
   ) {
     super(message)
     this.name = 'ApiError'
@@ -313,15 +392,18 @@ export class ApiError extends Error {
 
 async function errorFrom(res: Response): Promise<ApiError> {
   let detail = `${res.status}`
+  let reason: string | undefined
   try {
-    const body = (await res.json()) as { message?: string | string[] }
+    const body = (await res.json()) as { message?: string | string[]; reason?: unknown }
     if (body?.message) {
       detail = Array.isArray(body.message) ? body.message.join(', ') : body.message
     }
+    if (typeof body?.reason === 'string') reason = body.reason
   } catch {
     // Non-JSON error body — the status code is all we have.
   }
-  return new ApiError(detail, res.status)
+  const retry = Number(res.headers?.get('retry-after'))
+  return new ApiError(detail, res.status, reason, Number.isFinite(retry) && retry > 0 ? retry : undefined)
 }
 
 // ---------------------------------------------------------------------------
@@ -498,11 +580,45 @@ export async function fetchSite(
  * before the body starts, and simply stops yielding if the connection dies
  * mid-answer — the caller keeps whatever arrived.
  */
+/** One of the site's pages an answer drew from: a route, or a command line a link runs. */
+export interface AskSource {
+  title: string
+  target: string
+}
+
+/**
+ * Which model wrote an answer, how fast, and from which pages: one event after the last
+ * delta. Its shape is `backend/src/ask/ask.service.ts`'s `AskMeta`.
+ */
+export interface AskMeta {
+  model: string
+  label?: string
+  outputTokens: number
+  /** The runtime sent no count, so `outputTokens` counts the deltas. */
+  approx?: boolean
+  firstTokenMs: number
+  totalMs: number
+  tokensPerSecond: number | null
+  sources: AskSource[]
+}
+
+export type AskEvent = { delta: string } | { meta: AskMeta }
+
+/** A meta event from a backend that sends one; anything else is skipped, as an unknown event is. */
+function readMeta(value: unknown): AskMeta | undefined {
+  const meta = value as Partial<AskMeta> | null
+  if (!meta || typeof meta.model !== 'string' || typeof meta.outputTokens !== 'number') return undefined
+  const sources = Array.isArray(meta.sources)
+    ? meta.sources.filter((s): s is AskSource => typeof s?.title === 'string' && typeof s?.target === 'string')
+    : []
+  return { ...(meta as AskMeta), sources }
+}
+
 export async function* askStream(
   question: string,
   locale: Locale,
   signal?: AbortSignal,
-): AsyncGenerator<string> {
+): AsyncGenerator<AskEvent> {
   const started = performance.now()
   const traced = observers.size > 0
   // The question's shape, never the question: strace prints keys.
@@ -551,9 +667,9 @@ export async function* askStream(
         const payload = raw.slice('data:'.length).trim()
         if (payload === '[DONE]') return
 
-        let event: { delta?: string; error?: string }
+        let event: { delta?: string; error?: string; reason?: string; meta?: unknown }
         try {
-          event = JSON.parse(payload) as { delta?: string; error?: string }
+          event = JSON.parse(payload) as { delta?: string; error?: string; reason?: string; meta?: unknown }
         } catch {
           // A malformed chunk is not worth throwing away the answer for.
           continue
@@ -563,8 +679,10 @@ export async function* askStream(
         // so it could not be a status code. Raised as one anyway: `ask` decides
         // what to draw from the error alone, and this keeps that one decision
         // in one place.
-        if (event.error) throw new ApiError(event.error, event.error === 'busy' ? 503 : 502)
-        if (event.delta) yield event.delta
+        if (event.error) throw new ApiError(event.error, event.error === 'busy' ? 503 : 502, event.reason)
+        if (event.delta) yield { delta: event.delta }
+        const meta = readMeta(event.meta)
+        if (meta) yield { meta }
       }
     }
   } finally {
@@ -592,6 +710,7 @@ export const api = {
       body: JSON.stringify({ day, locale, guesses }),
     }),
   health: () => request<HealthReport>('/health'),
+  lab: (options?: RequestOptions) => request<LabReport>('/lab', undefined, options),
   /**
    * `wall`'s wave. Enabled, a bare 204 (`undefined` here), whatever became of it. The
    * empty JSON body is the point: the server takes nothing else, so the browser's CORS
@@ -604,11 +723,21 @@ export const api = {
       body: '{}',
     }),
   guestbook: (options?: RequestOptions) => request<GuestbookList>('/guestbook', undefined, options),
-  sign: (name: string, message: string) =>
-    request<GuestbookEntry>('/guestbook', {
+  // `201` and the entry from an API without moderation, `202` and `{ id, status }` from
+  // one with it: the two apps deploy in no fixed order, so both are read.
+  sign: (name: string, message: string, locale?: Locale) =>
+    request<GuestbookEntry | GuestbookPending>('/guestbook', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name, message }),
+      body: JSON.stringify(locale ? { name, message, locale } : { name, message }),
+    }),
+  guestbookStatus: (id: string) => request<{ status: GuestbookStatus }>(`/guestbook/${encodeURIComponent(id)}/status`),
+  heldGuestbook: (password: string) =>
+    request<HeldGuestbookEntry[]>('/guestbook/held', { headers: adminHeaders(password) }),
+  approveGuestbookEntry: (id: string, password: string) =>
+    request<void>(`/guestbook/${encodeURIComponent(id)}/approve`, {
+      method: 'POST',
+      headers: adminHeaders(password),
     }),
   deleteGuestbookEntry: (id: string, password: string) =>
     request<void>(`/guestbook/${id}`, {

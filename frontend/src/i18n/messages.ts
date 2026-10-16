@@ -242,6 +242,7 @@ export const messages = {
     why: { en: 'Decisions', fr: 'Décisions' },
     note: { en: 'Design notes', fr: 'Notes de conception' },
     now: { en: 'Now', fr: 'En ce moment' },
+    lab: { en: 'The lab', fr: 'Le labo' },
     // Read after a note in the other language: the notes aren't translated.
     inEnglish: { en: 'in English', fr: 'en anglais' },
     inFrench: { en: 'in French', fr: 'en français' },

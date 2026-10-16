@@ -37,7 +37,7 @@ async function submit() {
 </script>
 
 <template>
-  <section id="contact" class="py-20 pt-24 pb-32">
+  <section id="contact" class="py-20 pt-24 pb-32" data-api="/contact">
     <div class="max-w-5xl mx-auto px-4">
       <SectionHeader section="contact" tone="green" />
 
@@ -129,7 +129,7 @@ async function submit() {
             </Button>
             <p class="text-xs text-muted-foreground">
               {{ t(m.contact.notice) }}
-              <RouterLink to="/privacy" class="text-primary hover:underline">/privacy</RouterLink>
+              <RouterLink to="/privacy" class="text-primary underline underline-offset-2">/privacy</RouterLink>
             </p>
           </form>
         </div>

@@ -168,8 +168,8 @@ user-supplied data (guestbook entries), so there is deliberately no markup escap
 
 ### Achievements
 
-38 entries in `terminal/achievements.ts`, persisted under `couvbat:achievements` in
-`localStorage`. `completionist` cascades off the other 37 and repaints the three.js palette.
+39 entries in `terminal/achievements.ts`, persisted under `couvbat:achievements` in
+`localStorage`. `completionist` cascades off the other 38 and repaints the three.js palette.
 Adding one means adding it to `achievementList` *and* the README's spoiler table.
 
 ### Colour schemes: tokens only
@@ -186,8 +186,9 @@ the overrides, so `main.css` stays its only definition. The consequences for new
   watching `useTheme().theme` or reading at draw time, not caching them on mount.
 - `themes.spec.ts` holds every scheme to contrast floors and to writing exactly the tokens
   `:root` declares, so a new token needs deriving in `themeTokens()`. The floors live in one
-  place, `lib/themeRules.ts`; muted and body text are lifted to them when the table is built,
-  but the default never is, so a change to `main.css` has to pass on its own.
+  place, `lib/themeRules.ts`; every tone they name (body and muted text, and the colourful
+  tones, which are body-size text in badges and prompts) is lifted to them when the table is
+  built, but the default never is, so a change to `main.css` has to pass on its own.
 
 ### Backend: NestJS, one module per capability
 

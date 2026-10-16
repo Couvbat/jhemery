@@ -31,6 +31,8 @@ export function visitorShapesFor(online: number | null): number {
 const shapeCount = ref(BASE_SHAPE_COUNT)
 const gravity = ref(true)
 const constellation = ref(false)
+/** Whether the field reacts to the music playing on the site: `scene music off` for the session. */
+const music = ref(true)
 
 /** Returns the count actually reached, which may be the cap. */
 export function spawnShapes(count: number): number {
@@ -49,10 +51,16 @@ export function setConstellation(enabled?: boolean): boolean {
   return constellation.value
 }
 
+export function setMusicReaction(enabled?: boolean): boolean {
+  music.value = enabled ?? !music.value
+  return music.value
+}
+
 export function resetScene() {
   shapeCount.value = BASE_SHAPE_COUNT
   gravity.value = true
   constellation.value = false
+  music.value = true
 }
 
 export function useSceneControl() {
@@ -62,9 +70,11 @@ export function useSceneControl() {
     visitorShapes: computed(() => visitorShapesFor(online.value)),
     gravityOn: computed(() => gravity.value),
     constellationOn: computed(() => constellation.value),
+    musicOn: computed(() => music.value),
     spawnShapes,
     setGravity,
     setConstellation,
+    setMusicReaction,
     resetScene,
   }
 }
