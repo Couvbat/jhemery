@@ -41,7 +41,9 @@ export class MarketsService {
   constructor(private config: ConfigService) {}
 
   async getQuotes(): Promise<MarketsReport> {
-    const coins = (this.config.get<string>('MARKETS_COINS') ?? DEFAULT_COINS).trim();
+    const coins = (
+      this.config.get<string>('MARKETS_COINS') ?? DEFAULT_COINS
+    ).trim();
     if (!coins) return { configured: false };
 
     if (this.cache && this.cache.expiresAt > Date.now()) {
@@ -78,7 +80,10 @@ export class MarketsService {
     url.searchParams.set('price_change_percentage', '24h');
 
     const res = await fetch(url, {
-      headers: { Accept: 'application/json', 'User-Agent': 'jhemery-portfolio' },
+      headers: {
+        Accept: 'application/json',
+        'User-Agent': 'jhemery-portfolio',
+      },
       signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
     });
     if (!res.ok) throw new Error(`CoinGecko failed: ${res.status}`);

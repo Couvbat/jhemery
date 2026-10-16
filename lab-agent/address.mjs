@@ -10,9 +10,11 @@
  * side, before anything is sent.
  */
 export const ADDRESS_PATTERNS = [
-  /\b\d{1,3}(?:\.\d{1,3}){3}\b/,
+  // Bounded by what can't continue the number, not by `\b`: a letter or an underscore
+  // beside it is a word character too, so `backup_192.168.1.20` had no boundary to match.
+  /(?<!\d)\d{1,3}(?:\.\d{1,3}){3}(?!\d)/,
   /::/,
-  /\b[0-9a-f]{1,4}(?::[0-9a-f]{1,4}){7}\b/i,
+  /(?<![0-9a-f])[0-9a-f]{1,4}(?::[0-9a-f]{1,4}){7}(?![0-9a-f])/i,
   /:\/\//,
   /[a-z0-9-]+(?:\.[a-z0-9-]+)*:\d{1,5}(?![\w.:])/i,
   /\.(?:lan|local|home\.arpa|ts\.net)\b/i,

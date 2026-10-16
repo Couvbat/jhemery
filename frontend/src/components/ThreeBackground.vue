@@ -6,7 +6,7 @@ import { useCrt } from '@/composables/useCrt'
 import { useMotion } from '@/composables/useMotion'
 import { usePresence } from '@/composables/usePresence'
 import { RIPPLE_SECONDS, rippleOffset } from './ripple'
-import { createMusicReact, levelOf, lowOf, reactToMusic, RIPPLE_SHARE, type MusicInput } from './music-react'
+import type { MusicInput, MusicReaction, MusicReactState } from './music-react'
 import { currentMusic } from '@/lib/music-signal'
 import { followSeason } from './season'
 import { fieldMood, pickPalette, type Hue, type Palette } from './palette'
@@ -191,8 +191,15 @@ let rippleShare = 1
  * The music the field follows (`music-react.ts`, `lib/music-signal.ts`): its envelopes,
  * the buffer a source's spectrum is read into, and what was last applied, all allocated
  * once. Read at draw time, as the colours are, so nothing re-renders.
+ *
+ * `music-react.ts` itself is fetched when the first music starts, not with the field:
+ * most visits play none, and this chunk counts against the first load's byte budget
+ * (`lighthouserc.yml`). Until it is in, the field is as it would be in silence.
  */
-const musicReact = createMusicReact()
+let musicKit: typeof import('./music-react') | null = null
+let musicKitAsked = false
+let musicReact: MusicReactState | null = null
+const SILENT: MusicReaction = { speed: 1, scale: 1, opacity: 1, ripple: false }
 const musicBins = new Uint8Array(128)
 const musicInput: MusicInput = { level: null, low: null, beats: null, beatsPerBar: 4 }
 let appliedScale = 1
@@ -694,11 +701,18 @@ function animate(now: number) {
 
   // The music, if any is playing and the visitor hasn't turned it off (`scene music off`).
   const source = musicOn.value ? currentMusic() : null
-  if (source) {
+  if (source && !musicKitAsked) {
+    musicKitAsked = true
+    void import('./music-react').then((kit) => {
+      musicKit = kit
+      musicReact = kit.createMusicReact()
+    })
+  }
+  if (source && musicKit) {
     if (source.spectrum) {
       source.spectrum(musicBins)
-      musicInput.level = levelOf(musicBins)
-      musicInput.low = lowOf(musicBins)
+      musicInput.level = musicKit.levelOf(musicBins)
+      musicInput.low = musicKit.lowOf(musicBins)
     } else {
       // A waveform's height is mostly kick and bass in this music: it breathes the shapes too.
       musicInput.level = musicInput.low = source.level?.() ?? null
@@ -706,11 +720,11 @@ function animate(now: number) {
     musicInput.beats = source.beats()
     musicInput.beatsPerBar = source.beatsPerBar ?? 4
   }
-  const music = reactToMusic(musicReact, source ? musicInput : null, now, f, motion.value)
+  const music = musicKit && musicReact ? musicKit.reactToMusic(musicReact, source ? musicInput : null, now, f, motion.value) : SILENT
   // A downbeat ripples at a third of `wall`'s strength, never over one already running.
   if (music.ripple && rippleAt === null && motion.value === 'full') {
     rippleAt = now
-    rippleShare = RIPPLE_SHARE
+    rippleShare = musicKit!.RIPPLE_SHARE
   }
   // Light follows the level only, slowly: see `music-react.ts` on why never the beat.
   if (Math.abs(music.opacity - musicGlow) > 0.002) {

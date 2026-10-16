@@ -4,13 +4,7 @@
  * once, here, instead of being reimplemented next to every renderer.
  */
 export type WeatherCondition =
-  | 'clear'
-  | 'cloudy'
-  | 'fog'
-  | 'drizzle'
-  | 'rain'
-  | 'snow'
-  | 'thunder';
+  'clear' | 'cloudy' | 'fog' | 'drizzle' | 'rain' | 'snow' | 'thunder';
 
 export interface WeatherNow {
   /** °C. */

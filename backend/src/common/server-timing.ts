@@ -47,6 +47,10 @@ export function serverTiming(res: Response, copy: ServerCopy | null): void {
  * call. Younger after than before (or none before) is a fetch this request made; the
  * same age is the copy served. No age after is nothing cached at all, an unconfigured
  * service or a failed first fetch, and gets no header.
+ *
+ * Nor does an answer that served nothing: a refresh that fails after the copy expired
+ * returns `{ configured: false }` and leaves the old copy in place, whose age still
+ * reads as a hit (review of #160). The answer is the outcome, so it is read too.
  */
 export async function timedCopy<T>(
   res: Response,
@@ -58,7 +62,7 @@ export async function timedCopy<T>(
   const started = clock();
   const result = await work();
   const after = age() ?? null;
-  if (after !== null) {
+  if (after !== null && !servedNothing(result)) {
     serverTiming(
       res,
       before === null || after < before
@@ -67,4 +71,13 @@ export async function timedCopy<T>(
     );
   }
   return result;
+}
+
+/** The degraded answer every caching service gives when it has nothing to serve. */
+function servedNothing(result: unknown): boolean {
+  return (
+    typeof result === 'object' &&
+    result !== null &&
+    (result as { configured?: unknown }).configured === false
+  );
 }

@@ -7,5 +7,7 @@
     "rootDir": "./src",
     "tsBuildInfoFile": "./dist/tsconfig.build.tsbuildinfo"
   },
-  "exclude": ["node_modules", "test", "dist", "**/*spec.ts"]
+  // scripts/ are run by hand with tsx (eval-moderation.ts), never deployed: outside
+  // src/, they would only break the rootDir above.
+  "exclude": ["node_modules", "test", "dist", "scripts", "**/*spec.ts"]
 }

@@ -32,7 +32,10 @@ export function downsample(values: number[], buckets: number): number[] {
   const out: number[] = [];
   for (let i = 0; i < buckets; i++) {
     const start = Math.floor((i * values.length) / buckets);
-    const end = Math.max(start + 1, Math.floor(((i + 1) * values.length) / buckets));
+    const end = Math.max(
+      start + 1,
+      Math.floor(((i + 1) * values.length) / buckets),
+    );
     const slice = values.slice(start, end);
     out.push(slice.reduce((sum, v) => sum + v, 0) / slice.length);
   }

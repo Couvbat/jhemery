@@ -1,4 +1,4 @@
-import { tempos as siteTempos, type Tempo } from '@/content/music'
+import type { Tempo } from '@/content/music'
 import { attachMusic } from '@/lib/music-signal'
 import type { WidgetMessage } from '@/composables/useMusicPlayer'
 
@@ -120,13 +120,18 @@ export interface SoundCloudBridge {
 
 export function createSoundCloudBridge(
   options: {
+    /**
+     * `content/music.ts`'s, handed in by `MusicSection` rather than imported: shared with
+     * the home page's own chunk, the module was split into a request of its own on the
+     * first load, which has a byte budget (`lighthouserc.yml`).
+     */
     tempos?: Readonly<Record<string, Tempo>>
     now?: () => number
     /** The waveform's JSON, parsed; injected by the specs. */
     load?: (url: string) => Promise<unknown>
   } = {},
 ): SoundCloudBridge {
-  const tempos = options.tempos ?? siteTempos
+  const tempos = options.tempos ?? {}
   const now = options.now ?? (() => performance.now())
   const load = options.load ?? fetchWaveform
   // The specs' loader is theirs alone: the session's cache is the real one's.

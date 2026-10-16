@@ -90,6 +90,19 @@ describe('server timing', () => {
       ).resolves.toBe('x');
       expect(headers).toEqual({});
     });
+
+    // Review of #160: a refresh that failed after the copy expired answered
+    // `{ configured: false }` and kept the old copy, whose age read as a hit.
+    it('says nothing when the answer served nothing, an old copy or not', async () => {
+      const { res, headers } = fakeResponse();
+      await timedCopy(
+        res,
+        () => 900_000,
+        () => Promise.resolve({ configured: false }),
+        clock(),
+      );
+      expect(headers).toEqual({});
+    });
   });
 });
 

@@ -14,6 +14,7 @@ import { setXray, setXrayPath, useXray } from '@/composables/useXray'
 import { api, apiUrl, fetchSite, type HealthReport, type LabReport } from '@/lib/api'
 import { sourceUrl } from '@/lib/source'
 import { dataLine, newestByRoute, newestOf, STREAM_ROUTE, type TimingEntry } from '@/lib/xray-data'
+import { keptTimings } from '@/lib/timing-keep'
 import { parseTrace, pathHops, type Trace } from '@/lib/xray-path'
 import { listeningTo } from './music-react'
 import { newestSignatures } from './signatures'
@@ -308,6 +309,8 @@ onMounted(() => {
     attributes: true,
     attributeFilter: ['class', 'style', 'hidden', 'open', 'inert'],
   })
+  // What the buffer lost when it was last emptied, then what it holds now.
+  takeTimings(keptTimings() as unknown as TimingEntry[])
   if (typeof PerformanceObserver !== 'undefined') {
     try {
       timingObserver = new PerformanceObserver((list) => takeTimings(list.getEntries() as unknown as TimingEntry[]))
