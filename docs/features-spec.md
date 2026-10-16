@@ -553,10 +553,13 @@ the last started followed, detaching falling back) and `ThreeBackground` reads a
 `AnalyserNode` (256-point) in series before the destination and counts beats from a monotone step
 index at each step's own tempo (`beatsAt`); the stems engine puts one after its limiter and counts
 `position × bpm / 60`. `components/music/soundcloud-bridge.ts`, fetched by `MusicSection` only
-once the frame exists, speaks the widget's `postMessage` protocol as `api.js` does (JSON
-`{ method, value }`, `addEventListener` per event, `getCurrentSound` for the permalink), accepts
-only `https://w.soundcloud.com` from that frame, re-anchors its beat on every `playProgress`, and
-takes tempos from `content/music.ts`. `components/music-react.ts` turns a source into speed,
+once the frame exists, hears the widget through `useMusicEmbed`'s one conversation with it
+(`listen`): JSON `{ method, value }` as `api.js` speaks it, `addEventListener` per event,
+`getCurrentSound` for the sound, only `https://w.soundcloud.com` from that frame. It re-anchors the
+position on every `playProgress` (which never counts as playing: the widget sends a few after
+`pause`), takes tempos from `content/music.ts` for the beat, and reads the level off the track's
+waveform, `waveform_url`'s JSON on `wave.sndcdn.com` (CSP `connect-src`), each height over the
+track's tallest, squared. `components/music-react.ts` turns a source into speed,
 scale, opacity and a ripple flag with time-based envelopes (250 ms attack, 600 ms release), so
 30 and 60 fps move alike; its spec holds opacity to 0.1 within any 333 ms under a 200 BPM beat
 and a square-wave level, and beats never reach it. `scene music off` is a session flag in

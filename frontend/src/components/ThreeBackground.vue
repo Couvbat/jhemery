@@ -700,7 +700,8 @@ function animate(now: number) {
       musicInput.level = levelOf(musicBins)
       musicInput.low = lowOf(musicBins)
     } else {
-      musicInput.level = musicInput.low = null
+      // A waveform's height is mostly kick and bass in this music: it breathes the shapes too.
+      musicInput.level = musicInput.low = source.level?.() ?? null
     }
     musicInput.beats = source.beats()
     musicInput.beatsPerBar = source.beatsPerBar ?? 4

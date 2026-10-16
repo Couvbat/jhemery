@@ -1,61 +1,55 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, describe, expect, it } from 'vitest'
 import { currentMusic } from '@/lib/music-signal'
-import { createSoundCloudBridge, permalinkPath, readWidgetMessage, WIDGET_ORIGIN, widgetBeats } from '../music/soundcloud-bridge'
+import {
+  createSoundCloudBridge,
+  levelAt,
+  permalinkPath,
+  waveformJsonUrl,
+  waveformLevels,
+  widgetBeats,
+} from '../music/soundcloud-bridge'
 
 /**
  * The SoundCloud bridge (`docs/superpowers/specs/2026-10-15-music-reactive-field-design.md`):
- * the widget's protocol as `api.js` speaks it, read from one origin and one frame only, and
- * defensively, since it is another origin's input.
+ * what the field follows of the widget's messages, which `useMusicEmbed` has already
+ * checked and hands over, and the waveform it reads the track's level from, defensively,
+ * since it is another origin's file.
  */
 
 const TEMPOS = { '/couvbat/night-shift': { bpm: 165, firstBeatMs: 500 } }
+const WAVE = 'https://wave.sndcdn.com/m9Fa3SkFfPMT_m.json'
+const SOUND = {
+  permalink_url: 'https://soundcloud.com/couvbat/night-shift',
+  waveform_url: WAVE,
+  duration: 10_000,
+}
 
-function setup() {
-  const posted: Array<{ data: string; origin: string }> = []
-  const contentWindow = { postMessage: (data: string, origin: string) => posted.push({ data, origin }) }
-  const frame = Object.assign(new EventTarget(), { contentWindow }) as unknown as HTMLIFrameElement
-  const target = new EventTarget() as unknown as Window
+function setup(waveform: unknown = { width: 3, height: 140, samples: [0, 140, 70] }) {
   let clock = 1_000
-  const onPlaying = vi.fn()
-  const bridge = createSoundCloudBridge(frame, { tempos: TEMPOS, target, onPlaying, now: () => clock })
-  const say = (method: string, value?: unknown, from: { origin?: string; source?: unknown; raw?: string } = {}) =>
-    target.dispatchEvent(
-      Object.assign(new Event('message'), {
-        origin: from.origin ?? WIDGET_ORIGIN,
-        source: 'source' in from ? from.source : contentWindow,
-        data: from.raw ?? JSON.stringify({ method, value }),
-      }),
-    )
-  return { bridge, posted, say, onPlaying, tick: (ms: number) => (clock += ms), frame }
+  const asked: string[] = []
+  const bridge = createSoundCloudBridge({
+    tempos: TEMPOS,
+    now: () => clock,
+    load: (url) => {
+      asked.push(url)
+      return Promise.resolve(waveform)
+    },
+  })
+  const say = (method: string, value?: unknown) => bridge.receive({ method, value })
+  return { bridge, say, asked, tick: (ms: number) => (clock += ms) }
 }
 
 let current: ReturnType<typeof setup> | null = null
-beforeEach(() => {
+afterEach(() => {
+  current?.bridge.dispose()
   current = null
 })
-afterEach(() => current?.bridge.dispose())
 
 describe('the SoundCloud bridge', () => {
-  it('subscribes as api.js does: the four events, then the current sound, again on ready', () => {
-    current = setup()
-    const sent = () => current!.posted.map((p) => JSON.parse(p.data) as { method: string; value: unknown })
-    expect(sent()).toEqual([
-      { method: 'addEventListener', value: 'play' },
-      { method: 'addEventListener', value: 'pause' },
-      { method: 'addEventListener', value: 'finish' },
-      { method: 'addEventListener', value: 'playProgress' },
-      { method: 'getCurrentSound', value: null },
-    ])
-    expect(current.posted.every((p) => p.origin === WIDGET_ORIGIN)).toBe(true)
-    current.say('ready')
-    expect(sent()).toHaveLength(10)
-  })
-
   it('attaches while the widget plays, beats from the hand-entered tempo, and lets go on pause', () => {
     current = setup()
-    current.say('getCurrentSound', { permalink_url: 'https://soundcloud.com/couvbat/night-shift' })
+    current.say('getCurrentSound', SOUND)
     current.say('play')
-    expect(current.onPlaying).toHaveBeenLastCalledWith(true)
     const source = currentMusic()!
     expect(source).toMatchObject({ id: 'soundcloud', bpm: 165 })
     expect(source.spectrum).toBeUndefined()
@@ -69,34 +63,86 @@ describe('the SoundCloud bridge', () => {
     expect(source.beats()).toBeCloseTo(6.875)
     current.say('pause')
     expect(currentMusic()).not.toBe(source)
-    expect(current.onPlaying).toHaveBeenLastCalledWith(false)
+    expect(current.bridge.playing).toBe(false)
   })
 
-  it('has no beat for a track with no tempo, and plays from progress alone', () => {
+  it('follows the track’s level off its waveform, as the position moves', async () => {
     current = setup()
-    current.say('getCurrentSound', { permalink_url: 'https://soundcloud.com/couvbat/other' })
+    current.say('getCurrentSound', SOUND)
+    current.say('play')
+    current.say('playProgress', { currentPosition: 0 })
+    const source = currentMusic()!
+    // Asked for once, as JSON, and nothing until it is in.
+    expect(current.asked).toEqual([WAVE])
+    expect(source.level!()).toBeNull()
+    await Promise.resolve()
+    await Promise.resolve()
+
+    expect(source.level!()).toBe(0)
+    current.tick(5_000)
+    // Halfway through the track is the tallest height, at full level.
+    expect(source.level!()).toBeCloseTo(1)
+    current.tick(2_500)
+    // Three quarters: between the tallest and half its height, which squares to a quarter.
+    expect(source.level!()).toBeCloseTo((1 + 0.25) / 2)
+  })
+
+  it('has no beat for a track with no tempo', () => {
+    current = setup()
+    current.say('getCurrentSound', { ...SOUND, permalink_url: 'https://soundcloud.com/couvbat/other' })
+    current.say('play')
     current.say('playProgress', { currentPosition: 100 })
-    expect(current.bridge.playing).toBe(true)
     expect(currentMusic()!.beats()).toBeNull()
     expect(currentMusic()!.bpm).toBeNull()
   })
 
-  it('ignores another origin, another frame, and anything not the protocol', () => {
+  // Found against the real widget: a few more progress messages follow `pause`, and the
+  // field kept going in silence.
+  it('takes progress for the position, never for playing', () => {
     current = setup()
-    current.say('play', undefined, { origin: 'https://evil.example' })
-    current.say('play', undefined, { source: {} })
-    current.say('play', undefined, { raw: '{not json' })
-    current.say('play', undefined, { raw: JSON.stringify({ value: 1 }) })
-    current.say('openTheVault', { anything: true })
-    current.say('playProgress', { currentPosition: 'soon' })
-    expect(current.bridge.playing).toBe(true)
-    // Only the last line started it, with no anchor: no beat from a garbled position.
-    expect(currentMusic()!.beats()).toBeNull()
+    current.say('playProgress', { currentPosition: 100 })
+    expect(current.bridge.playing).toBe(false)
+    current.say('play')
+    current.say('pause')
+    current.say('playProgress', { currentPosition: 140 })
+    expect(current.bridge.playing).toBe(false)
+    expect(currentMusic()).toBeNull()
   })
 
-  it('lets go of everything when disposed', () => {
+  it('takes the widget’s word on whether it is paused', () => {
     current = setup()
+    current.say('isPaused', false)
+    expect(current.bridge.playing).toBe(true)
+    current.say('isPaused', 'no')
+    expect(current.bridge.playing).toBe(true)
+    current.say('isPaused', true)
+    expect(current.bridge.playing).toBe(false)
+  })
+
+  it('drops a waveform that arrives after the playlist moved on', async () => {
+    let release!: (value: unknown) => void
+    const bridge = createSoundCloudBridge({ load: () => new Promise((resolve) => (release = resolve)) })
+    bridge.receive({ method: 'getCurrentSound', value: SOUND })
+    bridge.receive({ method: 'play', value: null })
+    bridge.receive({ method: 'playProgress', value: { currentPosition: 5_000 } })
+    bridge.receive({ method: 'getCurrentSound', value: { ...SOUND, waveform_url: null } })
+    release({ samples: [140, 140] })
+    await Promise.resolve()
+    await Promise.resolve()
+    expect(currentMusic()!.level!()).toBeNull()
+    bridge.dispose()
+  })
+
+  it('ignores what isn’t the protocol, and lets go of everything when disposed', () => {
+    current = setup()
+    current.say('openTheVault', { anything: true })
+    expect(current.bridge.playing).toBe(false)
+    current.say('getCurrentSound', SOUND)
     current.say('play')
+    current.say('playProgress', { currentPosition: 'soon' })
+    // No anchor from a garbled position, so no beat and no level.
+    expect(currentMusic()!.beats()).toBeNull()
+    expect(currentMusic()!.level!()).toBeNull()
     current.bridge.dispose()
     expect(current.bridge.playing).toBe(false)
     current.say('play')
@@ -104,22 +150,40 @@ describe('the SoundCloud bridge', () => {
   })
 })
 
-describe('reading the widget', () => {
-  it('accepts a JSON string from the widget’s origin and frame only', () => {
-    const frame = {}
-    const event = (data: unknown, origin = WIDGET_ORIGIN, source: unknown = frame) => ({ data, origin, source })
-    expect(readWidgetMessage(event('{"method":"play"}'), frame)).toEqual({ method: 'play', value: undefined })
-    expect(readWidgetMessage(event({ method: 'play' }), frame)).toBeNull()
-    expect(readWidgetMessage(event('{"method":"play"}', 'http://w.soundcloud.com'), frame)).toBeNull()
-    expect(readWidgetMessage(event('{"method":"play"}'), null)).toBeNull()
-    expect(readWidgetMessage(event('"play"'), frame)).toBeNull()
-  })
-
+describe('reading the widget and the waveform', () => {
   it('reads a sound’s path on soundcloud.com, and nothing else', () => {
     expect(permalinkPath('https://soundcloud.com/couvbat/night-shift/')).toBe('/couvbat/night-shift')
     expect(permalinkPath('https://evil.example/couvbat/night-shift')).toBeNull()
     expect(permalinkPath('javascript:alert(1)')).toBeNull()
     expect(permalinkPath(42)).toBeNull()
+  })
+
+  it('fetches a waveform from SoundCloud’s CDN only, as JSON', () => {
+    expect(waveformJsonUrl(WAVE)).toBe(WAVE)
+    expect(waveformJsonUrl('https://wave.sndcdn.com/m9Fa3SkFfPMT_m.png')).toBe(WAVE)
+    expect(waveformJsonUrl('http://wave.sndcdn.com/m9Fa3SkFfPMT_m.json')).toBeNull()
+    expect(waveformJsonUrl('https://wave.sndcdn.com.evil.example/m9Fa3SkFfPMT_m.json')).toBeNull()
+    expect(waveformJsonUrl('https://wave.sndcdn.com/../m9Fa3SkFfPMT_m.json')).toBeNull()
+    expect(waveformJsonUrl(null)).toBeNull()
+  })
+
+  it('turns heights into levels against the track’s tallest, and refuses anything else', () => {
+    expect(Array.from(waveformLevels({ samples: [0, 70, 140] })!)).toEqual([0, 0.25, 1])
+    expect(waveformLevels({ samples: [] })).toBeNull()
+    expect(waveformLevels({ samples: [0, 0] })).toBeNull()
+    expect(waveformLevels({ samples: [1, '2'] })).toBeNull()
+    expect(waveformLevels({ samples: [1, -2] })).toBeNull()
+    expect(waveformLevels({ samples: new Array(10_001).fill(1) })).toBeNull()
+    expect(waveformLevels('nope')).toBeNull()
+  })
+
+  it('reads the level between two heights, clamped to the track', () => {
+    const levels = Float32Array.from([0, 1])
+    expect(levelAt(levels, 250, 1_000)).toBeCloseTo(0.25)
+    expect(levelAt(levels, -5, 1_000)).toBe(0)
+    expect(levelAt(levels, 5_000, 1_000)).toBe(1)
+    expect(levelAt(levels, 0, 0)).toBeNull()
+    expect(levelAt(null, 0, 1_000)).toBeNull()
   })
 
   it('counts beats from an anchor, and none without one or a tempo', () => {

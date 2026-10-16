@@ -16,6 +16,12 @@ export interface MusicSource {
   beatsPerBar?: number
   /** Fills a buffer the caller owns with 0–255 frequency bins; absent when the source can't be heard. */
   spectrum?: (into: Uint8Array<ArrayBuffer>) => void
+  /**
+   * For a source that can't be heard but whose loudness is known: the level now, 0–1, which
+   * stands for the low band too. SoundCloud's, read off the track's waveform; null until the
+   * waveform and the position are both in.
+   */
+  level?: () => number | null
 }
 
 /** Attached sources, oldest first: the last is the one the field follows. */

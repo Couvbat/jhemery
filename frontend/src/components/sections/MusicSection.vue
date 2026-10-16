@@ -7,7 +7,7 @@ import WindowDots from '@/components/WindowDots.vue'
 import { music } from '@/content'
 import { stemTracks } from '@/content/stems'
 import { useLocale } from '@/i18n'
-import { setPlayerPlaying, useMusicEmbed, useMusicPlayer } from '@/composables/useMusicPlayer'
+import { useMusicEmbed, useMusicPlayer } from '@/composables/useMusicPlayer'
 
 const { t, m } = useLocale()
 const { autoplayNonce, playerLoaded } = useMusicPlayer()
@@ -20,26 +20,32 @@ const StemsMixer = defineAsyncComponent(() => import('@/components/stems/StemsMi
 const frameEl = ref<HTMLIFrameElement | null>(null)
 // `src` follows the chosen scheme, but never while the player is playing: it listens to the
 // frame for that (see `useMusicEmbed`).
-const { src, load: loadFrame, onFrameLoad } = useMusicEmbed(frameEl)
+const { src, load: loadFrame, onFrameLoad, listen } = useMusicEmbed(frameEl)
 async function load() {
   loadFrame()
   await nextTick()
   frameEl.value?.focus()
 }
 
-// The frame's play state, for the field to follow (`components/music/soundcloud-bridge.ts`):
-// its own chunk, fetched once there is a frame and never before, as the frame itself is.
-// A `play` remounts the frame, and the bridge follows it to the new one.
-let bridge: { dispose: () => void } | null = null
+// What the frame plays, for the field to follow (`components/music/soundcloud-bridge.ts`):
+// its own chunk, fetched once there is a frame and never before, as the frame itself is. It
+// hears the embed's conversation with the widget rather than starting one. A `play`
+// remounts the frame, and a new bridge follows the new one from its first word.
+let unfollow: (() => void) | null = null
 watch(frameEl, async (frame) => {
-  bridge?.dispose()
-  bridge = null
+  unfollow?.()
+  unfollow = null
   if (!frame) return
   const { createSoundCloudBridge } = await import('@/components/music/soundcloud-bridge')
   if (frameEl.value !== frame) return
-  bridge = createSoundCloudBridge(frame, { onPlaying: setPlayerPlaying })
+  const bridge = createSoundCloudBridge()
+  const unlisten = listen(bridge.receive)
+  unfollow = () => {
+    unlisten()
+    bridge.dispose()
+  }
 })
-onBeforeUnmount(() => bridge?.dispose())
+onBeforeUnmount(() => unfollow?.())
 </script>
 
 <template>
