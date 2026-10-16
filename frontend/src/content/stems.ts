@@ -4,9 +4,10 @@ import type { Localised } from './types'
  * Tracks of Jules's, split into stems a visitor can remix in the music section (roadmap
  * §J, *Stems*). The mixer (`components/stems/`) shows only while this list has a track, so
  * it ships empty and nothing appears until there are stems to put in it. Imported as
- * `@/content/stems` rather than through the barrel, and kept to data: the music section
- * reads it on the home page, and everything the mixer computes from it is in the mixer's
- * own chunk.
+ * `@/content/stems` rather than through the barrel, and kept to data: the build reads
+ * whether it has a track (`__HAS_STEMS__`, vite.config.ts), so the home page carries
+ * neither the list nor the mixer while it is empty, and everything the mixer computes from
+ * it is in the mixer's own chunk.
  *
  * Each stem is a file under `public/stems/<track id>/`, all of one track the same length,
  * and the excerpt is what loops: a mixer holds every stem decoded at once, so a whole

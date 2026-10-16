@@ -1,4 +1,4 @@
-import type { Locale, Localised } from './types'
+import type { Localised } from './types'
 
 /**
  * Things Jules hosts at a fixed time: a live radio set, a release, a watch party
@@ -14,8 +14,9 @@ import type { Locale, Localised } from './types'
  * Unlike the seasons, an event is an instant rather than a local day: a set at 21:00 in
  * Paris starts at 20:00 in London, so each reader shows it in the visitor's own zone.
  *
- * Only the list is here, in the barrel, so the home page can ask whether there is one.
- * What the readers do with it is `upcoming.ts`, which only they load.
+ * Only the list is here. The build reads whether it has an entry (`__HAS_EVENTS__`,
+ * vite.config.ts), and leaves the footer's event line out of the home page while it hasn't;
+ * what the readers do with it is `upcoming.ts`, which only they load.
  */
 export interface SiteEvent {
   /**
@@ -34,8 +35,3 @@ export interface SiteEvent {
 }
 
 export const events: readonly SiteEvent[] = []
-
-/** The feed a calendar app subscribes to, one per language (`vite-plugins/calendar.ts`). */
-export function feedFile(locale: Locale): string {
-  return locale === 'fr' ? 'events.fr.ics' : 'events.ics'
-}

@@ -66,7 +66,7 @@ src/content/
   upcoming.ts    what the readers compute from it (when, which are ahead) and their words;
                  outside the barrel, so an empty list costs the home page nothing
   stems.ts       StemTrack[], tracks split into stems for the music section's mixer;
-                 outside the barrel, and only data
+                 outside the barrel, and only data, read by the build (`__HAS_STEMS__`)
   security.ts    the disclosure policy and security.txt; outside the barrel, like privacy.ts
   docs.ts        githubSlug and headingSlugs, so a link to a doc's heading can be checked
   decisions.ts   Decision[], what the site chose and turned down; read by `why` (§3)
@@ -875,7 +875,9 @@ mounted, so coming back to *full* or *calm* picks the scene up where it stood.
   weather's, so they apply whichever palette wins; the season palette's own speed is 1, so the
   speed counts once. Slots, never colours, so a season repaints inside the visitor's scheme.
   The same day gives `fortune` its own pool (`content/fortunes.ts`, `Localised` like the
-  everyday lines) and adds one line to `neofetch` and one to the boot log. No achievement:
+  everyday lines) and adds one line to `neofetch` and one to the boot log. The `neofetch` rows
+  are `seasonRows` in `fortunes.ts` too, not fields of the days: `seasons.ts` is in the
+  barrel, which the boot log's line needs, and only the terminal reads the rows. No achievement:
   `completionist` would then wait up to a year on the calendar, when every other achievement
   waits on the visitor.
 - **Guestbook entries** — the newest twelve entries are wireframes, in a third pool beside the
@@ -957,9 +959,11 @@ wraps rather than run wider than the screen, which a guestbook name can make it 
   is the feed's `UID`, so it never changes once published. While one hasn't ended, `/now` lists
   it in the visitor's zone with a relative phrase, `calendar` prints the same, and from
   `SOON_DAYS` (7) before its start the footer's status line names it through
-  `FooterEvent.vue`, which re-reads the clock each minute. The footer only fetches that
-  component while the list has an entry, and the helpers and words all readers share are in
-  `upcoming.ts`, outside the barrel: with the list empty, the home page pays for one array. `vite-plugins/calendar.ts` writes `/events.ics` and `/events.fr.ics` from RFC 5545
+  `FooterEvent.vue`, which re-reads the clock each minute. The build reads whether the list
+  has an entry (`__HAS_EVENTS__`, defined in `vite.config.ts`), and with none the footer's
+  code for the line and the chunk itself aren't built; the helpers and words all readers
+  share are in `upcoming.ts`, outside the barrel, `feedFile` included: with the list empty,
+  the home page carries nothing of it. `vite-plugins/calendar.ts` writes `/events.ics` and `/events.fr.ics` from RFC 5545
   by hand: CRLF lines folded at 75 octets without splitting a character or an escape, TEXT
   escaped, every time in UTC. The feed always carries a `VTIMEZONE` for Europe/Paris that no
   event refers to, because the grammar requires one component and the list is often empty.
@@ -977,8 +981,9 @@ wraps rather than run wider than the screen, which a guestbook name can make it 
   squared faders, mute over solo as on a desk, an exponential 40 Hz–20 kHz cutoff, and the
   code `<track>.<base64url(version, count, level and flags per stem, cutoff)>`, refused when
   the count doesn't match the track's. A hidden tab pauses it, as it stops `acid`. The
-  mixer's chunk, like `FooterEvent`'s, is kept out of the service worker's precache, since
-  neither is fetched while its list is empty.
+  mixer is built only while `stemTracks` has an entry (`__HAS_STEMS__`, as for the events),
+  and its chunk, like `FooterEvent`'s, is kept out of the service worker's precache once it
+  is, since few visitors ever open it.
 - **Save file** (`lib/save-file.ts`, `components/SaveFile.vue` on `/privacy`) — the visitor's
   chosen groups (settings, progress, scores, shell; never secrets) as one code:
   `base64url(version · format · payload)`, the payload a JSON object of key to value,

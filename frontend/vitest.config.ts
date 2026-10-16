@@ -12,6 +12,8 @@ export default defineConfig({
   define: {
     __BUILD_SHA__: JSON.stringify('dev'),
     __BUILD_TIME__: JSON.stringify('2026-01-01T00:00:00.000Z'),
+    __HAS_EVENTS__: 'false',
+    __HAS_STEMS__: 'false',
   },
   resolve: {
     alias: {

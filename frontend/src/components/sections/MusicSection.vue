@@ -5,16 +5,15 @@ import { Badge } from '@/components/ui/badge'
 import SectionHeader from '@/components/SectionHeader.vue'
 import WindowDots from '@/components/WindowDots.vue'
 import { music } from '@/content'
-import { stemTracks } from '@/content/stems'
 import { useLocale } from '@/i18n'
 import { useMusicEmbed, useMusicPlayer } from '@/composables/useMusicPlayer'
 
 const { t, m } = useLocale()
 const { autoplayNonce, playerLoaded } = useMusicPlayer()
 
-// Its own chunk, fetched only when there is a track to mix (`content/stems.ts`): with the
-// list empty the home page never asks for it.
-const StemsMixer = defineAsyncComponent(() => import('@/components/stems/StemsMixer.vue'))
+// Its own chunk, and only in a build with a track to mix (`__HAS_STEMS__`, vite.config.ts):
+// with `content/stems.ts` empty, neither the mixer nor the code to fetch it is built.
+const StemsMixer = __HAS_STEMS__ ? defineAsyncComponent(() => import('@/components/stems/StemsMixer.vue')) : null
 
 // The button goes when the frame comes, and focus would fall to `<body>` with it.
 const frameEl = ref<HTMLIFrameElement | null>(null)
@@ -142,7 +141,7 @@ async function load() {
         </div>
       </div>
 
-      <StemsMixer v-if="stemTracks.length" class="mt-4" />
+      <StemsMixer v-if="StemsMixer" class="mt-4" />
     </div>
   </section>
 </template>

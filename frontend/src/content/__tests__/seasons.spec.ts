@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { profile, seasonOn, seasonOnDay, seasons, untilTomorrow } from '..'
-import { fortunePool, fortunes, seasonalFortunes } from '../fortunes'
+import { fortunePool, fortunes, seasonalFortunes, seasonRows } from '../fortunes'
 
 // Dates here are built with the local `Date` constructor, so the specs hold in whatever
 // time zone they run: the season is the visitor's local day, never UTC's.
@@ -50,8 +50,8 @@ describe('seasons', () => {
 
   it('has a neofetch line in both languages and a boot line for each', () => {
     for (const season of seasons) {
-      expect(season.neofetch.en, season.id).toBeTruthy()
-      expect(season.neofetch.fr, season.id).toBeTruthy()
+      expect(seasonRows[season.id].en, season.id).toBeTruthy()
+      expect(seasonRows[season.id].fr, season.id).toBeTruthy()
       expect(season.boot, season.id).toBeTruthy()
     }
   })
