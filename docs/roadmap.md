@@ -940,6 +940,12 @@ shipped in #152, one commit each.
 |---|---|---|---|---|
 | [x] | Stems | Shipped in #152. One of Jules's tracks as stems on faders in the music section: mute, solo, level, a low-pass over the mix, and the mix as a link. Every stem decoded and started at one instant, so they stay sample-locked. The list ships empty, and the mixer isn't drawn or fetched until it has a track. | `content/stems.ts` (new), `components/stems/` (new), `components/sections/MusicSection.vue` | M |
 
+### Fixes found on the way
+
+| ✔ | Feature | Approach | Files | Effort |
+|---|---|---|---|---|
+| [x] | Lighthouse measures the home page | Found while #154 was in CI. LHCI collected the first five HTML files in `dist/`, and the first is `/index.html`, an address the router has no route for, so every number the gate held was the 404 page's. `lighthouserc.yml` now names its URLs, with `/` first. The home page then measured 0.79 for performance, 0.93 for accessibility and 0.32 for CLS, which visitors had been getting all along. **Layout shift:** the hero's tagline typed itself into an empty box, growing from one line to three and pushing the page down (0.27). It now types over its own invisible full text, in one grid cell. Its cursor, an element that moved with every letter, added 0.08, and a `::after` counted the same. While typing, the cursor is the line's last character, solid, as a terminal's is; once done, it is the blinking element it was. CLS is 0.008, as the 404's was. **Contrast:** the colourful tones were held to 3:1, the large-text floor, but they are body-size text in badges and prompts, and the default's purple read 4.08:1. `FLOORS` holds them to 4.5:1 on background and surface. `readable()` lifts every tone `FLOORS` names, not only muted and body text, which moves twelve colours in six schemes. The default's purple is `oklch(0.63 0.3 300)`, by hand, as the default always is. Two links in muted text, told apart by colour alone, are underlined. **Budget:** the byte ceiling is 304 KiB, re-based on the home page, which fetches eight live-data calls that 404 in the harness. Medians now: performance 0.96, accessibility 1, CLS 0.008, 303 KiB. | `lighthouserc.yml`, `components/sections/HeroSection.vue`, `lib/themeRules.ts`, `lib/themes.ts`, `assets/main.css`, `MusicSection.vue`, `ContactSection.vue`, `public/run/*/neofetch.txt` | S–M |
+
 ### Departures from the approach column
 
 The approach column above was written after the build, so these are departures from the
