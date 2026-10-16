@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { buildCalendar, escapeText, fold, utcStamp } from '../../../vite-plugins/calendar'
-import { feedFile, type SiteEvent } from '../events'
+import type { SiteEvent } from '../events'
+import { feedFile } from '../upcoming'
 
 const AT = new Date('2026-10-14T09:30:00Z')
 

@@ -3,6 +3,9 @@
 /** Injected by Vite `define` — see vite.config.ts. */
 declare const __BUILD_SHA__: string
 declare const __BUILD_TIME__: string
+/** Whether `content/events.ts` and `content/stems.ts` list anything, at build time. */
+declare const __HAS_EVENTS__: boolean
+declare const __HAS_STEMS__: boolean
 
 interface ImportMetaEnv {
   readonly VITE_API_URL?: string

@@ -1,3 +1,4 @@
+import { profile } from './profile'
 import { seasonOn, type SeasonId } from './seasons'
 import type { Localised } from './types'
 
@@ -136,4 +137,27 @@ export const seasonalFortunes: Record<SeasonId, readonly Localised[]> = {
 export function fortunePool(at: Date = new Date()): readonly Localised[] {
   const season = seasonOn(at)
   return season ? seasonalFortunes[season.id] : fortunes
+}
+
+/**
+ * `neofetch`'s `Season` row on each day. Here rather than beside the days in `seasons.ts`,
+ * which is in the barrel and so loads with every first paint (the boot log reads it), for the
+ * reason this module is kept out of the barrel: only the terminal reads these lines.
+ */
+export const seasonRows: Record<SeasonId, Localised> = {
+  halloween: { en: 'Halloween — the wireframes are haunted', fr: 'Halloween — les formes sont hantées' },
+  solstice: {
+    en: 'winter solstice — the longest night, north of the equator',
+    fr: 'solstice d’hiver — la plus longue nuit, au nord de l’équateur',
+  },
+  'new-year': { en: 'New Year’s Day — same bugs, new year', fr: 'jour de l’an — mêmes bugs, nouvelle année' },
+  birthday: {
+    en: `the site’s birthday — first commit ${profile.since}`,
+    fr: `anniversaire du site — premier commit le ${profile.since}`,
+  },
+  'music-day': {
+    en: 'Fête de la Musique — every output unmuted',
+    fr: 'Fête de la Musique — toutes les sorties sont ouvertes',
+  },
+  'april-fools': { en: 'April Fools’ Day — the wireframes turn backwards', fr: '1er avril — les formes tournent à l’envers' },
 }

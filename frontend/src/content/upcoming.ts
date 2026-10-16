@@ -1,6 +1,6 @@
 // Through the barrel rather than from each sibling: the home page already loads the
 // barrel's chunk, and importing `sections.ts` on its own split it into a chunk of its own.
-import { events, findSection, isExternal, profile, type Localised, type SiteEvent } from './index'
+import { events, findSection, isExternal, profile, type Locale, type Localised, type SiteEvent } from './index'
 
 /**
  * The readers' side of `events.ts`: when an event starts and ends, which are ahead, and the
@@ -9,6 +9,11 @@ import { events, findSection, isExternal, profile, type Localised, type SiteEven
  * footer's event line, the terminal, the build's feed), and the home page sits at its byte
  * budget, so none of this loads for a visitor while the list is empty.
  */
+
+/** The feed a calendar app subscribes to, one per language (`vite-plugins/calendar.ts`). */
+export function feedFile(locale: Locale): string {
+  return locale === 'fr' ? 'events.fr.ics' : 'events.ics'
+}
 
 /** How far ahead the footer starts announcing one. The block on `/now` lists them all. */
 export const SOON_DAYS = 7
