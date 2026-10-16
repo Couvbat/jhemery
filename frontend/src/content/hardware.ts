@@ -56,18 +56,6 @@ export const machines: Machine[] = [
       { key: 'SSD', value: 'Crucial M500 480 GB' },
     ],
   },
-  {
-    name: 'Azazel',
-    category: 'nas',
-    os: 'TrueNAS CE',
-    specs: [
-      { key: 'Motherboard', value: 'Z97 MPOWER MAX AC' },
-      { key: 'CPU', value: 'Intel i7-4770K (3.5 GHz)' },
-      { key: 'GPU', value: 'GeForce GTX 1060 3G' },
-      { key: 'RAM', value: '16 GB DDR3 1866 MHz (2×8 GB)' },
-      { key: 'SSD', value: 'Crucial M500 480 GB' },
-    ],
-  },
 ]
 
 export const peripherals: Spec[] = [

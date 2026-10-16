@@ -42,7 +42,9 @@ describe('the lab’s topology', () => {
     }
   })
 
-  it('leaves Azazel off: it is retired', () => {
+  it('draws every NAS the hardware section lists, and only those', () => {
+    const drawn = labNodes.filter((node) => node.kind === 'machine').map((node) => node.machine)
+    for (const machine of machines.filter((each) => each.category === 'nas')) expect(drawn).toContain(machine.name)
     expect(ids).not.toContain('azazel')
   })
 
