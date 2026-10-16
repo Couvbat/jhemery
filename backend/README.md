@@ -33,7 +33,7 @@ unconfigured rather than failing.
 
 ## Modules and routes
 
-One module per capability under `src/`, each a controller, a service, its DTOs and a spec: `ask`,
+One module per capability under `src/`, each with its controller and, mostly, a service, DTOs and a spec: `ask`,
 `contact`, `steam`, `github`, `weather`, `markets`, `presence`, `stats`, `guestbook`, `rooms`,
 `jobs`, `health`, `mcp` and `lab`. The [root README's API table](../README.md#the-api) lists
 every route with its limits. It is the copy kept current, so it isn't repeated here.
@@ -41,8 +41,9 @@ every route with its limits. It is the copy kept current, so it isn't repeated h
 Every optional integration degrades instead of erroring — endpoints report `configured: false` (or
 `enabled: false`) and the frontend renders that state: no Steam key hides live activity, no GitHub
 token drops the heatmap and pinned repos, no weather coordinates hide `weather`, and a model that
-can't answer names a reason (`unconfigured`, `busy`, `warming`, `unreachable`…), which the
-terminal turns into plain words and a pointer at `mail`. `ask`, `guestbook`, `rooms`, `jobs`,
+can't answer names a reason (`unconfigured`, `warming`, `unreachable`…), which the terminal
+turns into plain words and a pointer at `mail` (a busy model, or the hourly limit, just says to
+wait). `ask`, `guestbook`, `rooms`, `jobs`,
 `mcp`, `wall` and `lab` are **off by default**; with MCP off, `/mcp` is a plain 404.
 
 Privacy is a constraint on every module, not a policy on top: `/presence` pushes one integer with

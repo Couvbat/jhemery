@@ -646,7 +646,7 @@ every other line, the visitor's address and country among them, before anything 
 | `guestbook` | `GET /guestbook` | "guestbook is closed" |
 | `sign <message>` | `POST /guestbook` | error line |
 | `mail` | `POST /contact` | error line |
-| `ask <question>` | `POST /ask` | the reason in plain words (the hourly limit and when it lifts, busy, waking up, not answering, no model), each pointing at `mail` |
+| `ask <question>` | `POST /ask` | the reason in plain words: the hourly limit and when it lifts, or busy, both meaning wait; or waking up, not answering, no model, each pointing at `mail` |
 | `lab` | `GET /lab` | one line saying the feed is off, unreachable or empty, pointing at `hardware nas` |
 | `systemctl [status [unit]]` | `GET /health` | every unit `unknown` — the unit list is kept client-side for exactly this |
 | `who` | `GET /presence` (SSE, started on demand by `whenPresent`) | "who: presence is unavailable right now" |

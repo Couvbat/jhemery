@@ -21,8 +21,9 @@
   # `curl jhemery.xyz/neofetch`: a command's output as a page, generated into
   # run/<locale>/<name>.txt by src/terminal/__tests__/curl-pages.spec.ts. Only the
   # command-line clients, not the crawler list above: a crawler asking for /about
-  # wants the page a browser gets. French when the client asks for it first, and a
-  # name with no page falls through to the SPA like any other path.
+  # wants the page a browser gets. French when the client asks for it first. A name with
+  # no curl page goes on to its page copy if it has one (/now), and otherwise to the 404
+  # further down (`curl jhemery.xyz/neofetc`), never to the app.
   RewriteCond %{HTTP_USER_AGENT} (curl|wget|httpie) [NC]
   RewriteCond %{HTTP:Accept-Language} ^fr [NC]
   RewriteCond %{DOCUMENT_ROOT}/run/fr/$1.txt -f
@@ -42,7 +43,8 @@
   # canonical URL (vite-plugins/pages.ts): /tools/json is pages/tools/json.html.
   # Without it every route answers with the home page's head, canonical included,
   # and a crawler files them all under /. After the curl pages, so `curl /tools`
-  # still gets text; a path with no copy (a room code, the 404) gets index.html.
+  # still gets text; a path with no copy (a room code, the 404) gets index.html, except a
+  # command-line client's unknown single name, which gets the 404 below.
   #
   # French first: ?lang=fr is the French URL of the same page (src/content/pages.ts),
   # and its copy is pages/fr/<path>.html, the home page's pages/fr/index.html. The
