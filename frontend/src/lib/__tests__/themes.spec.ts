@@ -94,7 +94,7 @@ describe('themes', () => {
   })
 
   // The floors live in themeRules.ts: body and muted text at AA (4.5:1) on background,
-  // surface and raised; primary at AA; the colourful tones at AA-large (3:1).
+  // surface and raised; the colourful tones at AA on background and surface.
   describe.each(themes.map((theme) => [theme.id, theme] as const))('%s', (_, theme) => {
     it('meets every contrast floor', () => {
       expect(checkFloors(theme.colours)).toEqual([])

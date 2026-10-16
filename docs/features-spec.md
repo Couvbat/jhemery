@@ -375,9 +375,10 @@ variant covers the few fixed palette colours that stay. The listing's swatches a
 output needs a colour that is *not* the current scheme's, so `OutputSegment` has a `colour` field.
 It is only ever set from the theme table. The floors live in `src/lib/themeRules.ts`: body and
 muted text at 4.5:1 on background, surface *and* raised (the `bg-muted` title bars are 12 px
-muted text), primary at 4.5:1, the other tones at 3:1. Muted and body text are lifted to the
-floor by rule when the table is built, stepping OKLCH lightness with hue and chroma kept, so a
-new scheme passes by construction; `themes.spec.ts` checks every scheme against the same floors.
+muted text), and the colourful tones (primary, accent, secondary, warning, destructive) at
+4.5:1 on background and surface, since they are body-size text too, in badges and prompts. Every
+tone with a floor is lifted to it by rule when the table is built, stepping OKLCH lightness with
+hue and chroma kept, so a new scheme passes by construction; `themes.spec.ts` checks every scheme against the same floors.
 The default is never lifted. It lives in `main.css` and Lighthouse measures it, so it must pass as
 shipped, and a spec holds that. Three upstream colours were also adjusted by hand before the rule
 existed, each noted in the file.

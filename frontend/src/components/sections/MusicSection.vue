@@ -153,7 +153,7 @@ onBeforeUnmount(() => unfollow?.())
                 :href="music.profileUrl"
                 target="_blank"
                 rel="noopener noreferrer"
-                class="text-accent hover:text-accent/80 transition-colors"
+                class="text-accent underline underline-offset-2 hover:text-accent/80 transition-colors"
                 >soundcloud.com/couvbat</a
               >
             </p>
