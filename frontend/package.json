@@ -18,7 +18,8 @@
     "test:e2e:ui": "playwright test --ui",
     "assets": "./scripts/gen-assets.sh",
     "wordlists": "node scripts/build-wordlists.mjs",
-    "stems": "node scripts/stems.mjs"
+    "stems": "node scripts/stems.mjs",
+    "tempos": "node scripts/tempos.mjs"
   },
   "dependencies": {
     "@ffmpeg/core": "^0.12.10",

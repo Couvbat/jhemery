@@ -199,7 +199,7 @@ let rippleShare = 1
 let musicKit: typeof import('./music-react') | null = null
 let musicKitAsked = false
 let musicReact: MusicReactState | null = null
-const SILENT: MusicReaction = { speed: 1, scale: 1, opacity: 1, ripple: false }
+const SILENT: MusicReaction = { speed: 1, scale: 1, opacity: 1, ripple: false, surge: false }
 const musicBins = new Uint8Array(128)
 const musicInput: MusicInput = { level: null, low: null, beats: null, beatsPerBar: 4 }
 let appliedScale = 1
@@ -721,10 +721,11 @@ function animate(now: number) {
     musicInput.beatsPerBar = source.beatsPerBar ?? 4
   }
   const music = musicKit && musicReact ? musicKit.reactToMusic(musicReact, source ? musicInput : null, now, f, motion.value) : SILENT
-  // A downbeat ripples at a third of `wall`'s strength, never over one already running.
-  if (music.ripple && rippleAt === null && motion.value === 'full') {
+  // A downbeat ripples at a third of `wall`'s strength, never over one already running. A
+  // surge (a drop landing) ripples at its full strength, and may cut a downbeat's short.
+  if (motion.value === 'full' && (music.surge ? rippleAt === null || rippleShare < 1 : music.ripple && rippleAt === null)) {
     rippleAt = now
-    rippleShare = musicKit!.RIPPLE_SHARE
+    rippleShare = music.surge ? 1 : musicKit!.RIPPLE_SHARE
   }
   // Light follows the level only, slowly: see `music-react.ts` on why never the beat.
   if (Math.abs(music.opacity - musicGlow) > 0.002) {

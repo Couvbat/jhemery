@@ -11,17 +11,31 @@
  * geometry, never light: the scale pulse and the downbeat ripple follow the beat, and
  * opacity follows only the level, within +10 %, through a 600 ms envelope both ways, so it
  * can't swing at beat rate. Colour never follows the music at all.
+ *
+ * **Stronger than the spec's first bounds**, on the owner's call after trying it (#160):
+ * at ×1.6 and +6 % a SoundCloud track, which has no beat without a hand-entered tempo,
+ * moved the field too little to see. Geometry only; light keeps its bounds above. A surge,
+ * the level leaping well over where it has settled as a drop does, sends a ripple at
+ * `wall`'s full strength, at most every three seconds (a build-up's and its drop's both
+ * land, and one never cuts another short), so a drop is seen to land.
  */
 
 /** The level envelope: quick enough to feel, slow enough to never twitch. */
 export const ATTACK_MS = 250
 export const RELEASE_MS = 600
 /** How fast the field drifts at full level, and with a source that can't be heard. */
-export const MAX_SPEED = 1.6
+export const MAX_SPEED = 2.2
 export const PLAYING_SPEED = 1.2
+/** Calm's ceiling stays the spec's: a visitor who asked for less motion gets the old bound. */
+export const CALM_MAX_SPEED = 1.6
 /** The low band's slow breath, and each beat's pulse, on the shapes' scale. */
-export const MAX_BREATH = 0.06
+export const MAX_BREATH = 0.15
 export const MAX_PULSE = 0.04
+/** The slow envelope a surge is measured against, and how far and how high the level must leap. */
+export const SETTLE_MS = 3_000
+export const SURGE_RISE = 0.35
+export const SURGE_FLOOR = 0.6
+export const SURGE_EVERY_MS = 3_000
 /** How quickly a beat's pulse eases out. */
 export const PULSE_MS = 120
 /** The level's most on opacity, through its slowest envelope only. */
@@ -33,14 +47,16 @@ export const RIPPLE_SHARE = 1 / 3
 export const REFERENCE_MS = 1000 / 60
 
 export interface MusicReaction {
-  /** On the drift, beside the weather's and the season's: ×1 to ×1.6. */
+  /** On the drift, beside the weather's and the season's: ×1 to ×2.2 (×1.6 at calm). */
   speed: number
-  /** On every shape's scale: the breath and the beat pulse together, at most +10 %. */
+  /** On every shape's scale: the breath and the beat pulse together, at most +19 %. */
   scale: number
   /** On the shapes' opacity: 1 to 1.1, from the level alone. */
   opacity: number
-  /** A downbeat ripple starts this frame. */
+  /** A downbeat ripple starts this frame, at a third of `wall`'s strength. */
   ripple: boolean
+  /** A surge starts this frame: a ripple at `wall`'s full strength. */
+  surge: boolean
 }
 
 /** What the background read from the current source this frame. */
@@ -59,10 +75,13 @@ export interface MusicReactState {
   low: number
   /** The slow envelope opacity follows: the release's time both ways. */
   glow: number
+  /** Where the level has settled, over `SETTLE_MS`: what a surge leaps from. */
+  settled: number
   pulse: number
   /** The beat last seen, floored, or null. */
   beat: number | null
   lastRipple: number
+  lastSurge: number
   out: MusicReaction
 }
 
@@ -71,10 +90,12 @@ export function createMusicReact(): MusicReactState {
     level: 0,
     low: 0,
     glow: 0,
+    settled: 0,
     pulse: 0,
     beat: null,
     lastRipple: -Infinity,
-    out: { speed: 1, scale: 1, opacity: 1, ripple: false },
+    lastSurge: -Infinity,
+    out: { speed: 1, scale: 1, opacity: 1, ripple: false, surge: false },
   }
 }
 
@@ -98,26 +119,41 @@ export function reactToMusic(
 ): MusicReaction {
   const out = state.out
   const dt = f * REFERENCE_MS
-  out.ripple = false
+  out.ripple = out.surge = false
   if (motion === 'paused') {
-    state.level = state.low = state.glow = state.pulse = 0
+    state.level = state.low = state.glow = state.settled = state.pulse = 0
     state.beat = null
     out.speed = out.scale = out.opacity = 1
     return out
   }
 
-  // A source that can't be heard lifts the field as a third of full level would.
+  // A source that can't be heard (nor read off a waveform) lifts the field to ×1.2.
   const heard = input?.level ?? (input ? (PLAYING_SPEED - 1) / (MAX_SPEED - 1) : 0)
   state.level = follow(state.level, heard, dt, ATTACK_MS, RELEASE_MS)
-  out.speed = 1 + (MAX_SPEED - 1) * state.level
 
   if (motion === 'calm') {
     // Calm is for a visitor who wants the page to move less, and a beat is movement.
+    out.speed = 1 + (CALM_MAX_SPEED - 1) * state.level
     state.low = state.pulse = state.glow = 0
+    state.settled = state.level
     state.beat = null
     out.scale = out.opacity = 1
     return out
   }
+  out.speed = 1 + (MAX_SPEED - 1) * state.level
+
+  // A drop lands: the level well over where it had settled. Read only off a real level,
+  // never the constant lift, and measured before the slow envelope catches up.
+  if (
+    input?.level != null &&
+    state.level >= SURGE_FLOOR &&
+    state.level - state.settled >= SURGE_RISE &&
+    now - state.lastSurge >= SURGE_EVERY_MS
+  ) {
+    out.surge = true
+    state.lastSurge = now
+  }
+  state.settled = follow(state.settled, state.level, dt, SETTLE_MS, SETTLE_MS)
 
   state.low = follow(state.low, input?.low ?? 0, dt, ATTACK_MS, RELEASE_MS)
   state.glow = follow(state.glow, input?.level ?? 0, dt, RELEASE_MS, RELEASE_MS)

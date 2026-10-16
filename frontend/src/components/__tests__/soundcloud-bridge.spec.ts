@@ -83,8 +83,8 @@ describe('the SoundCloud bridge', () => {
     // Halfway through the track is the tallest height, at full level.
     expect(source.level!()).toBeCloseTo(1)
     current.tick(2_500)
-    // Three quarters: between the tallest and half its height, which squares to a quarter.
-    expect(source.level!()).toBeCloseTo((1 + 0.25) / 2)
+    // Three quarters: between the tallest and the middle of the track's range.
+    expect(source.level!()).toBeCloseTo((1 + 0.5) / 2)
   })
 
   it('has no beat for a track with no tempo', () => {
@@ -167,8 +167,15 @@ describe('reading the widget and the waveform', () => {
     expect(waveformJsonUrl(null)).toBeNull()
   })
 
-  it('turns heights into levels against the track’s tallest, and refuses anything else', () => {
-    expect(Array.from(waveformLevels({ samples: [0, 70, 140] })!)).toEqual([0, 0.25, 1])
+  it('places heights in the track’s own range, and refuses anything else', () => {
+    expect(Array.from(waveformLevels({ samples: [0, 70, 140] })!)).toEqual([0, 0.5, 1])
+    // A loud master: an intro at 95 and minutes within a few percent of the peak. Against
+    // the peak alone they read 0.68 and 0.95; in the track's range, near 0 and 1.
+    const master = waveformLevels({ samples: [...new Array(20).fill(95), ...new Array(75).fill(133), ...new Array(5).fill(140)] })!
+    expect(master[0]).toBe(0)
+    expect(master[50]).toBeGreaterThan(0.8)
+    // A drone has no range: against its peak.
+    expect(Array.from(waveformLevels({ samples: [100, 100, 100] })!)).toEqual([1, 1, 1])
     expect(waveformLevels({ samples: [] })).toBeNull()
     expect(waveformLevels({ samples: [0, 0] })).toBeNull()
     expect(waveformLevels({ samples: [1, '2'] })).toBeNull()

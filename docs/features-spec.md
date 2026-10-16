@@ -558,9 +558,18 @@ once the frame exists, hears the widget through `useMusicEmbed`'s one conversati
 `getCurrentSound` for the sound, only `https://w.soundcloud.com` from that frame. It re-anchors the
 position on every `playProgress` (which never counts as playing: the widget sends a few after
 `pause`), takes tempos from `content/music.ts` for the beat, and reads the level off the track's
-waveform, `waveform_url`'s JSON on `wave.sndcdn.com` (CSP `connect-src`), each height over the
-track's tallest, squared. `components/music-react.ts` turns a source into speed,
-scale, opacity and a ripple flag with time-based envelopes (250 ms attack, 600 ms release), so
+waveform, `waveform_url`'s JSON on `wave.sndcdn.com` (CSP `connect-src`), each height placed
+between the track's 10th and 95th percentiles. The waveform is 100 ms a point and its
+autocorrelation shows no beat, so the tempos are found offline instead: `npm run tempos`
+(`scripts/tempos.mjs`, the detection in `scripts/tempo-lib.mjs`) decodes a file, or a SoundCloud
+URL fetched with `yt-dlp`, to mono 11 025 Hz with `ffmpeg`; takes spectral flux (512-point frames,
+11.6 ms hop), an autocorrelation read through a four-multiple comb over one octave, then the grid
+that best fits the whole track to 0.01 BPM and a quarter frame (a whole BPM within 2 % of its
+score is preferred); picks the beat over its offbeat by the energy in 21–64 Hz just after it, and
+the first beat as the first grid beat with a kick on it; and with `--write` merges the entries
+into `tempos`, printing the offbeat's first beat beside each in case a bass took the beat. `components/music-react.ts`, fetched by the background when music first plays, turns a source
+into speed (×2.2, ×1.6 at calm), scale (+15 % breath, +4 % pulse), opacity (+10 %) and two ripple
+flags, a downbeat's and a surge's, with time-based envelopes (250 ms attack, 600 ms release), so
 30 and 60 fps move alike; its spec holds opacity to 0.1 within any 333 ms under a 200 BPM beat
 and a square-wave level, and beats never reach it. `scene music off` is a session flag in
 `useSceneControl`.

@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it } from 'vitest'
 import { tempos } from '@/content/music'
 import { attachMusic, currentMusic, type MusicSource } from '@/lib/music-signal'
 import {
+  CALM_MAX_SPEED,
   createMusicReact,
   levelOf,
   listeningTo,
@@ -14,6 +15,7 @@ import {
   reactToMusic,
   REFERENCE_MS,
   RIPPLE_EVERY_MS,
+  SURGE_EVERY_MS,
   type MusicInput,
 } from '../music-react'
 
@@ -67,7 +69,7 @@ function run(
 ) {
   const state = createMusicReact()
   const f = 1000 / fps / REFERENCE_MS
-  const frames: Array<{ t: number; speed: number; scale: number; opacity: number; ripple: boolean }> = []
+  const frames: Array<{ t: number; speed: number; scale: number; opacity: number; ripple: boolean; surge: boolean }> = []
   for (let t = 0; t <= seconds * 1000; t += 1000 / fps) {
     const out = reactToMusic(state, input(t), t, f, motion)
     frames.push({ t, ...out })
@@ -85,11 +87,11 @@ const loud = (beats: (t: number) => number | null = () => null) => (t: number): 
 const at200 = (t: number) => (t / 1000) * (200 / 60)
 
 describe('how the field reacts', () => {
-  it('drifts up to ×1.6 at full level, and back to ×1 without music', () => {
+  it('drifts up to ×2.2 at full level, and back to ×1 without music', () => {
     const frames = run(3, 60, loud())
     expect(frames.at(-1)!.speed).toBeCloseTo(MAX_SPEED, 2)
     expect(Math.max(...frames.map((frame) => frame.speed))).toBeLessThanOrEqual(MAX_SPEED + 1e-9)
-    const after = run(3, 60, (t) => (t < 1500 ? loud()(t) : null))
+    const after = run(4, 60, (t) => (t < 1500 ? loud()(t) : null))
     expect(after.at(-1)!.speed).toBeCloseTo(1, 1)
   })
 
@@ -98,7 +100,7 @@ describe('how the field reacts', () => {
     expect(frames.at(-1)!.speed).toBeCloseTo(PLAYING_SPEED, 2)
   })
 
-  it('breathes with the low band and pulses on each beat, within +6 % and +4 %', () => {
+  it('breathes with the low band and pulses on each beat, within +15 % and +4 %', () => {
     const frames = run(4, 60, loud(at200))
     const scales = frames.map((frame) => frame.scale)
     expect(Math.max(...scales)).toBeLessThanOrEqual(1 + MAX_BREATH + MAX_PULSE + 1e-9)
@@ -144,13 +146,39 @@ describe('how the field reacts', () => {
 
   it('gives calm the level on the speed alone: no breath, no pulse, no ripple, no light', () => {
     const frames = run(6, 60, loud(at200), 'calm')
-    expect(frames.every((frame) => frame.scale === 1 && frame.opacity === 1 && !frame.ripple)).toBe(true)
-    expect(frames.at(-1)!.speed).toBeGreaterThan(1.5)
+    expect(frames.every((frame) => frame.scale === 1 && frame.opacity === 1 && !frame.ripple && !frame.surge)).toBe(true)
+    // The spec's first ceiling, kept for calm when full motion went past it.
+    expect(frames.at(-1)!.speed).toBeCloseTo(CALM_MAX_SPEED, 2)
+  })
+
+  // The owner's call (#160): a drop landing is seen, as `wall`'s ripple at full strength.
+  describe('a surge', () => {
+    const level = (at: (t: number) => number) => (t: number): MusicInput => ({ level: at(t), low: at(t), beats: null, beatsPerBar: 4 })
+
+    it('fires once when the level leaps from a breakdown into a drop, not while it stays there', () => {
+      const frames = run(20, 60, level((t) => (t < 6_000 ? 0.1 : 0.95)))
+      const surges = frames.filter((frame) => frame.surge).map((frame) => frame.t)
+      expect(surges).toHaveLength(1)
+      expect(surges[0]!).toBeGreaterThan(6_000)
+      expect(surges[0]!).toBeLessThan(6_600)
+    })
+
+    it('takes no gentle rise for one, and no source that can’t be heard', () => {
+      expect(run(30, 60, level((t) => Math.min(0.9, t / 30_000))).some((frame) => frame.surge)).toBe(false)
+      expect(run(10, 60, () => ({ level: null, low: null, beats: null, beatsPerBar: 4 })).some((frame) => frame.surge)).toBe(false)
+    })
+
+    it('fires at most once every three seconds, however the level jumps', () => {
+      const frames = run(40, 60, level((t) => (Math.floor(t / 2_000) % 2 ? 1 : 0)))
+      const surges = frames.filter((frame) => frame.surge).map((frame) => frame.t)
+      expect(surges.length).toBeGreaterThan(1)
+      for (let i = 1; i < surges.length; i += 1) expect(surges[i]! - surges[i - 1]!).toBeGreaterThanOrEqual(SURGE_EVERY_MS)
+    })
   })
 
   it('does nothing at paused', () => {
     const frames = run(2, 60, loud(at200), 'paused')
-    expect(frames.every((frame) => frame.speed === 1 && frame.scale === 1 && frame.opacity === 1 && !frame.ripple)).toBe(true)
+    expect(frames.every((frame) => frame.speed === 1 && frame.scale === 1 && frame.opacity === 1 && !frame.ripple && !frame.surge)).toBe(true)
   })
 })
 

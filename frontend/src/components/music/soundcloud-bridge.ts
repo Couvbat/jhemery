@@ -51,20 +51,26 @@ export function waveformJsonUrl(url: unknown): string | null {
 }
 
 /**
- * The waveform's heights as levels, 0–1, or null if it isn't one. Each is its height over
- * the track's tallest, squared: a loud master sits near its peak through a whole drop, and
- * the square keeps a breakdown's dip as plain to the field as it is to the ear.
+ * The waveform's heights as levels, 0–1, or null if it isn't one. Each is placed in the
+ * track's own range, from its quietest tenth to its loudest twentieth: a loud master sits
+ * within a few percent of its peak for whole minutes, so against the peak alone (squared,
+ * as this first did) an intro read 0.45 and a drop 0.9, and the field barely told them
+ * apart. In its own range a breakdown reads near 0 and a drop near 1.
  */
 export function waveformLevels(data: unknown): Float32Array | null {
   const samples = (data as { samples?: unknown } | null)?.samples
   if (!Array.isArray(samples) || !samples.length || samples.length > MAX_SAMPLES) return null
-  let max = 0
   for (const sample of samples) {
     if (typeof sample !== 'number' || !Number.isFinite(sample) || sample < 0) return null
-    if (sample > max) max = sample
   }
-  if (!max) return null
-  return Float32Array.from(samples as number[], (sample) => (sample / max) ** 2)
+  const sorted = Float32Array.from(samples as number[]).sort()
+  const top = sorted.at(-1)!
+  if (!top) return null
+  const low = sorted[Math.floor(sorted.length * 0.1)]!
+  const high = sorted[Math.min(sorted.length - 1, Math.floor(sorted.length * 0.95))]!
+  // A waveform with no range to speak of (a drone): against its peak, as a level.
+  if (high - low < top * 0.05) return Float32Array.from(samples as number[], (sample) => sample / top)
+  return Float32Array.from(samples as number[], (sample) => Math.min(1, Math.max(0, (sample - low) / (high - low))))
 }
 
 /** The level at `positionMs` into a track `durationMs` long, between the two nearest heights. */
