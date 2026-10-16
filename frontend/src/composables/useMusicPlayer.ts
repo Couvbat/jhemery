@@ -4,8 +4,8 @@ import { embedColour, useTheme } from './useTheme'
 
 /**
  * Lets the terminal's `play` command start the SoundCloud embed in the music section.
- * Bumping the nonce remounts the iframe with `auto_play=true`; SoundCloud offers no
- * post-load API without pulling in their widget script.
+ * Bumping the nonce remounts the iframe with `auto_play=true`, the only way to start it
+ * from outside.
  */
 const nonce = ref(0)
 
@@ -37,6 +37,41 @@ export function useMusicPlayer() {
 export const SOUNDCLOUD_ORIGIN = 'https://w.soundcloud.com'
 
 /**
+ * What the music section's frame is subscribed to. `play`, `pause` and `finish` are the
+ * repaint's; `playProgress` is the field's (`components/music/soundcloud-bridge.ts`), which
+ * follows the position, and asks for the sound with `getCurrentSound`. One conversation for
+ * both, so the widget is subscribed once.
+ */
+export const WIDGET_EVENTS = ['play', 'pause', 'finish', 'playProgress'] as const
+
+/** A message longer than this is no widget's. */
+const MAX_MESSAGE = 200_000
+
+export interface WidgetMessage {
+  method: string
+  value: unknown
+}
+
+/**
+ * A message from this frame's widget, or null for anything else: another origin, another
+ * frame, a payload that isn't the protocol's JSON. Another origin's input, read as
+ * defensively as a save link is.
+ */
+export function readWidgetMessage(event: { origin: string; source: unknown; data: unknown }, frame: unknown): WidgetMessage | null {
+  if (event.origin !== SOUNDCLOUD_ORIGIN || !frame || event.source !== frame) return null
+  if (typeof event.data !== 'string' || event.data.length > MAX_MESSAGE) return null
+  let parsed: unknown
+  try {
+    parsed = JSON.parse(event.data)
+  } catch {
+    return null
+  }
+  const message = parsed as { method?: unknown; value?: unknown } | null
+  if (!message || typeof message !== 'object' || typeof message.method !== 'string') return null
+  return { method: message.method, value: message.value }
+}
+
+/**
  * How long a stopped player has to start again before it counts as stopped: between two
  * tracks of the playlist the widget says `finish`, then `play` for the next one, and a
  * repaint in that gap would cut the next track off.
@@ -62,7 +97,9 @@ const HANDSHAKE_TRIES = 20
  * `api.js` speaks: `{ method, value }` as JSON, `play`, `pause` and `finish` for whoever
  * subscribes, and `isPaused` answered when asked. Spoken directly, as the radio rooms' player
  * speaks it, so no SoundCloud script runs on the site; every message is checked to come
- * from this frame on SoundCloud's origin, and only its `method` and a boolean are read.
+ * from this frame on SoundCloud's origin (`readWidgetMessage`). This is the frame's only
+ * conversation: the field's bridge hears it through `listen` rather than subscribing the
+ * widget a second time.
  *
  * Previews (`tour`'s, the 🎨 menu's) don't count: only the chosen scheme repaints the
  * player. `embedColour()` is that scheme's green, but never a forged one's, which would
@@ -119,9 +156,11 @@ export function useMusicEmbed(frame?: Ref<HTMLIFrameElement | null>) {
   let heard = false
   let handshake: ReturnType<typeof setInterval> | undefined
   const subscribe = () => {
-    for (const name of ['play', 'pause', 'finish']) post('addEventListener', name)
+    for (const name of WIDGET_EVENTS) post('addEventListener', name)
     post('isPaused', null)
+    post('getCurrentSound', null)
   }
+  const listeners = new Set<(message: WidgetMessage) => void>()
   function onFrameLoad() {
     heard = false
     clearInterval(handshake)
@@ -134,13 +173,8 @@ export function useMusicEmbed(frame?: Ref<HTMLIFrameElement | null>) {
   }
 
   function onMessage(event: MessageEvent) {
-    if (event.origin !== SOUNDCLOUD_ORIGIN || !frame?.value || event.source !== frame.value.contentWindow) return
-    let message: { method?: unknown; value?: unknown }
-    try {
-      message = typeof event.data === 'string' ? JSON.parse(event.data) : {}
-    } catch {
-      return
-    }
+    const message = readWidgetMessage(event, frame?.value?.contentWindow)
+    if (!message) return
     heard = true
     switch (message.method) {
       // Said unprompted once the widget listens, which stops the retries above before any
@@ -156,12 +190,15 @@ export function useMusicEmbed(frame?: Ref<HTMLIFrameElement | null>) {
         break
       case 'play':
         started()
+        // The playlist may have moved on to another sound.
+        post('getCurrentSound', null)
         break
       case 'pause':
       case 'finish':
         stopped()
         break
     }
+    for (const listener of listeners) listener(message)
   }
 
   function started() {
@@ -187,6 +224,7 @@ export function useMusicEmbed(frame?: Ref<HTMLIFrameElement | null>) {
     window.addEventListener('message', onMessage)
     onScopeDispose(() => {
       window.removeEventListener('message', onMessage)
+      listeners.clear()
       clearTimeout(grace)
       clearInterval(handshake)
     })
@@ -196,6 +234,16 @@ export function useMusicEmbed(frame?: Ref<HTMLIFrameElement | null>) {
     src: computed(() => soundcloudEmbedSrc(colour.value, autoplay.value)),
     /** For the frame's `load` event: each `src` is a new player to subscribe to. */
     onFrameLoad,
+    /**
+     * Hears every message of the frame's widget after the repaint has, until the returned
+     * function is called. One that arrives late asks what it missed, so it is told again.
+     */
+    listen(listener: (message: WidgetMessage) => void): () => void {
+      listeners.add(listener)
+      post('isPaused', null)
+      post('getCurrentSound', null)
+      return () => listeners.delete(listener)
+    },
     load() {
       // The scheme may have changed since setup, and there is no frame yet to reload.
       repaint(false)

@@ -22,6 +22,11 @@ export interface UnitHealth {
   cacheAge?: number | null;
   /** A count the service already keeps: visitors online, rooms open, jobs known. */
   detail?: Record<string, number>;
+  /**
+   * What the last real use found and how long ago, for a unit whose being configured
+   * says nothing about whether it works: `ask`'s last answer or the reason it failed.
+   */
+  last?: { outcome: string; agoMs: number };
 }
 
 export interface HealthReport {

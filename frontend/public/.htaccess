@@ -148,6 +148,10 @@
   #                plays a same-origin media file.
   #   connect-src  api.jhemery.xyz is the backend (contact form, guestbook, ask);
   #                'self' covers same-origin builds and the precached assets.
+  #                wave.sndcdn.com is the waveform of the SoundCloud track
+  #                playing, the file the player draws its own bars from, read
+  #                for the background to follow (soundcloud-bridge.ts) and
+  #                fetched only once the visitor has loaded the player.
   #   frame-src    w.soundcloud.com is the player embed in MusicSection.vue and
   #                the radio rooms; www.youtube-nocookie.com is the watch-party
   #                player and the small one for a YouTube item in a radio
@@ -157,7 +161,7 @@
   #   object-src / base-uri / form-action are locked down because nothing here
   #                uses them, and each is a known way to turn a stray HTML
   #                injection into something worse.
-  Header always set Content-Security-Policy "default-src 'self'; script-src 'self' 'wasm-unsafe-eval' https://umami.jhemery.xyz; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https:; media-src blob:; font-src 'self' data:; connect-src 'self' https://api.jhemery.xyz https://umami.jhemery.xyz; frame-src https://w.soundcloud.com https://www.youtube-nocookie.com; worker-src 'self'; manifest-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'; upgrade-insecure-requests"
+  Header always set Content-Security-Policy "default-src 'self'; script-src 'self' 'wasm-unsafe-eval' https://umami.jhemery.xyz; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https:; media-src blob:; font-src 'self' data:; connect-src 'self' https://api.jhemery.xyz https://umami.jhemery.xyz https://wave.sndcdn.com; frame-src https://w.soundcloud.com https://www.youtube-nocookie.com; worker-src 'self'; manifest-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'; upgrade-insecure-requests"
 
   # Only files under /assets/ carry a content hash in their name, so they are the
   # only ones safe to freeze. Matching by extension instead would also freeze

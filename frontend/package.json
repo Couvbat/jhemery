@@ -17,7 +17,8 @@
     "test:e2e": "playwright test",
     "test:e2e:ui": "playwright test --ui",
     "assets": "./scripts/gen-assets.sh",
-    "wordlists": "node scripts/build-wordlists.mjs"
+    "wordlists": "node scripts/build-wordlists.mjs",
+    "stems": "node scripts/stems.mjs"
   },
   "dependencies": {
     "@ffmpeg/core": "^0.12.10",

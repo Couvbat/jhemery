@@ -250,6 +250,15 @@ export const achievementList: Achievement[] = [
     description: { en: 'Opened a shell on the host.', fr: 'Ouvert un shell sur l’hôte.' },
   },
   {
+    id: 'labRat',
+    title: { en: 'Lab Rat', fr: 'Rat de labo' },
+    hint: {
+      en: 'Some of the machines here answer to their own names.',
+      fr: 'Certaines des machines d’ici répondent à leur propre nom.',
+    },
+    description: { en: 'Logged in to one of the lab’s machines.', fr: 'Connecté à l’une des machines du labo.' },
+  },
+  {
     id: 'diffsy',
     title: { en: 'Spot the Difference', fr: 'Trouvez l’erreur' },
     hint: {
@@ -355,7 +364,7 @@ const knownIds = new Set(achievementList.map((a) => a.id))
 /**
  * The unlocked set as stored, trusting none of it: a save link (`lib/save-file.ts`) can
  * restore this key from someone else's code. Ids that are no achievement are dropped, or
- * the count would read 39/38. A set holding every other achievement but not the last one
+ * the count would read 40/39. A set holding every other achievement but not the last one
  * gets it here, since only a new unlock cascades into it and there would be none left.
  */
 function loadUnlocked(): Set<string> {

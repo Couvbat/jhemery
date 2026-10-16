@@ -4,7 +4,7 @@ import { messages } from '@/i18n/messages'
 import { expandAliases } from '@/terminal/aliases'
 import { expandHistory, history, historyBase, prefixMatches, pushHistory } from '@/terminal/history'
 import { pick, type Locale } from '@/content/types'
-import { fail } from '@/terminal/format'
+import { fail, segmented } from '@/terminal/format'
 import { completableFlags, renderUsage } from '@/terminal/manual'
 import { lastStageStart, parseLine, replaceStages, type Link, type Stage } from '@/terminal/parse'
 import {
@@ -63,6 +63,7 @@ const draft = ref('')
 const pendingPrompt = shallowRef<{
   question: string
   mask: boolean
+  inline: boolean
   resolve: (value: string) => void
   reject: (reason?: unknown) => void
 } | null>(null)
@@ -297,10 +298,12 @@ function buildContext(args: string[], raw: string, scope: Scope, stdin?: OutputL
     prompt: (question: string, options) => {
       if (!tty) throw notATty(raw)
       return new Promise<string>((resolvePrompt, rejectPrompt) => {
-        append({ text: question, tone: 'accent' })
+        // Inline, the input row's label is the question until the answer echoes it.
+        if (!options?.inline) append({ text: question, tone: 'accent' })
         pendingPrompt.value = {
           question,
           mask: options?.mask ?? false,
+          inline: options?.inline ?? false,
           resolve: resolvePrompt,
           reject: rejectPrompt,
         }
@@ -603,7 +606,12 @@ export async function submit(value: string): Promise<void> {
   if (pending) {
     pendingPrompt.value = null
     // Answers to a question are not commands, so they don't get the shell prompt.
-    append({ text: `  ${pending.mask ? '•'.repeat(value.length) : value}`, tone: 'accent' })
+    const shown = pending.mask ? '•'.repeat(value.length) : value
+    append(
+      pending.inline
+        ? segmented([{ text: pending.question, tone: 'accent' }, { text: ` ${shown}` }])
+        : { text: `  ${shown}`, tone: 'accent' },
+    )
     pending.resolve(value)
     return
   }

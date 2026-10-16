@@ -1,10 +1,10 @@
 <script setup lang="ts">
-import { defineAsyncComponent, nextTick, ref } from 'vue'
+import { defineAsyncComponent, nextTick, onBeforeUnmount, ref, watch } from 'vue'
 import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import SectionHeader from '@/components/SectionHeader.vue'
 import WindowDots from '@/components/WindowDots.vue'
-import { music } from '@/content'
+import { music, tempos } from '@/content'
 import { useLocale } from '@/i18n'
 import { useMusicEmbed, useMusicPlayer } from '@/composables/useMusicPlayer'
 
@@ -19,12 +19,32 @@ const StemsMixer = __HAS_STEMS__ ? defineAsyncComponent(() => import('@/componen
 const frameEl = ref<HTMLIFrameElement | null>(null)
 // `src` follows the chosen scheme, but never while the player is playing: it listens to the
 // frame for that (see `useMusicEmbed`).
-const { src, load: loadFrame, onFrameLoad } = useMusicEmbed(frameEl)
+const { src, load: loadFrame, onFrameLoad, listen } = useMusicEmbed(frameEl)
 async function load() {
   loadFrame()
   await nextTick()
   frameEl.value?.focus()
 }
+
+// What the frame plays, for the field to follow (`components/music/soundcloud-bridge.ts`):
+// its own chunk, fetched once there is a frame and never before, as the frame itself is. It
+// hears the embed's conversation with the widget rather than starting one. A `play`
+// remounts the frame, and a new bridge follows the new one from its first word.
+let unfollow: (() => void) | null = null
+watch(frameEl, async (frame) => {
+  unfollow?.()
+  unfollow = null
+  if (!frame) return
+  const { createSoundCloudBridge } = await import('@/components/music/soundcloud-bridge')
+  if (frameEl.value !== frame) return
+  const bridge = createSoundCloudBridge({ tempos })
+  const unlisten = listen(bridge.receive)
+  unfollow = () => {
+    unlisten()
+    bridge.dispose()
+  }
+})
+onBeforeUnmount(() => unfollow?.())
 </script>
 
 <template>

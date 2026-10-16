@@ -41,7 +41,11 @@ const extraPinnedRepos = computed(() =>
 </script>
 
 <template>
-  <section id="projects" class="py-20 pt-24">
+  <section
+    id="projects"
+    class="py-20 pt-24"
+    data-api="/github/activity /github/contributions /github/pinned-repos /github/workflow-status"
+  >
     <div class="max-w-5xl mx-auto px-4">
       <SectionHeader section="projects" tone="green" />
 

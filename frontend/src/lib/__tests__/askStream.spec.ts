@@ -30,7 +30,7 @@ describe('askStream', () => {
   async function drain(res: Response): Promise<string[]> {
     global.fetch = vi.fn().mockResolvedValue(res)
     const deltas: string[] = []
-    for await (const delta of askStream('does he know Rust?', 'en')) deltas.push(delta)
+    for await (const item of askStream('does he know Rust?', 'en')) if ('delta' in item) deltas.push(item.delta)
     return deltas
   }
 
@@ -83,6 +83,48 @@ describe('askStream', () => {
 
     const failure = await drain(res).catch((err: unknown) => err)
     expect((failure as ApiError).status).toBe(503)
+  })
+
+  it('yields the meta as its own item, sources and all, and skips one it can’t read', async () => {
+    const meta = {
+      model: 'gemma4:e4b',
+      label: 'poseidon · RTX 3080',
+      outputTokens: 58,
+      firstTokenMs: 410,
+      totalMs: 1930,
+      tokensPerSecond: 38.2,
+      sources: [{ title: 'Why the ticker polls', target: 'why polling' }, { title: 7 }],
+    }
+    global.fetch = vi
+      .fn()
+      .mockResolvedValue(body(event({ delta: 'Yes' }), event({ meta }), event({ meta: { model: 3 } }), 'data: [DONE]\n\n'))
+    const items = []
+    for await (const item of askStream('q?', 'en')) items.push(item)
+    expect(items).toEqual([
+      { delta: 'Yes' },
+      { meta: { ...meta, sources: [{ title: 'Why the ticker polls', target: 'why polling' }] } },
+    ])
+  })
+
+  it('carries the reason an in-band error names, and the API’s reason and Retry-After on a status', async () => {
+    const inBand = await drain(body(event({ error: 'asleep', reason: 'empty' }))).catch((err: unknown) => err)
+    expect(inBand).toMatchObject({ status: 502, reason: 'empty' })
+
+    const limited = {
+      ok: false,
+      status: 429,
+      headers: new Headers({ 'Retry-After': '725' }),
+      json: () => Promise.resolve({ message: 'Too many requests' }),
+    } as unknown as Response
+    await expect(drain(limited)).rejects.toMatchObject({ status: 429, retryAfter: 725 })
+
+    const refused = {
+      ok: false,
+      status: 502,
+      headers: new Headers(),
+      json: () => Promise.resolve({ message: 'The model answered 403', reason: 'refused' }),
+    } as unknown as Response
+    await expect(drain(refused)).rejects.toMatchObject({ status: 502, reason: 'refused' })
   })
 
   it('skips a malformed chunk rather than throwing the answer away', async () => {

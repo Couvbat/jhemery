@@ -367,6 +367,19 @@ Reproduce with the two `curl` commands in [Known gaps](#known-gaps). If they sti
 
 Note `curl -X POST` does **not** reproduce a browser here: it sends the POST directly, while a browser preflights it first because of the JSON content type. Testing only the POST leaves the half that actually fails untested.
 
+### When `ask` is silent
+
+Each step rules out one hop, so go in this order. Every probe from outside spends one of the five questions an hour per address: a sixth reads as a 429, not as the outage.
+
+1. **`strace ask test` in the site's terminal.** A 429 is the rate limit (the line says how many minutes are left); a 502 is a failure with a reason; a 200 with a stream is a model that answered.
+2. **`systemctl status ask`.** Its `Last:` line is the last real question's outcome and how long ago: `last answer 4 min ago`, or `last failure 2 min ago: the model host's edge refused the API`. The reasons are a closed set (`backend/src/ask/ask.failure.ts`): `unreachable` (no HTTP answer: DNS, connect, TLS), `refused` (401 or 403 from the model host's edge, typically a Cloudflare rule that no longer admits the API host's address), `upstream` (any other status, 5xx and 524 included), `timeout` (no first token in 20 s, so the request detached to finish loading), `warming` (a detached load still running), `empty` (the stream ended with no words), `silent` (the controller's 45 s ceiling answered), `busy`, `unconfigured`. It never sends a question of its own.
+3. **The model's `/v1/models` from the home network.** Edge, tunnel, proxy and runtime together: if this fails, the problem is at home.
+4. **The same from the API host, over SSH.** The edge rule as the API's own address meets it: a 403 here and a 200 from home is the `refused` case.
+5. **The backend's stderr log**, whose `ask failed after 812ms: refused (The model answered 403)` lines name the reason and the upstream's status. Still never a question, an answer or an address.
+6. **The runtime's log on the model host**, for what the model itself made of the request.
+
+The model's context window matters too: Ollama's default is a few thousand tokens, and a prompt longer than the window is truncated without an error, which can take the rules with it. Set it to at least 8 192 tokens on the model host (`OLLAMA_CONTEXT_LENGTH=8192`, or `num_ctx` in a Modelfile), and check it again after changing `LLM_MODEL`.
+
 ## Outbound calls from rooms
 
 With `ROOMS_ENABLED=true` the backend also calls out, from the server's IP, to
@@ -376,6 +389,49 @@ item's own URL. It is the one feature besides the downloader that makes YouTube 
 see this IP, which is why it is held to a global budget of 30 lookups a minute and four at once,
 with misses remembered for 10 minutes ([room-titles.ts](../backend/src/rooms/room-titles.ts)).
 If either site starts refusing the server, rooms keep working and the queue shows bare IDs.
+
+## The lab map: the agent and the API
+
+`/lab` draws the homelab from content and colours it from `GET /lab`, which serves whatever the lab
+last pushed. Push, never pull: the API never calls the lab, so nothing here opens a path into the
+home network. Two halves to turn on.
+
+**The API.** In the server's `.env`: `LAB_ENABLED=true`, `LAB_INGEST_TOKEN` (32 characters or
+more; `openssl rand -hex 32`), and `LAB_NODES`, the ids the map draws (`backend/.env.example` lists
+them). Restart the app. `systemctl status lab` in the site's terminal then reads *active* with
+*nothing cached yet* until the first push.
+
+**The agent.** `lab-agent/` is plain ES modules for Node 22 with no dependencies, so nothing is
+installed or built. On the NAS that will run it:
+
+1. Check the repo out on a dataset (`git clone`, then `git pull` to update).
+2. Create a TrueNAS custom app from `lab-agent/compose.example.yaml`: the official `node:22-alpine`
+   image with the `lab-agent` folder mounted read-only, `node /app/agent.mjs` as the command, no
+   port, a non-root user.
+3. Fill in its environment there, never in the repo, since it holds the lab's internal addresses:
+   `LAB_API_URL`, `LAB_INGEST_TOKEN` (the API's value), Glances per machine (`LAB_GLANCES`,
+   `id=url` pairs), each GPU's memory (`LAB_GPU_VRAM_MB`, since Glances reports VRAM as a
+   percentage), TrueNAS per machine (`LAB_TRUENAS` with `wss://` for the JSON-RPC API or `https://`
+   for REST, and `LAB_TRUENAS_KEYS`), Uptime Kuma's `/metrics` (`LAB_KUMA_URL`, `LAB_KUMA_KEY`)
+   and **`LAB_KUMA_MONITORS`, which decides what may be shown**: a Kuma monitor not listed there
+   is never sent, which is how a critical service Kuma watches stays off the map. Then
+   `LAB_OLLAMA_URL` and `LAB_CLOUDFLARED_URL` (cloudflared's metrics server, `--metrics
+   0.0.0.0:20241`).
+4. Start it. Its log has one line per push: `pushed: 10 accepted, 0 dropped`, a dropped id being a
+   typo in `LAB_NODES` or `LAB_KUMA_MONITORS`, or `push refused: 400 — property … should not
+   exist`, which is the API refusing something the schema doesn't list. `node agent.mjs --once`
+   pushes a single snapshot and exits, for trying a change.
+
+**The Cloudflare rule.** The token is the control; a WAF rule is the second lock, so a leaked token
+is not enough on its own. In the zone's *Security → WAF → Custom rules*: *if* the hostname is the
+API's *and* the URI path is `/lab/snapshot` *and* the IP source address is **not** the home
+network's address, *then* Block. With a dynamic home address, keep it in a Cloudflare IP list that
+something at home updates, as the model's own rule already needs.
+
+**When the map goes grey.** *Stale* after five minutes without a push: the agent's log says why
+(`push failed: …` is the API unreachable from home; a 403 is a token that differs between the two
+`.env`s; a 429 is two agents pushing). A day with no push at all is drawn grey on the 30-day bars,
+never red, since the API cannot tell a sleeping lab from a broken push.
 
 ## What the shell can run — facts for the downloader
 
@@ -464,5 +520,5 @@ upgrade, and the thing to try first when YouTube starts refusing.
 
   A `mod_remoteip` that rewrites Apache's peer to the visitor is handled already, since the rewritten address is not a Cloudflare one and gets used as it is. The Passenger behaviour, forwarding the client's header and then adding a second `X-Forwarded-For` line, was checked against Passenger's source and replayed against Express on a Unix socket. It has not been observed on the server itself.
 - **The first visitor to a cold `ask` model is told it is asleep, on purpose.** A cold load measures ~34s against a 20s deadline, so that visitor cannot be served. Rather than cancel — which used to abort the load itself and left the model permanently cold, since Ollama drops a load when its client disconnects — the request detaches and finishes loading in the background. The next visitor gets an answer in ~1.4s. Setting `OLLAMA_KEEP_ALIVE=-1` on the model host makes even that first miss a once-per-reboot event rather than once per idle period.
-- **Nothing on the server reports why `ask` failed.** The service logs latency and outcome to stdout, which on Passenger goes to the app's stderr log. When `ask` misbehaves that log is the only account of it, and both diagnoses above had to be reconstructed from black-box probing plus the *model host's* log instead — see [ask-command-design.md](superpowers/specs/2026-08-04-ask-command-design.md).
+- **`ask` reports why it failed, but only from the last real question.** `systemctl status ask` names the last outcome and its reason ([When `ask` is silent](#when-ask-is-silent)), and the stderr log carries the upstream's status. Nothing probes the model on its own, by design: `/health` never wakes a machine in a flat. So after a fix, the reason stays until the next question proves it — see [ask-my-lab-design.md](superpowers/specs/2026-10-15-ask-my-lab-design.md) §4.
 - **A backend hang reaches the browser as a CORS error, not a timeout.** Cloudflare gives the origin 100s to send response headers, then substitutes its own 524 — which carries no `Access-Control-Allow-Origin`, so the console reports a missing CORS header against an endpoint whose CORS is fine (verified above, in both directions). Worth knowing before chasing `enableCors` or `FRONTEND_URL`: on `api.jhemery.xyz`, *"CORS header missing"* plus a 5xx status usually means the origin was silent, not misconfigured. `/ask` now bounds its own response at 45s so it cannot produce one; no other endpoint has a slow path long enough to matter.

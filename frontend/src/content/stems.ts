@@ -9,6 +9,10 @@ import type { Localised } from './types'
  * neither the list nor the mixer while it is empty, and everything the mixer computes from
  * it is in the mixer's own chunk.
  *
+ * `npm run stems -- <folder>` (`scripts/stems.mjs`) makes a track from a folder of DAW
+ * exports: it cuts and encodes the stems, writes the waveforms' `peaks.json` beside them,
+ * and prints the entry to paste here.
+ *
  * Each stem is a file under `public/stems/<track id>/`, all of one track the same length,
  * and the excerpt is what loops: a mixer holds every stem decoded at once, so a whole
  * track would cost a phone hundreds of megabytes (see `DECODED_BYTES_PER_SECOND`). AAC
@@ -23,14 +27,27 @@ export interface Stem {
   file: string
   /** The file's size in bytes, which the load button announces. A spec holds it to the file. */
   bytes: number
+  /** Its plugins, in order: `['Serum 2', 'OTT', 'Valhalla Room']`. Facts, so plain strings. */
+  chain?: string[]
 }
 
 export interface StemTrack {
   /** Lower-case words: the folder under `public/stems/`, and the head of a mix code. */
   id: string
   title: string
-  /** The excerpt's length in seconds. */
+  /** The excerpt's length in seconds, which is also exactly what loops. */
   seconds: number
+  /**
+   * The liner notes, all facts (plain strings) and all optional, so a track costs the home
+   * page bytes only for what it fills in. The transport steps a bar at a time with `bpm`.
+   */
+  bpm?: number
+  /** Four unless said otherwise. */
+  beatsPerBar?: number
+  key?: string
+  daw?: string
+  /** An ISO date. */
+  released?: string
   note?: Localised
   /** The whole track, where it is published. */
   url?: string

@@ -1,0 +1,1 @@
+{ "models": [{ "name": "gemma4:e4b", "model": "gemma4:e4b", "size": 6012954624, "digest": "abc", "expires_at": "2026-10-15T20:12:00Z", "size_vram": 2202009600 }] }

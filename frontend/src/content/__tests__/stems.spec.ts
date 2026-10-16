@@ -1,7 +1,8 @@
-import { existsSync, statSync } from 'node:fs'
+import { existsSync, readFileSync, statSync } from 'node:fs'
 import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
 import { decodedBytes, downloadBytes } from '@/components/stems/load'
+import { decodePeaks } from '@/components/stems/peaks'
 import { DECODED_BYTES_PER_SECOND, MAX_DECODED_BYTES, MAX_STEMS, stemTracks, type StemTrack } from '../stems'
 
 /**
@@ -32,6 +33,9 @@ function problems(track: StemTrack): string[] {
   check(decodedBytes(track) <= MAX_DECODED_BYTES, 'decodes to more than a phone can spare')
   check(!track.url || track.url.startsWith('https://'), 'a url that isn’t https')
   check(!track.note || !!track.note.fr, 'a note with no French')
+  check(track.bpm === undefined || (track.bpm > 0 && track.bpm < 400), `a tempo of ${track.bpm}`)
+  check(track.beatsPerBar === undefined || (Number.isInteger(track.beatsPerBar) && track.beatsPerBar > 0), 'beats per bar that aren’t a whole number')
+  check(track.released === undefined || /^\d{4}-\d{2}-\d{2}$/.test(track.released), `released ${track.released} isn't an ISO date`)
   // In the track's own folder, and in a format every browser decodes (Safari: no Opus).
   const file = new RegExp(`^${track.id}/[a-z0-9-]+\\.(m4a|mp3)$`)
   for (const stem of track.stems) {
@@ -56,6 +60,17 @@ describe('the stems list', () => {
     },
   )
 
+  // The waveforms, fetched before any audio: one lane per stem, the length it declares.
+  it.each(stemTracks.map((track) => [track.id, track] as const))('%s has its peaks.json, a lane per stem', (_id, track) => {
+    const path = join(STEMS_DIR, track.id, 'peaks.json')
+    expect(existsSync(path), path).toBe(true)
+    const file = JSON.parse(readFileSync(path, 'utf8')) as { points: number }
+    const peaks = decodePeaks(file, track)
+    expect(peaks, 'a lane missing, or of the wrong length').not.toBeNull()
+    expect(Object.keys(peaks!.stems)).toEqual(track.stems.map((stem) => stem.id))
+    expect(peaks!.points).toBe(file.points)
+  })
+
   it('names each track once', () => {
     expect(new Set(stemTracks.map((track) => track.id)).size).toBe(stemTracks.length)
   })
@@ -64,6 +79,8 @@ describe('the stems list', () => {
     expect(problems(FIXTURE)).toEqual([])
     const bad = { ...FIXTURE, id: 'Night Shift', seconds: 3600, stems: [{ ...FIXTURE.stems[0]!, file: 'elsewhere/drums.opus' }] }
     expect(problems(bad)).toHaveLength(4)
+    expect(problems({ ...FIXTURE, bpm: 165, key: 'F minor', daw: 'FL Studio', released: '2026-10-15' })).toEqual([])
+    expect(problems({ ...FIXTURE, bpm: -1, released: 'last spring' })).toHaveLength(2)
   })
 
   it('counts what a track costs to download and to hold decoded', () => {

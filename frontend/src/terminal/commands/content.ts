@@ -279,6 +279,8 @@ export const contentCommands: Command[] = [
         out.push(...keyValues(machine.specs, 'muted'))
         out.push(blank)
       }
+      // The NAS are the lab, which `/lab` draws live; the specs above are what doesn't change.
+      if (requested !== 'pc') out.push(line('live: /lab', 'muted'))
       return out
     },
   },

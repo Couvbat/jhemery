@@ -168,8 +168,8 @@ user-supplied data (guestbook entries), so there is deliberately no markup escap
 
 ### Achievements
 
-38 entries in `terminal/achievements.ts`, persisted under `couvbat:achievements` in
-`localStorage`. `completionist` cascades off the other 37 and repaints the three.js palette.
+39 entries in `terminal/achievements.ts`, persisted under `couvbat:achievements` in
+`localStorage`. `completionist` cascades off the other 38 and repaints the three.js palette.
 Adding one means adding it to `achievementList` *and* the README's spoiler table.
 
 ### Colour schemes: tokens only

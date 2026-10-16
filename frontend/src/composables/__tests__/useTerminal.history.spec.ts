@@ -49,7 +49,7 @@ describe('history expansion in the shell', () => {
     await answerName('J!!')
     await done
     // The prompt's answer is never expanded either.
-    expect(mocks.sign).toHaveBeenCalledWith('J!!', 'Great site!!')
+    expect(mocks.sign).toHaveBeenCalledWith('J!!', 'Great site!!', 'en')
   })
 
   // `!-2` against a different last entry, so only the histverify push can make it the last.
@@ -68,7 +68,7 @@ describe('history expansion in the shell', () => {
     const done = submit('s Great site!!')
     await answerName('J')
     await done
-    expect(mocks.sign).toHaveBeenCalledWith('J', 'Great site!!')
+    expect(mocks.sign).toHaveBeenCalledWith('J', 'Great site!!', 'en')
 
     mocks.sign.mockClear()
     history.value = ['s hi']

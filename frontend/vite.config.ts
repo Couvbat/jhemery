@@ -12,6 +12,7 @@ import { notesPlugin } from './vite-plugins/notes'
 import { pagesPlugin } from './vite-plugins/pages'
 import { resumePlugin } from './vite-plugins/resume'
 import { searchPlugin } from './vite-plugins/search'
+import { corpusPlugin } from './vite-plugins/corpus'
 import { securityPlugin } from './vite-plugins/security'
 import { thirdPartyPlugin } from './vite-plugins/third-party'
 import { stampSource, xrayPlugin } from './vite-plugins/xray'
@@ -34,6 +35,7 @@ export default defineConfig({
     pagesPlugin(),
     discoveryPlugin(),
     searchPlugin(),
+    corpusPlugin(),
     thirdPartyPlugin(),
     xrayPlugin(),
     VitePWA({
@@ -140,6 +142,8 @@ export default defineConfig({
           // The palette's search index (`vite-plugins/search.ts`). The palette fetches it,
           // which the fallback never answers; this is for a browser opening it by hand.
           /^\/search\.json$/,
+          // What `ask` retrieves from (`vite-plugins/corpus.ts`), read by the backend.
+          /^\/corpus\.json$/,
           // The calendar feeds (`vite-plugins/calendar.ts`), which a calendar app reads.
           /^\/events(\.fr)?\.ics$/,
           // RFC 9116's file, at the root and at the path `.htaccess` answers from it.

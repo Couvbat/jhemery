@@ -102,6 +102,14 @@ export const pages: PageMeta[] = [
     },
   ),
   page(
+    '/lab',
+    { en: 'The lab', fr: 'Le labo' },
+    {
+      en: 'A live map of the homelab behind this site and its model: the machines, the services and the path a request takes, coloured by a snapshot the lab pushes once a minute.',
+      fr: 'Une carte en direct du homelab derrière ce site et son modèle : les machines, les services et le chemin d’une requête, colorés par un instantané que le labo envoie chaque minute.',
+    },
+  ),
+  page(
     '/privacy',
     { en: 'What this site keeps', fr: 'Ce que ce site garde' },
     {

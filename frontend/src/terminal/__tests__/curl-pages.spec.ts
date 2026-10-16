@@ -47,6 +47,7 @@ const EXCLUDED: Record<string, string> = {
   xray: 'it draws over the page, which a terminal hasn’t got',
   // What is ahead depends on the day, and a page is a snapshot served all year.
   calendar: 'the appointments ahead, which a snapshot can’t know',
+  stems: 'a mixer, and there is no audio in a terminal',
 }
 
 const ORIGIN = `https://${profile.domain}`

@@ -17,3 +17,11 @@ export const OUTER_ATTR = 'data-src-outer'
 
 /** What the build resolves for each component, by repo path: the files its words come from. */
 export type XrayMap = Record<string, string[]>
+
+/**
+ * On the root of a component that renders API data: the routes that feed it, separated
+ * by spaces (`/steam/activity`). A literal attribute in its template, not a build stamp:
+ * the component knows which `api.*` call feeds it, and the compiler doesn't.
+ * `src/__tests__/xray-api.spec.ts` holds every live component to carrying one.
+ */
+export const API_ATTR = 'data-api'

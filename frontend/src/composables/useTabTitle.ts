@@ -23,6 +23,8 @@ export function tabTitle(path: string): string {
   const { t, m } = useLocale()
   // Routes outside the prism have no view, so they name themselves.
   if (/^\/now\/?$/.test(path)) return `${t(m.now.heading)} — ${profile.name}`
+  // Not in `m`: the lab's words stay in its own chunk, and this is the one the tab needs.
+  if (/^\/lab\/?$/.test(path)) return `${t({ en: 'The lab', fr: 'Le labo' })} — ${profile.name}`
   if (/^\/privacy\/?$/.test(path)) return `${t(m.privacy.heading)} — ${profile.name}`
   if (/^\/legal\/?$/.test(path)) return `${t(m.legal.heading)} — ${profile.name}`
   if (/^\/security\/?$/.test(path)) return `${t(m.security.heading)} — ${profile.name}`
@@ -52,7 +54,7 @@ export function tabTitle(path: string): string {
  */
 export function pageLabel(path: string): string {
   const { t, m } = useLocale()
-  const outside = /^\/(now|privacy|legal|security|work\/[^/]+)\/?$/.test(path)
+  const outside = /^\/(now|lab|privacy|legal|security|work\/[^/]+)\/?$/.test(path)
   if (!outside && !viewFor(path)) return `${t(m.notFound.label)} — ${profile.name}`
   return tabTitle(path)
 }

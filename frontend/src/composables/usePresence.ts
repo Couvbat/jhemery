@@ -167,5 +167,11 @@ export async function sendWave(signal?: AbortSignal): Promise<WaveResult> {
 }
 
 export function usePresence() {
-  return { online: computed(() => online.value), wave: computed(() => wave.value) }
+  return {
+    online: computed(() => online.value),
+    wave: computed(() => wave.value),
+    // Open once a count has come through, for x-ray's data line: a held stream has no
+    // finished request for Resource Timing to list.
+    streaming: computed(() => online.value !== null),
+  }
 }

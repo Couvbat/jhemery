@@ -3,6 +3,7 @@ import type { Localised } from '@/content/types'
 import { fetchSteam, formatPlaytime, useSteam } from '@/composables/useSteam'
 import { fetchCommits, relativeTime, shortRepo, useGithub } from '@/composables/useGithub'
 import { fetchWeather, useWeather } from '@/composables/useWeather'
+import { decorativeMotion } from '@/composables/useMotion'
 import { messages as m } from '@/i18n/messages'
 import {
   api,
@@ -14,7 +15,8 @@ import {
 import { announce } from '../achievements'
 import { blank, fail, heading, line, link, pre } from '../format'
 import { formatChange, formatPrice, sparkline } from '../sparkline'
-import type { Command, OutputLine } from '../types'
+import { sleep } from '../timing'
+import type { Command, CommandContext, OutputLine } from '../types'
 import { ART_WIDTH, compass, weatherArt, windArrow } from '../weather-art'
 import { cacheGuestbookEntries, filenameFor } from './guestbook-fs'
 
@@ -100,6 +102,59 @@ function quoteLines(quote: MarketQuote): OutputLine[] {
     pre(`     ${sparkline(quote.sparkline)}`, up ? 'success' : 'error'),
     blank,
   ]
+}
+
+/**
+ * What `sign` says when the guestbook reads entries first
+ * (`docs/superpowers/specs/2026-10-15-guestbook-moderation-design.md`, *The signer's side*).
+ */
+const SIGN_WORDS = {
+  received: {
+    en: '✓ received. a local model reads every entry before it shows — usually a few seconds.',
+    fr: '✓ reçu. un modèle local lit chaque message avant qu’il apparaisse — en général quelques secondes.',
+  },
+  reading: { en: 'reading', fr: 'lecture' },
+  published: { en: '✓ it’s up — `guestbook` to see it.', fr: '✓ il est en ligne — `guestbook` pour le voir.' },
+  held: {
+    en: 'held for Jules to read; it will show if it’s fine.',
+    fr: 'gardé pour que Jules le lise ; il apparaîtra s’il est correct.',
+  },
+  asleep: {
+    en: 'the model is asleep. it will show within 30 minutes either way.',
+    fr: 'le modèle dort. il apparaîtra dans les 30 minutes de toute façon.',
+  },
+} satisfies Record<string, Localised>
+
+/** How often, and how long, `sign` asks after a pending entry. */
+export const VERDICT_POLL_MS = 2_000
+export const VERDICT_WAIT_MS = 20_000
+
+/**
+ * Asks after the entry every 2 s for up to 20 s, in a frame: the dots move only while
+ * motion is allowed. A failed poll counts as no news, never as a verdict.
+ */
+async function waitForVerdict(ctx: CommandContext, id: string): Promise<OutputLine[]> {
+  const draw = ctx.frame()
+  const moving = decorativeMotion() !== 'paused'
+  for (let waited = VERDICT_POLL_MS; waited <= VERDICT_WAIT_MS; waited += VERDICT_POLL_MS) {
+    const dots = moving ? '.'.repeat(1 + ((waited / VERDICT_POLL_MS) % 3)) : '…'
+    draw([line(`${ctx.t(SIGN_WORDS.reading)}${dots}`, 'muted')])
+    await sleep(VERDICT_POLL_MS, ctx.signal)
+    const status = await api
+      .guestbookStatus(id)
+      .then((reply) => reply.status)
+      .catch(() => undefined)
+    if (status === 'published') {
+      draw([line(ctx.t(SIGN_WORDS.published), 'success')])
+      return []
+    }
+    if (status === 'held') {
+      draw([line(ctx.t(SIGN_WORDS.held), 'muted')])
+      return []
+    }
+  }
+  draw([line(ctx.t(SIGN_WORDS.asleep), 'muted')])
+  return []
 }
 
 export const liveCommands: Command[] = [
@@ -288,7 +343,8 @@ export const liveCommands: Command[] = [
     description: { en: 'Leave a message in the guestbook', fr: 'Laisser un message' },
     group: 'live',
     writes: 'server',
-    async run({ args, prompt, print, t }) {
+    async run(ctx) {
+      const { args, prompt, print, t, locale } = ctx
       // One pair of outer quotes is the shell's, not the message's: `sign "great site; love
       // it"` is how the shell says to pass an operator on, so it must not post the quotes.
       const message = args.join(' ').trim().replace(/^(["'])([\s\S]*)\1$/, '$2').trim()
@@ -308,13 +364,20 @@ export const liveCommands: Command[] = [
       if (!name) return [fail('sign: a name is required')]
 
       print(line('signing…', 'muted'))
+      let signed: Awaited<ReturnType<typeof api.sign>>
       try {
-        await api.sign(name, message)
-        return [line('✓ signed. run `guestbook` to see it.', 'success'), ...announce('sign', t)]
+        signed = await api.sign(name, message, locale)
       } catch (error) {
         const detail = error instanceof ApiError ? error.message : 'request failed'
         return [fail(`sign: ${detail}`)]
       }
+      // The achievement is for an accepted entry, whether or not it is up yet.
+      const toast = announce('sign', t)
+      if ('status' in signed && signed.status === 'pending') {
+        print(line(t(SIGN_WORDS.received), 'success'))
+        return [...(await waitForVerdict(ctx, signed.id)), ...toast]
+      }
+      return [line('✓ signed. run `guestbook` to see it.', 'success'), ...toast]
     },
   },
   {

@@ -3,7 +3,9 @@ import { coreCommands } from './core'
 import { navigateCommands } from './navigate'
 import { toolCommands } from './tools'
 import { contentCommands } from './content'
+import { stemsCommands } from './stems'
 import { liveCommands } from './live'
+import { labCommands } from './lab'
 import { askCommands } from './ask'
 import { eggCommands } from './eggs'
 import { gameCommands } from './games'
@@ -27,8 +29,10 @@ export function collectCommands(): Command[] {
     ...toolCommands,
     ...textCommands,
     ...contentCommands,
+    ...stemsCommands,
     ...workCommands,
     ...liveCommands,
+    ...labCommands,
     ...askCommands,
     ...eggCommands,
     ...gameCommands,
