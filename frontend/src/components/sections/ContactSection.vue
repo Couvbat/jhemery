@@ -129,7 +129,7 @@ async function submit() {
             </Button>
             <p class="text-xs text-muted-foreground">
               {{ t(m.contact.notice) }}
-              <RouterLink to="/privacy" class="text-primary hover:underline">/privacy</RouterLink>
+              <RouterLink to="/privacy" class="text-primary underline underline-offset-2">/privacy</RouterLink>
             </p>
           </form>
         </div>
