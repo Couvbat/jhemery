@@ -1,8 +1,4 @@
-import {
-  Injectable,
-  InternalServerErrorException,
-  Logger,
-} from '@nestjs/common';
+import { Injectable, InternalServerErrorException, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import * as nodemailer from 'nodemailer';
 import { ContactDto } from './contact.dto';
@@ -27,18 +23,11 @@ export class ContactService {
 
     if (!host || !user || !pass) {
       this.logger.warn('SMTP not configured — logging message instead');
-      this.logger.log(
-        `Contact from ${dto.name} <${dto.email}>: ${dto.message}`,
-      );
+      this.logger.log(`Contact from ${dto.name} <${dto.email}>: ${dto.message}`);
       return;
     }
 
-    const transporter = nodemailer.createTransport({
-      host,
-      port,
-      secure: port === 465,
-      auth: { user, pass },
-    });
+    const transporter = nodemailer.createTransport({ host, port, secure: port === 465, auth: { user, pass } });
 
     try {
       await transporter.sendMail({
