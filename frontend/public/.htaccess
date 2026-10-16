@@ -55,11 +55,41 @@
   RewriteCond %{DOCUMENT_ROOT}/pages/$1.html -f
   RewriteRule ^([a-z0-9/-]+?)/?$ /pages/$1.html [L]
 
+  # A command-line client asking for a name nothing above gave a page
+  # (`curl jhemery.xyz/neofetc`) gets a 404 and run/<locale>/_404.txt, the list of
+  # pages, rather than the app's HTML. Single names only, the curl pages' own
+  # namespace: every route of one segment has a page copy above, so this takes none.
+  RewriteCond %{HTTP_USER_AGENT} (curl|wget|httpie) [NC]
+  RewriteCond %{REQUEST_FILENAME} !-f
+  RewriteCond %{REQUEST_FILENAME} !-d
+  RewriteRule ^[a-z0-9-]+/?$ - [NC,R=404,L]
+
   # SPA fallback: hand every non-file request to index.html so Vue Router owns
-  # routing. Without this, a hard refresh on any path other than / 404s.
+  # routing. Without this, a hard refresh on any path other than / 404s. Never for
+  # /assets/: a tab still running the previous deploy asks for chunks that are gone,
+  # and index.html in their place is refused as script (nosniff) and could be kept by
+  # the service worker's runtime cache under the chunk's name. A real 404 fails the
+  # import at once and is never cached, and what it was for degrades as it already
+  # does (the palette says its search failed, e2e/search.spec.ts).
+  RewriteCond %{REQUEST_URI} !^/assets/
   RewriteCond %{REQUEST_FILENAME} !-f
   RewriteCond %{REQUEST_FILENAME} !-d
   RewriteRule ^ /index.html [L]
+</IfModule>
+
+# The 404 above, as text, and only for the clients that asked: a browser's own 404 (a
+# missing asset) stays the server's. It varies by client and language as the pages do,
+# and `always`, since the merges further down reach only successful responses.
+<If "%{HTTP_USER_AGENT} =~ /(curl|wget|httpie)/i && %{HTTP:Accept-Language} =~ /^fr/i">
+  ErrorDocument 404 /run/fr/_404.txt
+</If>
+<ElseIf "%{HTTP_USER_AGENT} =~ /(curl|wget|httpie)/i">
+  ErrorDocument 404 /run/en/_404.txt
+</ElseIf>
+<IfModule mod_headers.c>
+  <If "%{HTTP_USER_AGENT} =~ /(curl|wget|httpie)/i">
+    Header always merge Vary "User-Agent, Accept-Language"
+  </If>
 </IfModule>
 
 <IfModule mod_mime.c>
