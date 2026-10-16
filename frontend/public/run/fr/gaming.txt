@@ -7,6 +7,14 @@ optimiser un build, speedrunner un niveau, ou dénicher du lore caché.
 [2mgenres[0m
 [38;5;201mRPG · Roguelite · Strategy · Indie · Simulation · FPS[0m
 
-[2mrun `steam` for live activity.[0m
+[2mfavoris[0m
+▸ The Binding of Isaac     Real Platinum God
+▸ Hollow Knight: Silksong
+▸ Project Zomboid
+▸ Slay the Spire 2         Ascension 10
+▸ Factorio
+▸ Faster Than Light
+
+[2mlancez `steam` pour ce qui se joue, et leurs heures.[0m
 
 [2mcurl jhemery.xyz/help pour les autres pages · en direct dans un navigateur : https://jhemery.xyz/?run=gaming[0m

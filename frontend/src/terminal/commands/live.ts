@@ -1,6 +1,6 @@
-import { gaming, profile } from '@/content'
+import { profile } from '@/content'
 import type { Localised } from '@/content/types'
-import { fetchSteam, formatPlaytime, useSteam } from '@/composables/useSteam'
+import { fetchSteam, formatPlaytime, formatReceipt, useSteam } from '@/composables/useSteam'
 import { fetchCommits, relativeTime, shortRepo, useGithub } from '@/composables/useGithub'
 import { fetchWeather, useWeather } from '@/composables/useWeather'
 import { decorativeMotion } from '@/composables/useMotion'
@@ -170,7 +170,7 @@ export const liveCommands: Command[] = [
       print(line('fetching…', 'muted'))
       await fetchSteam()
 
-      const { profile: steamProfile, games } = useSteam(false)
+      const { profile: steamProfile, games, favourites } = useSteam(false)
       const out: OutputLine[] = [...heading('steam')]
 
       if (steamProfile.value) {
@@ -178,25 +178,34 @@ export const liveCommands: Command[] = [
         out.push(line(`${p.name} — ${p.inGame ? `in-game: ${p.inGame}` : p.status}`, 'primary'))
         out.push(blank)
       } else {
-        out.push(line('live activity unavailable — showing the static log', 'muted'))
+        out.push(
+          line(
+            t({ en: 'live activity unavailable — here are the favourites', fr: 'activité en direct indisponible — voici les favoris' }),
+            'muted',
+          ),
+        )
         out.push(blank)
       }
 
-      const rows = games.value?.length
-        ? games.value.map((g) => ({
-            name: g.name,
-            status: formatPlaytime(g.playtime2Weeks || g.playtimeForever),
-          }))
-        : gaming.fallbackGames.map((g) => ({ name: g.name, status: t(g.status) }))
+      // What is being played is Steam's alone; the favourites carry their notes, and their
+      // hours and achievements when Steam had them (`content/gaming.ts`).
+      const recent = (games.value ?? []).map((g) => ({
+        name: g.name,
+        status: formatPlaytime(g.playtime2Weeks || g.playtimeForever),
+      }))
+      const picks = favourites.value.map((g) => ({
+        name: g.name,
+        status: [g.note && t(g.note), g.receipt && formatReceipt(g.receipt, t(m.gaming.achievements))]
+          .filter(Boolean)
+          .join(' · '),
+      }))
+      const width = [...recent, ...picks].reduce((max, r) => Math.max(max, r.name.length), 0)
+      const rows = (list: { name: string; status: string }[]): OutputLine[] =>
+        list.map((r) => ({ text: `▸ ${r.name.padEnd(width)}  ${r.status}`.trimEnd(), tone: 'default', pre: true }))
 
-      const width = rows.reduce((max, r) => Math.max(max, r.name.length), 0)
-      out.push(
-        ...rows.map((r) => ({
-          text: `▸ ${r.name.padEnd(width)}  ${r.status}`,
-          tone: 'default' as const,
-          pre: true,
-        })),
-      )
+      out.push(...rows(recent))
+      if (recent.length) out.push(blank)
+      out.push(line(t(m.gaming.favourites), 'muted'), ...rows(picks))
       return out
     },
   },

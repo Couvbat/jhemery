@@ -246,6 +246,7 @@ export const contentCommands: Command[] = [
     linkable: true,
     palette: true,
     run({ t }) {
+      const width = Math.max(...gaming.favourites.map((game) => game.name.length))
       return [
         ...heading('gaming'),
         ...wrap(t(gaming.blurb)).map((text) => line(text)),
@@ -253,7 +254,10 @@ export const contentCommands: Command[] = [
         line('genres', 'muted'),
         ...tags(gaming.genres, 'secondary'),
         blank,
-        line('run `steam` for live activity.', 'muted'),
+        line(t({ en: 'favourites', fr: 'favoris' }), 'muted'),
+        ...gaming.favourites.map((game) => pre(`▸ ${game.name.padEnd(width)}  ${game.note ? t(game.note) : ''}`.trimEnd())),
+        blank,
+        line(t({ en: 'run `steam` for what is being played, and their hours.', fr: 'lancez `steam` pour ce qui se joue, et leurs heures.' }), 'muted'),
       ]
     },
   },

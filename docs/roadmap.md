@@ -5,8 +5,7 @@ commands, live information), then games vol. 2 (§E), views and tools (§F), the
 batch (§G), the late-September brainstorm (§H), the October brainstorm (§I), the mid-October
 one (§J), the lab batch (§K) and its follow-up (§L). Built feature by feature, across sessions.
 
-**Current state: §A–§K are shipped. §L's fixes are done and its one feature is next.** Anything
-else still open is under [Open](#open) and [Known issues](#known-issues).
+**Current state: §A–§L are shipped.** Anything else still open is under [Open](#open) and [Known issues](#known-issues).
 
 **How to use:** tick a box when the feature ships, and append the PR number. Design detail for
 each row is the "approach" column — enough to act on without re-deriving. Anything that grows into
@@ -1056,7 +1055,28 @@ with the markets module, the tour's games stop, and `stems` listed while it has 
 
 | ✔ | Feature | Approach | Files | Effort |
 |---|---|---|---|---|
-| [ ] | Steam with receipts | The gaming cards hold claims typed by hand (*150+ hours*, *Real Platinum God*) that start drifting the day they're written. Worse, with Steam off or down, two of them showed a *live* badge because their typed status read *Currently playing*, so the page claimed live activity exactly when the feed was down, and `corpus.json` told `ask` the same. `content/gaming.ts` lists favourites as `{ appId, name, note? }` instead: the note is what Steam can't say, the hours and achievements are Steam's. The frontend sends the favourites' ids on the call it already makes (`/steam/activity?apps=…`, eight at most), so the content stays the one list and the home page makes no new request. The API answers from `GetOwnedGames`, fetched once a day for the whole library, and one `GetPlayerAchievements` per favourite, cached a day too, a game with no stats cached as none; only games in the library are ever looked up, which bounds what a forged list can cost. With Steam off the cards show the names and notes and no badge; `gaming` and `ask` read the same favourites. Needs the Steam profile's game details public, which the recent-games list already does. | `backend/src/steam/`, `content/gaming.ts`, `content/types.ts`, `lib/api.ts`, `composables/useSteam.ts`, `components/sections/GamingSection.vue`, `terminal/commands/live.ts`, `terminal/commands/content.ts`, `vite-plugins/corpus.ts`, `e2e/`, README | S–M |
+| [x] | Steam with receipts | The gaming cards hold claims typed by hand (*150+ hours*, *Real Platinum God*) that start drifting the day they're written. Worse, with Steam off or down, two of them showed a *live* badge because their typed status read *Currently playing*, so the page claimed live activity exactly when the feed was down, and `corpus.json` told `ask` the same. `content/gaming.ts` lists favourites as `{ appId, name, note? }` instead: the note is what Steam can't say, the hours and achievements are Steam's. The frontend sends the favourites' ids on the call it already makes (`/steam/activity?apps=…`, eight at most), so the content stays the one list and the home page makes no new request. The API answers from `GetOwnedGames`, fetched once a day for the whole library, and one `GetPlayerAchievements` per favourite, cached a day too, a game with no stats cached as none; only games in the library are ever looked up, which bounds what a forged list can cost. With Steam off the cards show the names and notes and no badge; `gaming` and `ask` read the same favourites. The hours need the profile's game details public, which the recent-games list already does. | `backend/src/steam/`, `content/gaming.ts`, `content/types.ts`, `lib/api.ts`, `composables/useSteam.ts`, `components/sections/GamingSection.vue`, `terminal/commands/live.ts`, `terminal/commands/content.ts`, `vite-plugins/corpus.ts`, `e2e/`, README | S–M |
+
+### Departures from the approach column
+
+- **Steam with receipts:**
+  - Four favourites have no note. Their typed *Currently playing* and *150+ hours* were exactly
+    what Steam now says, and a note that says why each one matters is the owner's to write.
+  - What Steam can't answer is kept briefly: an empty library (game details private, or a blip)
+    and a failed achievements call for five minutes, so neither hides the receipts for a day.
+    Steam's 400 for a game that keeps no achievements is kept a day, like a count.
+  - The receipts give whole hours (`1204h`), since a total in the hundreds has no use for the
+    decimal the recent games' two-week figures keep.
+  - The card's header says *Favourites* with Steam off, rather than *Recent activity log*,
+    which was the typed list claiming to be recent.
+  - `gaming` lists the favourites with their notes, so its curl page does too; `steam`'s
+    unavailable line, and `gaming`'s last one, are in French as well now.
+  - Checked against the real API on 16 October: the library answered for all six, and every
+    achievements call said *Profile is not public*, a 400 like a game with no stats. Hours
+    need public game details; achievements need the profile itself public. So the counts
+    show once the owner makes it public, until then the cards show hours, and the backend
+    logs the refusal rather than reading it as a game with none. The receipts' first find:
+    Factorio's typed *150+ hours* is 146.
 
 ## Build order
 

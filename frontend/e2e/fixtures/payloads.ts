@@ -47,6 +47,9 @@ export const steamConfigured: SteamActivity = {
       playtimeForever: 3_600,
     },
   ],
+  // The Binding of Isaac's receipts (`content/gaming.ts` lists it first): 1204 hours, and
+  // every achievement but one.
+  favourites: [{ appId: 250900, minutes: 72_240, achievements: { achieved: 636, total: 637 } }],
 }
 
 export const githubActivityConfigured: GithubActivity = {
