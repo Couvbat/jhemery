@@ -1,10 +1,11 @@
 # backend
 
-The `api.jhemery.xyz` service — NestJS 11, TypeScript. It backs the portfolio's live features:
+The `api.jhemery.xyz` service — NestJS 12, TypeScript. It backs the portfolio's live features:
 the terminal's `ask`, the contact form, Steam and GitHub activity, weather, crypto quotes, live
-presence, the session counter and the daily wordle's histogram, the guestbook, the watch/radio and
-connect-four rooms, the owner-only downloader, the health report behind `systemctl status`, and a
-read-only MCP endpoint for agents.
+presence, the session counter and the daily wordle's histogram, the guestbook and its moderation
+by the same model, the watch/radio and connect-four rooms, the owner-only downloader, the health
+report behind `systemctl status`, a read-only MCP endpoint for agents, and the snapshot behind
+the lab map.
 
 For the site itself, see the [root README](../README.md).
 
@@ -32,48 +33,17 @@ unconfigured rather than failing.
 
 ## Modules and routes
 
-| Route | Module | Notes |
-|---|---|---|
-| `POST /ask` | `ask` | SSE stream of an answer from a self-hosted, OpenAI-compatible model. 5/hour per IP. |
-| `POST /contact` | `contact` | Sends the terminal's `mail` message over SMTP. 2 per hour per IP. |
-| `GET /steam/activity` | `steam` | Profile + recently played, 5-minute cache. |
-| `GET /github/activity` | `github` | Recent public commits, 5-minute cache. |
-| `GET /github/contributions` | `github` | Contribution heatmap — GraphQL, needs a token. |
-| `GET /github/pinned-repos` | `github` | Pinned repos — GraphQL, needs a token. |
-| `GET /github/workflow-status` | `github` | Four latest Actions runs for `GITHUB_REPO`; public REST, token optional. 60 s cache. |
-| `GET /weather` | `weather` | Open-Meteo for the coordinates in config (never the caller's). 10-minute cache. |
-| `GET /markets` | `markets` | CoinGecko quotes + 7-day series for `MARKETS_COINS`. 5-minute cache. |
-| `GET /presence` | `presence` | SSE: one integer, the number of open connections. 25 s heartbeat. With `wall` on, also a named `wave` event with `{}`. |
-| `POST /presence/wall` | `presence` | A wave to every connection, one every 3 s site-wide at most. 204, or `{ configured: false }` when off. 6/min per IP. Off by default (`WALL_ENABLED`). |
-| `GET /stats` | `stats` | `{ sessions }` — terminal sessions ever opened. |
-| `POST /stats/session` | `stats` | Count one session. 5/hour per IP. |
-| `GET /stats/wordle` | `stats` | `?day=YYYY-MM-DD&locale=en\|fr` → the daily wordle's seven counts (solved in 1–6, or not). |
-| `POST /stats/wordle` | `stats` | `{ day, locale, guesses }` (0 = not solved), today or yesterday UTC only; 14 days kept. 5/hour per IP. |
-| `GET /guestbook` | `guestbook` | Newest 25 entries. |
-| `POST /guestbook` | `guestbook` | Sign. 1/min per IP. |
-| `DELETE /guestbook/:id` | `guestbook` | Moderation; requires the `x-admin-password` header. |
-| `GET /rooms` | `rooms` | `{ enabled }` — the feature flag, so the pages can say so. |
-| `POST /rooms` | `rooms` | Create a `watch`, `radio` or `connect4` room; returns the code and the host token. 10/hour per IP. |
-| `GET /rooms/:code` | `rooms` | Snapshot: state, queue, member count, and a game room's move list. |
-| `GET /rooms/:code/events` | `rooms` | SSE of the same snapshot on every change, plus a 25 s heartbeat. Subscribing *is* membership. |
-| `POST /rooms/:code/state` | `rooms` | Host only (`x-room-token`): media, position, playing, queue. 120/min per IP. Refused on a game room. |
-| `DELETE /rooms/:code` | `rooms` | Host only: ends the room for everyone. |
-| `POST /rooms/:code/join` | `rooms` | Game rooms: the second seat's token, once; a third caller gets 409. 20/min per IP. |
-| `POST /rooms/:code/move` | `rooms` | `{ column }` with a seat token in `x-room-token`; only on that seat's turn, into a column with room. 120/min per IP. |
-| `POST /rooms/:code/rematch` | `rooms` | Either seat: clears the board and swaps who opens. 20/min per IP. |
-| `GET /jobs` | `jobs` | Admin only (`x-admin-password`): `{ configured, jobs }`. Doubles as the frontend's password check. |
-| `POST /jobs` | `jobs` | Admin only: start a yt-dlp job for one video or one track. 202 with the job. 20/hour per IP. |
-| `GET /jobs/:id` | `jobs` | Admin only: poll. |
-| `GET /jobs/:id/file` | `jobs` | Admin only: the mp3, streamed once and then deleted. |
-| `DELETE /jobs/:id` | `jobs` | Admin only: cancel a running job, or dismiss a finished one. |
-| `GET /health` | `health` | `{ uptime, units }`: one line per module (active or inactive and why, cache age, a count), for `systemctl status`. |
-| `POST /mcp` | `mcp` | Read-only MCP over stateless Streamable HTTP (JSON-RPC in, JSON out). `GET`/`DELETE` answer 405. 60/min per IP. |
+One module per capability under `src/`, each a controller, a service, its DTOs and a spec: `ask`,
+`contact`, `steam`, `github`, `weather`, `markets`, `presence`, `stats`, `guestbook`, `rooms`,
+`jobs`, `health`, `mcp` and `lab`. The [root README's API table](../README.md#the-api) lists
+every route with its limits. It is the copy kept current, so it isn't repeated here.
 
 Every optional integration degrades instead of erroring — endpoints report `configured: false` (or
 `enabled: false`) and the frontend renders that state: no Steam key hides live activity, no GitHub
-token drops the heatmap and pinned repos, no weather coordinates hide `weather`, an unreachable
-model makes the terminal say the model is asleep and point at `mail`. `ask`, `guestbook`, `rooms`,
-`jobs`, `mcp` and `wall` are **off by default**; with MCP off, `/mcp` is a plain 404.
+token drops the heatmap and pinned repos, no weather coordinates hide `weather`, and a model that
+can't answer names a reason (`unconfigured`, `busy`, `warming`, `unreachable`…), which the
+terminal turns into plain words and a pointer at `mail`. `ask`, `guestbook`, `rooms`, `jobs`,
+`mcp`, `wall` and `lab` are **off by default**; with MCP off, `/mcp` is a plain 404.
 
 Privacy is a constraint on every module, not a policy on top: `/presence` pushes one integer with
 no visitor id (and a contentless `wave` when `wall` is on), `/stats` counts sessions rather than commands, `/weather` uses server-side
@@ -111,6 +81,12 @@ network, and it spends a private machine's electricity, so it is opt-in by desig
   copy. Cached for an hour, capped at 16k chars, with a built-in fallback corpus, which is also all
   it uses when `FRONTEND_URL` is unset: then it fetches nothing. **The corpus never blocks an
   answer** — a cold or unreachable fetch is skipped, not awaited.
+- Beside it, up to four passages that BM25 finds for the question in
+  `${FRONTEND_URL}/corpus.json` (`ask.corpus.ts`), fetched the same way, and with the lab map on,
+  the lab as it is now. The design is the
+  [ask-my-lab spec](../docs/superpowers/specs/2026-10-15-ask-my-lab-design.md).
+- The model slot is `common/llm.ts`, shared with the guestbook's moderation, which waits its turn
+  as a background caller.
 - Budgets: ~300 output tokens, 20 s to the first token (then it detaches and lets the model warm
   up in the background), 15 s idle timeout, and a 45 s structural silence ceiling in the
   controller.
@@ -137,6 +113,10 @@ Disabled unless `GUESTBOOK_ENABLED=true` — it is a publicly writable field.
 - Writes are serialised through a queue and written via rename, so two concurrent signings can't
   clobber each other.
 - `DELETE /guestbook/:id` refuses outright unless `ADMIN_PASSWORD` is set.
+- With `GUESTBOOK_MODERATION=model`, the model reads each entry before it publishes, and only an
+  explicit hold holds: anything still pending after `GUESTBOOK_GRACE_MINUTES` publishes anyway.
+  The [moderation spec](../docs/superpowers/specs/2026-10-15-guestbook-moderation-design.md) has
+  the rest.
 
 ## `rooms`
 
@@ -202,6 +182,14 @@ time, unset means locked).
   30 minutes after they are produced if never fetched, the whole `DATA_DIR/jobs` emptied on boot.
 - Progress is read from yt-dlp's own `[download] 42.7%` lines; a failure keeps its last `ERROR`
   line, never the whole log.
+
+## `lab`
+
+Disabled unless `LAB_ENABLED=true`. Push, never pull: the lab agent (`lab-agent/`, on a NAS)
+sends a snapshot once a minute behind a bearer token, and `GET /lab` serves the last one, so no
+visitor request reaches the home network. The schema is closed and refuses anything that looks
+like an address, a port or a URL. The [lab map spec](../docs/superpowers/specs/2026-10-15-lab-map-design.md)
+has the rest.
 
 ## Tests
 

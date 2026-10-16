@@ -322,7 +322,7 @@ export const contentCommands: Command[] = [
         [`${profile.handle}@${profile.host}`, ''],
         ['OS', 'Portfolio 1.0 (Vue 3 / Vite)'],
         ['Host', profile.domain],
-        ['Kernel', 'NestJS 11'],
+        ['Kernel', 'NestJS 12'],
         ['Uptime', uptime()],
         ['Shell', 'couvsh 1.0'],
         ['DE', 'TailwindCSS 4'],

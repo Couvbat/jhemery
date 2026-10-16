@@ -12,7 +12,7 @@ tools, watch-party and radio rooms, and 39 hidden achievements. English and Fren
 [![Backend checks](https://github.com/Couvbat/jhemery/actions/workflows/backend-pr-check.yml/badge.svg?branch=dev)](https://github.com/Couvbat/jhemery/actions/workflows/backend-pr-check.yml)
 [![Licence: MIT](https://img.shields.io/badge/licence-MIT-green.svg)](LICENSE)
 ![Vue 3](https://img.shields.io/badge/Vue-3-42b883?logo=vuedotjs&logoColor=white)
-![NestJS 11](https://img.shields.io/badge/NestJS-11-e0234e?logo=nestjs&logoColor=white)
+![NestJS 12](https://img.shields.io/badge/NestJS-12-e0234e?logo=nestjs&logoColor=white)
 ![three.js](https://img.shields.io/badge/three.js-wireframes-black?logo=threedotjs)
 
 **[jhemery.xyz](https://jhemery.xyz)** · press <kbd>`</kbd> to open the terminal · or try `curl jhemery.xyz`
@@ -114,7 +114,7 @@ documents every variable, including why the risky ones ship disabled.
 
 ```
 frontend/   Vue 3 + Vite + Tailwind 4 SPA: sections, terminal, games, tools, rooms, PWA
-backend/    NestJS 11 API: ask, contact, steam, github, weather, markets, presence,
+backend/    NestJS 12 API: ask, contact, steam, github, weather, markets, presence,
             stats, guestbook, rooms, jobs, health, mcp, lab
 lab-agent/  the lab's side of /lab: plain Node modules, no dependencies, one container
             on a NAS that pushes the lab's snapshot to the API
@@ -306,7 +306,7 @@ panel can't disagree. `ps` and `top` are still jokes.
 | `stems` | | The tracks the music section's mixer holds, with tempo, key, loop length and stem count; `stems <track>` opens one in the mixer. Says none are published yet while the list is empty |
 | `resume` | `cv` | Condensed résumé (experience, education, stack, links), with a link to the printable one |
 | `curl` | | `curl [-I] jhemery.xyz[/path]`: a real request to this site. The bare host is `resume.txt`, coloured, with the hidden parts left hidden; `-I` prints the real response headers. Any other host can't be resolved from a browser tab |
-| `why` | | `why <topic>`: what the site chose, what it turned down and why, the PR, and a link to the design note. `why` alone lists the fifteen topics (`why mcp-sdk`, `why polling`, `why battleship`…) |
+| `why` | | `why <topic>`: what the site chose, what it turned down and why, the PR, and a link to the design note. `why` alone lists the topics (`why mcp-sdk`, `why polling`, `why battleship`…) |
 | `tour` | | A one-minute walk through the site: `neofetch`, a colour scheme shown for a moment and put back, the games, the `curl` hint, and how many achievements you've found. In the tap shell it shows the `why` topics instead of the games and the `curl` hint, which need a keyboard. `?run=tour` is the link to share |
 | `xray [path]` | | Outlines every component on screen and tags it with its file and where its words come from, each linked at the build's commit, and for a live widget the API route that fed it, its time and the server copy's age (see [X-ray mode](#the-page)). `path` opens *this visit's path* too. <kbd>Esc</kbd> or a second `xray` ends it, and `?run=xray` works too |
 
