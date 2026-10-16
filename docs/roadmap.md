@@ -3,10 +3,10 @@
 Status tracker for the feature brainstorm: first three categories (three.js background, terminal
 commands, live information), then games vol. 2 (§E), views and tools (§F), the September 2026
 batch (§G), the late-September brainstorm (§H), the October brainstorm (§I), the mid-October
-one (§J) and the lab batch (§K). Built feature by feature, across sessions.
+one (§J), the lab batch (§K) and its follow-up (§L). Built feature by feature, across sessions.
 
-**Current state: §A–§K are shipped.** Anything else still open is under [Open](#open) and
-[Known issues](#known-issues).
+**Current state: §A–§K are shipped. §L's fixes are done and its one feature is next.** Anything
+else still open is under [Open](#open) and [Known issues](#known-issues).
 
 **How to use:** tick a box when the feature ships, and append the PR number. Design detail for
 each row is the "approach" column — enough to act on without re-deriving. Anything that grows into
@@ -1026,6 +1026,38 @@ housekeeping after §K, off the hardware section too); every service that isn't 
 (the lab map spec lists which are and which aren't); the installed models are public. What was
 still open moved to [Open](#open).
 
+## L. Mid-October 2026, round two
+
+Brainstormed on 2026-10-16, the day §K shipped. Six lenses (visitors the site still serves badly,
+the open web, proof of craft, Jules's work beyond the site, memorable moments, and subtraction)
+gave forty-six candidates. Each was checked against the code, and thirteen were pitched. The
+owner picked one, Steam with receipts, and the fixes the checks had found. The rest were left,
+which is worth knowing before the next round pitches them again: a lab journal with written
+postmortems, a model report card, what the lab costs in watts, the API naming the build it runs,
+each privacy claim naming the test that keeps it, case studies beyond this repository, every page
+as markdown, a link preview per page, the résumé in DNS, the turn-based games playable by ear,
+the shell's key on a French keyboard, and four removals for the curation pass (`rickroll`, `btc`
+with the markets module, the tour's games stop, and `stems` listed while it has no track).
+
+### Fixes found on the way
+
+| ✔ | Feature | Approach | Files | Effort |
+|---|---|---|---|---|
+| [x] | Azazel is retired here too | Retired on 15 October and left off `/lab`, but `content/hardware.ts` still listed it, so the NAS tab read ×3, `hardware nas` and its curl page printed `azazel@nas` above `live: /lab`, and `corpus.json` gave `ask` a passage about it. The entry goes, and `lab.spec.ts` holds every NAS the hardware section lists to a machine on the map. | `content/hardware.ts`, `content/__tests__/lab.spec.ts`, `public/run/*/hardware.txt`, lab-map spec | S |
+| [x] | NestJS 12, everywhere | `backend/package.json` is on ^12.1.2; neofetch's Kernel row, its curl pages, the README's badge and layout and the backend README said 11. | `terminal/commands/content.ts`, `public/run/*/neofetch.txt`, README, `backend/README.md` | S |
+| [x] | The hidden commands' errors stop `&&` | Every command module reported operand errors with `fail()` except `eggs.ts`, whose error tone alone the shell reads as output: `banner && whoami` ran `whoami`, and `vim nope \| wc -l` piped the error into `wc`. Its real failures use `fail()` now; the jokes that print in red (the `rm -rf /` stages, the panic, the teapot) keep only the colour. | `terminal/commands/eggs.ts`, `composables/__tests__/useTerminal.pipes.spec.ts` | S |
+| [x] | `scene music off` writes | It flips a session flag as `gravity off` does, and `types.ts` lists the scene under `local`, but `scene` classed only `reset` as a write, lower-casing what `run()` compared exactly. Any argument is `local` now. | `terminal/commands/eggs.ts`, `scene.spec.ts`, `registry.spec.ts` | S |
+| [x] | `tw-animate-css` goes | Imported by `main.css` and used by nothing, it still put seventeen `@property` rules into the first-load CSS: 253 bytes gzipped off the home page. | `assets/main.css`, `package.json` | S |
+| [x] | curl gets a 404, and a gone chunk a real one | `curl jhemery.xyz/neofetc` printed `index.html` with a 200. A command-line client's unknown single name now gets a 404 and `run/<locale>/_404.txt`, the list of pages (an `ErrorDocument` scoped to those clients, with `Vary`). `/assets/` is kept out of the SPA fallback, so a tab older than a deploy gets a 404 for a removed chunk instead of HTML that `nosniff` refuses and the service worker's runtime cache could keep. Checked against Apache 2.4 in a container. A reload on Vite's `preloadError` was tried and left out: the palette already says its search failed when its chunk never comes, and a page-wide reload would also fire offline. | `public/.htaccess`, `public/run/*/_404.txt`, `terminal/__tests__/curl-pages.spec.ts` | S |
+| [x] | Evidence links that resolve | `portfolio.spec.ts` called a dead `usedIn` link "a false claim", but checked only the URL's prefix. It checks the file on disk now, as `work.spec.ts` does. | `content/__tests__/portfolio.spec.ts`, `content/skills.ts` | S |
+| [x] | Docs that describe an older site | This file said §K hadn't started and kept the old motion rule in its conventions. features-spec §5 named the old motion helper, quoted `sudo` with the wrong user and had no `lab` in its live table. The backend README's route table was two releases behind and now defers to the root README's, the one kept current. CLAUDE.md missed `lab` and `lab-agent/`, and named `content.json` as the only file the backend reads from the frontend (`ask` reads `llms.txt` and `corpus.json` too). The README counted fifteen `why` topics, frontend/README 38 achievements. Five comments were wrong: the contact form's limit, the og-image script, the welcome "never repeating", and the stems list's cost to the home page (twice). | this file, `features-spec.md`, `CLAUDE.md`, the three READMEs, `ask.controller.ts`, `index.html`, `useTerminal.ts`, `content/stems.ts` | S |
+
+### Gaming
+
+| ✔ | Feature | Approach | Files | Effort |
+|---|---|---|---|---|
+| [ ] | Steam with receipts | The gaming cards hold claims typed by hand (*150+ hours*, *Real Platinum God*) that start drifting the day they're written. Worse, with Steam off or down, two of them showed a *live* badge because their typed status read *Currently playing*, so the page claimed live activity exactly when the feed was down, and `corpus.json` told `ask` the same. `content/gaming.ts` lists favourites as `{ appId, name, note? }` instead: the note is what Steam can't say, the hours and achievements are Steam's. The frontend sends the favourites' ids on the call it already makes (`/steam/activity?apps=…`, eight at most), so the content stays the one list and the home page makes no new request. The API answers from `GetOwnedGames`, fetched once a day for the whole library, and one `GetPlayerAchievements` per favourite, cached a day too, a game with no stats cached as none; only games in the library are ever looked up, which bounds what a forged list can cost. With Steam off the cards show the names and notes and no badge; `gaming` and `ask` read the same favourites. Needs the Steam profile's game details public, which the recent-games list already does. | `backend/src/steam/`, `content/gaming.ts`, `content/types.ts`, `lib/api.ts`, `composables/useSteam.ts`, `components/sections/GamingSection.vue`, `terminal/commands/live.ts`, `terminal/commands/content.ts`, `vite-plugins/corpus.ts`, `e2e/`, README | S–M |
+
 ## Build order
 
 **Phase 1 — quick wins, no backend (S):** ✅ shipped on `feat/phase-1` → `dev`.
@@ -1112,6 +1144,10 @@ further):
   on poseidon being the one settled), whether Nextcloud goes on the map (off in the draft), and
   the stems' licence line. The stems mixer waits on a first track's stems, and stays hidden until
   then.
+- From §L, for the owner: `/now` (`content/now.ts`, last updated 24 September) still lists the
+  CTF chain, the QR encoder and connect four as being built, and MCP as being learnt. All of it
+  shipped weeks ago, and the 90-day warning won't say so until late December. It's in the
+  owner's words, so it waits for them.
 
 ## Known issues
 
