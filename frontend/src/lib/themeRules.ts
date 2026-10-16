@@ -2,9 +2,9 @@ import { contrastRatio, oklchToRgb, parseColour, rgbToOklch, toHex, type RGB } f
 import type { ThemeColours, ThemeMode } from './themes'
 
 /**
- * The contrast every scheme is held to, in one place: `themes.ts` lifts muted and body
- * text to it when the table is built, `themes.spec.ts` checks every scheme against it,
- * and the scheme forge (`forge.ts`) grows a palette until it passes.
+ * The contrast every scheme is held to, in one place: `themes.ts` lifts every tone
+ * `FLOORS` names to it when the table is built, `themes.spec.ts` checks every scheme
+ * against it, and the scheme forge (`forge.ts`) grows a palette until it passes.
  *
  * Body and muted text reach WCAG AA (4.5:1) on every surface text is drawn on, raised
  * included: the 12 px window title bars are muted text on `bg-muted`, and that pair at
