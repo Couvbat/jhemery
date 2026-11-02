@@ -201,7 +201,7 @@ describe('curl pages', () => {
   // after every rule that could give the name a page, and before the SPA's fallback.
   it('is the 404 a command-line client gets, after every page and before the fallback', () => {
     const htaccess = readFileSync(join(process.cwd(), 'public/.htaccess'), 'utf8')
-    const notFound = htaccess.indexOf('RewriteRule ^[a-z0-9-]+/?$ - [NC,R=404,L]')
+    const notFound = htaccess.indexOf('RewriteRule ^[a-z0-9-]+/?$ - [R=404,L]')
     expect(notFound).toBeGreaterThan(htaccess.lastIndexOf('/pages/$1.html [L]'))
     expect(notFound).toBeLessThan(htaccess.indexOf('RewriteRule ^ /index.html [L]'))
     for (const locale of LOCALES) expect(htaccess).toContain(`ErrorDocument 404 /run/${locale}/_404.txt`)
