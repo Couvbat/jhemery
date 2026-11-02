@@ -55,7 +55,7 @@ src/content/
   skills.ts      flat skill list
   projects.ts    Project[] with status + stack
   music.ts       genres, tools, blurb, playlist URL
-  gaming.ts      genres, platforms, fallback game log, blurb
+  gaming.ts      genres, platforms, the favourite games (Steam app id, note), blurb
   hardware.ts    machines[] + peripherals[]
   contact.ts     socials
   experience.ts  dated roles and courses, newest first; the current role names profile.employer
@@ -639,14 +639,15 @@ every other line, the visitor's address and country among them, before anything 
 ### live
 | Command | Endpoint | Fallback |
 |---|---|---|
-| `steam` / `playing` | `GET /steam/activity` | static game log from `content/gaming.ts` |
+| `steam` / `playing` | `GET /steam/activity?apps=` | the favourites from `content/gaming.ts`, with their notes and no hours |
 | `gitlog` (alias `git log`) | `GET /github/activity` | "no activity available" |
 | `weather` / `wttr` | `GET /weather` | "weather: unavailable" |
 | `btc` / `stonks` / `crypto` | `GET /markets` | "btc: quotes unavailable" |
 | `guestbook` | `GET /guestbook` | "guestbook is closed" |
 | `sign <message>` | `POST /guestbook` | error line |
 | `mail` | `POST /contact` | error line |
-| `ask <question>` | `POST /ask` | "the model is asleep — try `mail`" |
+| `ask <question>` | `POST /ask` | the reason in plain words: the hourly limit and when it lifts, or busy, both meaning wait; or waking up, not answering, no model, each pointing at `mail` |
+| `lab` | `GET /lab` | one line saying the feed is off, unreachable or empty, pointing at `hardware nas` |
 | `systemctl [status [unit]]` | `GET /health` | every unit `unknown` — the unit list is kept client-side for exactly this |
 | `who` | `GET /presence` (SSE, started on demand by `whenPresent`) | "who: presence is unavailable right now" |
 | `wall` | `POST /presence/wall` | "broadcasts are switched off here" when off; "could not be sent" (a `fail()`) otherwise |
@@ -780,7 +781,7 @@ heading to an entry.
 
 | Trigger | Effect |
 |---|---|
-| `sudo <anything>` | `couvbat is not in the sudoers file. This incident has been reported.` |
+| `sudo <anything>` | `visitor is not in the sudoers file. This incident has been reported.` |
 | `sudo -i` / `sudo -k` | The owner's real use: a masked prompt for the admin password, checked against the API, unlocks the downloader tool for the tab (§11); `-k` locks again. `sudo rm <entry>` removes a guestbook entry the same way |
 | `sudo rm -rf /` | Fake cascading deletion, page desaturates, then restores with a wink |
 | `matrix` | Full-screen canvas digital rain; any key or click exits |
@@ -814,11 +815,12 @@ Hidden commands (`sudo`, `vim`, `:q`, `matrix`, `reboot`, `ssh`, `whois`, `crt`,
 Finding them is the point. `help --all` lists them for the impatient. `play` and `achievements`
 are deliberately *not* hidden: they are signposts rather than secrets.
 
-**Motion:** every animated surface funnels through one `prefersReducedMotion()` helper in
-`useCrt.ts` rather than each re-reading the media query. `matrix` prints a one-line reply instead
-of opening the canvas, `sl` renders a static train, `top` draws one frame instead of six, the
-boot sequence and the Three.js background are skipped entirely, CRT overdrive resolves without
-animating, `acid` plays without a playhead, and the achievement toast shortens its dwell time.
+**Motion:** every animated surface reads the motion level (§9) rather than re-reading the media
+query, and `prefers-reduced-motion` holds that level at *paused*. So under the OS setting `matrix`
+prints a one-line reply instead of opening the canvas, `sl` renders a static train, `top` draws
+one frame instead of six, the boot sequence and the Three.js background are skipped entirely, CRT
+overdrive resolves without animating, `acid` plays without a playhead, and the achievement toast
+shortens its dwell time.
 
 ### The CTF chain
 

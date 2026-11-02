@@ -5,29 +5,22 @@ import { Badge } from '@/components/ui/badge'
 import SectionHeader from '@/components/SectionHeader.vue'
 import { gaming } from '@/content'
 import { useLocale } from '@/i18n'
-import { useSteam, formatPlaytime } from '@/composables/useSteam'
+import { useSteam, formatPlaytime, formatReceipt } from '@/composables/useSteam'
 import WindowDots from '@/components/WindowDots.vue'
 
 const { t, m } = useLocale()
-const { profile: steamProfile, games: steamGames } = useSteam()
+const { profile: steamProfile, games: steamGames, favourites } = useSteam()
 
-const displayGames = computed(() => {
-  if (steamGames.value?.length) {
-    return steamGames.value.map((g) => ({
-      name: g.name,
-      status:
-        g.name === steamProfile.value?.inGame
-          ? t(m.gaming.inGame)
-          : formatPlaytime(g.playtime2Weeks || g.playtimeForever),
-      live: g.name === steamProfile.value?.inGame,
-    }))
-  }
-  return gaming.fallbackGames.map((g) => ({
+// What is being played comes from Steam alone, so the card never says *live* while the feed
+// is down: with it off, only the favourites show, and they claim nothing about today.
+const recentGames = computed(() =>
+  (steamGames.value ?? []).map((g) => ({
     name: g.name,
-    status: t(g.status),
-    live: g.status.en === 'Currently playing',
-  }))
-})
+    status:
+      g.name === steamProfile.value?.inGame ? t(m.gaming.inGame) : formatPlaytime(g.playtime2Weeks || g.playtimeForever),
+    live: g.name === steamProfile.value?.inGame,
+  })),
+)
 </script>
 
 <template>
@@ -81,9 +74,7 @@ const displayGames = computed(() => {
             <span class="ml-3 text-xs text-muted-foreground">game-log.txt</span>
           </div>
           <CardContent class="p-4 font-mono text-xs space-y-1">
-            <p class="text-muted-foreground mb-2">
-              {{ steamProfile ? t(m.gaming.liveFromSteam) : t(m.gaming.recentLog) }}
-            </p>
+            <p v-if="steamProfile" class="text-muted-foreground mb-2">{{ t(m.gaming.liveFromSteam) }}</p>
             <p v-if="steamProfile" class="mb-2 flex items-center gap-1.5">
               <span
                 :class="[
@@ -103,7 +94,7 @@ const displayGames = computed(() => {
                 }}
               </span>
             </p>
-            <div v-for="game in displayGames" :key="game.name" class="flex items-center gap-2">
+            <div v-for="game in recentGames" :key="game.name" class="flex items-center gap-2">
               <span class="text-secondary shrink-0">▸</span>
               <span class="text-foreground flex-1">{{ game.name }}</span>
               <span
@@ -113,6 +104,15 @@ const displayGames = computed(() => {
                 ]"
               >
                 {{ game.status }}
+              </span>
+            </div>
+            <p :class="['text-muted-foreground mb-2', recentGames.length && 'mt-3']">{{ t(m.gaming.favourites) }}</p>
+            <div v-for="game in favourites" :key="game.appId" class="flex flex-wrap items-center gap-x-2">
+              <span class="text-secondary shrink-0">▸</span>
+              <span class="text-foreground flex-1">{{ game.name }}</span>
+              <span v-if="game.note || game.receipt" class="text-muted-foreground">
+                {{ [game.note && t(game.note), game.receipt && formatReceipt(game.receipt)].filter(Boolean).join(' · ')
+                }}<span v-if="game.receipt?.achievements" class="sr-only"> {{ t(m.gaming.achievements) }}</span>
               </span>
             </div>
             <a

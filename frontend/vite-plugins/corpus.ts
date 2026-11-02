@@ -156,7 +156,9 @@ export function buildCorpus(sha = commitSha(), generatedAt = new Date().toISOStr
       title: { en: 'Gaming', fr: 'Jeux vidéo' },
       text: map(
         (l) =>
-          `${flat(gaming.blurb[l])} Genres: ${gaming.genres.join(', ')}. ${gaming.fallbackGames.map((g) => `${g.name} (${g.status[l]})`).join(', ')}.`,
+          // The favourites and their notes only: what is being played is live, and a
+          // build-time passage saying "currently playing" would be stale the day after.
+          `${flat(gaming.blurb[l])} Genres: ${gaming.genres.join(', ')}. ${l === 'fr' ? 'Favoris' : 'Favourites'}: ${gaming.favourites.map((g) => (g.note ? `${g.name} (${g.note[l]})` : g.name)).join(', ')}.`,
       ),
       target: '/#gaming',
     },

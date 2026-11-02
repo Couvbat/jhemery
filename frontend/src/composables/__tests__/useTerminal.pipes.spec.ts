@@ -130,6 +130,25 @@ describe('; && ||', () => {
     expect(texts()).toEqual(['couvbat'])
   })
 
+  // Found after §K: the hidden commands reported their operand errors in the error tone
+  // alone, which the shell reads as output, so `&&` ran on and a pipe swallowed them.
+  it('stops && at a hidden command’s operand error, and keeps it out of the pipe', async () => {
+    await run('banner && whoami')
+    expect(texts()).toEqual(['banner: missing operand'])
+    clearBuffer()
+    await run('vim nope | wc -l')
+    expect(texts()).toEqual(['vim: nope: No such file or directory', '0'])
+  })
+
+  // The same sweep found three more modules reporting usage errors in the tone alone.
+  it('stops && at a usage error from flag, wordle or acid', async () => {
+    for (const line of ['flag && whoami', 'wordle nope && whoami', 'acid nope && whoami']) {
+      clearBuffer()
+      await run(line)
+      expect(texts(), line).not.toContain('couvbat')
+    }
+  })
+
   // Found in review: `why` is a command, so resolving every stage first wasn't enough.
   it('runs nothing when a message to the server shares an unquoted line with an operator', async () => {
     await run('sign love it; why not')

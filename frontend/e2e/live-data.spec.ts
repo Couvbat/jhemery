@@ -26,30 +26,41 @@ import {
  */
 
 test.describe('steam', () => {
-  test('configured — the gaming section shows live activity', async ({ page, api }) => {
+  test('configured — the gaming section shows live activity, and the favourites’ receipts', async ({ page, api }) => {
     api.use('configured')
+    // The ids the content lists ride on the call the section already makes.
+    const asked = page.waitForRequest((request) => new URL(request.url()).pathname.endsWith('/steam/activity'))
     await page.goto('/')
 
     const section = page.locator('#gaming')
     await expect(section).toContainText(steamConfigured.profile!.name)
     await expect(section).toContainText(steamConfigured.profile!.inGame!)
+    await expect(section).toContainText('1204h · 636/637')
+    expect(new URL((await asked).url()).searchParams.get('apps')).toBe(gaming.favourites.map((game) => game.appId).join(','))
   })
 
-  test('unconfigured — falls back to the static game log', async ({ page, api, pageErrors }) => {
+  test('unconfigured — the favourites and their notes, and nothing claims to be live', async ({
+    page,
+    api,
+    pageErrors,
+  }) => {
     api.use('unconfigured')
     await page.goto('/')
 
     const section = page.locator('#gaming')
-    await expect(section).toContainText(gaming.fallbackGames[0]!.name)
+    await expect(section).toContainText(gaming.favourites[0]!.name)
+    await expect(section).toContainText(gaming.favourites[0]!.note!.en)
     await expect(section).not.toContainText(steamConfigured.profile!.name)
+    await expect(section.locator('.bg-primary\\/20')).toHaveCount(0)
     expect(pageErrors).toEqual([])
   })
 
-  test('down — same fallback, and nothing thrown', async ({ page, api, pageErrors }) => {
+  test('down — the same favourites, and nothing thrown', async ({ page, api, pageErrors }) => {
     api.use('down')
     await page.goto('/')
 
-    await expect(page.locator('#gaming')).toContainText(gaming.fallbackGames[0]!.name)
+    await expect(page.locator('#gaming')).toContainText(gaming.favourites[0]!.name)
+    await expect(page.locator('#gaming').locator('.bg-primary\\/20')).toHaveCount(0)
     expect(pageErrors).toEqual([])
   })
 })

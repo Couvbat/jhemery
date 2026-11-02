@@ -18,7 +18,7 @@ describe('scene', () => {
     expect(text).toMatch(/^music\s+on$/m)
   })
 
-  it('turns the reaction to the music off and on, writing nothing', async () => {
+  it('turns the reaction to the music off and on, which changes the scene', async () => {
     expect((await runCommand(scene, ['music', 'off'])).text).toBe('the field ignores the music.')
     expect(musicOn.value).toBe(false)
     expect((await runCommand(scene)).text).toMatch(/^music\s+off$/m)
@@ -27,14 +27,18 @@ describe('scene', () => {
     // A bare `scene music` toggles, as `gravity` does.
     await runCommand(scene, ['music'])
     expect(musicOn.value).toBe(false)
-    expect(writesOf(scene, ['music', 'off'])).toBe('none')
+    expect(writesOf(scene, ['music', 'off'])).toBe('local')
+    expect(writesOf(scene, [])).toBe('none')
   })
 
   it('brings it back on reset, and refuses a word it doesn’t know', async () => {
     await runCommand(scene, ['music', 'off'])
     resetScene()
     expect(musicOn.value).toBe(true)
-    expect((await runCommand(scene, ['music', 'loud'])).text).toBe('scene: unknown argument `music`')
+    const refused = await runCommand(scene, ['music', 'loud'])
+    expect(refused.text).toBe('scene: unknown argument `music`')
+    // An operand error, so it reaches the screen from a pipe and stops `&&`.
+    expect(refused.lines[0]).toMatchObject({ tone: 'error', stderr: true })
   })
 
   it('offers music and its two words for Tab', () => {

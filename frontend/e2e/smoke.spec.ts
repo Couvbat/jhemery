@@ -53,9 +53,9 @@ test.describe('fixtures', () => {
     await page.goto('/')
 
     // The documented degraded state: no Steam key means no live activity, and the
-    // section renders the hand-written game list instead of an error.
+    // section renders the favourites from the content instead of an error.
     await expect(page.locator('#gaming')).not.toContainText(steamConfigured.profile!.name)
-    await expect(page.locator('#gaming')).toContainText(gaming.fallbackGames[0]!.name)
+    await expect(page.locator('#gaming')).toContainText(gaming.favourites[0]!.name)
   })
 
   test('the app fixture seeds locale before first paint', async ({ page, app }) => {

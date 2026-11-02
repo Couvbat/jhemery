@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { decisions } from '../decisions'
-import { machines } from '../hardware'
+import { machines, nas } from '../hardware'
 import { labLinks, labNodes, labTiers } from '../lab'
 
 /**
@@ -42,7 +42,9 @@ describe('the lab’s topology', () => {
     }
   })
 
-  it('leaves Azazel off: it is retired', () => {
+  it('draws every NAS the hardware section lists, and only those', () => {
+    const drawn = labNodes.filter((node) => node.kind === 'machine').map((node) => node.machine)
+    expect(new Set(drawn)).toEqual(new Set(nas.map((machine) => machine.name)))
     expect(ids).not.toContain('azazel')
   })
 

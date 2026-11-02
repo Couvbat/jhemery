@@ -1,4 +1,4 @@
-import { readdirSync } from 'node:fs'
+import { readdirSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest'
 
@@ -82,6 +82,23 @@ const footer = (name: string, locale: Locale): string => {
   )
 }
 
+/** `help.txt`'s list: every page, with what it is. */
+function pageList(locale: Locale): OutputLine[] {
+  const t = <T,>(value: Localised<T>) => value[locale]
+  const targets = [profile.domain, ...pages.map((c) => `${profile.domain}/${c.name}`)]
+  const pad = Math.max(...targets.map((target) => `  curl ${target}`.length))
+  const row = (target: string, what: string): OutputLine => {
+    const left = `  curl ${target}`.padEnd(pad)
+    return { text: `${left}  ${what}`, segments: [{ text: left, tone: 'accent' }, { text: `  ${what}` }] }
+  }
+  return [
+    { text: t({ en: 'What a terminal can read here:', fr: 'Ce qu’un terminal peut lire ici :' }), tone: 'primary' },
+    { text: '' },
+    row(profile.domain, t({ en: 'the résumé', fr: 'le CV' })),
+    ...pages.map((c) => row(`${profile.domain}/${c.name}`, t(c.description))),
+  ]
+}
+
 /** The command's output with every line that depends on the clock left out. */
 async function stableOutput(command: Command, locale: Locale): Promise<OutputLine[]> {
   setLocale(locale)
@@ -157,26 +174,36 @@ describe('curl pages', () => {
     })
 
     it(`${locale}/help.txt lists them`, async () => {
-      const t = <T,>(value: Localised<T>) => value[locale]
-      const targets = [profile.domain, ...pages.map((c) => `${profile.domain}/${c.name}`)]
-      const pad = Math.max(...targets.map((target) => `  curl ${target}`.length))
-      const row = (target: string, what: string): OutputLine => {
-        const left = `  curl ${target}`.padEnd(pad)
-        return { text: `${left}  ${what}`, segments: [{ text: left, tone: 'accent' }, { text: `  ${what}` }] }
-      }
-      const lines: OutputLine[] = [
-        { text: t({ en: 'What a terminal can read here:', fr: 'Ce qu’un terminal peut lire ici :' }), tone: 'primary' },
-        { text: '' },
-        row(profile.domain, t({ en: 'the résumé', fr: 'le CV' })),
-        ...pages.map((c) => row(`${profile.domain}/${c.name}`, t(c.description))),
-      ]
-      const page = `${toAnsi(lines, { origin: ORIGIN })}\n${footer('help', locale)}`
+      const page = `${toAnsi(pageList(locale), { origin: ORIGIN })}\n${footer('help', locale)}`
       await expect(page).toMatchFileSnapshot(`${pagesDir}${locale}/help.txt`)
+    })
+
+    // What a terminal gets for a name with no page (`curl jhemery.xyz/neofetc`), with a
+    // 404, where it used to get the app's HTML. Named outside the pages' `[a-z0-9-]`, so
+    // no URL the rules rewrite can serve it with a 200.
+    it(`${locale}/_404.txt says so, and lists the pages`, async () => {
+      const t = <T,>(value: Localised<T>) => value[locale]
+      const lines: OutputLine[] = [
+        { text: t({ en: 'No page by that name.', fr: 'Aucune page de ce nom.' }), tone: 'error' },
+        { text: '' },
+        ...pageList(locale),
+      ]
+      await expect(`${toAnsi(lines, { origin: ORIGIN })}\n\n`).toMatchFileSnapshot(`${pagesDir}${locale}/_404.txt`)
     })
   }
 
   it.each(LOCALES)('leaves no orphan in %s: every file is a page', (locale) => {
     const files = readdirSync(`${pagesDir}${locale}`).sort()
-    expect(files).toEqual([...pages.map((c) => `${c.name}.txt`), 'help.txt'].sort())
+    expect(files).toEqual([...pages.map((c) => `${c.name}.txt`), 'help.txt', '_404.txt'].sort())
+  })
+
+  // `.htaccess` answers a command-line client's unknown name with that page and a 404,
+  // after every rule that could give the name a page, and before the SPA's fallback.
+  it('is the 404 a command-line client gets, after every page and before the fallback', () => {
+    const htaccess = readFileSync(join(process.cwd(), 'public/.htaccess'), 'utf8')
+    const notFound = htaccess.indexOf('RewriteRule ^[a-z0-9-]+/?$ - [R=404,L]')
+    expect(notFound).toBeGreaterThan(htaccess.lastIndexOf('/pages/$1.html [L]'))
+    expect(notFound).toBeLessThan(htaccess.indexOf('RewriteRule ^ /index.html [L]'))
+    for (const locale of LOCALES) expect(htaccess).toContain(`ErrorDocument 404 /run/${locale}/_404.txt`)
   })
 })

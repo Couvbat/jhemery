@@ -95,8 +95,8 @@ to fill in before building:
 So the model's path reads, left to right: the API, Cloudflare's restricted rule, the tunnel,
 Nginx Proxy Manager, Ollama on poseidon. That is the route `ask` takes today, drawn.
 
-**Azazel is retired**, so it is not on the map. `content/hardware.ts` still lists it as a NAS;
-marking it retired there is a separate content change, and the map doesn't wait on it.
+**Azazel is retired**, so it is not on the map. `content/hardware.ts` listed it as a NAS until
+the housekeeping after §K took it out, and `lab.spec.ts` now holds the two lists to each other.
 
 ### Which services are on it
 

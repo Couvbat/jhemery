@@ -2,6 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import {
   SteamActivity,
+  SteamFavourite,
   SteamRecentGame,
   SteamProfile,
   SteamStatus,
@@ -19,6 +20,36 @@ const PERSONA_STATES: SteamStatus[] = [
 ];
 
 const CACHE_TTL_MS = 5 * 60 * 1000;
+/** Steam's answer or nothing, as weather and markets wait: a hung call holds a page load. */
+const REQUEST_TIMEOUT_MS = 8000;
+/** Hours played and achievements move slowly: the library and each game's count, a day. */
+const LIBRARY_TTL_MS = 24 * 60 * 60 * 1000;
+/** As many favourites as one request may ask about. */
+export const MAX_FAVOURITES = 8;
+
+/**
+ * `?apps=250900,427520`: the favourites' app ids, as `content/gaming.ts` lists them. Up to
+ * eight, each once; anything else is read as no favourites, never as an error, since the
+ * activity beside them is still worth answering.
+ */
+export function parseApps(raw: unknown): number[] {
+  const pattern = new RegExp(
+    `^\\d{1,10}(?:,\\d{1,10}){0,${MAX_FAVOURITES - 1}}$`,
+  );
+  if (typeof raw !== 'string' || !pattern.test(raw)) return [];
+  return [...new Set(raw.split(',').map(Number))];
+}
+
+type Achievements = NonNullable<SteamFavourite['achievements']>;
+
+/**
+ * Whether one request went to Steam, or waited on a call another request had out, for its
+ * `Server-Timing` (`SteamController`). Per request, so neither a slow call nor a neighbour's
+ * fetch can make it read as the copy served (review of #171).
+ */
+export interface UpstreamTrace {
+  upstream: boolean;
+}
 
 interface ResolveVanityUrlResponse {
   response: { success: number; steamid?: string };
@@ -36,6 +67,16 @@ interface PlayerSummariesResponse {
   };
 }
 
+interface OwnedGamesResponse {
+  response: {
+    games?: Array<{ appid: number; playtime_forever?: number }>;
+  };
+}
+
+interface PlayerAchievementsResponse {
+  playerstats?: { achievements?: Array<{ achieved: number }>; error?: string };
+}
+
 interface RecentlyPlayedGamesResponse {
   response: {
     games?: Array<{
@@ -49,7 +90,9 @@ interface RecentlyPlayedGamesResponse {
 }
 
 async function fetchJson<T>(url: URL): Promise<T> {
-  const res = await fetch(url);
+  const res = await fetch(url, {
+    signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+  });
   if (!res.ok) throw new Error(`Steam API request failed: ${res.status}`);
   return res.json() as Promise<T>;
 }
@@ -59,10 +102,28 @@ export class SteamService {
   private readonly logger = new Logger(SteamService.name);
   private resolvedSteamId64: string | null = null;
   private cache: { data: SteamActivity; expiresAt: number } | null = null;
+  private library: { data: Map<number, number>; expiresAt: number } | null =
+    null;
+  private libraryFailedAt = 0;
+  private readonly achievementCounts = new Map<
+    number,
+    { data: Achievements | null; expiresAt: number }
+  >();
+  // The calls out now: requests that arrive meanwhile share them rather than each asking
+  // Steam again (review of #171).
+  private libraryInFlight: Promise<Map<number, number> | null> | null = null;
+  private readonly achievementsInFlight = new Map<
+    number,
+    Promise<Achievements | null>
+  >();
 
   constructor(private config: ConfigService) {}
 
-  async getActivity(): Promise<SteamActivity> {
+  /** The live activity, and the receipts of each favourite `apps` names. */
+  async getActivity(
+    apps: readonly number[] = [],
+    trace: UpstreamTrace = { upstream: false },
+  ): Promise<SteamActivity> {
     const apiKey = this.config.get<string>('STEAM_API_KEY');
     const steamId = this.config.get<string>('STEAM_ID');
 
@@ -70,10 +131,22 @@ export class SteamService {
       return { configured: false };
     }
 
+    const activity = await this.activity(apiKey, steamId, trace);
+    if (!activity.configured || !apps.length) return activity;
+    const favourites = await this.favourites(apiKey, steamId, apps, trace);
+    return favourites ? { ...activity, favourites } : activity;
+  }
+
+  private async activity(
+    apiKey: string,
+    steamId: string,
+    trace: UpstreamTrace,
+  ): Promise<SteamActivity> {
     if (this.cache && this.cache.expiresAt > Date.now()) {
       return this.cache.data;
     }
 
+    trace.upstream = true;
     try {
       const steamId64 = await this.resolveSteamId64(apiKey, steamId);
       const [profile, recentGames] = await Promise.all([
@@ -90,6 +163,181 @@ export class SteamService {
       );
       return { configured: false };
     }
+  }
+
+  /**
+   * Each favourite the library holds, with its hours and, when the game keeps any, its
+   * achievements. The library is one call a day whatever is asked, and only a game in it
+   * is ever looked up, so a forged `?apps=` costs at most one call per game owned, a day.
+   * Undefined when the library can't be read, Steam being down: the cards then show the
+   * notes alone. Game details that aren't public read as an empty library, the same.
+   */
+  private async favourites(
+    apiKey: string,
+    steamId: string,
+    apps: readonly number[],
+    trace: UpstreamTrace,
+  ): Promise<SteamFavourite[] | undefined> {
+    try {
+      const steamId64 = await this.resolveSteamId64(apiKey, steamId);
+      const library = await this.fetchLibrary(apiKey, steamId64, trace);
+      if (!library) return undefined;
+      const owned = apps.filter((appId) => library.has(appId));
+      const counts = await Promise.all(
+        owned.map((appId) =>
+          this.fetchAchievements(apiKey, steamId64, appId, trace),
+        ),
+      );
+      return owned.map((appId, i) => ({
+        appId,
+        minutes: library.get(appId)!,
+        ...(counts[i] ? { achievements: counts[i] } : {}),
+      }));
+    } catch (err) {
+      this.logger.warn(
+        `Failed to read the Steam favourites: ${err instanceof Error ? err.message : String(err)}`,
+      );
+      return undefined;
+    }
+  }
+
+  /**
+   * Every owned game's minutes played, by app id. An empty answer is kept only briefly, and
+   * logged, since it is most likely game details that aren't public. A failed read is tried
+   * again in five minutes, not on every visit: until then the last library read, if any, or
+   * null. One read at a time, whoever asks.
+   */
+  private fetchLibrary(
+    apiKey: string,
+    steamId64: string,
+    trace: UpstreamTrace,
+  ): Promise<Map<number, number> | null> {
+    const now = Date.now();
+    if (this.library && this.library.expiresAt > now) {
+      return Promise.resolve(this.library.data);
+    }
+    if (now - this.libraryFailedAt < CACHE_TTL_MS) {
+      return Promise.resolve(this.library?.data ?? null);
+    }
+    trace.upstream = true;
+    this.libraryInFlight ??= this.readLibrary(apiKey, steamId64).finally(() => {
+      this.libraryInFlight = null;
+    });
+    return this.libraryInFlight;
+  }
+
+  private async readLibrary(
+    apiKey: string,
+    steamId64: string,
+  ): Promise<Map<number, number> | null> {
+    const now = Date.now();
+    const url = new URL(
+      'https://api.steampowered.com/IPlayerService/GetOwnedGames/v1/',
+    );
+    url.searchParams.set('key', apiKey);
+    url.searchParams.set('steamid', steamId64);
+    url.searchParams.set('include_played_free_games', '1');
+
+    let json: OwnedGamesResponse;
+    try {
+      json = await fetchJson<OwnedGamesResponse>(url);
+    } catch (err) {
+      this.libraryFailedAt = now;
+      this.logger.warn(
+        `Failed to fetch the Steam library: ${err instanceof Error ? err.message : String(err)}`,
+      );
+      return this.library?.data ?? null;
+    }
+    const data = new Map(
+      (json.response.games ?? []).map((g) => [
+        g.appid,
+        g.playtime_forever ?? 0,
+      ]),
+    );
+    if (!data.size) {
+      this.logger.warn(
+        'The Steam library came back empty: are the profile\'s "Game details" public?',
+      );
+    }
+    this.library = {
+      data,
+      expiresAt: now + (data.size ? LIBRARY_TTL_MS : CACHE_TTL_MS),
+    };
+    return data;
+  }
+
+  /**
+   * How many of a game's achievements are unlocked, or null when Steam won't say. Two
+   * refusals are answers, kept a day like a count: a 400 "Requested app has no stats" for a
+   * game that keeps none, and a 403 "Profile is not public", since the library's hours ask
+   * only for public game details and achievements ask for the profile. That one is logged,
+   * being the owner's setting to change. Any other failure is kept for five minutes, so a
+   * blip doesn't hide a count for a day, and none fails the activity beside it. One call per
+   * game at a time, whoever asks.
+   */
+  private fetchAchievements(
+    apiKey: string,
+    steamId64: string,
+    appId: number,
+    trace: UpstreamTrace,
+  ): Promise<Achievements | null> {
+    const cached = this.achievementCounts.get(appId);
+    if (cached && cached.expiresAt > Date.now()) {
+      return Promise.resolve(cached.data);
+    }
+    trace.upstream = true;
+    let pending = this.achievementsInFlight.get(appId);
+    if (!pending) {
+      pending = this.readAchievements(apiKey, steamId64, appId).finally(() =>
+        this.achievementsInFlight.delete(appId),
+      );
+      this.achievementsInFlight.set(appId, pending);
+    }
+    return pending;
+  }
+
+  private async readAchievements(
+    apiKey: string,
+    steamId64: string,
+    appId: number,
+  ): Promise<Achievements | null> {
+    let data: Achievements | null = null;
+    let ttl = CACHE_TTL_MS;
+    try {
+      const url = new URL(
+        'https://api.steampowered.com/ISteamUserStats/GetPlayerAchievements/v1/',
+      );
+      url.searchParams.set('key', apiKey);
+      url.searchParams.set('steamid', steamId64);
+      url.searchParams.set('appid', String(appId));
+      const res = await fetch(url, {
+        signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+      });
+      if (res.ok) {
+        const list =
+          ((await res.json()) as PlayerAchievementsResponse).playerstats
+            ?.achievements ?? [];
+        if (list.length) {
+          data = {
+            achieved: list.filter((a) => a.achieved === 1).length,
+            total: list.length,
+          };
+        }
+        ttl = LIBRARY_TTL_MS;
+      } else if (res.status === 400 || res.status === 403) {
+        ttl = LIBRARY_TTL_MS;
+        const error = (
+          (await res.json().catch(() => ({}))) as PlayerAchievementsResponse
+        ).playerstats?.error;
+        if (error && !/no stats/i.test(error)) {
+          this.logger.warn(`Steam achievements for ${appId}: ${error}`);
+        }
+      }
+    } catch {
+      // Unreachable: no count, and another try in five minutes.
+    }
+    this.achievementCounts.set(appId, { data, expiresAt: Date.now() + ttl });
+    return data;
   }
 
   private async resolveSteamId64(

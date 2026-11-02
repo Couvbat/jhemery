@@ -10,7 +10,8 @@ background. Two independent npm projects, no workspace/monorepo tooling:
 ```
 frontend/   Vue 3 + Vite + Tailwind 4 SPA (sections, terminal, games, achievements, PWA)
 backend/    NestJS API (ask, contact, steam, github, weather, markets, presence, stats, guestbook,
-            rooms, jobs, health, mcp)
+            rooms, jobs, health, mcp, lab)
+lab-agent/  the lab's side of /lab: a dependency-free container on a NAS that pushes snapshots
 docs/       features-spec.md, roadmap.md, deploy.md; superpowers/{specs,plans} for the bigger pieces
 ```
 
@@ -94,11 +95,12 @@ this; violating it breaks `npm run build` with an error pointing at the résumé
 the offending file. The résumé plugin generates `/resume.txt` (also what the terminal's `curl`
 prints), the printable `/resume.html` and `/resume.fr.html`, and `/content.json` from here, so the
 CV has exactly one source. `content.json` is fetched at runtime by the **backend's** MCP endpoint
-from `${FRONTEND_URL}`. That is the one place the two apps depend on each other, and the shape is
-mirrored rather than shared (`backend/src/mcp/mcp.types.ts`), with the backend refusing any
-`version` it doesn't list in `CONTENT_VERSIONS` (1 and 2 today). So a change to its shape needs a
-new `version`, and a backend that accepts both the old and the new one: the two apps deploy from
-the same push in no fixed order.
+from `${FRONTEND_URL}`, and `ask` fetches `llms.txt` and `corpus.json` from there too. Those three
+files are where the two apps depend on each other. The JSON shapes are mirrored rather than shared
+(`backend/src/mcp/mcp.types.ts`, `backend/src/ask/corpus.types.ts`), with the backend refusing any
+`version` it doesn't list in `CONTENT_VERSIONS` (1 and 2 today) or `CORPUS_VERSIONS` (1). So a
+change to either shape needs a new `version`, and a backend that accepts both the old and the new
+one: the two apps deploy from the same push in no fixed order.
 
 The same goes for what crawlers read. `content/pages.ts` lists every public page with its title
 and description (build-only: the app keeps just the paths and URLs, in `content/site.ts`, because
@@ -192,7 +194,7 @@ the overrides, so `main.css` stays its only definition. The consequences for new
 
 ### Backend: NestJS, one module per capability
 
-`app.module.ts` wires ~13 feature modules, each `{controller, service, dto, spec}`. `main.ts`
+`app.module.ts` wires 14 feature modules, each `{controller, service, dto, spec}`. `main.ts`
 carries the cross-cutting decisions and explains each in comments: helmet with a `default-src
 'none'` CSP (JSON API, never a document), CORS locked to `FRONTEND_URL` + localhost,
 `trust proxy` at one hop so the per-IP `common/rate-limit.guard.ts` sees real clients behind Apache
@@ -200,8 +202,8 @@ carries the cross-cutting decisions and explains each in comments: helmet with a
 whitelisting `ValidationPipe`.
 
 **Everything optional degrades gracefully.** No Steam key → live activity hidden; no GitHub token
-→ heatmap dropped; unreachable LLM → the terminal says it's asleep. `ask`, `guestbook`, `rooms`,
-`jobs`, `mcp` and `wall` are **off by default**. Endpoints report `configured: false` rather than
+→ heatmap dropped; a model that can't answer → the API names a reason and the terminal says it in
+plain words. `ask`, `guestbook`, `rooms`, `jobs`, `mcp`, `wall` and `lab` are **off by default**. Endpoints report `configured: false` rather than
 erroring, and the frontend renders that state. Preserve this when adding integrations.
 `backend/.env.example` documents every variable and why the risky ones are off.
 

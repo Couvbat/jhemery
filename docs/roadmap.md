@@ -3,10 +3,10 @@
 Status tracker for the feature brainstorm: first three categories (three.js background, terminal
 commands, live information), then games vol. 2 (§E), views and tools (§F), the September 2026
 batch (§G), the late-September brainstorm (§H), the October brainstorm (§I), the mid-October
-one (§J) and the lab batch (§K). Built feature by feature, across sessions.
+one (§J), the lab batch (§K) and its follow-up (§L). Built feature by feature, across sessions.
 
-**Current state: §A–§I are shipped, and so is §J. §K is specced and not started.** Anything else still open is
-under [Open](#open) and [Known issues](#known-issues).
+**Current state: §A–§L are shipped.** Anything else still open is under [Open](#open) and
+[Known issues](#known-issues).
 
 **How to use:** tick a box when the feature ships, and append the PR number. Design detail for
 each row is the "approach" column — enough to act on without re-deriving. Anything that grows into
@@ -16,7 +16,9 @@ from its row.
 Conventions that apply to every row, so they are not repeated:
 
 - Every user-facing string is `Localised<{en, fr}>` via `useLocale()`/`t()`.
-- Every animated surface checks `prefersReducedMotion()` (`composables/useCrt.ts`).
+- Every animated surface reads the motion level: `decorativeMotion()` (`composables/useMotion.ts`,
+  which `prefers-reduced-motion` holds at *paused*), except the games, whose stepped mode reads
+  `prefersReducedMotion()` (features-spec §9).
 - New commands are one object appended to an array in `terminal/commands/*.ts`; `help`,
   tab-completion and the palette derive from the registry. `registry.spec.ts`'s generic invariants
   cover them for free.
@@ -1008,30 +1010,79 @@ read one snapshot the lab pushes to the API, so the lab map goes first.
 
 | ✔ | Feature | Approach | Files | Effort |
 |---|---|---|---|---|
-| [x] | Lab map | [Spec](superpowers/specs/2026-10-15-lab-map-design.md). A `/lab` page drawing the homelab as HTML cards in request-path tiers with an SVG of wires behind them, topology from a new `content/lab.ts`, coloured by a snapshot that a small zero-dependency agent in the repo (`lab-agent/`, one container on a NAS) pushes to a new, off-by-default `lab` module (`POST /lab/snapshot` with a bearer token, `GET /lab` for visitors). Push, never pull: no visitor request reaches home. A closed schema refuses addresses, ports and versions. Plus a visible `lab` command. | `backend/src/lab/` (new), `lab-agent/` (new), the backend PR check, `content/lab.ts` (new), `views/LabView.vue` (new), `lib/lab.ts` (new), `lib/api.ts`, `router/index.ts`, `content/pages.ts`, `vite-plugins/discovery.ts`, `llms.template.md`, `SiteFooter.vue`, `terminal/commands/`, `systemctl.ts`, `deploy.md` | L |
-| [x] | Lab shell | [Spec](superpowers/specs/2026-10-15-lab-shell-design.md). `ssh poseidon` and `ssh optimus` open a simulated shell, labelled as one, whose `uptime`, `zpool status`, `nvidia-smi`, `ollama ps` and `glances` print the real snapshot. Opens with the feed off too, from `hardware.ts`, so its achievement (`labRat`) never waits on the lab. | `terminal/commands/eggs.ts`, `terminal/lab-shell/` (new), `terminal/achievements.ts`, README | M |
-| [x] | Ask my lab | [Spec](superpowers/specs/2026-10-15-ask-my-lab-design.md). `ask` answers from everything the site already says (lexical retrieval over a new build artifact, `/corpus.json`, with the pages it drew from printed as links, revisiting the `ask-no-rag` decision), gets a `LAB NOW` block from the snapshot, a meta event (model, tokens per second, machine), a closed set of failure reasons surfaced in `systemctl status ask` and the degraded copy (429 told apart from asleep), and an *Ask the lab* form on `/lab` that phones can use. | `backend/src/ask/`, `common/health.ts`, `common/rate-limit.guard.ts`, `terminal/commands/ask.ts`, `lib/api.ts`, `lib/ask-session.ts` (new), `views/LabView.vue`, `systemctl.ts`, `deploy.md` | M |
-| [x] | Guestbook moderation | [Spec](superpowers/specs/2026-10-15-guestbook-moderation-design.md). Off by default. Entries wait as `pending` for the local model's verdict; only an explicit `hold` holds, and anything without a verdict publishes after 30 minutes, so the guestbook is never less available than today. Optional model replies, labelled. The model slot moves to `common/llm.ts`, shared with `ask`. | `backend/src/guestbook/`, `backend/src/common/llm.ts` (new), `backend/src/ask/ask.service.ts`, `backend/scripts/eval-moderation.ts` (new), `terminal/commands/live.ts`, `terminal/commands/eggs.ts`, `content/legal.ts`, `content/privacy.ts` | M |
-| [x] | Stems, vol. 2 | [Spec](superpowers/specs/2026-10-15-stems-vol2-design.md). A prep script from DAW exports to a published track (cut, encode, check bars and size, peaks, print the entry), waveform lanes from a 4 kB peaks file shown before any audio loads, seeking that keeps the stems locked, liner notes (BPM, key, plugin chains), and a `stems` command. | `scripts/stems.mjs` (new), `scripts/stems-lib.mjs` (new), `content/stems.ts`, `components/stems/`, `terminal/commands/content.ts` | M |
-| [x] | Music-reactive field | [Spec](superpowers/specs/2026-10-15-music-reactive-field-design.md). The three.js background follows whatever music the visitor plays: `acid` and the stems mixer through an analyser and their own exact beat clocks, SoundCloud through a hand-written bridge to the widget's play state and position plus tempos entered by hand in `content/music.ts`. Beats move geometry, never light (no flashing at 150–200 BPM); *calm* follows the level only; `scene music off`. Revisits *beat-synced wireframes* from *Dropped*. | `lib/music-signal.ts` (new), `components/music-react.ts` (new), `components/music/soundcloud-bridge.ts` (new), `components/ThreeBackground.vue`, `tools/acid/`, `components/stems/`, `content/music.ts`, `composables/useMusicPlayer.ts`, `useSceneControl.ts` | M |
-| [x] | X-ray data layer | [Spec](superpowers/specs/2026-10-15-xray-data-layer-design.md). Components that render API data carry `data-api`, held to it by a source scan; the layer reads Resource Timing (the API adds `Timing-Allow-Origin` and `Server-Timing` with its cache age) to tag each with its route, time and freshness; `xray path` shows this visit's hops from `/cdn-cgi/trace`, keeping only the colo, HTTP and TLS versions. | `lib/xray-stamp.ts`, `lib/xray-data.ts` (new), `components/XrayLayer.vue`, the live components, `main.ts` (both apps), `backend/src/common/`, the caching controllers | M |
+| [x] | Lab map | Shipped in #160. [Spec](superpowers/specs/2026-10-15-lab-map-design.md). A `/lab` page drawing the homelab as HTML cards in request-path tiers with an SVG of wires behind them, topology from a new `content/lab.ts`, coloured by a snapshot that a small zero-dependency agent in the repo (`lab-agent/`, one container on a NAS) pushes to a new, off-by-default `lab` module (`POST /lab/snapshot` with a bearer token, `GET /lab` for visitors). Push, never pull: no visitor request reaches home. A closed schema refuses addresses, ports and versions. Plus a visible `lab` command. | `backend/src/lab/` (new), `lab-agent/` (new), the backend PR check, `content/lab.ts` (new), `views/LabView.vue` (new), `lib/lab.ts` (new), `lib/api.ts`, `router/index.ts`, `content/pages.ts`, `vite-plugins/discovery.ts`, `llms.template.md`, `SiteFooter.vue`, `terminal/commands/`, `systemctl.ts`, `deploy.md` | L |
+| [x] | Lab shell | Shipped in #160. [Spec](superpowers/specs/2026-10-15-lab-shell-design.md). `ssh poseidon` and `ssh optimus` open a simulated shell, labelled as one, whose `uptime`, `zpool status`, `nvidia-smi`, `ollama ps` and `glances` print the real snapshot. Opens with the feed off too, from `hardware.ts`, so its achievement (`labRat`) never waits on the lab. | `terminal/commands/eggs.ts`, `terminal/lab-shell/` (new), `terminal/achievements.ts`, README | M |
+| [x] | Ask my lab | Shipped in #160. [Spec](superpowers/specs/2026-10-15-ask-my-lab-design.md). `ask` answers from everything the site already says (lexical retrieval over a new build artifact, `/corpus.json`, with the pages it drew from printed as links, revisiting the `ask-no-rag` decision), gets a `LAB NOW` block from the snapshot, a meta event (model, tokens per second, machine), a closed set of failure reasons surfaced in `systemctl status ask` and the degraded copy (429 told apart from asleep), and an *Ask the lab* form on `/lab` that phones can use. | `backend/src/ask/`, `common/health.ts`, `common/rate-limit.guard.ts`, `terminal/commands/ask.ts`, `lib/api.ts`, `lib/ask-session.ts` (new), `views/LabView.vue`, `systemctl.ts`, `deploy.md` | M |
+| [x] | Guestbook moderation | Shipped in #160. [Spec](superpowers/specs/2026-10-15-guestbook-moderation-design.md). Off by default. Entries wait as `pending` for the local model's verdict; only an explicit `hold` holds, and anything without a verdict publishes after 30 minutes, so the guestbook is never less available than today. Optional model replies, labelled. The model slot moves to `common/llm.ts`, shared with `ask`. | `backend/src/guestbook/`, `backend/src/common/llm.ts` (new), `backend/src/ask/ask.service.ts`, `backend/scripts/eval-moderation.ts` (new), `terminal/commands/live.ts`, `terminal/commands/eggs.ts`, `content/legal.ts`, `content/privacy.ts` | M |
+| [x] | Stems, vol. 2 | Shipped in #160. [Spec](superpowers/specs/2026-10-15-stems-vol2-design.md). A prep script from DAW exports to a published track (cut, encode, check bars and size, peaks, print the entry), waveform lanes from a 4 kB peaks file shown before any audio loads, seeking that keeps the stems locked, liner notes (BPM, key, plugin chains), and a `stems` command. | `scripts/stems.mjs` (new), `scripts/stems-lib.mjs` (new), `content/stems.ts`, `components/stems/`, `terminal/commands/content.ts` | M |
+| [x] | Music-reactive field | Shipped in #160. [Spec](superpowers/specs/2026-10-15-music-reactive-field-design.md). The three.js background follows whatever music the visitor plays: `acid` and the stems mixer through an analyser and their own exact beat clocks, SoundCloud through a hand-written bridge to the widget's play state and position plus tempos entered by hand in `content/music.ts`. Beats move geometry, never light (no flashing at 150–200 BPM); *calm* follows the level only; `scene music off`. Revisits *beat-synced wireframes* from *Dropped*. | `lib/music-signal.ts` (new), `components/music-react.ts` (new), `components/music/soundcloud-bridge.ts` (new), `components/ThreeBackground.vue`, `tools/acid/`, `components/stems/`, `content/music.ts`, `composables/useMusicPlayer.ts`, `useSceneControl.ts` | M |
+| [x] | X-ray data layer | Shipped in #160. [Spec](superpowers/specs/2026-10-15-xray-data-layer-design.md). Components that render API data carry `data-api`, held to it by a source scan; the layer reads Resource Timing (the API adds `Timing-Allow-Origin` and `Server-Timing` with its cache age) to tag each with its route, time and freshness; `xray path` shows this visit's hops from `/cdn-cgi/trace`, keeping only the colo, HTTP and TLS versions. | `lib/xray-stamp.ts`, `lib/xray-data.ts` (new), `components/XrayLayer.vue`, the live components, `main.ts` (both apps), `backend/src/common/`, the caching controllers | M |
 
-**Before the first branch:** the specs are build input, published at `/notes/<slug>`, and
-`content/__tests__/notes.spec.ts` counts the notes: 20 with these seven (it was 13; the counts in
-the comments of `vite-plugins/notes.ts` and `vite-plugins/markdown.ts` follow). Commit the specs,
-this section and that count together, on their own docs branch into `dev`.
+All seven shipped together in #160, and each spec's *Status* line records what changed on the
+way.
 
-**Order:** the lab map; then the lab shell and the x-ray data layer, in either order; ask my lab
-(its parts 2 and 4, the site's passages and the failure reasons, don't need the map and can go
-first; part 4 is the one that would have named the 15 October outage); guestbook moderation after it, since both touch `ask.service.ts`; stems
-vol. 2 whenever a first track is ready, since it is mostly content; the music-reactive field at
-any point, since it needs no backend and `acid` and SoundCloud already exist.
+**Settled with the owner, 15 October:** Azazel is retired and off the map (and, since the
+housekeeping after §K, off the hardware section too); every service that isn't critical is on it
+(the lab map spec lists which are and which aren't); the installed models are public. What was
+still open moved to [Open](#open).
 
-**Settled with the owner, 15 October:** Azazel is retired and off the map; every service that
-isn't critical is on it (the lab map spec lists which are and which aren't); the installed models
-are public. **Still open:** which machine runs each service, Nextcloud (off in the draft), and the
-stems' licence line. Stems vol. 2 waits on the owner extracting a first track's stems; its code
-can ship before them, since the mixer stays hidden while the list is empty.
+## L. Mid-October 2026, round two
+
+Brainstormed on 2026-10-16, the day §K shipped. Six lenses (visitors the site still serves badly,
+the open web, proof of craft, Jules's work beyond the site, memorable moments, and subtraction)
+gave forty-six candidates. Each was checked against the code, and thirteen were pitched. The
+owner picked one, Steam with receipts, and the fixes the checks had found. The rest were left,
+which is worth knowing before the next round pitches them again: a lab journal with written
+postmortems, a model report card, what the lab costs in watts, the API naming the build it runs,
+each privacy claim naming the test that keeps it, case studies beyond this repository, every page
+as markdown, a link preview per page, the résumé in DNS, the turn-based games playable by ear,
+the shell's key on a French keyboard, and four removals for the curation pass (`rickroll`, `btc`
+with the markets module, the tour's games stop, and `stems` listed while it has no track).
+
+### Fixes found on the way
+
+| ✔ | Feature | Approach | Files | Effort |
+|---|---|---|---|---|
+| [x] | Azazel is retired here too | Shipped in #170. Retired on 15 October and left off `/lab`, but `content/hardware.ts` still listed it, so the NAS tab read ×3, `hardware nas` and its curl page printed `azazel@nas` above `live: /lab`, and `corpus.json` gave `ask` a passage about it. The entry goes, and `lab.spec.ts` holds every NAS the hardware section lists to a machine on the map. | `content/hardware.ts`, `content/__tests__/lab.spec.ts`, `public/run/*/hardware.txt`, lab-map spec | S |
+| [x] | NestJS 12, everywhere | Shipped in #170. `backend/package.json` is on ^12.1.2; neofetch's Kernel row, its curl pages, the README's badge and layout and the backend README said 11. | `terminal/commands/content.ts`, `public/run/*/neofetch.txt`, README, `backend/README.md` | S |
+| [x] | Errors that stop `&&` | Shipped in #170. The shell reads the error tone alone as output, so a failure has to come through `fail()`. `eggs.ts` never did: `banner && whoami` ran `whoami`, and `vim nope \| wc -l` piped the error into `wc`. Review found the same in `flag`, `decrypt`, `wordle`, `acid` and connect four. Their real failures use `fail()` now; the jokes that print in red (the `rm -rf /` stages, the panic, the teapot) and a lost wordle's answer keep only the colour. | `terminal/commands/eggs.ts`, `ctf.ts`, `tools.ts`, `games/wordle.ts`, `games/connect4.ts`, `composables/__tests__/useTerminal.pipes.spec.ts` | S |
+| [x] | `scene music off` writes | Shipped in #170. It flips a session flag as `gravity off` does, and `types.ts` lists the scene under `local`, but `scene` classed only `reset` as a write, lower-casing what `run()` compared exactly. Any argument is `local` now. | `terminal/commands/eggs.ts`, `scene.spec.ts`, `registry.spec.ts` | S |
+| [x] | `tw-animate-css` goes | Shipped in #170. Imported by `main.css` and used by nothing, it still put seventeen `@property` rules into the first-load CSS: 253 bytes gzipped off the home page. | `assets/main.css`, `package.json` | S |
+| [x] | curl gets a 404, and a gone chunk a real one | Shipped in #170. `curl jhemery.xyz/neofetc` printed `index.html` with a 200. A command-line client's unknown single name (in lower case, as the rules above it read names; `/Lab` still reaches the app, whose router takes any case) now gets a 404 and `run/<locale>/_404.txt`, the list of pages (an `ErrorDocument` scoped to those clients, with `Vary`). The terminal's own `curl`, whose `fetch` can't send curl's user agent, answers the same way, reading the path without its query as Apache does. `/assets/` is kept out of the SPA fallback, so a tab older than a deploy gets a 404 for a removed chunk instead of HTML that `nosniff` refuses and the service worker's runtime cache could keep. Checked against Apache 2.4 in a container. A reload on Vite's `preloadError` was tried and left out: the palette already says its search failed when its chunk never comes, and a page-wide reload would also fire offline. | `public/.htaccess`, `public/run/*/_404.txt`, `terminal/commands/content.ts`, `terminal/__tests__/curl-pages.spec.ts`, `curl.spec.ts` | S |
+| [x] | Evidence links that resolve | Shipped in #170. `portfolio.spec.ts` called a dead `usedIn` link "a false claim", but checked only the URL's prefix. It checks the file on disk now, as `work.spec.ts` does. | `content/__tests__/portfolio.spec.ts`, `content/skills.ts` | S |
+| [x] | Docs that describe an older site | Shipped in #170. This file said §K hadn't started and kept the old motion rule in its conventions. features-spec §5 named the old motion helper, quoted `sudo` with the wrong user and had no `lab` in its live table. The backend README's route table was two releases behind and now defers to the root README's, the one kept current, which gains the two limits only the old table had. CLAUDE.md missed `lab` and `lab-agent/`, and named `content.json` as the only file the backend reads from the frontend (`ask` reads `llms.txt` and `corpus.json` too). The README counted fifteen `why` topics, frontend/README 38 achievements. Five comments were wrong: the contact form's limit, the og-image script, the welcome "never repeating", and the stems list's cost to the home page (twice). | this file, `features-spec.md`, `CLAUDE.md`, the three READMEs, `ask.controller.ts`, `index.html`, `useTerminal.ts`, `content/stems.ts` | S |
+
+### Gaming
+
+| ✔ | Feature | Approach | Files | Effort |
+|---|---|---|---|---|
+| [x] | Steam with receipts | Shipped in #171. The gaming cards hold claims typed by hand (*150+ hours*, *Real Platinum God*) that start drifting the day they're written. Worse, with Steam off or down, two of them showed a *live* badge because their typed status read *Currently playing*, so the page claimed live activity exactly when the feed was down, and `corpus.json` told `ask` the same. `content/gaming.ts` lists favourites as `{ appId, name, note? }` instead: the note is what Steam can't say, the hours and achievements are Steam's. The frontend sends the favourites' ids on the call it already makes (`/steam/activity?apps=…`, eight at most), so the content stays the one list and the home page makes no new request. The API answers from `GetOwnedGames`, fetched once a day for the whole library, and one `GetPlayerAchievements` per favourite, cached a day too, a game with no stats cached as none; only games in the library are ever looked up, which bounds what a forged list can cost. With Steam off the cards show the names and notes and no badge; `gaming` and `ask` read the same favourites. The hours need the profile's game details public, which the recent-games list already does. | `backend/src/steam/`, `content/gaming.ts`, `content/types.ts`, `lib/api.ts`, `composables/useSteam.ts`, `components/sections/GamingSection.vue`, `terminal/commands/live.ts`, `terminal/commands/content.ts`, `vite-plugins/corpus.ts`, `e2e/`, README | S–M |
+
+### Departures from the approach column
+
+- **Steam with receipts:**
+  - Four favourites have no note. Their typed *Currently playing* and *150+ hours* were exactly
+    what Steam now says, and a note that says why each one matters is the owner's to write.
+  - What Steam can't answer is kept briefly: an empty library (game details private, or a blip)
+    and a failed achievements call for five minutes, so neither hides the receipts for a day.
+    Steam's 400 for a game that keeps no achievements is kept a day, like a count.
+  - The receipts give whole hours (`1204h`), since a total in the hundreds has no use for the
+    decimal the recent games' two-week figures keep.
+  - The card's header says *Favourites* with Steam off, rather than *Recent activity log*,
+    which was the typed list claiming to be recent.
+  - `gaming` lists the favourites with their notes, so its curl page does too; `steam`'s
+    unavailable line, and `gaming`'s last one, are in French as well now.
+  - Checked against the real API on 16 October: the library answered for all six, and the
+    achievements calls said *Profile is not public* with a 403, beside Project Zomboid's
+    *Requested app has no stats* with a 400. Hours need public game details; achievements
+    need the profile itself public. So the counts show once the owner makes it public;
+    until then the cards show hours, and the backend logs the refusal rather than reading
+    it as a game with none. The receipts' first find: Factorio's typed *150+ hours* is 146.
+  - After review: every call to Steam has an 8-second deadline, as weather's and markets'
+    have; a library that fails to load is asked for again in five minutes, the last one read
+    serving meanwhile, rather than on every page load; an empty one is logged, being most
+    likely game details that aren't public; and `Server-Timing` reads a request that fetched
+    a favourite from Steam as a miss.
 
 ## Build order
 
@@ -1115,6 +1166,14 @@ further):
 
 - A curation pass, which is a judgement call rather than a row: retire or fold the weakest joke
   commands, and record each removal here, the way *Dropped* records what never shipped.
+- From §K, for the owner: which machine runs each service in `content/lab.ts` (a draft, Ollama
+  on poseidon being the one settled), whether Nextcloud goes on the map (off in the draft), and
+  the stems' licence line. The stems mixer waits on a first track's stems, and stays hidden until
+  then.
+- From §L, for the owner: `/now` (`content/now.ts`, last updated 24 September) still lists the
+  CTF chain, the QR encoder and connect four as being built, and MCP as being learnt. All of it
+  shipped weeks ago, and the 90-day warning won't say so until late December. It's in the
+  owner's words, so it waits for them.
 
 ## Known issues
 

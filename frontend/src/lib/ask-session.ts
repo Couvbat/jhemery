@@ -81,9 +81,9 @@ function isReason(value: unknown): value is AskReason {
 }
 
 /**
- * The lines to show, in order. Every one but the 429's ends by pointing at `mail`, which
- * reaches the human whatever the model is doing; and an error with no reason (a network
- * failure, or an API from before reasons) reads as it always did.
+ * The lines to show, in order. Every one but the 429's and busy's (which mean wait) ends by
+ * pointing at `mail`, which reaches the human whatever the model is doing; and an error with
+ * no reason (a network failure, or an API from before reasons) reads as it always did.
  */
 export function degradedCopy(error: unknown): Localised[] {
   if (error instanceof ApiError) {
