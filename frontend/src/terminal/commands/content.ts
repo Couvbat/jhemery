@@ -49,13 +49,14 @@ import { swatches } from './theme'
  * own copy of `index.html`, as a browser would get).
  */
 async function fetchCurlPath(path: string, method: 'GET' | 'HEAD', locale: string, signal: AbortSignal): Promise<SiteResponse> {
-  const page = /^\/([a-z0-9-]+)\/?$/i.exec(path)?.[1]
+  // Apache reads the path alone, and in its case: `/neofetc?lang=fr` is the name `neofetc`,
+  // and `/Lab` none of these, so it reaches the app (review of #170).
+  const page = /^\/([a-z0-9-]+)\/?$/.exec(path.split('?')[0]!)?.[1]
   if (page) {
     const run = await fetchSite(`/run/${locale}/${page}.txt`, method, { signal })
     if (run.status === 200 && (run.headers.get('content-type') ?? '').startsWith('text/plain')) return run
     // `/notes` has a rewrite of its own, and every other one-word page a copy.
-    const name = page.toLowerCase()
-    if (name !== 'notes' && !pagePaths.includes(`/${name}`)) {
+    if (page !== 'notes' && !pagePaths.includes(`/${page}`)) {
       const missing = await fetchSite(`/run/${locale}/_404.txt`, method, { signal })
       return { ...missing, status: 404, statusText: 'Not Found' }
     }

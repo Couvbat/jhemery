@@ -146,7 +146,19 @@ describe('curl', () => {
     const typo = await runCommand(curl, ['jhemery.xyz/neofetc'])
     expect(fetchMock.mock.calls.map((c) => c[0])).toEqual(['/run/en/neofetc.txt', '/run/en/_404.txt'])
     expect(typo.text).toContain('No page by that name.')
-    expect((await runCommand(curl, ['-I', 'jhemery.xyz/Neofetc'])).text.split('\n')[0]).toBe('HTTP/2 404')
+    // Apache reads the path without its query (review of #170).
+    fetchMock.mockClear()
+    expect((await runCommand(curl, ['-I', 'jhemery.xyz/neofetc?lang=fr'])).text.split('\n')[0]).toBe('HTTP/2 404')
+    expect(fetchMock.mock.calls.map((c) => c[0])).toEqual(['/run/en/neofetc.txt', '/run/en/_404.txt'])
+  })
+
+  // Review of #170: Apache's rules read case, so a route in another case (`/Lab`) reaches
+  // the app, whose router takes it, rather than the 404.
+  it('leaves a name in another case to the app, as Apache does', async () => {
+    fetchMock.mockImplementation(async () => text('<!doctype html>', 'text/html'))
+    const lab = await runCommand(curl, ['-I', 'jhemery.xyz/Lab'])
+    expect(fetchMock.mock.calls.map((c) => c[0])).toEqual(['/Lab'])
+    expect(lab.text.split('\n')[0]).toBe('HTTP/2 200')
   })
 
   it('passes unknown flags back as curl would, without fetching', async () => {

@@ -59,12 +59,14 @@
 
   # A command-line client asking for a name nothing above gave a page
   # (`curl jhemery.xyz/neofetc`) gets a 404 and run/<locale>/_404.txt, the list of
-  # pages, rather than the app's HTML. Single names only, the curl pages' own
-  # namespace: every route of one segment has a page copy above, so this takes none.
+  # pages, rather than the app's HTML. Single lower-case names only, the curl pages'
+  # own namespace: every route of one segment has a page copy above, so this takes
+  # none. Like those rules it reads case, so a name in any other (`/Lab`) reaches the
+  # app as a browser's would, whose router takes routes in any case (review of #170).
   RewriteCond %{HTTP_USER_AGENT} (curl|wget|httpie) [NC]
   RewriteCond %{REQUEST_FILENAME} !-f
   RewriteCond %{REQUEST_FILENAME} !-d
-  RewriteRule ^[a-z0-9-]+/?$ - [NC,R=404,L]
+  RewriteRule ^[a-z0-9-]+/?$ - [R=404,L]
 
   # SPA fallback: hand every non-file request to index.html so Vue Router owns
   # routing. Without this, a hard refresh on any path other than / 404s. Never for
