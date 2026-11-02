@@ -55,7 +55,7 @@ src/content/
   skills.ts      flat skill list
   projects.ts    Project[] with status + stack
   music.ts       genres, tools, blurb, playlist URL
-  gaming.ts      genres, platforms, fallback game log, blurb
+  gaming.ts      genres, platforms, the favourite games (Steam app id, note), blurb
   hardware.ts    machines[] + peripherals[]
   contact.ts     socials
   experience.ts  dated roles and courses, newest first; the current role names profile.employer
@@ -639,7 +639,7 @@ every other line, the visitor's address and country among them, before anything 
 ### live
 | Command | Endpoint | Fallback |
 |---|---|---|
-| `steam` / `playing` | `GET /steam/activity` | static game log from `content/gaming.ts` |
+| `steam` / `playing` | `GET /steam/activity?apps=` | the favourites from `content/gaming.ts`, with their notes and no hours |
 | `gitlog` (alias `git log`) | `GET /github/activity` | "no activity available" |
 | `weather` / `wttr` | `GET /weather` | "weather: unavailable" |
 | `btc` / `stonks` / `crypto` | `GET /markets` | "btc: quotes unavailable" |

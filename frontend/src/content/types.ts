@@ -74,9 +74,15 @@ export interface ViewMeta {
   heading: Localised
 }
 
-export interface GameEntry {
+/**
+ * A game on the gaming card. The note is what Steam can't say (a challenge beaten, a
+ * difficulty reached); the hours and achievements are Steam's, fetched by `appId`, so they
+ * are never typed here to drift.
+ */
+export interface FavouriteGame {
+  appId: number
   name: string
-  status: Localised
+  note?: Localised
 }
 
 /** One place a skill is actually used, so the claim can be checked. */

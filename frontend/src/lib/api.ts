@@ -54,10 +54,19 @@ export interface SteamProfile {
   inGame?: string
 }
 
+/** A favourite's receipts (`content/gaming.ts`): its hours, and its achievements if it has any. */
+export interface SteamFavourite {
+  appId: number
+  minutes: number
+  achievements?: { achieved: number; total: number }
+}
+
 export interface SteamActivity {
   configured: boolean
   profile?: SteamProfile
   recentGames?: SteamRecentGame[]
+  /** The favourites asked about that the library holds; absent when it couldn't be read. */
+  favourites?: SteamFavourite[]
 }
 
 export interface GithubCommit {
@@ -692,7 +701,8 @@ export async function* askStream(
 }
 
 export const api = {
-  steamActivity: () => request<SteamActivity>('/steam/activity'),
+  steamActivity: (apps: readonly number[] = []) =>
+    request<SteamActivity>(apps.length ? `/steam/activity?apps=${apps.join(',')}` : '/steam/activity'),
   githubActivity: () => request<GithubActivity>('/github/activity'),
   githubContributions: () => request<GithubContributions>('/github/contributions'),
   githubPinnedRepos: () => request<GithubPinnedRepos>('/github/pinned-repos'),
