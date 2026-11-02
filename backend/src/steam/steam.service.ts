@@ -42,6 +42,15 @@ export function parseApps(raw: unknown): number[] {
 
 type Achievements = NonNullable<SteamFavourite['achievements']>;
 
+/**
+ * Whether one request went to Steam, or waited on a call another request had out, for its
+ * `Server-Timing` (`SteamController`). Per request, so neither a slow call nor a neighbour's
+ * fetch can make it read as the copy served (review of #171).
+ */
+export interface UpstreamTrace {
+  upstream: boolean;
+}
+
 interface ResolveVanityUrlResponse {
   response: { success: number; steamid?: string };
 }
@@ -100,13 +109,21 @@ export class SteamService {
     number,
     { data: Achievements | null; expiresAt: number }
   >();
-  /** When this service last called Steam for anything, for `copyAge()`. */
-  private lastUpstreamAt = 0;
+  // The calls out now: requests that arrive meanwhile share them rather than each asking
+  // Steam again (review of #171).
+  private libraryInFlight: Promise<Map<number, number> | null> | null = null;
+  private readonly achievementsInFlight = new Map<
+    number,
+    Promise<Achievements | null>
+  >();
 
   constructor(private config: ConfigService) {}
 
   /** The live activity, and the receipts of each favourite `apps` names. */
-  async getActivity(apps: readonly number[] = []): Promise<SteamActivity> {
+  async getActivity(
+    apps: readonly number[] = [],
+    trace: UpstreamTrace = { upstream: false },
+  ): Promise<SteamActivity> {
     const apiKey = this.config.get<string>('STEAM_API_KEY');
     const steamId = this.config.get<string>('STEAM_ID');
 
@@ -114,21 +131,22 @@ export class SteamService {
       return { configured: false };
     }
 
-    const activity = await this.activity(apiKey, steamId);
+    const activity = await this.activity(apiKey, steamId, trace);
     if (!activity.configured || !apps.length) return activity;
-    const favourites = await this.favourites(apiKey, steamId, apps);
+    const favourites = await this.favourites(apiKey, steamId, apps, trace);
     return favourites ? { ...activity, favourites } : activity;
   }
 
   private async activity(
     apiKey: string,
     steamId: string,
+    trace: UpstreamTrace,
   ): Promise<SteamActivity> {
     if (this.cache && this.cache.expiresAt > Date.now()) {
       return this.cache.data;
     }
 
-    this.lastUpstreamAt = Date.now();
+    trace.upstream = true;
     try {
       const steamId64 = await this.resolveSteamId64(apiKey, steamId);
       const [profile, recentGames] = await Promise.all([
@@ -158,14 +176,17 @@ export class SteamService {
     apiKey: string,
     steamId: string,
     apps: readonly number[],
+    trace: UpstreamTrace,
   ): Promise<SteamFavourite[] | undefined> {
     try {
       const steamId64 = await this.resolveSteamId64(apiKey, steamId);
-      const library = await this.fetchLibrary(apiKey, steamId64);
+      const library = await this.fetchLibrary(apiKey, steamId64, trace);
       if (!library) return undefined;
       const owned = apps.filter((appId) => library.has(appId));
       const counts = await Promise.all(
-        owned.map((appId) => this.fetchAchievements(apiKey, steamId64, appId)),
+        owned.map((appId) =>
+          this.fetchAchievements(apiKey, steamId64, appId, trace),
+        ),
       );
       return owned.map((appId, i) => ({
         appId,
@@ -184,17 +205,32 @@ export class SteamService {
    * Every owned game's minutes played, by app id. An empty answer is kept only briefly, and
    * logged, since it is most likely game details that aren't public. A failed read is tried
    * again in five minutes, not on every visit: until then the last library read, if any, or
-   * null.
+   * null. One read at a time, whoever asks.
    */
-  private async fetchLibrary(
+  private fetchLibrary(
+    apiKey: string,
+    steamId64: string,
+    trace: UpstreamTrace,
+  ): Promise<Map<number, number> | null> {
+    const now = Date.now();
+    if (this.library && this.library.expiresAt > now) {
+      return Promise.resolve(this.library.data);
+    }
+    if (now - this.libraryFailedAt < CACHE_TTL_MS) {
+      return Promise.resolve(this.library?.data ?? null);
+    }
+    trace.upstream = true;
+    this.libraryInFlight ??= this.readLibrary(apiKey, steamId64).finally(() => {
+      this.libraryInFlight = null;
+    });
+    return this.libraryInFlight;
+  }
+
+  private async readLibrary(
     apiKey: string,
     steamId64: string,
   ): Promise<Map<number, number> | null> {
     const now = Date.now();
-    if (this.library && this.library.expiresAt > now) return this.library.data;
-    if (now - this.libraryFailedAt < CACHE_TTL_MS) {
-      return this.library?.data ?? null;
-    }
     const url = new URL(
       'https://api.steampowered.com/IPlayerService/GetOwnedGames/v1/',
     );
@@ -202,7 +238,6 @@ export class SteamService {
     url.searchParams.set('steamid', steamId64);
     url.searchParams.set('include_played_free_games', '1');
 
-    this.lastUpstreamAt = now;
     let json: OwnedGamesResponse;
     try {
       json = await fetchJson<OwnedGamesResponse>(url);
@@ -237,16 +272,35 @@ export class SteamService {
    * game that keeps none, and a 403 "Profile is not public", since the library's hours ask
    * only for public game details and achievements ask for the profile. That one is logged,
    * being the owner's setting to change. Any other failure is kept for five minutes, so a
-   * blip doesn't hide a count for a day, and none fails the activity beside it.
+   * blip doesn't hide a count for a day, and none fails the activity beside it. One call per
+   * game at a time, whoever asks.
    */
-  private async fetchAchievements(
+  private fetchAchievements(
+    apiKey: string,
+    steamId64: string,
+    appId: number,
+    trace: UpstreamTrace,
+  ): Promise<Achievements | null> {
+    const cached = this.achievementCounts.get(appId);
+    if (cached && cached.expiresAt > Date.now()) {
+      return Promise.resolve(cached.data);
+    }
+    trace.upstream = true;
+    let pending = this.achievementsInFlight.get(appId);
+    if (!pending) {
+      pending = this.readAchievements(apiKey, steamId64, appId).finally(() =>
+        this.achievementsInFlight.delete(appId),
+      );
+      this.achievementsInFlight.set(appId, pending);
+    }
+    return pending;
+  }
+
+  private async readAchievements(
     apiKey: string,
     steamId64: string,
     appId: number,
   ): Promise<Achievements | null> {
-    const cached = this.achievementCounts.get(appId);
-    if (cached && cached.expiresAt > Date.now()) return cached.data;
-
     let data: Achievements | null = null;
     let ttl = CACHE_TTL_MS;
     try {
@@ -256,7 +310,6 @@ export class SteamService {
       url.searchParams.set('key', apiKey);
       url.searchParams.set('steamid', steamId64);
       url.searchParams.set('appid', String(appId));
-      this.lastUpstreamAt = Date.now();
       const res = await fetch(url, {
         signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
       });
@@ -359,16 +412,6 @@ export class SteamService {
       playtime2Weeks: g.playtime_2weeks ?? 0,
       playtimeForever: g.playtime_forever ?? 0,
     }));
-  }
-
-  /**
-   * How old the copy a request was answered from is, for `Server-Timing`: the activity's
-   * age, or less when a favourite's hours or achievements went to Steam since, so a
-   * request that fetched one reads as a miss (`timedCopy`). Null with nothing cached.
-   */
-  copyAge(now = Date.now()): number | null {
-    const age = cacheAge(this.cache, CACHE_TTL_MS, now);
-    return age === null ? null : Math.min(age, now - this.lastUpstreamAt);
   }
 
   /** Configured or not, and how old the cached profile is — nothing is fetched. */

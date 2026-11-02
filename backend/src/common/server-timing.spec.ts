@@ -122,8 +122,6 @@ describe('server timing (HTTP)', () => {
     };
     const service = {
       health: () => ({ unit: 'unit', state: 'active', cacheAge: state.age }),
-      // Steam's: the activity's age, younger once a favourite went to Steam.
-      copyAge: () => state.age,
       cacheAges: () => ({
         activity: state.age,
         contributions: state.age,

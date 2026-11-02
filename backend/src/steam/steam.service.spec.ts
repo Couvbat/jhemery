@@ -1,5 +1,7 @@
 import { Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import type { Response } from 'express';
+import { SteamController } from './steam.controller';
 import { MAX_FAVOURITES, parseApps, SteamService } from './steam.service';
 
 /**
@@ -19,10 +21,8 @@ describe('SteamService', () => {
   let now: number;
   let warn: jest.SpyInstance;
   /** Steam's answers by method, each `{ status, body }`; the method is the URL's second segment. */
-  let answers: Record<
-    string,
-    (url: URL) => { status?: number; body?: unknown }
-  >;
+  type Answer = { status?: number; body?: unknown };
+  let answers: Record<string, (url: URL) => Answer | Promise<Answer>>;
 
   const service = () =>
     new SteamService({
@@ -88,15 +88,15 @@ describe('SteamService', () => {
         return { status: 503 };
       },
     };
-    fetchMock = jest.fn((input: URL) => {
+    fetchMock = jest.fn(async (input: URL) => {
       const url = new URL(String(input));
       const { status = 200, body = {} } =
-        answers[url.pathname.split('/')[2]](url);
-      return Promise.resolve({
+        await answers[url.pathname.split('/')[2]](url);
+      return {
         ok: status >= 200 && status < 300,
         status,
         json: () => Promise.resolve(body),
-      });
+      };
     });
     global.fetch = fetchMock;
   });
@@ -260,20 +260,50 @@ describe('SteamService', () => {
     }
   });
 
-  // Found in review: Server-Timing read the activity's cache alone, so a request that
-  // fetched a favourite's hours from Steam said it served a copy.
-  it('reads younger once a favourite has gone to Steam, so the request reads as a miss', async () => {
+  // Review of #171: the age a request read off the last call's start let a slow lookup,
+  // one second after another call, read as the copy served. The trace says it went.
+  it('tells Server-Timing a request went to Steam, however long Steam took', async () => {
     const steam = service();
-    await steam.getActivity();
-    now += 3 * 60_000;
-    const before = steam.copyAge(now)!;
-    expect(before).toBe(3 * 60_000);
+    const controller = new SteamController(steam);
+    const headers: Record<string, string> = {};
+    const res = {
+      setHeader: (name: string, value: string) => (headers[name] = value),
+    } as unknown as Response;
     await steam.getActivity([ISAAC]);
-    expect(steam.copyAge(now)!).toBeLessThan(before);
-    now += 60_000;
-    // Served from the copies now: older than before, so a hit.
-    const settled = steam.copyAge(now)!;
-    await steam.getActivity([ISAAC]);
-    expect(steam.copyAge(now)).toBe(settled);
+    now += 1000;
+    const answer = answers.GetPlayerAchievements;
+    answers.GetPlayerAchievements = (url) => {
+      now += 2000;
+      return answer(url);
+    };
+    await controller.getActivity(`${ISAAC},${FACTORIO}`, res);
+    expect(headers['Server-Timing']).toMatch(
+      /^cache;desc="miss", upstream;dur=/,
+    );
+    // Nothing left to fetch: the copy, three seconds old.
+    await controller.getActivity(`${ISAAC},${FACTORIO}`, res);
+    expect(headers['Server-Timing']).toBe('cache;desc="hit", age;dur=3000');
+  });
+
+  // Review of #171: requests that overlapped on a cold cache each asked Steam again.
+  it('shares one call among requests that overlap, the library’s and each game’s', async () => {
+    let release!: () => void;
+    const held = new Promise<void>((resolve) => (release = resolve));
+    const owned = answers.GetOwnedGames;
+    answers.GetOwnedGames = async (url) => {
+      await held;
+      return owned(url);
+    };
+    const steam = service();
+    const both = Promise.all([
+      steam.getActivity([ISAAC, FACTORIO]),
+      steam.getActivity([ISAAC, FACTORIO]),
+    ]);
+    await new Promise((resolve) => setImmediate(resolve));
+    release();
+    const [first, second] = await both;
+    expect(second.favourites).toEqual(first.favourites);
+    expect(calls('GetOwnedGames')).toHaveLength(1);
+    expect(calls('GetPlayerAchievements')).toHaveLength(2);
   });
 });
