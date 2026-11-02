@@ -35,13 +35,6 @@
 [2mRAM    →  16 GB DDR3 1333 MHz (4×4 GB)[0m
 [2mSSD    →  Crucial M500 480 GB[0m
 
-[38;5;46mazazel@nas — TrueNAS CE[0m
-[2mMotherboard  →  Z97 MPOWER MAX AC[0m
-[2mCPU          →  Intel i7-4770K (3.5 GHz)[0m
-[2mGPU          →  GeForce GTX 1060 3G[0m
-[2mRAM          →  16 GB DDR3 1866 MHz (2×8 GB)[0m
-[2mSSD          →  Crucial M500 480 GB[0m
-
 [2mlive: /lab[0m
 
 [2mcurl jhemery.xyz/help for the other pages · live in a browser: https://jhemery.xyz/?run=hardware[0m

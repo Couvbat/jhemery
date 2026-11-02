@@ -1,7 +1,7 @@
 import type { Localised } from '@/content/types'
 import { api, ApiError, openEventSource, roomEventsPath, type RoomSnapshot } from '@/lib/api'
 import { normaliseCode } from '@/rooms/sync'
-import { blank, line, segmented } from '../../format'
+import { blank, fail, line, segmented } from '../../format'
 import * as c4 from '../../games/connect4'
 import { abortError } from '../../timing'
 import type { Command, CommandContext, OutputLine, OutputSegment, Tone } from '../../types'
@@ -178,7 +178,7 @@ export const command: Command = {
         if (asked) {
           const normalised = normaliseCode(asked)
           if (!normalised) {
-            ctx.print(line(t(T.badCode), 'error'))
+            ctx.print(fail(t(T.badCode)))
             return
           }
           const joined = await api.joinRoom(normalised)
@@ -192,7 +192,7 @@ export const command: Command = {
           snapshot = created
         }
       } catch (error) {
-        ctx.print(line(t(explain(error)), 'error'))
+        ctx.print(fail(t(explain(error))))
         return
       }
 

@@ -296,7 +296,7 @@ export const toolCommands: Command[] = [
       // Before the first `await`, while the keystroke that ran this is still the event
       // being handled: see `openAudioContext`.
       const context = openAudioContext()
-      if (!context) return [line(`acid: ${t(ACID.noAudio)}`, 'error')]
+      if (!context) return [fail(`acid: ${t(ACID.noAudio)}`)]
 
       let engine: AcidEngine | undefined
       let release: (() => void) | undefined
@@ -310,7 +310,7 @@ export const toolCommands: Command[] = [
         if (ctx.signal.aborted) throw abortError()
         const code = ctx.args[0]
         const pattern = code ? acid.decode(code) : acid.DEFAULT_PATTERN
-        if (!pattern) return [line(`acid: ${code!.slice(0, 40)}: ${t(ACID.badCode)}`, 'error')]
+        if (!pattern) return [fail(`acid: ${code!.slice(0, 40)}: ${t(ACID.badCode)}`)]
 
         // Held for the whole run, as a game holds it: the output's live region goes quiet
         // while the playhead redraws, and nothing typed lands at the prompt meanwhile.

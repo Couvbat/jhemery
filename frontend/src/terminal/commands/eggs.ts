@@ -15,7 +15,7 @@ import { api, ApiError } from '@/lib/api'
 import { announce, unlock } from '../achievements'
 import { COW, TRAIN } from '../ascii'
 import { bannerLines, BANNER_MAX_CHARS } from '../ascii-banner'
-import { art, blank, line, link, pre } from '../format'
+import { art, blank, fail, line, link, pre } from '../format'
 import { labHosts, labLogin, labShell } from '../lab-shell'
 import { sleep } from '../timing'
 import type { Command, CommandContext, OutputLine } from '../types'
@@ -23,10 +23,10 @@ import { cacheHeldEntries, filenameFor, forgetGuestbookFile, resolveGuestbookFil
 import { ENV_FILE } from './env-file'
 import { listFiles, resolveFileLines } from './files'
 
-/** The registration record `whois` invents for this domain. */
 /** The target `/etc/shadow` names, ROT13'd there as `tvofba`. */
 const GIBSON = 'gibson'
 
+/** The registration record `whois` invents for this domain. */
 const WHOIS_RECORD: Array<[string, string]> = [
   ['Domain Name', profile.domain.toUpperCase()],
   ['Registry Domain ID', '1337-COUVBAT'],
@@ -102,12 +102,12 @@ async function elevate(ctx: CommandContext): Promise<OutputLine[]> {
     return [line(`root@${profile.host}:~# already root — sudo -k drops it`, 'muted')]
   }
   const password = await ctx.prompt('[sudo] password for visitor:', { mask: true })
-  if (!password) return [line('sudo: no password entered', 'error')]
+  if (!password) return [fail('sudo: no password entered')]
 
   const result = await unlockAdmin(password)
-  if (result === 'wrong') return [line('Sorry, try again.', 'error')]
+  if (result === 'wrong') return [fail('Sorry, try again.')]
   if (result === 'unreachable') {
-    return [line('sudo: unable to reach the API to check that', 'error')]
+    return [fail('sudo: unable to reach the API to check that')]
   }
   return [
     line(`root@${profile.host}:~#`, 'success'),
@@ -129,11 +129,11 @@ async function removeGuestbookEntry(
   // A held entry too, by the `held/<file>` name `sudo guestbook held` gave it.
   const entry = resolveGuestbookFile(target) ?? resolveHeldFile(target)
   if (!entry) {
-    return [line(`rm: cannot remove '${target}': No such file or directory`, 'error')]
+    return [fail(`rm: cannot remove '${target}': No such file or directory`)]
   }
 
   const password = await ctx.prompt('[sudo] password for visitor:', { mask: true })
-  if (!password) return [line('sudo: no password entered', 'error')]
+  if (!password) return [fail('sudo: no password entered')]
 
   try {
     await api.deleteGuestbookEntry(entry.id, password)
@@ -141,12 +141,12 @@ async function removeGuestbookEntry(
     return [line(`removed guestbook/${target}`, 'success')]
   } catch (error) {
     if (error instanceof ApiError && error.status === 403) {
-      return [line('sudo: incorrect password', 'error')]
+      return [fail('sudo: incorrect password')]
     }
     if (error instanceof ApiError && error.status === 404) {
-      return [line(`rm: cannot remove '${target}': No such file or directory`, 'error')]
+      return [fail(`rm: cannot remove '${target}': No such file or directory`)]
     }
-    return [line('rm: request failed', 'error')]
+    return [fail('rm: request failed')]
   }
 }
 
@@ -157,13 +157,13 @@ async function removeGuestbookEntry(
  */
 async function listHeld(ctx: CommandContext): Promise<OutputLine[]> {
   const password = await ctx.prompt('[sudo] password for visitor:', { mask: true })
-  if (!password) return [line('sudo: no password entered', 'error')]
+  if (!password) return [fail('sudo: no password entered')]
   let entries: Awaited<ReturnType<typeof api.heldGuestbook>>
   try {
     entries = await api.heldGuestbook(password)
   } catch (error) {
-    if (error instanceof ApiError && error.status === 403) return [line('sudo: incorrect password', 'error')]
-    return [line('guestbook: request failed', 'error')]
+    if (error instanceof ApiError && error.status === 403) return [fail('sudo: incorrect password')]
+    return [fail('guestbook: request failed')]
   }
   cacheHeldEntries(entries)
   if (!entries.length) return [line('nothing held, nothing waiting.', 'muted')]
@@ -182,17 +182,17 @@ async function listHeld(ctx: CommandContext): Promise<OutputLine[]> {
 /** `sudo approve <file>`: up, whatever the model said. */
 async function approveHeld(ctx: CommandContext, target: string): Promise<OutputLine[]> {
   const entry = resolveHeldFile(target)
-  if (!entry) return [line(`approve: ${target}: no such held entry — \`sudo guestbook held\` lists them`, 'error')]
+  if (!entry) return [fail(`approve: ${target}: no such held entry — \`sudo guestbook held\` lists them`)]
   const password = await ctx.prompt('[sudo] password for visitor:', { mask: true })
-  if (!password) return [line('sudo: no password entered', 'error')]
+  if (!password) return [fail('sudo: no password entered')]
   try {
     await api.approveGuestbookEntry(entry.id, password)
     forgetGuestbookFile(target)
     return [line(`published held/${filenameFor(entry)}`, 'success')]
   } catch (error) {
-    if (error instanceof ApiError && error.status === 403) return [line('sudo: incorrect password', 'error')]
-    if (error instanceof ApiError && error.status === 404) return [line(`approve: ${target}: already gone or already up`, 'error')]
-    return [line('approve: request failed', 'error')]
+    if (error instanceof ApiError && error.status === 403) return [fail('sudo: incorrect password')]
+    if (error instanceof ApiError && error.status === 404) return [fail(`approve: ${target}: already gone or already up`)]
+    return [fail('approve: request failed')]
   }
 }
 
@@ -298,7 +298,7 @@ export const eggCommands: Command[] = [
     async run(ctx) {
       const target = ctx.args[0]
       if (!target) {
-        return [line('usage: ssh [user@]hostname', 'error')]
+        return [fail('usage: ssh [user@]hostname')]
       }
 
       // The lab's machines answer to their own names, with a shell of their own.
@@ -307,7 +307,7 @@ export const eggCommands: Command[] = [
 
       const [user, host] = target.includes('@') ? target.split('@') : [profile.handle, target]
       if (host !== profile.domain && host !== 'localhost') {
-        return [line(`ssh: Could not resolve hostname ${host}: Name or service not known`, 'error')]
+        return [fail(`ssh: Could not resolve hostname ${host}: Name or service not known`)]
       }
 
       // The contact section's own prompt is `ssh contact@jhemery.xyz`, so typing it
@@ -320,7 +320,7 @@ export const eggCommands: Command[] = [
 
       if (user !== profile.handle && user !== 'root') {
         return [
-          line(`${user}@${host}: Permission denied (publickey).`, 'error'),
+          fail(`${user}@${host}: Permission denied (publickey).`),
           line(`hint: there is exactly one account here, and it is \`${profile.handle}\`.`, 'muted'),
         ]
       }
@@ -357,7 +357,7 @@ export const eggCommands: Command[] = [
 
       if (!known.includes(query)) {
         return [
-          line(`No match for "${query.toUpperCase()}".`, 'error'),
+          fail(`No match for "${query.toUpperCase()}".`),
           blank,
           line('>>> this registry only knows about one domain, and you are on it.', 'muted'),
         ]
@@ -407,7 +407,7 @@ export const eggCommands: Command[] = [
 
       const lines = resolveFileLines(file, ctx.t)
       if (!lines) {
-        return [line(`vim: ${file}: No such file or directory`, 'error')]
+        return [fail(`vim: ${file}: No such file or directory`)]
       }
       // The vim pane hides the scrollback, so this one goes out as a floating
       // toast rather than as output lines nobody would see.
@@ -443,7 +443,7 @@ export const eggCommands: Command[] = [
         if (effects.vimIsDirty()) {
           const message = 'E37: No write since last change (add ! to override)'
           effects.vimMessage(message)
-          return [line(message, 'error')]
+          return [fail(message)]
         }
         effects.vim(false)
         return [line('you are free. that was the hard part.', 'success'), ...announce('vim', t)]
@@ -457,7 +457,7 @@ export const eggCommands: Command[] = [
       const message = "E45: 'readonly' option is set (add ! to override)"
       effects.vimMessage(`${message} — try :q to quit without writing`)
       return [
-        line(message, 'error'),
+        fail(message),
         line('hint: try `:q` to quit without writing.', 'muted'),
       ]
     },
@@ -616,10 +616,10 @@ export const eggCommands: Command[] = [
     hidden: true,
     run({ args, t }) {
       const text = args.join(' ')
-      if (!text.trim()) return [line('banner: missing operand', 'error')]
+      if (!text.trim()) return [fail('banner: missing operand')]
 
       const rendered = bannerLines(text)
-      if (!rendered.length) return [line('banner: nothing to print', 'error')]
+      if (!rendered.length) return [fail('banner: nothing to print')]
 
       return [
         ...rendered.map((row) => pre(row, 'primary')),
@@ -641,7 +641,7 @@ export const eggCommands: Command[] = [
     run({ args, t }) {
       const [requested] = args
       if (requested && requested !== 'on' && requested !== 'off') {
-        return [line(`gravity: expected \`on\` or \`off\`, got \`${requested}\``, 'error')]
+        return [fail(`gravity: expected \`on\` or \`off\`, got \`${requested}\``)]
       }
 
       const on = setGravity(requested ? requested === 'on' : undefined)
@@ -662,7 +662,7 @@ export const eggCommands: Command[] = [
     run({ args }) {
       const requested = args[0] ? Number(args[0]) : 1
       if (!Number.isFinite(requested) || !Number.isInteger(requested)) {
-        return [line(`spawn: \`${args[0]}\` is not a whole number`, 'error')]
+        return [fail(`spawn: \`${args[0]}\` is not a whole number`)]
       }
 
       const before = useSceneControl().shapeCount.value
@@ -692,7 +692,7 @@ export const eggCommands: Command[] = [
     run({ args, t }) {
       const [requested] = args
       if (requested && requested !== 'on' && requested !== 'off') {
-        return [line(`constellation: expected \`on\` or \`off\`, got \`${requested}\``, 'error')]
+        return [fail(`constellation: expected \`on\` or \`off\`, got \`${requested}\``)]
       }
 
       const on = setConstellation(requested ? requested === 'on' : undefined)
@@ -707,7 +707,8 @@ export const eggCommands: Command[] = [
     usage: 'scene [reset|music on|music off]',
     description: { en: 'Inspect or reset the background', fr: 'Inspecter ou réinitialiser le fond' },
     group: 'fun',
-    writes: (args) => (args[0]?.toLowerCase() === 'reset' ? 'local' : 'none'),
+    // Listing reads; `reset` and `music on|off` change the scene, as `gravity off` does.
+    writes: (args) => (args.length ? 'local' : 'none'),
     hidden: true,
     complete: ({ index, args }) => (index === 0 ? ['reset', 'music'] : index === 1 && args[0] === 'music' ? ['on', 'off'] : []),
     run({ args }) {
@@ -722,7 +723,7 @@ export const eggCommands: Command[] = [
         const on = setMusicReaction(args[1] === undefined ? undefined : args[1] === 'on')
         return [line(on ? 'the field listens to the music.' : 'the field ignores the music.', 'success')]
       }
-      if (args.length) return [line(`scene: unknown argument \`${args[0]}\``, 'error')]
+      if (args.length) return [fail(`scene: unknown argument \`${args[0]}\``)]
 
       return [
         pre(`shapes         ${control.shapeCount.value}`, 'primary'),

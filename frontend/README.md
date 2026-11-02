@@ -87,11 +87,11 @@ it up.
 terminal/
   types.ts        Command, CommandContext, OutputLine, vim types
   registry.ts     name/alias lookup, tab completion, "did you mean" suggestions
-  commands/       core · theme · navigate · content · live · ask · eggs · system · systemctl ·
-                  tools · ctf · games/
+  commands/       every command, one module per group (core, content, live, eggs, system…)
+  lab-shell/      the simulated shell `ssh poseidon` opens
   games/          pure state for the eight games, word lists, key stream, local high scores
                   and the daily wordle's saved board
-  achievements.ts the 38 achievements, the localStorage store, toasts
+  achievements.ts every achievement, the localStorage store, toasts
   ctf.ts          the CTF stages: hashes and hints, never a flag
   diff.ts         the line diff shared by the `diff` command and the diff tool
   vimEditor.ts    pure state machine for the vim pane

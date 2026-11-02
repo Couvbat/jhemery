@@ -51,8 +51,8 @@ export class AskController {
    * with a body, so `EventSource` is out on the client side too.
    */
   @Post()
-  // Five questions is a generous visit. The contact form's 3-per-10-minutes
-  // window is the wrong shape for something that spends a GPU's time.
+  // Five questions an hour is a generous visit. The contact form's two an hour
+  // is the wrong shape for something people ask in a burst.
   @RateLimit({ limit: 5, windowMs: 60 * 60_000 })
   async question(@Body() dto: AskDto, @Res() res: Response): Promise<void> {
     // Set once the response is finished, by whichever of the three endings gets

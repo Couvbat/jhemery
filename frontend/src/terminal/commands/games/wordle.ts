@@ -1,7 +1,7 @@
 import type { Localised } from '@/content/types'
 import { api, type WordleHistogram } from '@/lib/api'
 import { copyText } from '@/tools/clipboard'
-import { blank, line, segmented } from '../../format'
+import { blank, fail, line, segmented } from '../../format'
 import { keyStream } from '../../games/input'
 import { dailyResult, recordDaily, type DailyResult } from '../../games/scores'
 import * as wordle from '../../games/wordle'
@@ -334,7 +334,7 @@ async function share(ctx: CommandContext): Promise<OutputLine[]> {
   if (!saved?.done) return [line(ctx.t(SHARE_NONE), 'muted')]
 
   const copied = await copyText(wordle.shareText({ ...saved, locale: ctx.locale }))
-  return [line(ctx.t(copied ? SHARED : NO_CLIPBOARD), copied ? 'success' : 'error')]
+  return [copied ? line(ctx.t(SHARED), 'success') : fail(ctx.t(NO_CLIPBOARD))]
 }
 
 export const command: Command = {
@@ -351,6 +351,6 @@ export const command: Command = {
     if (!mode) return freePlay(ctx)
     if (mode === 'daily') return daily(ctx)
     if (mode === 'share') return share(ctx)
-    return [line(ctx.t(USAGE), 'error')]
+    return [fail(ctx.t(USAGE))]
   },
 }

@@ -29,6 +29,7 @@ import { fetchSite, type SiteResponse } from '@/lib/api'
 import { REPO } from '@/lib/source'
 import { eventEnd, eventStart, feedFile, isLive, upcomingEvents } from '@/content/upcoming'
 import { seasonRows } from '@/content/fortunes'
+import { pagePaths } from '@/content/site'
 import { relative } from '@/tools/time/time'
 import { parseSgr } from '../ansi'
 import { MARK } from '../ascii'
@@ -43,14 +44,22 @@ import { swatches } from './theme'
  * What a real terminal gets for this path: `/neofetch` is the curl page
  * `/run/<locale>/neofetch.txt` there, which `.htaccess` hands to curl by its user agent,
  * a header a page's `fetch` can't set. So a one-word path tries that page first, in the
- * reader's language, and falls back to the path itself (whose answer is then the app's
- * `index.html`, as a browser would get).
+ * reader's language. A one-word name with no page of any kind is the 404 `.htaccess`
+ * gives curl, with `run/<locale>/_404.txt`; any other path is fetched as it is (a page's
+ * own copy of `index.html`, as a browser would get).
  */
 async function fetchCurlPath(path: string, method: 'GET' | 'HEAD', locale: string, signal: AbortSignal): Promise<SiteResponse> {
-  const page = /^\/([a-z0-9-]+)\/?$/.exec(path)?.[1]
+  // Apache reads the path alone, and in its case: `/neofetc?lang=fr` is the name `neofetc`,
+  // and `/Lab` none of these, so it reaches the app (review of #170).
+  const page = /^\/([a-z0-9-]+)\/?$/.exec(path.split('?')[0]!)?.[1]
   if (page) {
     const run = await fetchSite(`/run/${locale}/${page}.txt`, method, { signal })
     if (run.status === 200 && (run.headers.get('content-type') ?? '').startsWith('text/plain')) return run
+    // `/notes` has a rewrite of its own, and every other one-word page a copy.
+    if (page !== 'notes' && !pagePaths.includes(`/${page}`)) {
+      const missing = await fetchSite(`/run/${locale}/_404.txt`, method, { signal })
+      return { ...missing, status: 404, statusText: 'Not Found' }
+    }
   }
   return fetchSite(path, method, { signal })
 }
@@ -322,7 +331,7 @@ export const contentCommands: Command[] = [
         [`${profile.handle}@${profile.host}`, ''],
         ['OS', 'Portfolio 1.0 (Vue 3 / Vite)'],
         ['Host', profile.domain],
-        ['Kernel', 'NestJS 11'],
+        ['Kernel', 'NestJS 12'],
         ['Uptime', uptime()],
         ['Shell', 'couvsh 1.0'],
         ['DE', 'TailwindCSS 4'],

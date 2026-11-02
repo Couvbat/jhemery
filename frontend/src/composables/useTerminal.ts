@@ -857,9 +857,9 @@ export function completeInput(value: string, caret: number = value.length): Comp
 }
 
 /** Called by `TerminalOverlay` every time it opens — shows the welcome message
- *  on the very first-ever open (buffer stays non-empty forever after, so it
- *  never repeats), and runs whatever command the light `openTerminal()` queued
- *  up for us, if any. */
+ *  whenever the buffer is empty (the first open of each page load, and after
+ *  `clear`, since the buffer isn't persisted), and runs whatever command the
+ *  light `openTerminal()` queued up for us, if any. */
 export function primeOverlay() {
   // Once per session, here rather than in `run()`: a per-command ping would be
   // chatter, and it would mean the server learning which commands people run —

@@ -1,3 +1,5 @@
+import { existsSync } from 'node:fs'
+import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
 import { resolvePath } from '@/composables/useViewSwing'
 import {
@@ -19,6 +21,9 @@ import {
   yearSpan,
 } from '..'
 
+const repo = join(process.cwd(), '..')
+const TREE = /^https:\/\/github\.com\/Couvbat\/jhemery\/tree\/master(?:\/(.*))?$/
+
 describe('skills', () => {
   it('names each skill once', () => {
     expect(new Set(skillNames).size).toBe(skills.length)
@@ -30,7 +35,9 @@ describe('skills', () => {
     '%s → %s goes somewhere real',
     (_name, where) => {
       if (isExternal(where)) {
-        expect(where).toMatch(/^https:\/\/github\.com\/Couvbat\/jhemery(\/|$)/)
+        const path = TREE.exec(where)
+        expect(path, where).not.toBeNull()
+        expect(existsSync(join(repo, path![1] ?? '')), where).toBe(true)
       } else {
         expect(resolvePath(where), where).toBeDefined()
       }

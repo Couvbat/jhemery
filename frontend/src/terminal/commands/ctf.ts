@@ -11,7 +11,7 @@ import {
   type Stage,
   type Verdict,
 } from '../ctf'
-import { blank, line, pre, segmented } from '../format'
+import { blank, fail, line, pre, segmented } from '../format'
 import type { Command, CommandContext, OutputLine } from '../types'
 
 const m = messages.ctf
@@ -26,7 +26,7 @@ const numberOf = (stage: Stage) => stages.indexOf(stage) + 1
 function report(verdict: Verdict, t: CommandContext['t']): OutputLine[] {
   switch (verdict.kind) {
     case 'malformed':
-      return [line(t(m.malformed), 'error')]
+      return [fail(t(m.malformed))]
     case 'already':
       return [line(fill(t(m.already), { n: numberOf(verdict.stage) }), 'muted')]
     case 'order':
@@ -35,7 +35,7 @@ function report(verdict: Verdict, t: CommandContext['t']): OutputLine[] {
         line(`${t(m.hint)}: ${t(hintFor(verdict.current))}`, 'muted'),
       ]
     case 'wrong': {
-      const out = [line(t(m.wrong), 'error')]
+      const out = [fail(t(m.wrong))]
       // The ladder: a sharper hint after three misses, and again after six.
       if (verdict.current && (verdict.misses === 3 || verdict.misses === 6)) {
         out.push(line(t(m.nudge), 'muted'), line(`  ${t(hintFor(verdict.current))}`, 'accent'))
@@ -107,7 +107,7 @@ export const ctfCommands: Command[] = [
     writes: 'local',
     hidden: true,
     async run({ args, t }) {
-      if (!args[0]) return [line(t(m.usage), 'error')]
+      if (!args[0]) return [fail(t(m.usage))]
       return report(await submitFlag(args.join('')), t)
     },
   },
@@ -119,10 +119,10 @@ export const ctfCommands: Command[] = [
     hidden: true,
     async run({ t, locale }) {
       const result = await decryptFinale()
-      if (result.kind === 'corrupt') return [line(t(m.corrupt), 'error')]
+      if (result.kind === 'corrupt') return [fail(t(m.corrupt))]
       if (result.kind === 'missing') {
         return [
-          line(fill(t(m.missing), { n: 7 - result.missing.length }), 'error'),
+          fail(fill(t(m.missing), { n: 7 - result.missing.length })),
           line(`  ${t(m.missingStages)} ${result.missing.map(numberOf).join(', ')}`, 'muted'),
         ]
       }

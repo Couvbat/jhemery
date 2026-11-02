@@ -256,6 +256,7 @@ describe('what a command writes', () => {
     ['jq', ['.', '{}'], 'local'],
     ['clear', [], 'local'],
     ['scene', ['reset'], 'local'],
+    ['scene', ['music', 'off'], 'local'],
     ['hack', ['mainframe'], 'local'],
     ['rm', ['-rf', '~'], 'local'],
     // strace writes whatever it traces writes.
